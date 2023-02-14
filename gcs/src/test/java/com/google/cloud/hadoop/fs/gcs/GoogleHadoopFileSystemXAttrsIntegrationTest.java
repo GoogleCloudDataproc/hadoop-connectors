@@ -21,9 +21,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.MethodOutcome;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -33,35 +35,66 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public final class GoogleHadoopFileSystemXAttrsIntegrationTest extends HadoopFileSystemTestBase {
+public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
+
+  private FileSystem ghfs;
+
+  private HadoopFileSystemIntegrationHelper ghfsHelper;
+
+  private GoogleCloudStorageFileSystemIntegrationHelper gcsiHelper;
+
+  private final TestBucketHelper bucketHelper =
+      new TestBucketHelper(GoogleCloudStorageIntegrationHelper.TEST_BUCKET_NAME_PREFIX);
+
+  private String bucketName;
 
   @Before
   public void before() throws Exception {
 
-    GoogleHadoopFileSystem testInstance = new GoogleHadoopFileSystem();
-    ghfs = testInstance;
+    ghfs = new GoogleHadoopFileSystem();
 
-    // loadConfig needs ghfsHelper, which is normally created in
-    // postCreateInit. Create one here for it to use.
-    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
-
-    URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
+    URI initUri = new URI("gs://" + bucketHelper.getUniqueBucketName("init"));
     ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig());
 
-    if (GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE.get(
-        ghfs.getConf(), ghfs.getConf()::getBoolean)) {
-      testInstance.getGcsFs();
-    }
+    gcsiHelper =
+        new GoogleCloudStorageFileSystemIntegrationHelper(
+            ((GoogleHadoopFileSystem) ghfs).getGcsFs());
+    ghfs.mkdirs(new Path(ghfs.getUri()));
 
-    postCreateInit();
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
+    gcsiHelper.beforeAllTests();
+    bucketName = gcsiHelper.sharedBucketName1;
+  }
+
+  @After
+  public void after() throws IOException {
+    if (ghfs != null) {
+      if (gcsiHelper != null) {
+        gcsiHelper.afterAllTests();
+        gcsiHelper = null;
+      }
+      try {
+        ghfs.close();
+      } catch (IOException e) {
+        throw new RuntimeException("Unexpected exception", e);
+      }
+      ghfs = null;
+    }
+  }
+
+  public URI getTempFilePath() {
+    return gcsiHelper.getPath(bucketName, "file-" + UUID.randomUUID());
   }
 
   @Test
@@ -275,21 +308,6 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest extends HadoopFil
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, true)).isTrue();
-  }
-
-  @Test
-  @Override
-  public void testRename() throws Exception {
-    renameHelper(
-        new HdfsBehavior() {
-          /**
-           * Returns the MethodOutcome of trying to rename an existing file into the root directory.
-           */
-          @Override
-          public MethodOutcome renameFileIntoRootOutcome() {
-            return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
-          }
-        });
   }
 
   private static Map<String, String> toStringValuesMap(Map<String, byte[]> map) {

@@ -84,12 +84,6 @@ public class HadoopFileSystemIntegrationTest extends HadoopFileSystemTestBase {
     ghfsHelper.setIgnoreStatistics(); // Multi-threaded code screws us up.
   }
 
-  /** Perform initialization after creating test instances. */
-  @Override
-  public void postCreateInit() throws IOException {
-    super.postCreateInit();
-  }
-
   // -----------------------------------------------------------------
   // Tests that exercise behavior defined in HdfsBehavior.
   // -----------------------------------------------------------------

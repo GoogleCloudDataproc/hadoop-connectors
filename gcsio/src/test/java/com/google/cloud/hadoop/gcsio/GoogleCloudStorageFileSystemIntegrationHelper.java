@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import java.io.IOException;
@@ -44,10 +43,6 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
             .setBucketDeleteEnabled(true)
             .setCloudStorageOptions(gcsOptions)
             .build());
-  }
-
-  public static ClientType getClientType(boolean testStorageClient) {
-    return testStorageClient ? ClientType.STORAGE_CLIENT : ClientType.HTTP_API_CLIENT;
   }
 
   public static GoogleCloudStorageFileSystemIntegrationHelper create() throws IOException {
@@ -183,7 +178,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
   // -----------------------------------------------------------------
 
   /** Helper to construct a path. */
-  protected URI getPath(String bucketName, String objectName) {
+  public URI getPath(String bucketName, String objectName) {
     return UriPaths.fromStringPathComponents(
         bucketName, objectName, /* allowEmptyObjectName= */ true);
   }

@@ -75,8 +75,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // created after the test started.
   protected Instant testStartTime;
 
-  public String sharedBucketName1;
-  public String sharedBucketName2;
+  protected String sharedBucketName1;
+  protected String sharedBucketName2;
 
   // Name of the test object.
   protected String objectName = "gcsio-test.txt";
@@ -172,12 +172,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       Instant expectedFileModificationTime = Instant.now().plusMillis(1000L);
       // Use modification time instead of creation time - by default creation time
       // not fetched because it's not exposed in HCFS FileSystem interface.
+
       Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
 
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
-          .that(fileModificationTime)
-          .isAtLeast(Instant.ofEpochMilli(testStartTime.toEpochMilli()));
+          .that(fileModificationTime.toEpochMilli())
+          .isAtLeast(testStartTime.toEpochMilli());
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
           .that(fileModificationTime)

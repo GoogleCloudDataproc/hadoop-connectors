@@ -86,7 +86,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -118,18 +117,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     }
 
     super.postCreateInit();
-  }
-
-  @After
-  public void after() throws IOException {
-    if (gcs != null) {
-      gcsiHelper.afterAllTests();
-      gcsiHelper = null;
-    }
-    if (gcsfs != null) {
-      gcsfs.close();
-      gcsfs = null;
-    }
   }
 
   @Before
@@ -1057,7 +1044,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     createFile(new Path("/directory1/subdirectory2/file1"), data);
     createFile(new Path("/directory1/subdirectory2/file2"), data);
 
-    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/directory1*"));
+    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
     assertThat(stream(rootDirectories).map(d -> d.getPath().getName()).collect(toImmutableList()))
         .containsExactly("directory1");
 
@@ -1477,7 +1464,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
     createFile(new Path("/directory1/subdirectory1/file1"), "data".getBytes(UTF_8));
 
-    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/directory1*"));
+    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
     List<String> rootDirs =
         stream(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
 
