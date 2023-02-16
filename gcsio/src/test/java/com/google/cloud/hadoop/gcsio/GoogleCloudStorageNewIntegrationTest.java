@@ -799,7 +799,7 @@ public class GoogleCloudStorageNewIntegrationTest {
   public void listObjectInfo_allMetadataFieldsCorrect() throws Exception {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
-    String testDirName = name.getMethodName() + "/";
+    String testDirName = getMethodName() + "/";
     StorageResourceId objectId =
         new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object");
 
@@ -833,7 +833,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
     StorageResourceId objectId =
-        new StorageResourceId(gcsfsIHelper.sharedBucketName1, name.getMethodName());
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, getMethodName());
 
     // Create gzipped file so Content-Encoding will be not null
     CreateObjectOptions createOptions =
@@ -1350,7 +1350,11 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   private String getTestResource() {
-    return name.getMethodName() + "_" + UUID.randomUUID();
+    return getMethodName() + "_" + UUID.randomUUID();
+  }
+
+  private String getMethodName() {
+    return name.getMethodName().replace('[', '-').replace(']', '-');
   }
 
   @FunctionalInterface
