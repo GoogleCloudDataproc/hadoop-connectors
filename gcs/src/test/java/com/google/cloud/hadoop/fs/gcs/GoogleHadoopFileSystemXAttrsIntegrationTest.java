@@ -19,9 +19,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -31,11 +33,12 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.XAttrSetFlag;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -43,26 +46,66 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
-  private static HadoopFileSystemIntegrationHelper ghfsHelper;
-  private static FileSystem ghfs;
+  private FileSystem ghfs;
 
-  @BeforeClass
-  public static void setup() throws Throwable {
-    GoogleHadoopFileSystemIntegrationTest.storageResource.before();
-    ghfsHelper = GoogleHadoopFileSystemIntegrationTest.ghfsHelper;
-    ghfs = GoogleHadoopFileSystemIntegrationTest.ghfs;
+  private HadoopFileSystemIntegrationHelper ghfsHelper;
+
+  private GoogleCloudStorageFileSystemIntegrationHelper gcsiHelper;
+
+  private FileSystemDescriptor ghfsFileSystemDescriptor;
+
+  private final TestBucketHelper bucketHelper =
+      new TestBucketHelper(GoogleCloudStorageIntegrationHelper.TEST_BUCKET_NAME_PREFIX);
+
+  private String bucketName;
+
+  @Before
+  public void before() throws Exception {
+
+    GoogleHadoopFileSystem testInstance = new GoogleHadoopFileSystem();
+    ghfs = testInstance;
+    ghfsFileSystemDescriptor = testInstance;
+
+    URI initUri = new URI("gs://" + bucketHelper.getUniqueBucketName("init"));
+    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig());
+
+    gcsiHelper =
+        new GoogleCloudStorageFileSystemIntegrationHelper(
+            ((GoogleHadoopFileSystem) ghfs).getGcsFs());
+    ghfs.mkdirs(new Path(ghfs.getUri()));
+
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor);
+    gcsiHelper.beforeAllTests();
+    bucketName = gcsiHelper.sharedBucketName1;
   }
 
-  @AfterClass
-  public static void cleanup() {
-    ghfs = null;
-    ghfsHelper = null;
-    GoogleHadoopFileSystemIntegrationTest.storageResource.after();
+  @After
+  public void after() throws IOException {
+    if (ghfs != null) {
+      if (gcsiHelper != null) {
+        gcsiHelper.afterAllTests();
+        gcsiHelper = null;
+      }
+      GoogleCloudStorageFileSystem gcsfs = ((GoogleHadoopFileSystem) ghfs).getGcsFs();
+      if (gcsfs != null) {
+        gcsfs.close();
+      }
+      try {
+        ghfs.close();
+      } catch (IOException e) {
+        throw new RuntimeException("Unexpected exception", e);
+      }
+      ghfs = null;
+    }
+  }
+
+  public URI getTempFilePath() {
+    return gcsiHelper.getPath(bucketName, "file-" + UUID.randomUUID());
   }
 
   @Test
   public void getXAttr_nonExistentAttr() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-get-xattr", 1, /* overwrite= */ false);
 
@@ -77,7 +120,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void getXAttr_returnEmptyMapOnEmptyNames() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-get-xattr", 1, /* overwrite= */ false);
 
@@ -92,7 +135,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
   @Test
   public void getXAttr_nonGhfsMetadata() throws Exception {
     GoogleCloudStorageFileSystem gcsFs = ((GoogleHadoopFileSystem) ghfs).getGcsFs();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
 
     ghfsHelper.writeFile(filePath, "obj-test-get-xattr-extra", 1, /* overwrite= */ false);
@@ -118,7 +161,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-set-xattr", 1, /* overwrite= */ false);
 
@@ -153,7 +196,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr_throwsExceptionOnNullFlags() {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     Throwable exception =
         assertThrows(
@@ -164,7 +207,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr_throwsExceptionOnEmptyFlags() {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     EnumSet<XAttrSetFlag> emptyFlags = EnumSet.noneOf(XAttrSetFlag.class);
     Throwable exception =
@@ -176,7 +219,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr_replace() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-set-xattr-replace", 1, /* overwrite= */ false);
 
@@ -196,7 +239,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr_create_fail() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-set-xattr-create-fail", 1, /* overwrite= */ false);
 
@@ -215,7 +258,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr_replace_fail() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-set-xattr-replace-fail", 1, /* overwrite= */ false);
 
@@ -235,7 +278,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void setXAttr_throwsExceptionOnFlagsNull() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-set-xattr-create-fail", 1, /* overwrite= */ false);
     Throwable e =
@@ -251,7 +294,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   @Test
   public void removeXAttr() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-remove-xattr", 1, /* overwrite= */ false);
 

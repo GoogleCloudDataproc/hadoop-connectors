@@ -43,7 +43,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.ClassRule;
 import org.junit.Test;
 
 /**
@@ -57,46 +56,42 @@ import org.junit.Test;
 public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSystemIntegrationTest {
 
   // GHFS access instance.
-  static FileSystem ghfs;
-  static FileSystemDescriptor ghfsFileSystemDescriptor;
+  FileSystem ghfs;
+  FileSystemDescriptor ghfsFileSystemDescriptor;
 
-  protected static HadoopFileSystemIntegrationHelper ghfsHelper;
+  protected HadoopFileSystemIntegrationHelper ghfsHelper;
 
-  public static void postCreateInit() throws IOException {
+  @Override
+  public void postCreateInit() throws IOException {
     postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor));
   }
 
   /** Perform initialization after creating test instances. */
-  public static void postCreateInit(HadoopFileSystemIntegrationHelper helper) throws IOException {
+  public void postCreateInit(HadoopFileSystemIntegrationHelper helper) throws IOException {
     ghfsHelper = helper;
     ghfsHelper.ghfs.mkdirs(
         new Path(ghfsHelper.ghfsFileSystemDescriptor.getFileSystemRoot().toUri()));
-    GoogleCloudStorageFileSystemIntegrationTest.postCreateInit(ghfsHelper);
+    super.postCreateInit(ghfsHelper);
 
     // Ensures that we do not accidentally end up testing wrong functionality.
     gcsfs = null;
   }
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(HadoopFileSystemTestBase.class) {
-        @Override
-        public void after() {
-          if (ghfs != null) {
-            if (ghfs instanceof GoogleHadoopFileSystemBase) {
-              gcs = ((GoogleHadoopFileSystemBase) ghfs).getGcsFs().getGcs();
-            }
-            GoogleCloudStorageFileSystemIntegrationTest.storageResource.after();
-            try {
-              ghfs.close();
-            } catch (IOException e) {
-              throw new RuntimeException("Unexpected exception", e);
-            }
-            ghfs = null;
-            ghfsFileSystemDescriptor = null;
-          }
-        }
-      };
+  @Override
+  public void after() throws IOException {
+    if (ghfs != null) {
+      if (ghfs instanceof GoogleHadoopFileSystem) {
+        gcs = ((GoogleHadoopFileSystem) ghfs).getGcsFs().getGcs();
+      }
+      super.after();
+      try {
+        ghfs.close();
+      } catch (IOException e) {
+        throw new RuntimeException("Unexpected exception", e);
+      }
+      ghfs = null;
+    }
+  }
 
   // -----------------------------------------------------------------
   // Overridden methods from GCS test.
@@ -271,7 +266,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /** Tests read() when invalid arguments are passed. */
   @Test
   public void testReadInvalidArgs() throws IOException {
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     ghfsHelper.writeFile(hadoopPath, "file text", 1, /* overwrite= */ true);
     FSDataInputStream readStream = ghfs.open(hadoopPath);
@@ -309,7 +304,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testWrite1Byte() throws IOException {
     String text = "Hello World!";
     byte[] textBytes = text.getBytes(UTF_8);
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     FSDataOutputStream writeStream = ghfs.create(hadoopPath);
 
@@ -349,7 +344,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   @Test
   public void testOverwrite() throws IOException {
     // Get a temp path and ensure that it does not already exist.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(hadoopPath));
 
@@ -375,7 +370,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   @Test
   public void testConcurrentCreationWithoutOverwrite_onlyOneSucceeds() throws Exception {
     // Get a temp path and ensure that it does not already exist.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(hadoopPath));
 
@@ -418,7 +413,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
   @Test
   public void testAppend() throws IOException {
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
 
     ghfsHelper.writeTextFile(path.getAuthority(), path.getPath(), "content");
@@ -442,7 +437,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testFilePosition() throws IOException {
 
     // Write an object.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     String text = "Hello World!";
     int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
@@ -511,7 +506,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   @Test
   public void testFilePositionInDepthSeeks() throws IOException {
     // Write an object.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
 
     int bufferSize = 8 * 1024 * 1024;
@@ -613,7 +608,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
    */
   @Test
   public void testPreemptivelyEscapedPaths() throws IOException {
-    URI parentUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI parentUri = getTempFilePath();
     Path parentPath = ghfsHelper.castAsHadoopPath(parentUri);
     Path escapedPath = new Path(parentPath, new Path("foo%3Abar"));
 
@@ -660,8 +655,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
         String objectName,
         String expectedObjectName) {
       return new WorkingDirData(
-          ghfsHelper.createSchemeCompatibleHadoopPath(sharedBucketName1, objectName),
-          ghfsHelper.createSchemeCompatibleHadoopPath(sharedBucketName1, expectedObjectName));
+          ghfsHelper.createSchemeCompatibleHadoopPath(ghfsHelper.sharedBucketName1, objectName),
+          ghfsHelper.createSchemeCompatibleHadoopPath(
+              ghfsHelper.sharedBucketName1, expectedObjectName));
     }
 
     /**
@@ -673,7 +669,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     static WorkingDirData absolute(
         HadoopFileSystemIntegrationHelper ghfsHelper, String objectName) {
       return new WorkingDirData(
-          ghfsHelper.createSchemeCompatibleHadoopPath(sharedBucketName1, objectName), null);
+          ghfsHelper.createSchemeCompatibleHadoopPath(ghfsHelper.sharedBucketName1, objectName),
+          null);
     }
 
     /**
@@ -748,7 +745,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
   @Test
   public void testReadToEOFAndRewind() throws IOException {
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = getTempFilePath();
 
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     byte[] byteBuffer = new byte[1024];

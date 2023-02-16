@@ -37,7 +37,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.ClassRule;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -46,27 +46,18 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegrationTest {
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(GoogleHadoopFileSystemTest.class) {
-        @Override
-        public void before() throws Throwable {
-          // Disable logging.
-          // Normally you would need to keep a strong reference to any logger used for
-          // configuration, but the "root" logger is always present.
-          Logger.getLogger("").setLevel(Level.OFF);
+  @Before
+  public void before() throws IOException {
+    // Disable logging.
+    // Normally you would need to keep a strong reference to any logger used for
+    // configuration, but the "root" logger is always present.
+    Logger.getLogger("").setLevel(Level.OFF);
 
-          ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
-          ghfsFileSystemDescriptor = (FileSystemDescriptor) ghfs;
+    ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
+    ghfsFileSystemDescriptor = (FileSystemDescriptor) ghfs;
 
-          GoogleHadoopFileSystemIntegrationTest.postCreateInit();
-        }
-
-        @Override
-        public void after() {
-          GoogleHadoopFileSystemIntegrationTest.storageResource.after();
-        }
-      };
+    postCreateInit();
+  }
 
   @Test
   public void testVersionString() {
