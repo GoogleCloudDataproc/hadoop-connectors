@@ -57,17 +57,17 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class GoogleCloudStorageNewIntegrationTest {
 
   private static final CreateObjectOptions GZIP_CREATE_OPTIONS =
@@ -76,23 +76,15 @@ public class GoogleCloudStorageNewIntegrationTest {
   private static final ListObjectOptions INCLUDE_PREFIX_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
-  private GoogleCloudStorageOptions gcsOptions;
-  private RetryHttpInitializer httpRequestsInitializer;
-
-  @Parameterized.Parameter public boolean testStorageClientImpl;
-
-  @Parameters
-  public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(false, true);
-  }
-
-  private GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
+  private static GoogleCloudStorageOptions gcsOptions;
+  private static RetryHttpInitializer httpRequestsInitializer;
+  private static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
 
   @Rule public TestName name = new TestName();
   private TrackingHttpRequestInitializer gcsRequestsTracker;
 
-  @Before
-  public void before() throws Throwable {
+  @BeforeClass
+  public static void beforeClass() throws Throwable {
     Credentials credentials =
         checkNotNull(GoogleCloudStorageTestHelper.getCredentials(), "credentials must not be null");
 
@@ -107,18 +99,19 @@ public class GoogleCloudStorageNewIntegrationTest {
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(gcsOptions)
-                .setClientType(
-                    GoogleCloudStorageFileSystemIntegrationHelper.getClientType(
-                        testStorageClientImpl))
                 .build());
     gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
     gcsfsIHelper.beforeAllTests();
-    gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
-  @After
-  public void after() {
+  @AfterClass
+  public static void afterClass() {
     gcsfsIHelper.afterAllTests();
+  }
+
+  @Before
+  public void before() {
+    gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
   @Test
@@ -699,9 +692,7 @@ public class GoogleCloudStorageNewIntegrationTest {
   public void listObjectInfo_includePrefix_implicitDirInBucket() throws Exception {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
-    String testBucket =
-        gcsfsIHelper.createUniqueBucket(
-            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_impl-dir-in-bckt");
     gcsfsIHelper.createObjects(testBucket, "implDir/obj");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
@@ -798,7 +789,7 @@ public class GoogleCloudStorageNewIntegrationTest {
   public void listObjectInfo_allMetadataFieldsCorrect() throws Exception {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
-    String testDirName = getMethodName() + "/";
+    String testDirName = name.getMethodName() + "/";
     StorageResourceId objectId =
         new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object");
 
@@ -830,7 +821,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
     StorageResourceId objectId =
-        new StorageResourceId(gcsfsIHelper.sharedBucketName1, getMethodName());
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, name.getMethodName());
 
     // Create gzipped file so Content-Encoding will be not null
     CreateObjectOptions createOptions =
@@ -1286,11 +1277,11 @@ public class GoogleCloudStorageNewIntegrationTest {
     return listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
   }
 
-  private String createUniqueBucket(String suffix) throws IOException {
+  private static String createUniqueBucket(String suffix) throws IOException {
     return gcsfsIHelper.createUniqueBucket(suffix + UUID.randomUUID().toString().substring(0, 8));
   }
 
-  private void assertObjectFields(
+  private static void assertObjectFields(
       StorageResourceId expectedObjectId, GoogleCloudStorageItemInfo object) throws IOException {
     Storage storage = ((GoogleCloudStorageImpl) gcsfsIHelper.gcs).storage;
     StorageObject expectedObject =
@@ -1346,11 +1337,7 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   private String getTestResource() {
-    return getMethodName() + "_" + UUID.randomUUID();
-  }
-
-  public String getMethodName() {
-    return name.getMethodName().replace('[', '-').replace(']', '-');
+    return name.getMethodName() + "_" + UUID.randomUUID();
   }
 
   @FunctionalInterface
