@@ -172,7 +172,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
   // -----------------------------------------------------------------
 
   /** Helper to construct a path. */
-  protected URI getPath(String bucketName, String objectName) {
+  public URI getPath(String bucketName, String objectName) {
     return UriPaths.fromStringPathComponents(
         bucketName, objectName, /* allowEmptyObjectName= */ true);
   }
