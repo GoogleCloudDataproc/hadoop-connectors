@@ -44,29 +44,36 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for {@link GoogleCloudStorageFileSystemImpl} class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
-  private static GoogleCloudStorageOptions gcsOptions;
-  private static RetryHttpInitializer httpRequestsInitializer;
-  private static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
+  private GoogleCloudStorageOptions gcsOptions;
+  private RetryHttpInitializer httpRequestsInitializer;
+  private GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
 
   @Rule public TestName name = new TestName();
 
   private TrackingHttpRequestInitializer gcsRequestsTracker;
 
-  @BeforeClass
-  public static void beforeClass() throws Throwable {
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
+
+  @Before
+  public void before() throws Throwable {
     Credentials credentials =
         checkNotNull(GoogleCloudStorageTestHelper.getCredentials(), "credentials must not be null");
 
@@ -81,23 +88,22 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(gcsOptions)
+                .setClientType(
+                    GoogleCloudStorageFileSystemIntegrationHelper.getClientType(
+                        testStorageClientImpl))
                 .build());
 
     gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
     gcsfsIHelper.beforeAllTests();
+    gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
-  @AfterClass
-  public static void afterClass() throws Throwable {
+  @After
+  public void after() throws Throwable {
     gcsfsIHelper.afterAllTests();
     GoogleCloudStorageFileSystem gcsfs = gcsfsIHelper.gcsfs;
     assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName1))).isFalse();
     assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName2))).isFalse();
-  }
-
-  @Before
-  public void before() {
-    gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
   @Test
@@ -1231,10 +1237,14 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   private String getTestResource() {
-    return name.getMethodName() + "_" + UUID.randomUUID();
+    return getMethodName() + "_" + UUID.randomUUID();
   }
 
-  private static GoogleCloudStorageFileSystemOptions.Builder newGcsFsOptions() {
+  private String getMethodName() {
+    return name.getMethodName().replace('[', '-').replace(']', '-');
+  }
+
+  private GoogleCloudStorageFileSystemOptions.Builder newGcsFsOptions() {
     return GoogleCloudStorageFileSystemOptions.builder().setCloudStorageOptions(gcsOptions);
   }
 
