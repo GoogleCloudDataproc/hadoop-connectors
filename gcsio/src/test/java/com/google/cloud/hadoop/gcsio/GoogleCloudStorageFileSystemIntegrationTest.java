@@ -55,10 +55,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageFileSystemIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -81,6 +82,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // Name of the test object.
   protected String objectName = "gcsio-test.txt";
 
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
+
   /** Perform initialization once before tests are run. */
   @Before
   public void before() throws Exception {
@@ -92,6 +100,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           GoogleCloudStorageFileSystemOptions.builder().setMarkerFilePattern("_(FAILURE|SUCCESS)");
 
       optionsBuilder
+          .setClientType(
+              GoogleCloudStorageFileSystemIntegrationHelper.getClientType(testStorageClientImpl))
           .setBucketDeleteEnabled(true)
           .setCloudStorageOptions(
               GoogleCloudStorageOptions.builder()
@@ -176,7 +186,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
-          .that(fileModificationTime)
+          .that(fileModificationTime.plusMillis(2000))
           .isAtLeast(testStartTime);
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)

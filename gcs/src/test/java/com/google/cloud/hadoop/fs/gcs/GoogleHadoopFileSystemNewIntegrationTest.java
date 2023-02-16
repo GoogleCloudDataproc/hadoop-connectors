@@ -38,6 +38,7 @@ import com.google.common.io.CharStreams;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -49,10 +50,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemNewIntegrationTest {
 
   private static GoogleCloudStorageOptions gcsOptions;
@@ -62,6 +64,13 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
 
   @Rule public TestName name = new TestName();
   private TrackingHttpRequestInitializer gcsRequestsTracker;
+
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
 
   @Before
   public void before() throws Throwable {
@@ -79,7 +88,8 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     testBucketName = ghfsIHelper.getUniqueBucketName("new-it");
     URI testBucketUri = new URI("gs://" + testBucketName);
 
-    ghfs.initialize(testBucketUri, GoogleHadoopFileSystemTestBase.loadConfig());
+    ghfs.initialize(
+        testBucketUri, GoogleHadoopFileSystemTestBase.loadConfig(testStorageClientImpl));
 
     ghfs.getGcsFs().mkdir(testBucketUri);
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
@@ -181,7 +191,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     ghfs.initialize(
         UriPaths.fromResourceId(
             new StorageResourceId(testBucketName), /* allowEmptyObjectName= */ true),
-        GoogleHadoopFileSystemTestBase.loadConfig());
+        GoogleHadoopFileSystemTestBase.loadConfig(testStorageClientImpl));
     return ghfs;
   }
 }

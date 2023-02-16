@@ -34,6 +34,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.fs.FileSystem;
@@ -43,9 +44,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   private FileSystem ghfs;
@@ -59,13 +61,20 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   private String bucketName;
 
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
+
   @Before
   public void before() throws Exception {
 
     ghfs = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketHelper.getUniqueBucketName("init"));
-    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig());
+    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig(testStorageClientImpl));
 
     gcsiHelper =
         new GoogleCloudStorageFileSystemIntegrationHelper(

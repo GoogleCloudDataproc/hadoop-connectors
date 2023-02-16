@@ -35,6 +35,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
@@ -90,10 +91,10 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
 
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
@@ -109,7 +110,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
     URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
-    ghfs.initialize(initUri, loadConfig());
+    ghfs.initialize(initUri, loadConfig(testStorageClientImpl));
 
     if (GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE.get(
         ghfs.getConf(), ghfs.getConf()::getBoolean)) {
@@ -532,7 +533,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
   public void testBuildOptionsFromConfig() {
-    Configuration config = loadConfig("projectId", "path/to/serviceAccountKeyFile.json");
+    Configuration config = loadConfig(testStorageClientImpl);
+
+    config.set(GCS_PROJECT_ID.toString(), "projectId");
+    config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+    config.set("fs.gs.auth.service.account.json.keyfile", "path/to/serviceAccountKeyFile.json");
 
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
@@ -555,7 +560,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Override
   public void testInitializeSuccess() throws IOException {
     // Reuse loadConfig() to initialize auth related settings.
-    Configuration config = loadConfig();
+    Configuration config = loadConfig(testStorageClientImpl);
 
     // Set up remaining settings to known test values.
     long blockSize = 1024;
@@ -577,7 +582,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void testInitializeSucceedsWhenNoProjectIdConfigured()
       throws URISyntaxException, IOException {
-    Configuration config = loadConfig();
+    Configuration config = loadConfig(testStorageClientImpl);
     // Unset Project ID
     config.unset("fs.gs.project.id");
 
@@ -632,7 +637,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     // in the for-loop.
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
 
-    Configuration config = loadConfig();
+    Configuration config = loadConfig(testStorageClientImpl);
     ghfs.initialize(myGhfs.initUri, config);
 
     // setUpWorkingDirectoryTest() depends on getFileSystemRoot(), which in turn depends on
@@ -940,7 +945,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   private Configuration getConfigurationWithImplementation() {
-    Configuration conf = loadConfig();
+    Configuration conf = loadConfig(testStorageClientImpl);
     conf.set("fs.gs.impl", GoogleHadoopFileSystem.class.getCanonicalName());
     return conf;
   }
@@ -1044,7 +1049,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     createFile(new Path("/directory1/subdirectory2/file1"), data);
     createFile(new Path("/directory1/subdirectory2/file2"), data);
 
-    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/directory1*"));
     assertThat(stream(rootDirectories).map(d -> d.getPath().getName()).collect(toImmutableList()))
         .containsExactly("directory1");
 
@@ -1464,7 +1469,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
     createFile(new Path("/directory1/subdirectory1/file1"), "data".getBytes(UTF_8));
 
-    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/directory1*"));
     List<String> rootDirs =
         stream(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
 
@@ -1814,7 +1819,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void testInitializeCompatibleWithHadoopCredentialProvider() throws Exception {
-    Configuration config = loadConfig();
+    Configuration config = loadConfig(testStorageClientImpl);
 
     // This does not need to refer to a real bucket/path for the test.
     config.set(HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH, "jceks://gs@foobar/test.jceks");
