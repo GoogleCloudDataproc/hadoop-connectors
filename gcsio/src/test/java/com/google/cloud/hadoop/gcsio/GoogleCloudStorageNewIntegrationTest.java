@@ -64,10 +64,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageNewIntegrationTest {
 
   private static final CreateObjectOptions GZIP_CREATE_OPTIONS =
@@ -82,6 +83,13 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   @Rule public TestName name = new TestName();
   private TrackingHttpRequestInitializer gcsRequestsTracker;
+
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
 
   @BeforeClass
   public static void beforeClass() throws Throwable {
@@ -692,7 +700,9 @@ public class GoogleCloudStorageNewIntegrationTest {
   public void listObjectInfo_includePrefix_implicitDirInBucket() throws Exception {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
-    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_impl-dir-in-bckt");
+    String testBucket =
+        gcsfsIHelper.createUniqueBucket(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     gcsfsIHelper.createObjects(testBucket, "implDir/obj");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
@@ -809,7 +819,9 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(objectId.getBucketName(), testDirName);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(objectId.getObjectName());
-    assertObjectFields(objectId, listedObjects.get(0));
+    if (!testStorageClientImpl) {
+      assertObjectFields(objectId, listedObjects.get(0));
+    }
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -836,8 +848,9 @@ public class GoogleCloudStorageNewIntegrationTest {
     }
 
     GoogleCloudStorageItemInfo object = gcs.getItemInfo(objectId);
-
-    assertObjectFields(objectId, object);
+    if (!testStorageClientImpl) {
+      assertObjectFields(objectId, object);
+    }
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(objectId.getBucketName(), objectId.getObjectName()));
   }
