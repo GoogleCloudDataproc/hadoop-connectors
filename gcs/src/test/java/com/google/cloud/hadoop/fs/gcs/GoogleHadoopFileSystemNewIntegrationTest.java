@@ -43,9 +43,8 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -64,8 +63,8 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   @Rule public TestName name = new TestName();
   private TrackingHttpRequestInitializer gcsRequestsTracker;
 
-  @BeforeClass
-  public static void beforeClass() throws Throwable {
+  @Before
+  public void before() throws Throwable {
     Credentials credentials =
         checkNotNull(
             GoogleCloudStorageTestHelper.getCredentials(), "credentials should not be null");
@@ -83,16 +82,12 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     ghfs.initialize(testBucketUri, GoogleHadoopFileSystemTestBase.loadConfig());
 
     ghfs.getGcsFs().mkdir(testBucketUri);
-  }
-
-  @AfterClass
-  public static void afterClass() {
-    ghfsIHelper.afterAllTests();
-  }
-
-  @Before
-  public void before() throws Exception {
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
+  }
+
+  @After
+  public void after() {
+    ghfsIHelper.afterAllTests();
   }
 
   @Test

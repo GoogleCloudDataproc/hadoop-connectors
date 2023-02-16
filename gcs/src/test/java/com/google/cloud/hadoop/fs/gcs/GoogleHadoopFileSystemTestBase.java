@@ -23,7 +23,6 @@ import static com.google.common.truth.Truth.assertWithMessage;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -40,7 +39,6 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.junit.ClassRule;
 import org.junit.Test;
 
 /**
@@ -75,16 +73,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     config.setBoolean("fs.gs.bucket.delete.enable", true);
     return config;
   }
-
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(GoogleHadoopFileSystemTestBase.class) {
-        /** Perform clean-up once after all tests are turn. */
-        @Override
-        public void after() {
-          HadoopFileSystemTestBase.storageResource.after();
-        }
-      };
 
   // -----------------------------------------------------------------------------------------
   // Tests that vary according to the GHFS variant, but which we want to make sure get tested.
@@ -154,7 +142,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     String bucketName = sharedBucketName1;
     GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
-    URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI seedUri = getTempFilePath();
     Path parentPath = ghfsHelper.castAsHadoopPath(seedUri);
     URI parentUri = myghfs.getGcsPath(parentPath);
 
@@ -179,7 +167,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
-    URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI seedUri = getTempFilePath();
     Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);
     URI dirUri = myghfs.getGcsPath(dirPath);
 
@@ -209,7 +197,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
-    URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI seedUri = getTempFilePath();
     Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);
     URI dirUri = myghfs.getGcsPath(dirPath);
     Path subDir = new Path(dirPath, "subdir");
@@ -242,7 +230,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
-    URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI seedUri = getTempFilePath();
     Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);
     URI dirUri = myghfs.getGcsPath(dirPath);
 
@@ -273,8 +261,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
-    Path dirPath =
-        ghfsHelper.castAsHadoopPath(GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath());
+    Path dirPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
     URI dirUri = myghfs.getGcsPath(dirPath);
     Path subDir = new Path(dirPath, "subdir");
     URI subdirUri = myghfs.getGcsPath(subDir);
@@ -441,7 +428,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   @Test
   public void CopyFromLocalFileIOStatisticsTest() throws IOException {
     // Temporary file in GHFS.
-    URI tempFileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI tempFileUri = getTempFilePath();
     Path tempFilePath = ghfsHelper.castAsHadoopPath(tempFileUri);
     Path tempDirPath = tempFilePath.getParent();
     String text = "Hello World!";
@@ -490,14 +477,14 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // Create test data.
 
     // Temporary file in GHFS.
-    URI tempFileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI tempFileUri = getTempFilePath();
     Path tempFilePath = ghfsHelper.castAsHadoopPath(tempFileUri);
     Path tempDirPath = tempFilePath.getParent();
     String text = "Hello World!";
     ghfsHelper.writeFile(tempFilePath, text, 1, /* overwrite= */ false);
 
     // Another temporary file in GHFS.
-    URI tempFileUri2 = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI tempFileUri2 = getTempFilePath();
     Path tempFilePath2 = ghfsHelper.castAsHadoopPath(tempFileUri2);
 
     // Temporary file in local FS.
