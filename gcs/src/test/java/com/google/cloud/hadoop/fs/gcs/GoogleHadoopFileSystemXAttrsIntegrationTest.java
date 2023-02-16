@@ -84,6 +84,10 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
         gcsiHelper.afterAllTests();
         gcsiHelper = null;
       }
+      GoogleCloudStorageFileSystem gcsfs = ((GoogleHadoopFileSystem) ghfs).getGcsFs();
+      if (gcsfs != null) {
+        gcsfs.close();
+      }
       try {
         ghfs.close();
       } catch (IOException e) {

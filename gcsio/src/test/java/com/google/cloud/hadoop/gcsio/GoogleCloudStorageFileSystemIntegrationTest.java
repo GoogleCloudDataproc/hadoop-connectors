@@ -73,7 +73,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   // Time when test started. Used for determining which objects got
   // created after the test started.
-  protected Instant testStartTime;
+  protected final Instant testStartTime = Instant.now();
 
   protected String sharedBucketName1;
   protected String sharedBucketName2;
@@ -130,7 +130,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Perform initialization after creating test instances. */
   public void postCreateInit(GoogleCloudStorageFileSystemIntegrationHelper helper)
       throws IOException {
-    testStartTime = Instant.now();
 
     gcsiHelper = helper;
     gcsiHelper.beforeAllTests();
@@ -177,8 +176,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
-          .that(fileModificationTime.toEpochMilli())
-          .isAtLeast(testStartTime.toEpochMilli());
+          .that(fileModificationTime)
+          .isAtLeast(testStartTime);
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
           .that(fileModificationTime)
