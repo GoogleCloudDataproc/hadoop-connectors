@@ -186,7 +186,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
-          .that(fileModificationTime.plusMillis(2000))
+          .that(fileModificationTime)
           .isAtLeast(testStartTime);
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
