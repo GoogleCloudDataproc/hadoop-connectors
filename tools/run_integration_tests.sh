@@ -16,6 +16,7 @@
 
 # tools/run_integration_tests.sh <project_id> <path_to_json_keyfile> [optional_maven_parameters, [...]]
 
+echo "[!] Running integration tests"
 set -Eeuo pipefail
 
 export GCS_TEST_PROJECT_ID=$1
