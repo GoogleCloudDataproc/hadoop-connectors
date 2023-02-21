@@ -251,10 +251,10 @@
                     <include>com.google.longrunning.**</include>
                     <include>com.google.protobuf.**</include>
                     <include>com.google.rpc.**</include>
+                    <include>com.google.re2j.**</include>
                     <include>com.google.storage.**</include>
                     <include>com.google.thirdparty.**</include>
                     <include>com.google.type.**</include>
-                    <include>com.google.re2j.**</include>
                     <include>com.lmax.disruptor.**</include>
                   </includes>
                   <excludes>
