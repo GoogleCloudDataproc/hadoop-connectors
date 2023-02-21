@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
+/** Translates exceptions from API calls into {@link ErrorType} */
 public interface ErrorTypeExtractor {
   public ErrorType getErrorType(Exception exception);
 }

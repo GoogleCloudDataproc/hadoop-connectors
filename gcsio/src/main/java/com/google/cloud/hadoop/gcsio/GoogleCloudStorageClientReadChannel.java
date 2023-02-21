@@ -532,7 +532,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     checkArgument(
         resourceId.isStorageObject(), "Can not open a non-file object for read: %s", resourceId);
     if (!itemInfo.exists()) {
-      throw new FileNotFoundException(String.format("File not found: %s", resourceId));
+      throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
     }
     // The non-gRPC read channel has special support for gzip.
     // TODO: enable support for gzip if required.

@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -35,10 +36,10 @@ import org.apache.hadoop.fs.Path;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
 /** Unit tests for {@link GoogleHadoopFileSystem} class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegrationTest {
 
   @Before
@@ -67,6 +68,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     Configuration lazyConf = new Configuration();
     lazyConf.setBoolean("fs.gs.lazy.init.enable", true);
     lazyConf.set("fs.gs.auth.service.account.json.keyfile", "non-existent.json");
+    lazyConf.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
 
     lazyFs.initialize(new URI("gs://test-non-existent/"), lazyConf);
@@ -80,6 +82,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     lazyConf.setBoolean("fs.gs.lazy.init.enable", true);
     lazyConf.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     lazyConf.set("fs.gs.auth.service.account.json.keyfile", "non-existent.json");
+    lazyConf.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
 
     lazyFs.initialize(new URI("gs://test-non-existent"), lazyConf);
@@ -109,6 +112,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     eagerConf.setBoolean("fs.gs.lazy.init.enable", false);
     eagerConf.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     eagerConf.set("fs.gs.auth.service.account.json.keyfile", "non-existent.json");
+    eagerConf.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
     FileSystem eagerFs = new GoogleHadoopFileSystem();
 
     FileNotFoundException exception =
@@ -174,6 +178,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
+    config.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
     URI gsUri = new URI("gs://foobar/");
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();

@@ -24,6 +24,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -82,11 +83,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // Name of the test object.
   protected String objectName = "gcsio-test.txt";
 
-  @Parameterized.Parameter public boolean testStorageClientImpl;
+  @Parameterized.Parameter public ClientType storageClientType;
 
   @Parameters
-  public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(false, true);
+  public static Iterable<ClientType> getClientType() {
+    return List.of(ClientType.values());
   }
 
   /** Perform initialization once before tests are run. */
@@ -100,8 +101,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           GoogleCloudStorageFileSystemOptions.builder().setMarkerFilePattern("_(FAILURE|SUCCESS)");
 
       optionsBuilder
-          .setClientType(
-              GoogleCloudStorageFileSystemIntegrationHelper.getClientType(testStorageClientImpl))
+          .setClientType(storageClientType)
           .setBucketDeleteEnabled(true)
           .setCloudStorageOptions(
               GoogleCloudStorageOptions.builder()
@@ -184,10 +184,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
       Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
 
+      // Causing flakiness for unittest
+      // Comparing just upto milliseconds as that's the least count we have for
+      // `fileModificationTime`
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
-          .that(fileModificationTime)
-          .isAtLeast(testStartTime);
+          .that(fileModificationTime.toEpochMilli())
+          .isAtLeast(testStartTime.toEpochMilli());
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
           .that(fileModificationTime)

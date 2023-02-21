@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -53,14 +54,13 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
    * needed for setting up the credentials of a real GoogleCloudStorage.
    */
   protected static Configuration loadConfig() {
+    TestConfiguration testConf = TestConfiguration.getInstance();
     return GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
   }
 
-  protected static Configuration loadConfig(boolean testStorageClientImpl) {
+  protected static Configuration loadConfig(ClientType storageClientType) {
     Configuration config = loadConfig();
-    ClientType clientType =
-        testStorageClientImpl ? ClientType.STORAGE_CLIENT : ClientType.HTTP_API_CLIENT;
-    config.setEnum(GCS_CLIENT_TYPE.toString(), clientType);
+    config.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
     return config;
   }
 

@@ -61,7 +61,7 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
 
     // Create a FileSystem instance to access the given HDFS.
     URI hdfsUri = new URI(hdfsRoot);
-    Configuration config = GoogleHadoopFileSystemTestBase.loadConfig(testStorageClientImpl);
+    Configuration config = GoogleHadoopFileSystemTestBase.loadConfig(storageClientType);
     config.set("fs.default.name", hdfsRoot);
     ghfs = FileSystem.get(hdfsUri, config);
 

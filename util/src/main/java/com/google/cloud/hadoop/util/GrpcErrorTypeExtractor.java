@@ -18,6 +18,9 @@ package com.google.cloud.hadoop.util;
 
 import io.grpc.Status;
 
+/**
+ * Implementation for {@link ErrorTypeExtractor} for exception specifically thrown from gRPC path.
+ */
 public class GrpcErrorTypeExtractor implements ErrorTypeExtractor {
 
   public static final GrpcErrorTypeExtractor INSTANCE = new GrpcErrorTypeExtractor();

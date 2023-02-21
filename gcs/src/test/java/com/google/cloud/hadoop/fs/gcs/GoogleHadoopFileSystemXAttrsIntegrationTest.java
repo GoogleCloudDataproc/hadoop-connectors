@@ -22,6 +22,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -61,11 +62,11 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   private String bucketName;
 
-  @Parameterized.Parameter public boolean testStorageClientImpl;
+  @Parameterized.Parameter public ClientType storageClientType;
 
   @Parameters
-  public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(false, true);
+  public static Iterable<ClientType> getClientType() {
+    return List.of(ClientType.values());
   }
 
   @Before
@@ -74,7 +75,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
     ghfs = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketHelper.getUniqueBucketName("init"));
-    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig(testStorageClientImpl));
+    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig(storageClientType));
 
     gcsiHelper =
         new GoogleCloudStorageFileSystemIntegrationHelper(
@@ -89,6 +90,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
   @After
   public void after() throws IOException {
     if (ghfs != null) {
+      ghfsHelper.afterAllTests();
       if (gcsiHelper != null) {
         gcsiHelper.afterAllTests();
         gcsiHelper = null;

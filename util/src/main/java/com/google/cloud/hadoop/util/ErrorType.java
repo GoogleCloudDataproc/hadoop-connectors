@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
+/** Various error-types Exceptions would be mapped against. */
 public enum ErrorType {
   NON_FOUND,
   OUT_OF_RANGE,

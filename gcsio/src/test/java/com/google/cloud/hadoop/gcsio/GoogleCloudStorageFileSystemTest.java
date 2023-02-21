@@ -22,6 +22,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -81,15 +82,27 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
   }
 
   private GoogleCloudStorageFileSystemOptions.Builder getDefaultFileSystemOptions() {
-    return GoogleCloudStorageFileSystemOptions.builder()
-        .setClientType(
-            GoogleCloudStorageFileSystemIntegrationHelper.getClientType(testStorageClientImpl));
+    return GoogleCloudStorageFileSystemOptions.builder().setClientType(storageClientType);
   }
 
   private Class getGoogleCloudStorageImplClass() {
-    return testStorageClientImpl
-        ? GoogleCloudStorageClientImpl.class
-        : GoogleCloudStorageImpl.class;
+    switch (storageClientType) {
+      case STORAGE_CLIENT:
+        return GoogleCloudStorageClientImpl.class;
+      default:
+        return GoogleCloudStorageImpl.class;
+    }
+  }
+
+  private void verifyUnauthorizedAccess(GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
+    switch (storageClientType) {
+      case STORAGE_CLIENT:
+        new GoogleCloudStorageFileSystemImpl(NoCredentials.getInstance(), options);
+        break;
+      default:
+        new GoogleCloudStorageFileSystemImpl((Credentials) null, options);
+    }
   }
 
   @Test
@@ -153,11 +166,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
         options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
 
     // Verify that credentials == null works - this is required for unauthenticated access.
-    // TODO: this seems to be not the case with java-storage.
-    // Confirm and remove this `if`.
-    if (!testStorageClientImpl) {
-      new GoogleCloudStorageFileSystemImpl((Credentials) null, optionsBuilder.build());
-    }
+    verifyUnauthorizedAccess(optionsBuilder.build());
 
     // Verify that fake projectId/appName and empty cred does not throw.
     setDefaultValidOptions(optionsBuilder);

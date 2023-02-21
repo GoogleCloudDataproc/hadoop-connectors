@@ -54,7 +54,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
 
-  private final ErrorTypeExtractor errorExtractor;
+  // Error extractor to map APi exception to meaningful ErrorTypes.
+  private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -84,7 +85,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
             .build());
     this.storageOptions = options;
-    this.errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
     this.storage =
         clientLibraryStorage == null ? createStorage(credentials, options) : clientLibraryStorage;
   }
