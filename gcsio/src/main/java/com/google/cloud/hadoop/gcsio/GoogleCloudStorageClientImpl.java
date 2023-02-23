@@ -51,7 +51,7 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
+  private static GoogleCloudStorageImpl delegate;
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
 
@@ -65,6 +65,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
+
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
@@ -78,13 +79,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     super(
-        GoogleCloudStorageImpl.builder()
-            .setOptions(options)
-            .setCredentials(credentials)
-            .setHttpTransport(httpTransport)
-            .setHttpRequestInitializer(httpRequestInitializer)
-            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .build());
+        delegate =
+            GoogleCloudStorageImpl.builder()
+                .setOptions(options)
+                .setCredentials(credentials)
+                .setHttpTransport(httpTransport)
+                .setHttpRequestInitializer(httpRequestInitializer)
+                .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+                .build());
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null ? createStorage(credentials, options) : clientLibraryStorage;
@@ -108,7 +110,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     GoogleCloudStorageClientWriteChannel channel =
         new GoogleCloudStorageClientWriteChannel(
-            storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
+            storage,
+            storageOptions,
+            resourceIdWithGeneration,
+            options,
+            requesterShouldPay(resourceIdWithGeneration.getBucketName()),
+            backgroundTasksThreadPool);
     channel.initialize();
     return channel;
   }
@@ -144,7 +151,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         itemInfo == null ? getItemInfo(resourceId) : itemInfo,
         readOptions,
         errorExtractor,
-        storageOptions);
+        storageOptions,
+        requesterShouldPay(resourceId.getBucketName()));
   }
 
   @Override
@@ -158,6 +166,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     } finally {
       backgroundTasksThreadPool = null;
     }
+  }
+
+  @Override
+  public GoogleCloudStorageImpl getDelegate() {
+    return delegate;
   }
 
   /**
@@ -193,6 +206,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
         .build()
         .getService();
+  }
+
+  private boolean requesterShouldPay(String bucketName) throws IOException {
+    return getDelegate().requesterShouldPay(bucketName);
   }
 
   public static Builder builder() {

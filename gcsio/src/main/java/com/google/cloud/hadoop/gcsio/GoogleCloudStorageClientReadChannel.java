@@ -58,6 +58,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   // The size of this object generation, in bytes.
   private final long objectSize;
   private final ErrorTypeExtractor errorExtractor;
+  private final boolean requesterPays;
   private ContentReadChannel contentReadChannel;
 
   private boolean open = true;
@@ -71,7 +72,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions,
       ErrorTypeExtractor errorExtractor,
-      GoogleCloudStorageOptions storageOptions)
+      GoogleCloudStorageOptions storageOptions,
+      boolean requesterPays)
       throws IOException {
     validate(itemInfo);
     this.storage = storage;
@@ -79,8 +81,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-    this.readOptions = readOptions;
+    this.requesterPays = requesterPays;
     this.storageOptions = storageOptions;
+    this.readOptions = readOptions;
     this.objectSize = itemInfo.getSize();
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
   }
@@ -502,9 +505,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (blobId.getGeneration() != null) {
         blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
       }
+
       if (storageOptions.getEncryptionKey() != null) {
         blobReadOptions.add(
             BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      }
+
+      if (requesterPays) {
+        blobReadOptions.add(
+            BlobSourceOption.userProject(storageOptions.getRequesterPaysOptions().getProjectId()));
       }
       return blobReadOptions.toArray(new BlobSourceOption[blobReadOptions.size()]);
     }

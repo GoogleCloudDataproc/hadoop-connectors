@@ -2260,7 +2260,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  private boolean requesterShouldPay(String bucketName) {
+  protected boolean requesterShouldPay(String bucketName) {
     if (bucketName == null) {
       return false;
     }

@@ -232,6 +232,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
             .setMetadata(GoogleCloudStorageTestHelper.getDecodedMetadata(metadata))
             .setKmsKeyName(KMS_KEY)
             .build(),
+        /*requesterPays=*/ false,
         EXECUTOR_SERVICE);
   }
 
