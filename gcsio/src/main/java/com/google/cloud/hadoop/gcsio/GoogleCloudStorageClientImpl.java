@@ -142,8 +142,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         storage,
         itemInfo == null ? getItemInfo(resourceId) : itemInfo,
         readOptions,
-        requesterShouldPay(resourceId.getBucketName()),
-        storageOptions.getRequesterPaysOptions().getProjectId());
+        storageOptions,
+        requesterShouldPay(resourceId.getBucketName()));
   }
 
   @Override

@@ -51,11 +51,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private final StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
+  private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
   private final boolean requesterPays;
-  private final String requesterPaysProject;
 
   private ContentReadChannel contentReadChannel;
 
@@ -69,8 +69,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       Storage storage,
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions,
-      boolean requesterPays,
-      String requesterPaysProject)
+      GoogleCloudStorageOptions storageOptions,
+      boolean requesterPays)
       throws IOException {
     validate(itemInfo);
     this.storage = storage;
@@ -78,7 +78,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
     this.requesterPays = requesterPays;
-    this.requesterPaysProject = requesterPaysProject;
+    this.storageOptions = storageOptions;
     this.readOptions = readOptions;
     this.objectSize = itemInfo.getSize();
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
@@ -502,7 +502,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         readOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
       }
       if (requesterPays) {
-        readOptions.add(BlobSourceOption.userProject(requesterPaysProject));
+        readOptions.add(BlobSourceOption.userProject(storageOptions.getRequesterPaysOptions().getProjectId()));
       }
       return readOptions.toArray(new BlobSourceOption[readOptions.size()]);
     }
@@ -525,14 +525,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
       return endPosition;
     }
-  }
-
-  protected String getRequesterPaysProject() {
-    return null;
-  }
-
-  protected boolean requesterPays() {
-    return false;
   }
 
   @VisibleForTesting
