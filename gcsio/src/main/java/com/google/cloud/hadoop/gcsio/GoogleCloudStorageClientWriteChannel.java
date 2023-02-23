@@ -21,7 +21,6 @@ import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTE
 
 import com.google.cloud.WriteChannel;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
-import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
@@ -46,18 +45,18 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
   private final StorageResourceId resourceId;
   private WriteChannel writeChannel;
   private boolean uploadSucceeded = false;
-  // TODO: not supported as of now
-  // private final String requesterPaysProject;
 
   public GoogleCloudStorageClientWriteChannel(
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
+      boolean requesterPays,
       ExecutorService uploadThreadPool) {
     super(uploadThreadPool, storageOptions.getWriteChannelOptions());
     this.resourceId = resourceId;
-    this.writeChannel = getClientWriteChannel(storage, resourceId, createOptions, storageOptions);
+    this.writeChannel =
+        getClientWriteChannel(storage, resourceId, createOptions, storageOptions, requesterPays);
   }
 
   @Override
@@ -69,6 +68,10 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
+  }
+
+  public String getRequesterPaysProject() {
+    return null;
   }
 
   private static BlobInfo getBlobInfo(
@@ -90,13 +93,13 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
       Storage storage,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
-      GoogleCloudStorageOptions storageOptions) {
-    AsyncWriteChannelOptions channelOptions = storageOptions.getWriteChannelOptions();
+      GoogleCloudStorageOptions storageOptions,
+      boolean requesterPays) {
     WriteChannel writeChannel =
         storage.writer(
             getBlobInfo(resourceId, createOptions),
-            generateWriteOptions(createOptions, channelOptions));
-    writeChannel.setChunkSize(channelOptions.getUploadChunkSize());
+            generateWriteOptions(createOptions, storageOptions, requesterPays));
+    writeChannel.setChunkSize(storageOptions.getWriteChannelOptions().getUploadChunkSize());
 
     return writeChannel;
   }
@@ -156,16 +159,21 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
   }
 
   private static BlobWriteOption[] generateWriteOptions(
-      CreateObjectOptions createOptions, AsyncWriteChannelOptions channelOptions) {
+      CreateObjectOptions createOptions,
+      GoogleCloudStorageOptions storageOptions,
+      boolean requesterPays) {
     List<BlobWriteOption> writeOptions = new ArrayList<>();
-
     writeOptions.add(BlobWriteOption.disableGzipContent());
     writeOptions.add(BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
       writeOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
-    if (channelOptions.isGrpcChecksumsEnabled()) {
+    if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
       writeOptions.add(BlobWriteOption.crc32cMatch());
+    }
+    if (requesterPays) {
+      writeOptions.add(
+          BlobWriteOption.userProject(storageOptions.getRequesterPaysOptions().getProjectId()));
     }
     return writeOptions.toArray(new BlobWriteOption[writeOptions.size()]);
   }

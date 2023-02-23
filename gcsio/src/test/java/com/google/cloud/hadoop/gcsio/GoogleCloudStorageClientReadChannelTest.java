@@ -529,6 +529,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     if (itemInfo == null) {
       objectInfo = DEFAULT_ITEM_INFO;
     }
-    return new GoogleCloudStorageClientReadChannel(mockedStorage, objectInfo, readOptions);
+    return new GoogleCloudStorageClientReadChannel(
+        mockedStorage, objectInfo, readOptions, /*requesterPays*/ false, "dummyProjectId");
   }
 }

@@ -102,7 +102,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     GoogleCloudStorageClientWriteChannel channel =
         new GoogleCloudStorageClientWriteChannel(
-            storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
+            storage,
+            storageOptions,
+            resourceIdWithGeneration,
+            options,
+            requesterShouldPay(resourceIdWithGeneration.getBucketName()),
+            backgroundTasksThreadPool);
     channel.initialize();
     return channel;
   }
@@ -134,7 +139,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     return new GoogleCloudStorageClientReadChannel(
-        storage, itemInfo == null ? getItemInfo(resourceId) : itemInfo, readOptions);
+        storage,
+        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
+        readOptions,
+        requesterShouldPay(resourceId.getBucketName()),
+        storageOptions.getRequesterPaysOptions().getProjectId());
   }
 
   @Override
@@ -182,6 +191,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .setCredentials(credentials)
         .build()
         .getService();
+  }
+
+  private boolean requesterShouldPay(String bucketName) {
+    return ((GoogleCloudStorageImpl) getDelegate()).requesterShouldPay(bucketName);
   }
 
   public static Builder builder() {
