@@ -22,23 +22,19 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.gax.rpc.HeaderProvider;
 import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -138,7 +134,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     return new GoogleCloudStorageClientReadChannel(
-        storage, itemInfo == null ? getItemInfo(resourceId) : itemInfo, readOptions);
+        storage,
+        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
+        readOptions,
+        storageOptions);
   }
 
   @Override
@@ -183,63 +182,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       Credentials credentials, GoogleCloudStorageOptions storageOptions) {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
-        .setHeaderProvider(populateHeaderValues(storageOptions))
+        .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
         .setCredentials(credentials)
         .build()
         .getService();
-  }
-
-  private static HeaderProvider populateHeaderValues(GoogleCloudStorageOptions storageOptions) {
-    return () ->
-        ImmutableMap.<String, String>builder()
-            .putAll(getEncryptionHeaders(storageOptions))
-            .putAll(getDecryptionHeaders(storageOptions))
-            .putAll(storageOptions.getHttpRequestHeaders())
-            .build();
-  }
-
-  private static Map<String, String> getEncryptionHeaders(
-      GoogleCloudStorageOptions storageOptions) {
-    if (storageOptions.getEncryptionKey() == null) {
-      return Collections.EMPTY_MAP;
-    }
-    return ImmutableMap.<String, String>builder()
-        .put(
-            "x-goog-encryption-algorithm",
-            checkNotNull(
-                storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"))
-        .put(
-            "x-goog-encryption-key",
-            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null")
-                .value())
-        .put(
-            "x-goog-encryption-key-sha256",
-            checkNotNull(
-                    storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null")
-                .value())
-        .build();
-  }
-
-  private static Map<String, String> getDecryptionHeaders(
-      GoogleCloudStorageOptions storageOptions) {
-    if (storageOptions.getEncryptionKey() == null) {
-      return Collections.EMPTY_MAP;
-    }
-    return ImmutableMap.<String, String>builder()
-        .put(
-            "x-goog-copy-source-encryption-algorithm",
-            checkNotNull(
-                storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"))
-        .put(
-            "x-goog-copy-source-encryption-key",
-            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null")
-                .value())
-        .put(
-            "x-goog-copy-source-encryption-key-sha256",
-            checkNotNull(
-                    storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null")
-                .value())
-        .build();
   }
 
   public static Builder builder() {

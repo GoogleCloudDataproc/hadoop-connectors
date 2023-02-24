@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 
 import com.google.cloud.WriteChannel;
@@ -95,7 +96,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     WriteChannel writeChannel =
         storage.writer(
             getBlobInfo(resourceId, createOptions),
-            generateWriteOptions(createOptions, channelOptions));
+            generateWriteOptions(createOptions, storageOptions));
     writeChannel.setChunkSize(channelOptions.getUploadChunkSize());
 
     return writeChannel;
@@ -156,7 +157,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
   }
 
   private static BlobWriteOption[] generateWriteOptions(
-      CreateObjectOptions createOptions, AsyncWriteChannelOptions channelOptions) {
+      CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
     List<BlobWriteOption> writeOptions = new ArrayList<>();
 
     writeOptions.add(BlobWriteOption.disableGzipContent());
@@ -164,8 +165,14 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     if (createOptions.getKmsKeyName() != null) {
       writeOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
-    if (channelOptions.isGrpcChecksumsEnabled()) {
+    if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
       writeOptions.add(BlobWriteOption.crc32cMatch());
+    }
+    if (storageOptions.getEncryptionKey() != null) {
+      writeOptions.add(
+          BlobWriteOption.encryptionKey(
+              checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null")
+                  .value()));
     }
     return writeOptions.toArray(new BlobWriteOption[writeOptions.size()]);
   }
