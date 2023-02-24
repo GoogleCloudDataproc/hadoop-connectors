@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 
 import com.google.cloud.WriteChannel;
@@ -169,10 +168,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
       writeOptions.add(BlobWriteOption.crc32cMatch());
     }
     if (storageOptions.getEncryptionKey() != null) {
-      writeOptions.add(
-          BlobWriteOption.encryptionKey(
-              checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null")
-                  .value()));
+      writeOptions.add(BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
     return writeOptions.toArray(new BlobWriteOption[writeOptions.size()]);
   }
