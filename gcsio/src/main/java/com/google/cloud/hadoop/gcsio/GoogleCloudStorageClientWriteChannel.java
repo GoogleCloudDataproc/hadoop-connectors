@@ -95,7 +95,7 @@ class GoogleCloudStorageClientWriteChannel extends BaseAbstractGoogleAsyncWriteC
     WriteChannel writeChannel =
         storage.writer(
             getBlobInfo(resourceId, createOptions),
-            generateWriteOptions(createOptions, channelOptions));
+            generateWriteOptions(createOptions, storageOptions));
     writeChannel.setChunkSize(channelOptions.getUploadChunkSize());
 
     return writeChannel;
@@ -156,18 +156,22 @@ class GoogleCloudStorageClientWriteChannel extends BaseAbstractGoogleAsyncWriteC
   }
 
   private static BlobWriteOption[] generateWriteOptions(
-      CreateObjectOptions createOptions, AsyncWriteChannelOptions channelOptions) {
-    List<BlobWriteOption> writeOptions = new ArrayList<>();
+      CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
+    List<BlobWriteOption> blobWriteOptions = new ArrayList<>();
 
-    writeOptions.add(BlobWriteOption.disableGzipContent());
-    writeOptions.add(BlobWriteOption.generationMatch());
+    blobWriteOptions.add(BlobWriteOption.disableGzipContent());
+    blobWriteOptions.add(BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
-      writeOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
+      blobWriteOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
-    if (channelOptions.isGrpcChecksumsEnabled()) {
-      writeOptions.add(BlobWriteOption.crc32cMatch());
+    if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
+      blobWriteOptions.add(BlobWriteOption.crc32cMatch());
     }
-    return writeOptions.toArray(new BlobWriteOption[writeOptions.size()]);
+    if (storageOptions.getEncryptionKey() != null) {
+      blobWriteOptions.add(
+          BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+    return blobWriteOptions.toArray(new BlobWriteOption[blobWriteOptions.size()]);
   }
 
   @Override
