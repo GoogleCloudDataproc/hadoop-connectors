@@ -531,6 +531,10 @@ public class GoogleCloudStorageClientReadChannelTest {
       objectInfo = DEFAULT_ITEM_INFO;
     }
     return new GoogleCloudStorageClientReadChannel(
-        mockedStorage, objectInfo, readOptions, GrpcErrorTypeExtractor.INSTANCE);
+        mockedStorage,
+        objectInfo,
+        readOptions,
+        GrpcErrorTypeExtractor.INSTANCE,
+        GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
   }
 }

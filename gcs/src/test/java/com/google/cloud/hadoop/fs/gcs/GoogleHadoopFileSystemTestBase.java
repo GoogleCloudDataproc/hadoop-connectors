@@ -27,7 +27,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;

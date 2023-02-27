@@ -19,8 +19,11 @@ package com.google.cloud.hadoop.gcsio.integration;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertObjectContent;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -28,28 +31,44 @@ import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.Te
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import org.junit.AfterClass;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.util.List;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** CSEK encryption integration tests. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class CsekEncryptionIntegrationTest {
 
-  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("gcs-csek-encryption");
+  private final TestBucketHelper bucketHelper =
+      new TestBucketHelper("dataproc-gcs-csek-encryption");
 
-  @AfterClass
-  public static void afterAll() throws IOException {
-    BUCKET_HELPER.cleanup(
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
+
+  private final boolean testStorageClientImpl;
+
+  public CsekEncryptionIntegrationTest(boolean tesStorageClientImpl) {
+    this.testStorageClientImpl = tesStorageClientImpl;
+  }
+
+  @After
+  public void after() throws IOException {
+    bucketHelper.cleanup(
         makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build()));
   }
 
   @Test
   public void uploadAndGetObject() throws IOException {
-    GoogleCloudStorageImpl gcs = makeStorage(getCsekStorageOptions().build());
+    GoogleCloudStorage gcs = makeStorage(getCsekStorageOptions().build());
 
-    String bucketName = BUCKET_HELPER.getUniqueBucketName("upload-and-get");
+    String bucketName = bucketHelper.getUniqueBucketName("upload-and-get");
     StorageResourceId resourceId = new StorageResourceId(bucketName, "obj");
 
     gcs.createBucket(bucketName);
@@ -60,18 +79,48 @@ public class CsekEncryptionIntegrationTest {
   }
 
   @Test
+  public void uploadAndVerifyContent() throws IOException {
+    GoogleCloudStorage gcs = makeStorage(getCsekStorageOptions().build());
+
+    String bucketName = bucketHelper.getUniqueBucketName("upload-and-verify");
+    StorageResourceId resourceId = new StorageResourceId(bucketName, "obj");
+    gcs.createBucket(bucketName);
+
+    byte[] partition = writeObject(gcs, resourceId, /* partitionSize= */ 1 * 1024 * 1024);
+
+    assertObjectContent(gcs, resourceId, partition);
+  }
+
+  @Test
+  public void uploadAndReadThrow() throws IOException {
+    GoogleCloudStorage gcs = makeStorage(getCsekStorageOptions().build());
+
+    String bucketName = bucketHelper.getUniqueBucketName("upload-and-verify");
+    StorageResourceId resourceId = new StorageResourceId(bucketName, "obj");
+    gcs.createBucket(bucketName);
+
+    writeObject(gcs, resourceId, /* partitionSize= */ 1 * 1024 * 1024);
+
+    GoogleCloudStorage gcsWithoutEncryption =
+        makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build());
+
+    SeekableByteChannel readChannel = gcsWithoutEncryption.open(resourceId);
+    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+  }
+
+  @Test
   public void rewriteObject() throws IOException {
-    GoogleCloudStorageImpl gcs =
+    GoogleCloudStorage gcs =
         makeStorage(
             getCsekStorageOptions()
                 .setCopyWithRewriteEnabled(true)
                 .setMaxRewriteChunkSize(512 * 1024 * 1024)
                 .build());
 
-    String srcBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-src");
+    String srcBucketName = bucketHelper.getUniqueBucketName("rewrite-src");
     gcs.createBucket(srcBucketName);
 
-    String dstBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-dst");
+    String dstBucketName = bucketHelper.getUniqueBucketName("rewrite-dst");
     gcs.createBucket(dstBucketName);
 
     StorageResourceId srcResourceId = new StorageResourceId(srcBucketName, "encryptedObject");
@@ -87,15 +136,20 @@ public class CsekEncryptionIntegrationTest {
     assertObjectContent(gcs, dstResourceId, partition, partitionsCount);
   }
 
-  private static GoogleCloudStorageImpl makeStorage(GoogleCloudStorageOptions options)
-      throws IOException {
+  private GoogleCloudStorage makeStorage(GoogleCloudStorageOptions options) throws IOException {
+    if (testStorageClientImpl) {
+      return GoogleCloudStorageClientImpl.builder()
+          .setOptions(options)
+          .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+          .build();
+    }
     return GoogleCloudStorageImpl.builder()
         .setOptions(options)
         .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
         .build();
   }
 
-  private static GoogleCloudStorageOptions.Builder getCsekStorageOptions() {
+  private GoogleCloudStorageOptions.Builder getCsekStorageOptions() {
     return GoogleCloudStorageTestHelper.getStandardOptionBuilder()
         .setEncryptionAlgorithm("AES256")
         .setEncryptionKey(RedactedString.create("CSX19s0epGWZP3h271Idu8xma2WhMuKT8ZisYfcjLM8="))
