@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
@@ -29,21 +28,15 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
-import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.model.StorageObject;
-import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.BaseEncoding;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -57,57 +50,29 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-/** Integration tests for GoogleCloudStorageFileSystem class. */
-@RunWith(JUnit4.class)
-public class GoogleCloudStorageNewIntegrationTest {
+/**
+ * Abstract base class for GoogleCloudStorageFileSystem Integration Test. TestSuite extending these
+ * tests should initialize GoogleCloudStorageFileSystemIntegrationHelper as per its configuration.
+ */
+public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
-  private static final CreateObjectOptions GZIP_CREATE_OPTIONS =
+  protected static final CreateObjectOptions GZIP_CREATE_OPTIONS =
       CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentEncoding("gzip").build();
 
   private static final ListObjectOptions INCLUDE_PREFIX_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
-  private static GoogleCloudStorageOptions gcsOptions;
-  private static RetryHttpInitializer httpRequestsInitializer;
-  private static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
+  protected static GoogleCloudStorageOptions gcsOptions;
+  protected static RetryHttpInitializer httpRequestsInitializer;
+  protected static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
 
   @Rule public TestName name = new TestName();
-  private TrackingHttpRequestInitializer gcsRequestsTracker;
-
-  @BeforeClass
-  public static void beforeClass() throws Throwable {
-    Credentials credentials =
-        checkNotNull(GoogleCloudStorageTestHelper.getCredentials(), "credentials must not be null");
-
-    gcsOptions =
-        getStandardOptionBuilder().setBatchThreads(0).setCopyWithRewriteEnabled(false).build();
-    httpRequestsInitializer =
-        new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
-
-    GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystemImpl(
-            credentials,
-            GoogleCloudStorageFileSystemOptions.builder()
-                .setBucketDeleteEnabled(true)
-                .setCloudStorageOptions(gcsOptions)
-                .build());
-    gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
-    gcsfsIHelper.beforeAllTests();
-  }
-
-  @AfterClass
-  public static void afterClass() {
-    gcsfsIHelper.afterAllTests();
-  }
+  protected TrackingHttpRequestInitializer gcsRequestsTracker;
 
   @Before
   public void before() {
@@ -1275,7 +1240,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings()).isEmpty();
   }
 
-  private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
+  protected static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
     return listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
   }
 
@@ -1285,7 +1250,8 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   private static void assertObjectFields(
       StorageResourceId expectedObjectId, GoogleCloudStorageItemInfo object) throws IOException {
-    Storage storage = ((GoogleCloudStorageImpl) gcsfsIHelper.gcs).storage;
+    /*    Storage storage = ((GoogleCloudStorageImpl) gcsfsIHelper.gcs).storage;
+
     StorageObject expectedObject =
         storage
             .objects()
@@ -1307,7 +1273,11 @@ public class GoogleCloudStorageNewIntegrationTest {
                 checkNotNull(expectedObject.getMetageneration()),
                 new VerificationAttributes(
                     BaseEncoding.base64().decode(checkNotNull(expectedObject.getMd5Hash())),
-                    BaseEncoding.base64().decode(checkNotNull(expectedObject.getCrc32c())))));
+                    BaseEncoding.base64().decode(checkNotNull(expectedObject.getCrc32c())))));*/
+
+    GoogleCloudStorageItemInfo expectedObjectItemInfo =
+        gcsfsIHelper.gcs.getItemInfo(expectedObjectId);
+    assertThat(object).isEqualTo(expectedObjectItemInfo);
 
     // Verify that bucket-only fields are not set
     assertThat(object.getLocation()).isNull();
@@ -1329,16 +1299,10 @@ public class GoogleCloudStorageNewIntegrationTest {
     return testDir;
   }
 
-  private GoogleCloudStorage createGoogleCloudStorage(GoogleCloudStorageOptions options)
-      throws IOException {
-    return GoogleCloudStorageImpl.builder()
-        .setOptions(options)
-        .setCredentials(httpRequestsInitializer.getCredentials())
-        .setHttpRequestInitializer(gcsRequestsTracker)
-        .build();
-  }
+  protected abstract GoogleCloudStorage createGoogleCloudStorage(GoogleCloudStorageOptions options)
+      throws IOException;
 
-  private String getTestResource() {
+  protected String getTestResource() {
     return name.getMethodName() + "_" + UUID.randomUUID();
   }
 

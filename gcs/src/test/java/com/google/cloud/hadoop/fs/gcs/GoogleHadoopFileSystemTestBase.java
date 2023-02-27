@@ -54,7 +54,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
    * needed for setting up the credentials of a real GoogleCloudStorage.
    */
   protected static Configuration loadConfig() {
-    TestConfiguration testConf = TestConfiguration.getInstance();
     return GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
   }
 

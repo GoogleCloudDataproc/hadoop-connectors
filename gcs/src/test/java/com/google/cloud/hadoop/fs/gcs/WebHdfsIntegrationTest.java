@@ -28,7 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.runners.JUnit4;
 
 /**
  * Integration tests for HDFS.
@@ -44,7 +44,7 @@ import org.junit.runners.Parameterized;
  * the behavior of HDFS. The FileSystemDescriptor thus reroutes all the test methods through the
  * proper HDFS instance using webhdfs:/ paths.
  */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
 
   // Environment variable from which to get HDFS access info.
@@ -61,7 +61,7 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
 
     // Create a FileSystem instance to access the given HDFS.
     URI hdfsUri = new URI(hdfsRoot);
-    Configuration config = GoogleHadoopFileSystemTestBase.loadConfig(storageClientType);
+    Configuration config = new Configuration();
     config.set("fs.default.name", hdfsRoot);
     ghfs = FileSystem.get(hdfsUri, config);
 

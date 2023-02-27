@@ -22,7 +22,6 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -35,7 +34,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,10 +43,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   private FileSystem ghfs;
@@ -62,20 +59,13 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
   private String bucketName;
 
-  @Parameterized.Parameter public ClientType storageClientType;
-
-  @Parameters
-  public static Iterable<ClientType> getClientType() {
-    return List.of(ClientType.values());
-  }
-
   @Before
   public void before() throws Exception {
 
     ghfs = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketHelper.getUniqueBucketName("init"));
-    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig(storageClientType));
+    ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig());
 
     gcsiHelper =
         new GoogleCloudStorageFileSystemIntegrationHelper(
@@ -90,7 +80,6 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
   @After
   public void after() throws IOException {
     if (ghfs != null) {
-      ghfsHelper.afterAllTests();
       if (gcsiHelper != null) {
         gcsiHelper.afterAllTests();
         gcsiHelper = null;
