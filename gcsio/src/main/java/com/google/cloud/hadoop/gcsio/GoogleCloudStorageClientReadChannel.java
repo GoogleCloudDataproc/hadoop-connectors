@@ -493,14 +493,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private BlobSourceOption[] generateReadOptions(BlobId blobId) {
-      List<BlobSourceOption> readOptions = new ArrayList<>();
+      List<BlobSourceOption> blobReadOptions = new ArrayList<>();
       if (blobId.getGeneration() != null) {
-        readOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
+        blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
       }
       if (storageOptions.getEncryptionKey() != null) {
-        readOptions.add(BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+        blobReadOptions.add(
+            BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
       }
-      return readOptions.toArray(new BlobSourceOption[readOptions.size()]);
+      return blobReadOptions.toArray(new BlobSourceOption[blobReadOptions.size()]);
     }
 
     private boolean isFooterRead() {

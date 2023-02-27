@@ -157,20 +157,21 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
 
   private static BlobWriteOption[] generateWriteOptions(
       CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
-    List<BlobWriteOption> writeOptions = new ArrayList<>();
+    List<BlobWriteOption> blobWriteOptions = new ArrayList<>();
 
-    writeOptions.add(BlobWriteOption.disableGzipContent());
-    writeOptions.add(BlobWriteOption.generationMatch());
+    blobWriteOptions.add(BlobWriteOption.disableGzipContent());
+    blobWriteOptions.add(BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
-      writeOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
+      blobWriteOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
     if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
-      writeOptions.add(BlobWriteOption.crc32cMatch());
+      blobWriteOptions.add(BlobWriteOption.crc32cMatch());
     }
     if (storageOptions.getEncryptionKey() != null) {
-      writeOptions.add(BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+      blobWriteOptions.add(
+          BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
-    return writeOptions.toArray(new BlobWriteOption[writeOptions.size()]);
+    return blobWriteOptions.toArray(new BlobWriteOption[blobWriteOptions.size()]);
   }
 
   @Override
