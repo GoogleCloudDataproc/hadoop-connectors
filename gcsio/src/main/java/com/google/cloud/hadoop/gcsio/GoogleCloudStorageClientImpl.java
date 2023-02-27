@@ -134,7 +134,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     return new GoogleCloudStorageClientReadChannel(
-        storage, itemInfo == null ? getItemInfo(resourceId) : itemInfo, readOptions);
+        storage,
+        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
+        readOptions,
+        storageOptions);
   }
 
   @Override
@@ -179,6 +182,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       Credentials credentials, GoogleCloudStorageOptions storageOptions) {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
+        .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
         .setCredentials(credentials)
         .build()
         .getService();
