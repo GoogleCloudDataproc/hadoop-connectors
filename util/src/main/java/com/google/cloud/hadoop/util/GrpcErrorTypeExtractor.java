@@ -31,7 +31,7 @@ public class GrpcErrorTypeExtractor implements ErrorTypeExtractor {
   public ErrorType getErrorType(Exception error) {
     switch (Status.fromThrowable(error).getCode()) {
       case NOT_FOUND:
-        return ErrorType.NON_FOUND;
+        return ErrorType.NOT_FOUND;
       case OUT_OF_RANGE:
         return ErrorType.OUT_OF_RANGE;
       default:

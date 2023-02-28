@@ -33,10 +33,10 @@ import org.junit.runners.JUnit4;
 
 /**
  * Test suites of integration tests for {@link GoogleCloudStorageFileSystemImpl} class configured to
- * use java-storage client to connect to gcs server.
+ * use Apiary client to connect to gcs server.
  */
 @RunWith(JUnit4.class)
-public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
+public class GoogleCloudStorageFileSystemHttpClientNewIntegrationTest
     extends GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @BeforeClass
@@ -55,7 +55,7 @@ public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(gcsOptions)
-                .setClientType(ClientType.STORAGE_CLIENT)
+                .setClientType(ClientType.HTTP_API_CLIENT)
                 .build());
 
     gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
@@ -74,7 +74,7 @@ public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
       throws IOException {
     return new GoogleCloudStorageFileSystemImpl(
         options ->
-            GoogleCloudStorageClientImpl.builder()
+            GoogleCloudStorageImpl.builder()
                 .setOptions(options)
                 .setCredentials(httpRequestsInitializer.getCredentials())
                 .setHttpRequestInitializer(gcsRequestsTracker)

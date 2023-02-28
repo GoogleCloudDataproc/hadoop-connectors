@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.Test;
@@ -29,7 +30,7 @@ public class GrpcErrorTypeExtractorTest {
   @Test
   public void testNotFound() {
     Exception ex = new StatusRuntimeException(Status.NOT_FOUND);
-    assertThat(typeExtractor.getErrorType(ex)).isEqualTo(ErrorType.NON_FOUND);
+    assertThat(typeExtractor.getErrorType(ex)).isEqualTo(ErrorType.NOT_FOUND);
   }
 
   @Test

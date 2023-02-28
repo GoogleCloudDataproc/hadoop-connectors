@@ -30,7 +30,6 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
@@ -122,18 +121,20 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     checkNotNull(options, "options must not be null");
-    if (options.getClientType() == ClientType.STORAGE_CLIENT) {
-      return GoogleCloudStorageClientImpl.builder()
-          .setOptions(options.getCloudStorageOptions())
-          .setCredentials(credentials)
-          .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-          .build();
+    switch (options.getClientType()) {
+      case STORAGE_CLIENT:
+        return GoogleCloudStorageClientImpl.builder()
+            .setOptions(options.getCloudStorageOptions())
+            .setCredentials(credentials)
+            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .build();
+      default:
+        return GoogleCloudStorageImpl.builder()
+            .setOptions(options.getCloudStorageOptions())
+            .setCredentials(credentials)
+            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .build();
     }
-    return GoogleCloudStorageImpl.builder()
-        .setOptions(options.getCloudStorageOptions())
-        .setCredentials(credentials)
-        .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-        .build();
   }
 
   /**
@@ -145,7 +146,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    */
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
-    this(createCloudStorage(options, credentials, null), options);
+    this(createCloudStorage(options, credentials, /* downscopedAccessTokenFn= */ null), options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 

@@ -50,6 +50,7 @@ import java.util.List;
 class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   private final StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
   private final GoogleCloudStorageOptions storageOptions;
@@ -556,7 +557,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private IOException convertError(Exception error) {
     String msg = String.format("Error reading '%s'", resourceId);
     switch (errorExtractor.getErrorType(error)) {
-      case NON_FOUND:
+      case NOT_FOUND:
         return createFileNotFoundException(
             resourceId.getBucketName(), resourceId.getObjectName(), new IOException(msg, error));
       case OUT_OF_RANGE:
