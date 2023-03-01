@@ -62,6 +62,14 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     return config;
   }
 
+  protected static Configuration loadConfig(Configuration config, ClientType storageClientType) {
+    Configuration newConfig = new Configuration(config);
+    newConfig.setBoolean("fs.gs.implicit.dir.repair.enable", true);
+    newConfig.setBoolean("fs.gs.bucket.delete.enable", true);
+    newConfig.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
+    return newConfig;
+  }
+
   // -----------------------------------------------------------------------------------------
   // Tests that vary according to the GHFS variant, but which we want to make sure get tested.
   // -----------------------------------------------------------------------------------------

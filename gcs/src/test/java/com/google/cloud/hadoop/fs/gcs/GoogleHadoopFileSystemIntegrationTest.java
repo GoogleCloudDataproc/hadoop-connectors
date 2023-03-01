@@ -540,8 +540,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
   public void testBuildOptionsFromConfig() {
-    Configuration config = loadConfig(storageClientType);
-
+    Configuration config = loadConfig(new Configuration(), storageClientType);
     config.set(GCS_PROJECT_ID.toString(), "projectId");
     config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     config.set("fs.gs.auth.service.account.json.keyfile", "path/to/serviceAccountKeyFile.json");
