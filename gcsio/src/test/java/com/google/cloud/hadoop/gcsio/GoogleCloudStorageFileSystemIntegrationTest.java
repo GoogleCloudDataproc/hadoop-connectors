@@ -184,9 +184,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
       Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
 
-      // Causing flakiness for unittest
-      // Comparing just upto milliseconds as that's the least count we have for
-      // `fileModificationTime`
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
           .that(fileModificationTime)
