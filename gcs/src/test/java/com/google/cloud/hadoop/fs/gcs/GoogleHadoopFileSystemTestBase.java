@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -58,7 +57,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   protected static Configuration loadConfig(ClientType storageClientType) {
     Configuration config = loadConfig();
-    config.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
+    config.setEnum("fs.gs.client.type", storageClientType);
     return config;
   }
 
@@ -66,7 +65,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     Configuration newConfig = new Configuration(config);
     newConfig.setBoolean("fs.gs.implicit.dir.repair.enable", true);
     newConfig.setBoolean("fs.gs.bucket.delete.enable", true);
-    newConfig.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
+    newConfig.setEnum("fs.gs.client.type", storageClientType);
     return newConfig;
   }
 
