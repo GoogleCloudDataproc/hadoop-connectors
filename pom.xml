@@ -91,7 +91,7 @@
     <google.api-storage.version>v1-rev20220705-${google.api-client-libraries.version}</google.api-storage.version>
     <google.auth.version>1.12.1</google.auth.version>
     <google.auto-value.version>1.10.1</google.auto-value.version>
-    <google.cloud-bigquerystorage.version>2.25.0</google.cloud-bigquerystorage.version>
+    <google.cloud-bigquerystorage.version>2.28.4</google.cloud-bigquerystorage.version>
     <google.cloud-core.version>2.5.4</google.cloud-core.version>
     <google.cloud-storage.bom.version>2.17.2</google.cloud-storage.bom.version>
     <google.flogger.version>0.7.1</google.flogger.version>
