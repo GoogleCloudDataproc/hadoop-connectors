@@ -34,18 +34,17 @@ import java.util.logging.Logger;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
 /**
  * The unittest version of {@code GoogleCloudStorageFileSystemIntegrationTest}; the external
  * GoogleCloudStorage dependency is replaced by an in-memory version which mimics the same
  * bucket/object semantics.
  */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSystemIntegrationTest {
 
   @Before
-  @Override
   public void before() throws Exception {
     // Disable logging.
     // Normally you would need to keep a strong reference to any logger used for
@@ -81,12 +80,40 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
             .build());
   }
 
+  private GoogleCloudStorageFileSystemOptions.Builder getDefaultFileSystemOptions() {
+    return GoogleCloudStorageFileSystemOptions.builder().setClientType(storageClientType);
+  }
+
+  private Class getGoogleCloudStorageImplClass() {
+    switch (storageClientType) {
+      case STORAGE_CLIENT:
+        return GoogleCloudStorageClientImpl.class;
+      default:
+        return GoogleCloudStorageImpl.class;
+    }
+  }
+
+  @Test
+  public void testClientType() throws IOException {
+    GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
+
+    setDefaultValidOptions(optionsBuilder);
+
+    GoogleCloudStorageFileSystemOptions options = optionsBuilder.build();
+
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder().setProjectId(null).build());
+
+    GoogleCloudStorageFileSystem gcsfs =
+        new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build());
+    assertThat(gcsfs.getGcs()).isInstanceOf(getGoogleCloudStorageImplClass());
+  }
+
   /** Validates constructor. */
   @Test
   public void testConstructor() throws IOException {
     GoogleCredential cred = new GoogleCredential();
-    GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
-        GoogleCloudStorageFileSystemOptions.builder();
+    GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
 
     setDefaultValidOptions(optionsBuilder);
 
@@ -136,7 +163,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
         new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
 
     // White-box testing; check a few internal outcomes of our options.
-    assertThat(tmpGcsFs.getGcs()).isInstanceOf(GoogleCloudStorageImpl.class);
+    assertThat(tmpGcsFs.getGcs()).isInstanceOf(getGoogleCloudStorageImplClass());
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getRequesterPaysOptions())
         .isEqualTo(RequesterPaysOptions.DEFAULT);
   }

@@ -85,7 +85,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
 
   @Before
   public void setUp() throws Exception {
-    fakeWriteChannel = spy(new FakeWriteChannel());
+    fakeWriteChannel = spy(new CoopLockIntegrationTest.FakeWriteChannel());
     when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
         .thenReturn(fakeWriteChannel);
     writeChannel = getJavaStorageChannel();
@@ -137,7 +137,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
 
   @Test
   public void writeMultipleChunksFailure() throws IOException {
-    fakeWriteChannel = spy(new FakeWriteChannel(true));
+    fakeWriteChannel = spy(new CoopLockIntegrationTest.FakeWriteChannel(true));
     ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
     ArgumentCaptor<BlobWriteOption> blobWriteOptionsCapture =
         ArgumentCaptor.forClass(BlobWriteOption.class);
@@ -172,7 +172,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
 
     when(mockedJavaClientStorage.writer(any(), any()))
         .thenReturn(
-            new FakeWriteChannel() {
+            new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
               public int write(ByteBuffer src) {
                 try {

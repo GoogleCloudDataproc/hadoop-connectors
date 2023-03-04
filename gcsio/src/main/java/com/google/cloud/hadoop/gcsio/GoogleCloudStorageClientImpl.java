@@ -23,7 +23,10 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
+import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
@@ -50,6 +53,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
+
+  // Error extractor to map APi exception to meaningful ErrorTypes.
+  private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -123,6 +129,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         storage,
         itemInfo == null ? getItemInfo(resourceId) : itemInfo,
         readOptions,
+        errorExtractor,
         storageOptions);
   }
 
@@ -189,7 +196,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
-        .setCredentials(credentials)
+        .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
         .build()
         .getService();
   }

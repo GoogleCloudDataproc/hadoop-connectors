@@ -88,5 +88,9 @@
       <groupId>com.google.truth</groupId>
       <artifactId>truth</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-api</artifactId>
+    </dependency>
   </dependencies>
 </project>

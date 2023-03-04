@@ -31,6 +31,7 @@ import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -131,7 +132,7 @@ class GoogleCloudStorageClientWriteChannel extends BaseAbstractGoogleAsyncWriteC
           }
           byteBuffer.put(data.toByteArray());
           // switch to read mode
-          byteBuffer.flip();
+          ((Buffer) byteBuffer).flip();
           // this could result into partial write
           writeInternal(byteBuffer);
           if (!lastChunk) {

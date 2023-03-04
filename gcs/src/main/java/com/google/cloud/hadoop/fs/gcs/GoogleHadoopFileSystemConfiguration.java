@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksum
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
@@ -458,9 +459,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
 
-  /** Configuration key to enable using google-cloud-storage client for connecting with GCS */
-  public static final HadoopConfigurationProperty<Boolean> GCS_JAVA_CLIENT_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.javaclient.enable", false);
+  /** Configuration key to configure client to use for GCS access. */
+  public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
+      new HadoopConfigurationProperty<>("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
@@ -468,6 +469,7 @@ public class GoogleHadoopFileSystemConfiguration {
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
+        .setClientType(GCS_CLIENT_TYPE.get(config, config::getEnum))
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
         .setCooperativeLockingEnabled(
             GCS_COOPERATIVE_LOCKING_ENABLE.get(config, config::getBoolean))
@@ -476,8 +478,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setJavaClientEnabled(GCS_JAVA_CLIENT_ENABLE.get(config, config::getBoolean));
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
