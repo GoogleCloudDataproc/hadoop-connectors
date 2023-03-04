@@ -26,6 +26,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -38,6 +39,7 @@ import com.google.common.io.CharStreams;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -49,10 +51,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemNewIntegrationTest {
 
   private static GoogleCloudStorageOptions gcsOptions;
@@ -62,6 +65,13 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
 
   @Rule public TestName name = new TestName();
   private TrackingHttpRequestInitializer gcsRequestsTracker;
+
+  @Parameterized.Parameter public ClientType storageClientType;
+
+  @Parameters
+  public static Iterable<ClientType> getClientType() {
+    return List.of(ClientType.values());
+  }
 
   @Before
   public void before() throws Throwable {
@@ -79,14 +89,14 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     testBucketName = ghfsIHelper.getUniqueBucketName("new-it");
     URI testBucketUri = new URI("gs://" + testBucketName);
 
-    ghfs.initialize(testBucketUri, GoogleHadoopFileSystemTestBase.loadConfig());
+    ghfs.initialize(testBucketUri, GoogleHadoopFileSystemTestBase.loadConfig(storageClientType));
 
     ghfs.getGcsFs().mkdir(testBucketUri);
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
   @After
-  public void after() {
+  public void after() throws IOException {
     ghfsIHelper.afterAllTests();
   }
 
@@ -181,7 +191,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     ghfs.initialize(
         UriPaths.fromResourceId(
             new StorageResourceId(testBucketName), /* allowEmptyObjectName= */ true),
-        GoogleHadoopFileSystemTestBase.loadConfig());
+        GoogleHadoopFileSystemTestBase.loadConfig(storageClientType));
     return ghfs;
   }
 }

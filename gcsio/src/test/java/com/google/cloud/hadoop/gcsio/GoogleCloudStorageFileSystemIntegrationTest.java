@@ -24,6 +24,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -55,10 +56,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageFileSystemIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -73,13 +75,20 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   // Time when test started. Used for determining which objects got
   // created after the test started.
-  protected final Instant testStartTime = Instant.now();
+  protected static final Instant testStartTime = Instant.now();
 
   protected String sharedBucketName1;
   protected String sharedBucketName2;
 
   // Name of the test object.
   protected String objectName = "gcsio-test.txt";
+
+  @Parameterized.Parameter public ClientType storageClientType;
+
+  @Parameters
+  public static Iterable<ClientType> getClientType() {
+    return List.of(ClientType.values());
+  }
 
   /** Perform initialization once before tests are run. */
   @Before
@@ -92,6 +101,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           GoogleCloudStorageFileSystemOptions.builder().setMarkerFilePattern("_(FAILURE|SUCCESS)");
 
       optionsBuilder
+          .setClientType(storageClientType)
           .setBucketDeleteEnabled(true)
           .setCloudStorageOptions(
               GoogleCloudStorageOptions.builder()

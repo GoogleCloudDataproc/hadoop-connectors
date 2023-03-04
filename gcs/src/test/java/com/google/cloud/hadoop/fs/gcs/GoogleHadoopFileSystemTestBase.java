@@ -23,10 +23,9 @@ import static com.google.common.truth.Truth.assertWithMessage;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -53,25 +52,21 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
    * needed for setting up the credentials of a real GoogleCloudStorage.
    */
   protected static Configuration loadConfig() {
-    TestConfiguration testConf = TestConfiguration.getInstance();
-    return loadConfig(testConf.getProjectId(), testConf.getServiceAccountJsonKeyFile());
+    return GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
   }
 
-  /** Helper to load GHFS-specific config values other than those from the environment. */
-  protected static Configuration loadConfig(String projectId, String serviceAccountJsonKeyFile) {
-    assertWithMessage("Expected value for env var %s", TestConfiguration.GCS_TEST_PROJECT_ID)
-        .that(projectId)
-        .isNotNull();
-    Configuration config = new Configuration();
-    config.set("fs.gs.project.id", projectId);
-    if (serviceAccountJsonKeyFile != null) {
-      config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
-      config.set("fs.gs.auth.service.account.json.keyfile", serviceAccountJsonKeyFile);
-    }
-    config.setBoolean("fs.gs.implicit.dir.repair.enable", true);
-    // Allow buckets to be deleted in test cleanup:
-    config.setBoolean("fs.gs.bucket.delete.enable", true);
+  protected static Configuration loadConfig(ClientType storageClientType) {
+    Configuration config = loadConfig();
+    config.setEnum("fs.gs.client.type", storageClientType);
     return config;
+  }
+
+  protected static Configuration loadConfig(Configuration config, ClientType storageClientType) {
+    Configuration newConfig = new Configuration(config);
+    newConfig.setBoolean("fs.gs.implicit.dir.repair.enable", true);
+    newConfig.setBoolean("fs.gs.bucket.delete.enable", true);
+    newConfig.setEnum("fs.gs.client.type", storageClientType);
+    return newConfig;
   }
 
   // -----------------------------------------------------------------------------------------

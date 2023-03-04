@@ -110,6 +110,17 @@ public class HadoopFileSystemIntegrationHelper
     ghfs.delete(path, false);
   }
 
+  @Override
+  public void afterAllTests() {
+    try {
+      ghfs.delete(new Path(ghfs.getUri()), true);
+      super.afterAllTests();
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Exception while cleaning up the root %s", ghfs.getUri()), e);
+    }
+  }
+
   /** Deletes the given object. */
   @Override
   protected void delete(String bucketName, String objectName) throws IOException {
