@@ -160,7 +160,7 @@ public class GoogleCloudStorageImplCreateTest {
     // This mock will be used only when JavaClientStorage is enabled
     when(mockedJavaClientStorage.writer(any(), any()))
         .thenReturn(
-            new FakeWriteChannel() {
+            new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
               public void close() {
                 throw fakeError;
@@ -233,7 +233,7 @@ public class GoogleCloudStorageImplCreateTest {
     // This mock will be used only when JavaClientStorage is enabled
     when(mockedJavaClientStorage.writer(any(), any()))
         .thenReturn(
-            new FakeWriteChannel() {
+            new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
               public void close() {
                 throw fakeException;
@@ -278,7 +278,7 @@ public class GoogleCloudStorageImplCreateTest {
     // This mock will be used only when JavaClientStorage is enabled
     when(mockedJavaClientStorage.writer(any(), any()))
         .thenReturn(
-            new FakeWriteChannel() {
+            new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
               public int write(ByteBuffer src) {
                 try {

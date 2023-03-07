@@ -243,7 +243,9 @@ public class CoopLockRepairIntegrationTest {
 
   @Test
   public void failedDirectoryDelete_noLockFile_checkSucceeds() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("coop-delete-check-no-lock-failed");
+    String bucketName =
+        gcsfsIHelper.createUniqueBucket(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String fileName = "file";
     URI dirUri = bucketUri.resolve("delete_" + UUID.randomUUID() + "/");
@@ -292,7 +294,9 @@ public class CoopLockRepairIntegrationTest {
 
   @Test
   public void failedDirectoryDelete_noLogFile_checkSucceeds() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("coop-delete-check-no-log-failed");
+    String bucketName =
+        gcsfsIHelper.createUniqueBucket(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String fileName = "file";
     URI dirUri = bucketUri.resolve("delete_" + UUID.randomUUID() + "/");
@@ -441,7 +445,9 @@ public class CoopLockRepairIntegrationTest {
 
   @Test
   public void successfulDirectoryDelete_rollForward() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("coop-delete-forward-successful");
+    String bucketName =
+        gcsfsIHelper.createUniqueBucket(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
 
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String fileName = "file";
@@ -489,7 +495,9 @@ public class CoopLockRepairIntegrationTest {
 
   @Test
   public void failedDirectoryRename_noLogFile_successfullyRepaired() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("coop-rename-back-failed-copy-nolog");
+    String bucketName =
+        gcsfsIHelper.createUniqueBucket(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirName = "rename_" + UUID.randomUUID();
     String fileName = "file";
@@ -577,7 +585,7 @@ public class CoopLockRepairIntegrationTest {
     String commandSuffix = Ascii.toLowerCase(command).replace("--roll", "");
     String bucketName =
         gcsfsIHelper.createUniqueBucket(
-            String.format("coop-rename-%s-failed-%s", commandSuffix, failCopy ? "copy" : "delete"));
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirName = "rename_" + UUID.randomUUID();
     String fileName = "file";

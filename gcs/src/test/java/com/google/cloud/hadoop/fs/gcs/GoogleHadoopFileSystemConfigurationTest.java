@@ -45,6 +45,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksum
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
@@ -75,6 +76,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
+          put("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
           put("fs.gs.cooperative.locking.enable", false);
           put("fs.gs.cooperative.locking.expiration.timeout.ms", 120_000L);
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
@@ -136,7 +138,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
-          put("fs.gs.javaclient.enable", false);
         }
       };
 

@@ -24,15 +24,12 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
@@ -44,52 +41,18 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-/** Integration tests for {@link GoogleCloudStorageFileSystem} class. */
-@RunWith(JUnit4.class)
-public class GoogleCloudStorageFileSystemNewIntegrationTest {
+/** Abstract base class of integration tests for {@link GoogleCloudStorageFileSystem} class. */
+public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
-  private static GoogleCloudStorageOptions gcsOptions;
-  private static RetryHttpInitializer httpRequestsInitializer;
-  private static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
+  protected static GoogleCloudStorageOptions gcsOptions;
+  protected static RetryHttpInitializer httpRequestsInitializer;
+  protected static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
 
   @Rule public TestName name = new TestName();
-
-  @BeforeClass
-  public static void before() throws Throwable {
-    Credential credential =
-        checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
-
-    gcsOptions = getStandardOptionBuilder().build();
-    httpRequestsInitializer =
-        new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
-
-    GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
-            credential,
-            GoogleCloudStorageFileSystemOptions.builder()
-                .setBucketDeleteEnabled(true)
-                .setCloudStorageOptions(gcsOptions)
-                .build());
-
-    gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
-    gcsfsIHelper.beforeAllTests();
-  }
-
-  @AfterClass
-  public static void afterClass() throws Throwable {
-    gcsfsIHelper.afterAllTests();
-    GoogleCloudStorageFileSystem gcsfs = gcsfsIHelper.gcsfs;
-    assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName1))).isFalse();
-    assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName2))).isFalse();
-  }
 
   @Test
   public void mkdir_shouldCreateNewDirectory() throws Exception {
@@ -1167,11 +1130,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     return GoogleCloudStorageFileSystemOptions.builder().setCloudStorageOptions(gcsOptions);
   }
 
-  private static GoogleCloudStorageFileSystem newGcsFs(
+  protected abstract GoogleCloudStorageFileSystem newGcsFs(
       GoogleCloudStorageFileSystemOptions gcsfsOptions,
       TrackingHttpRequestInitializer gcsRequestsTracker)
-      throws IOException {
-    return new GoogleCloudStorageFileSystem(
-        o -> new GoogleCloudStorageImpl(o, gcsRequestsTracker), gcsfsOptions);
-  }
+      throws IOException;
 }

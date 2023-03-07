@@ -14,12 +14,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -27,9 +21,9 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.File;
 import java.io.IOException;
@@ -57,27 +51,21 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
    * needed for setting up the credentials of a real GoogleCloudStorage.
    */
   protected static Configuration loadConfig() {
-    TestConfiguration testConf = TestConfiguration.getInstance();
-    return loadConfig(
-        testConf.getProjectId(), testConf.getServiceAccount(), testConf.getPrivateKeyFile());
+    return GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
   }
 
-  /** Helper to load GHFS-specific config values other than those from the environment. */
-  protected static Configuration loadConfig(
-      String projectId, String serviceAccount, String privateKeyFile) {
-    assertWithMessage("Expected value for env var %s", TestConfiguration.GCS_TEST_PROJECT_ID)
-        .that(projectId)
-        .isNotNull();
-    Configuration config = new Configuration();
-    config.set(GCS_PROJECT_ID.getKey(), projectId);
-    if (serviceAccount != null && privateKeyFile != null) {
-      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
-      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
-    }
-    config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
-    // Allow buckets to be deleted in test cleanup:
-    config.setBoolean(GCE_BUCKET_DELETE_ENABLE.getKey(), true);
+  protected static Configuration loadConfig(ClientType storageClientType) {
+    Configuration config = loadConfig();
+    config.setEnum("fs.gs.client.type", storageClientType);
     return config;
+  }
+
+  protected static Configuration loadConfig(Configuration config, ClientType storageClientType) {
+    Configuration newConfig = new Configuration(config);
+    newConfig.setBoolean("fs.gs.implicit.dir.repair.enable", true);
+    newConfig.setBoolean("fs.gs.bucket.delete.enable", true);
+    newConfig.setEnum("fs.gs.client.type", storageClientType);
+    return newConfig;
   }
 
   // -----------------------------------------------------------------------------------------

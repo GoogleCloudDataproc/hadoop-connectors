@@ -40,10 +40,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
-/** Unittests for {@link GoogleHadoopFileSystem} class. */
-@RunWith(JUnit4.class)
+/** Unit tests for {@link GoogleHadoopFileSystem} class. */
+@RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegrationTest {
 
   @Before
@@ -74,6 +74,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
     lazyConf.set(
         GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
+    lazyConf.setEnum("fs.gs.client.type", storageClientType);
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
 
     lazyFs.initialize(new URI("gs://test-non-existent/"), lazyConf);
@@ -87,6 +88,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
     lazyConf.set(
         GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
+    lazyConf.setEnum("fs.gs.client.type", storageClientType);
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
 
     lazyFs.initialize(new URI("gs://test-non-existent"), lazyConf);
@@ -115,6 +117,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     eagerConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), false);
     eagerConf.set(
         GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
+    eagerConf.setEnum("fs.gs.client.type", storageClientType);
+
     FileSystem eagerFs = new GoogleHadoopFileSystem();
 
     FileNotFoundException exception =
@@ -178,6 +182,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void testGetDefaultPortIndicatesPortsAreNotUsed() throws Exception {
     Configuration config = new Configuration();
     config.set("fs.gs.auth.access.token.provider.impl", TestingAccessTokenProvider.class.getName());
+    config.setEnum("fs.gs.client.type", storageClientType);
     URI gsUri = new URI("gs://foobar/");
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
