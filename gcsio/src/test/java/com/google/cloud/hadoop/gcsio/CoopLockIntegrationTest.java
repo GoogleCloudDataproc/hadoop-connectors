@@ -34,6 +34,8 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.cloud.RestorableState;
+import com.google.cloud.WriteChannel;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
@@ -44,6 +46,7 @@ import com.google.gson.Gson;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -303,5 +306,57 @@ public class CoopLockIntegrationTest {
             interceptFn.accept(interceptedRequest);
           });
     };
+  }
+
+  /** FakeWriterChannel which writes only half the passed in byteBuffer capacity at a time. */
+  public static class FakeWriteChannel implements WriteChannel {
+
+    private boolean open = true;
+
+    private final boolean throwExceptionOnWrite;
+
+    public FakeWriteChannel() {
+      this.throwExceptionOnWrite = false;
+    }
+
+    public FakeWriteChannel(boolean throwExceptionOnWrite) {
+      this.throwExceptionOnWrite = throwExceptionOnWrite;
+    }
+
+    @Override
+    public void setChunkSize(int i) {}
+
+    @Override
+    public RestorableState<WriteChannel> capture() {
+      return null;
+    }
+
+    @Override
+    public int write(ByteBuffer src) throws IOException {
+      if (throwExceptionOnWrite) {
+        throw new IOException("Intentionally triggered");
+      }
+      int bytesWritten = 0;
+      // always writes half or less from the provided byte buffer capacity
+      int capacity = src.capacity();
+      if ((src.limit() - src.position()) <= capacity / 2) {
+        bytesWritten = src.limit();
+        src.position(src.limit());
+      } else {
+        bytesWritten = capacity / 2;
+        src.position(src.position() + capacity / 2);
+      }
+      return bytesWritten;
+    }
+
+    @Override
+    public boolean isOpen() {
+      return open;
+    }
+
+    @Override
+    public void close() throws IOException {
+      open = false;
+    }
   }
 }
