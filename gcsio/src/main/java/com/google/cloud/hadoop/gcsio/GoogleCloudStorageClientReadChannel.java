@@ -31,6 +31,7 @@ import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -43,7 +44,10 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /** Provides seekable read access to GCS via java-storage library. */
 @VisibleForTesting
@@ -220,8 +224,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
           }
-          int bytesRead = byteChannel.read(dst);
-
+          int bytesRead = readFromByteChannel(dst);
           if (bytesRead == 0) {
             throw new IOException(
                 String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
@@ -264,6 +267,25 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         }
       }
       return totalBytesRead;
+    }
+
+    private int readFromByteChannel(ByteBuffer buffer) throws IOException {
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      int numBytesRead = byteChannel.read(buffer);
+      readAPITrace(stopwatch, numBytesRead);
+      return numBytesRead;
+    }
+
+    private void readAPITrace(Stopwatch stopwatch, int bytesRead) {
+      long elapsedTime = stopwatch.elapsed(TimeUnit.MILLISECONDS);
+      if (storageOptions.isTraceLogEnabled()) {
+        Map<String, Object> jsonMap = new HashMap<>();
+        jsonMap.put("method", "java-storage-read");
+        jsonMap.put("bytesRead", bytesRead);
+        jsonMap.put("gcs-path", resourceId);
+        jsonMap.put("durationMs", elapsedTime);
+        EventLoggingHttpRequestInitializer.logDetails(jsonMap);
+      }
     }
 
     private int partiallyReadBytes(int remainingBeforeRead, ByteBuffer dst) {
@@ -327,6 +349,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         int totalBytesRead = 0;
         int bytesRead;
         do {
+          Stopwatch stopwatch = Stopwatch.createStarted();
           bytesRead = footerStream.read(footerContent, totalBytesRead, footerSize - totalBytesRead);
           if (bytesRead >= 0) {
             totalBytesRead += bytesRead;
@@ -410,7 +433,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       while (seekDistance > 0 && byteChannel != null) {
         try {
           int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
-          int bytesRead = byteChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+          int bytesRead = readFromByteChannel(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
           if (bytesRead < 0) {
             logger.atInfo().log(
                 "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
@@ -487,6 +510,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       try {
         readChannel.seek(seek);
         readChannel.limit(limit);
+        Map<String, Object> jsonMap = new HashMap<>();
+        jsonMap.put("method", "open-byte-channel");
+        EventLoggingHttpRequestInitializer.logDetails(jsonMap);
         return readChannel;
       } catch (Exception e) {
         throw new IOException(

@@ -39,6 +39,7 @@ import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
@@ -51,6 +52,9 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -312,7 +316,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           currentPosition);
 
       try {
-        int numBytesRead = contentChannel.read(buffer);
+        int numBytesRead = readFromContentChannel(buffer);
         checkIOPrecondition(numBytesRead != 0, "Read 0 bytes without blocking");
         if (numBytesRead < 0) {
           // Because we don't know decompressed object size for gzip-encoded objects,
@@ -586,7 +590,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     while (seekDistance > 0 && contentChannel != null) {
       try {
         int bufferSize = Math.toIntExact(Math.min(skipBuffer.length, seekDistance));
-        int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+        int bytesRead = readFromContentChannel(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
         if (bytesRead < 0) {
           // Shouldn't happen since we called validatePosition prior to this loop.
           logger.atInfo().log(
@@ -1145,6 +1149,24 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       getMetadata.setGeneration(resourceId.getGenerationId());
     }
     return getMetadata;
+  }
+
+  private int readFromContentChannel(ByteBuffer buffer) throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    int numBytesRead = contentChannel.read(buffer);
+    readAPITrace(stopwatch, numBytesRead);
+    return numBytesRead;
+  }
+
+  private void readAPITrace(Stopwatch stopwatch, int bytesRead) {
+    if (readOptions.isTraceLogEnabled()) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put("method", "apiary-read");
+      jsonMap.put("gcs-path", resourceId);
+      jsonMap.put("bytesRead", bytesRead);
+      jsonMap.put("durationMs", stopwatch.elapsed(TimeUnit.MILLISECONDS));
+      EventLoggingHttpRequestInitializer.logDetails(jsonMap);
+    }
   }
 
   /** Throws if this channel is not currently open. */

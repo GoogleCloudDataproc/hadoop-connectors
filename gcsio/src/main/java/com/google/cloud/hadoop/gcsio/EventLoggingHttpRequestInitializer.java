@@ -52,7 +52,7 @@ import java.util.stream.Stream;
 @VisibleForTesting
 public class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private final Gson gson = new Gson();
+  private static final Gson gson = new Gson();
 
   private static final ImmutableSet<String> REDACTED_REQUEST_HEADERS =
       Stream.of(AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION)
@@ -102,7 +102,7 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
     logDetails(jsonMap);
   }
 
-  private void logDetails(Map<String, Object> jsonMap) {
+  public static void logDetails(Map<String, Object> jsonMap) {
     logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
   }
 
