@@ -284,7 +284,13 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         jsonMap.put("bytesRead", bytesRead);
         jsonMap.put("gcs-path", resourceId);
         jsonMap.put("durationMs", elapsedTime);
-        EventLoggingHttpRequestInitializer.logDetails(jsonMap);
+        captureTraces(jsonMap);
+      }
+    }
+
+    private void captureTraces(Map<String, Object> apiTraces) {
+      if (storageOptions.isTraceLogEnabled()) {
+        EventLoggingHttpRequestInitializer.logDetails(apiTraces);
       }
     }
 
@@ -510,9 +516,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       try {
         readChannel.seek(seek);
         readChannel.limit(limit);
-        Map<String, Object> jsonMap = new HashMap<>();
-        jsonMap.put("method", "open-byte-channel");
-        EventLoggingHttpRequestInitializer.logDetails(jsonMap);
+        if (storageOptions.isTraceLogEnabled()) {
+          Map<String, Object> jsonMap = new HashMap<>();
+          jsonMap.put("method", "open-byte-channel");
+          captureTraces(jsonMap);
+        }
         return readChannel;
       } catch (Exception e) {
         throw new IOException(
