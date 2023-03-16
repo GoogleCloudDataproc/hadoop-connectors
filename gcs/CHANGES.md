@@ -7,7 +7,7 @@
 
 1. Added implementation of gRPC read/write path using java-storage
 
-1. Upgrade Google Cloud Storage dependency to 2.17.2 
+1. Upgrade Google Cloud Storage dependency to 2.17.2
 
 ## 2.2.11 - 2023-01-23
 
