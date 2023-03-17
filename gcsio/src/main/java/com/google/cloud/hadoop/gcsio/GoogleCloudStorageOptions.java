@@ -114,6 +114,9 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getProxyAddress();
 
   @Nullable
+  public abstract String getRequestReason();
+
+  @Nullable
   public abstract RedactedString getProxyUsername();
 
   @Nullable
@@ -203,6 +206,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setProxyUsername(RedactedString proxyUsername);
 
     public abstract Builder setProxyPassword(RedactedString proxyPassword);
+
+    public abstract Builder setRequestReason(String reason);
 
     public abstract Builder setCopyWithRewriteEnabled(boolean copyWithRewrite);
 

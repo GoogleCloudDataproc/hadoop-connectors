@@ -2195,6 +2195,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   <RequestT extends StorageRequest<?>> RequestT configureRequest(
       RequestT request, String bucketName) {
+    setRequestReason(request);
     setRequesterPaysProject(request, bucketName);
 
     if (request instanceof Storage.Objects.Get || request instanceof Storage.Objects.Insert) {
@@ -2207,6 +2208,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return request;
+  }
+
+  private <RequestT extends StorageRequest<?>> void setRequestReason(RequestT request) {
+    request.getRequestHeaders().set("x-goog-request-reason", storageOptions.getRequestReason());
   }
 
   private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {
