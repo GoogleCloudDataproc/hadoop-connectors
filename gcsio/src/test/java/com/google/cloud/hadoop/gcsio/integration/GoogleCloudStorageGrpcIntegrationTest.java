@@ -79,7 +79,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private final boolean tdEnabled;
 
   @Parameters
-  // TODO: Disabled TD for cloud-build b/274371396 enable once resolved.
+  // TODO: Disabled TD for cloud-build issues/956 enable once resolved.
   public static Iterable<Boolean> tdEnabled() {
     return ImmutableList.of(TEST_CONFIGURATION.isTrafficDirector());
   }
