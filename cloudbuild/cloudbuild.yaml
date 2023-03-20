@@ -43,6 +43,7 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
+      - 'TRAFFIC_DIRECTOR_ENABLED=false'
 
   # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -57,6 +58,7 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
+      - 'TRAFFIC_DIRECTOR_ENABLED=false'
 
 # Tests take on average 25 minutes to run
 timeout: 2400s
