@@ -22,6 +22,8 @@ public abstract class TestConfiguration {
 
   public static final String GCS_TEST_JSON_KEYFILE = "GCS_TEST_JSON_KEYFILE";
 
+  public static final String TRAFFIC_DIRECTOR_ENABLED = "TRAFFIC_DIRECTOR_ENABLED";
+
   /** Environment-based test configuration. */
   public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
     @Override
@@ -43,6 +45,16 @@ public abstract class TestConfiguration {
     public String getServiceAccountJsonKeyFile() {
       return System.getenv(GCS_TEST_JSON_KEYFILE);
     }
+
+    /** By default, TD is enabled unless specified specifically. */
+    @Override
+    public boolean isTrafficDirector() {
+      String td = System.getenv(TRAFFIC_DIRECTOR_ENABLED);
+      if (td != null && td.equalsIgnoreCase("false")) {
+        return false;
+      }
+      return true;
+    }
   }
 
   public static TestConfiguration getInstance() {
@@ -60,4 +72,6 @@ public abstract class TestConfiguration {
   public abstract String getPrivateKeyFile();
 
   public abstract String getServiceAccountJsonKeyFile();
+
+  public abstract boolean isTrafficDirector();
 }

@@ -41,6 +41,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils;
 import com.google.cloud.hadoop.gcsio.GrpcRequestTracingInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
+import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -65,6 +66,7 @@ import org.junit.runners.Parameterized.Parameters;
 public class GoogleCloudStorageGrpcIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  public static final TestConfiguration TEST_CONFIGURATION = TestConfiguration.getInstance();
 
   // Prefix this name with the prefix used in other gcs io integrate tests once it's whitelisted by
   // GCS to access gRPC API.
@@ -77,10 +79,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private final boolean tdEnabled;
 
   @Parameters
-  // Falling back to gRPC-LB for now as TD has issue with CloudBuild
-  // TODO: issues/956 Enabled TD once resolved.
+  // TODO: Disabled TD for cloud-build b/274371396 enable once resolved.
   public static Iterable<Boolean> tdEnabled() {
-    return ImmutableList.of(false);
+    return ImmutableList.of(TEST_CONFIGURATION.isTrafficDirector());
   }
 
   public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
