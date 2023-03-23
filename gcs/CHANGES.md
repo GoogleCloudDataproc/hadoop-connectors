@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 2.2.12 - 2023-03-23
 
 1. Added implementation of gRPC read/write path using java-storage
 
