@@ -67,6 +67,7 @@ import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Ascii;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -609,6 +610,24 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     int result = -1;
     logger.atFinest().log("getDefaultPort(): %d", result);
     return result;
+  }
+
+  public boolean hasPathCapability(Path path, String capability) throws IOException {
+    switch (validatePathCapabilityArgs(path, capability)) {
+        // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
+        // from Hadoop 3 when Hadoop 2 is no longer supported
+      case "fs.capability.paths.append":
+      case "fs.capability.paths.concat":
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private static String validatePathCapabilityArgs(Path path, String capability) {
+    checkNotNull(path);
+    checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
+    return Ascii.toLowerCase(capability);
   }
 
   /**

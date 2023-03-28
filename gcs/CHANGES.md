@@ -2,6 +2,8 @@
 
 ## Next
 
+1.  Upgrade Hadoop to 2.10.2/3.2.4.
+
 ## 2.1.9 - 2022-11-14
 
 1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
