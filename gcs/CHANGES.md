@@ -118,6 +118,8 @@
     fs.gs.outputstream.upload.chunk.size (default: 64m -> 24m)
     ```
 
+1.  Upgrade Hadoop to 3.3.5.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
