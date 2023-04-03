@@ -43,15 +43,14 @@ import java.util.concurrent.CountDownLatch;
 public class GoogleCloudStorageContentWriteStream {
 
   private final StorageResourceId resourceId;
-  private InsertChunkResponseObserver responseObserver;
-  private StreamObserver<WriteObjectRequest> requestStreamObserver;
   private final StorageStub stub;
   private final GoogleCloudStorageOptions storageOptions;
   private final AsyncWriteChannelOptions channelOptions;
   private final String uploadId;
   private final long writeOffset;
   private final Watchdog watchdog;
-  private boolean open;
+  private InsertChunkResponseObserver responseObserver;
+  private StreamObserver<WriteObjectRequest> requestStreamObserver;
 
   // Keeps track of inflight request in a stream
   private int inflightRequests = 0;
@@ -75,7 +74,10 @@ public class GoogleCloudStorageContentWriteStream {
 
   public void openStream() throws IOException {
     if (isOpen()) {
-      throw new IOException(String.format("Stream is already open for resourceId %s", resourceId));
+      throw new IOException(
+          String.format(
+              "Stream is already open for resourceId %s with uploadId %s and writeOffset %d",
+              resourceId, uploadId, writeOffset));
     }
     try {
       StorageStub storageStub = getStorageStubWithTracking(channelOptions.getGrpcWriteTimeout());
@@ -126,7 +128,7 @@ public class GoogleCloudStorageContentWriteStream {
     if (!isOpen()) {
       throw new IOException(
           String.format(
-              "Can't write without stream been open for '%s' with UploadID '%s' and writeOffset %d",
+              "Can't write without stream being open for '%s' with UploadID '%s' and writeOffset %d",
               resourceId, uploadId, writeOffset));
     }
     requestStreamObserver.onNext(request);
