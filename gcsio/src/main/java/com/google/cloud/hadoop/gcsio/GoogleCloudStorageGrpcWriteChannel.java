@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
@@ -27,7 +26,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -42,16 +40,11 @@ import com.google.storage.v2.QueryWriteStatusRequest;
 import com.google.storage.v2.QueryWriteStatusResponse;
 import com.google.storage.v2.StartResumableWriteRequest;
 import com.google.storage.v2.StartResumableWriteResponse;
-import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageStub;
 import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
+import com.google.storage.v2.WriteObjectResponse.WriteStatusCase;
 import com.google.storage.v2.WriteObjectSpec;
-import io.grpc.ClientCall;
-import io.grpc.Status;
-import io.grpc.stub.ClientCallStreamObserver;
-import io.grpc.stub.ClientCalls;
-import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -73,16 +66,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
 
-  // A set that defines all transient errors on which retry can be attempted.
-  private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
-      ImmutableSet.of(
-          Status.Code.DEADLINE_EXCEEDED,
-          Status.Code.INTERNAL,
-          Status.Code.RESOURCE_EXHAUSTED,
-          Status.Code.UNAVAILABLE);
-
   private final StorageStub stub;
-
   private final StorageResourceId resourceId;
   private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
@@ -183,6 +167,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private long writeOffset = 0;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
+    // TODO: performance gain by using a List instead of map
     private final TreeMap<Long, WriteObjectRequest> requestChunkMap = new TreeMap<>();
 
     UploadOperation(InputStream pipeSource, StorageResourceId resourceId, boolean tracingEnabled) {
@@ -243,124 +228,103 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSizeWithRetries(uploadId);
-      }
-      StorageStub storageStub = getStorageStubWithTracking(channelOptions.getGrpcWriteTimeout());
-      InsertChunkResponseObserver responseObserver =
-          new InsertChunkResponseObserver(uploadId, writeOffset);
-      ClientCall<WriteObjectRequest, WriteObjectResponse> call =
-          storageStub
-              .getChannel()
-              .newCall(StorageGrpc.getWriteObjectMethod(), stub.getCallOptions());
-      StreamObserver<WriteObjectRequest> writeObjectRequestStreamObserver =
-          ClientCalls.asyncClientStreamingCall(call, responseObserver);
-      StreamObserver<WriteObjectRequest> requestStreamObserver =
-          watchdog.watch(
-              call, writeObjectRequestStreamObserver, channelOptions.getGrpcWriteMessageTimeout());
-
-      // Wait for streaming RPC to become ready for upload.
-      try {
-        // wait for 1 min for the channel to be ready. Else bail out
-        if (!responseObserver.ready.await(60 * 1000, MILLISECONDS)) {
-          throw new IOException(
-              String.format(
-                  "Timed out while awaiting ready on responseObserver for '%s' with UploadID '%s'",
-                  resourceId, responseObserver.uploadId));
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException(
-            String.format(
-                "Interrupted while awaiting ready on responseObserver for '%s' with UploadID '%s'",
-                resourceId, responseObserver.uploadId));
+        freeUpCommittedRequests(requestChunkMap, writeOffset);
       }
 
       boolean objectFinalized = false;
+      GoogleCloudStorageContentWriteStream contentWriteChannelStream = null;
+      WriteObjectResponse writeObjectResponse = null;
       while (!objectFinalized) {
-        if (responseObserver.isComplete()) {
-          // reset streams
-          responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
-          call =
-              storageStub
-                  .getChannel()
-                  .newCall(StorageGrpc.getWriteObjectMethod(), stub.getCallOptions());
-          writeObjectRequestStreamObserver =
-              ClientCalls.asyncClientStreamingCall(call, responseObserver);
 
-          checkState(watchdog.getOpenStreams().size() == 0, "gRPC streams seems to be leaking");
-
-          requestStreamObserver =
-              watchdog.watch(
-                  call,
-                  writeObjectRequestStreamObserver,
-                  channelOptions.getGrpcWriteMessageTimeout());
+        if (contentWriteChannelStream == null || !contentWriteChannelStream.isOpen()) {
+          logger.atFinest().log(
+              "Opening new WriteObject stream for resource %s, Already written till offset %d",
+              resourceId, writeOffset);
+          contentWriteChannelStream =
+              new GoogleCloudStorageContentWriteStream(
+                  resourceId, storageOptions, stub, uploadId, writeOffset, watchdog);
+          contentWriteChannelStream.openStream();
         }
 
-        WriteObjectRequest insertRequest = null;
-        if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
-          insertRequest = getCachedRequest(requestChunkMap, writeOffset);
-          writeOffset += insertRequest.getChecksummedData().getContent().size();
-        } else {
-          // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
-          // for errors.
-          ByteString data =
-              ByteString.readFrom(
-                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
-          insertRequest = buildInsertRequest(writeOffset, data, false);
-          requestChunkMap.put(writeOffset, insertRequest);
-          writeOffset += data.size();
-        }
-        if (insertRequest != null) {
-          requestStreamObserver.onNext(insertRequest);
-          objectFinalized = insertRequest.getFinishWrite();
-        }
-        if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
-          break;
-        }
+        WriteObjectRequest insertRequest = getInsertRequest();
+        contentWriteChannelStream.writeChunk(insertRequest);
+        objectFinalized = insertRequest.getFinishWrite();
+
         if (objectFinalized
-            || requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
-          // We are closing request stream either
-          // 1. It's final request.
-          //  OR
-          // 2. If requestChunkMap is full. -> We are initiating `onComplete` call back so that gcs
-          // will checkpoint all chunks which we have already sent.
-          // It's imp to note here that we are just marking the stream complete. Object will still
-          // not be finalized and
-          // will only be done on a finalChunk i.e. insertRequest with `finishWrite` set to true.
-          requestStreamObserver.onCompleted();
-          try {
-            responseObserver.done.await();
-            if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
-              break;
-            }
-            // Clear the cached requests as we have established that
-            // 1. No more request to send in this stream AND
-            // 2. ResponseObserver is in Done state AND
-            // 3. No Error in ResponseObserver
-            logger.atFinest().log(
-                "Committed %d chunks against uploadId %s, resource %s. Cleaning up the requestChunkMap now.",
-                requestChunkMap.size(), uploadId, resourceId.toString());
-            requestChunkMap.clear();
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(
+            || contentWriteChannelStream.getInflightRequestCount()
+                >= channelOptions.getNumberOfBufferedRequests()) {
+          writeObjectResponse = contentWriteChannelStream.closeStream();
+          // TODO: extract committedWriteOffset from writeObjectResponse
+          long committedWriteOffset = writeOffset;
+          if (writeObjectResponse.getWriteStatusCase() == WriteStatusCase.PERSISTED_SIZE
+              && committedWriteOffset != writeObjectResponse.getPersistedSize()) {
+            String msg =
                 String.format(
-                    "Interrupted while awaiting response during upload of '%s' with UploadID '%s'",
-                    resourceId, responseObserver.uploadId));
+                    "After closing the stream expecting the persisted offset to be %d, but got %d in writeObjectResponse for resource %s with uploadId : %s and writeOffset %d",
+                    committedWriteOffset,
+                    writeObjectResponse.getPersistedSize(),
+                    resourceId,
+                    uploadId,
+                    writeOffset);
+            throw new IOException(msg);
           }
+          freeUpCommittedRequests(requestChunkMap, committedWriteOffset);
         }
       }
 
-      if (responseObserver.hasTransientError()) {
-        requestStreamObserver.onError(
-            responseObserver.hasTransientError()
-                ? responseObserver.transientError
-                : responseObserver.nonTransientError);
-        throw new IOException(
-            String.format("Got transient error for UploadID '%s'", responseObserver.uploadId),
-            responseObserver.transientError);
+      logger.atFinest().log(
+          "Resource %s is written successfully with uploadId %s and final offset as %d",
+          resourceId, uploadId, writeOffset);
+      return writeObjectResponse;
+    }
+
+    /**
+     * Created the InsertRequest from pipeSource or get it from the cached requests (in case
+     * requests are getting retried). Also update the writeOffset accordingly.
+     *
+     * @return InsertRequest which needs to be sent over the rpc stream.
+     * @throws IOException
+     */
+    private WriteObjectRequest getInsertRequest() throws IOException {
+      WriteObjectRequest insertRequest = null;
+      if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
+        insertRequest = getCachedRequest(requestChunkMap, writeOffset);
+        writeOffset += insertRequest.getChecksummedData().getContent().size();
+        return insertRequest;
       }
 
-      return responseObserver.getResponseOrThrow();
+      ByteString data =
+          ByteString.readFrom(
+              ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
+      insertRequest = buildInsertRequest(writeOffset, data, false);
+      requestChunkMap.put(writeOffset, insertRequest);
+      writeOffset += insertRequest.getChecksummedData().getContent().size();
+      return insertRequest;
+    }
+
+    private void freeUpCommittedRequests(
+        TreeMap<Long, WriteObjectRequest> requestChunkMap, final long committedWriteOffset)
+        throws IOException {
+
+      logger.atFinest().log(
+          "Fetched committedWriteOffset: size:%d, numBuffers:%d, committedWriteOffset:%d",
+          requestChunkMap.size(),
+          channelOptions.getNumberOfBufferedRequests(),
+          committedWriteOffset);
+
+      if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() < committedWriteOffset) {
+        // cleanup the whole map as we have committed all the requests.
+        requestChunkMap.clear();
+        return;
+      }
+      // cleanup chunks one by one.
+      // check and remove chunks from dataChunkMap
+      while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
+        logger.atFinest().log(
+            "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
+            requestChunkMap.size(), requestChunkMap.firstKey(), committedWriteOffset);
+        requestChunkMap.remove(requestChunkMap.firstKey());
+      }
     }
 
     private WriteObjectRequest buildInsertRequest(
@@ -423,88 +387,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
         }
       }
       return checkNotNull(request, "Request chunk not found for '%s'", resourceId);
-    }
-
-    /** Handler for responses from the Insert streaming RPC. */
-    private class InsertChunkResponseObserver
-        implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {
-
-      private final long writeOffset;
-      private final String uploadId;
-      // The response from the server, populated at the end of a successful streaming RPC.
-      private WriteObjectResponse response;
-      // The last transient error to occur during the streaming RPC.
-      public Throwable transientError = null;
-      // The last non-transient error to occur during the streaming RPC.
-      public Throwable nonTransientError = null;
-
-      // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the
-      // request stream is closed.
-      final CountDownLatch done = new CountDownLatch(1);
-      // CountDownLatch tracking readiness of the streaming RPC.
-      final CountDownLatch ready = new CountDownLatch(1);
-
-      InsertChunkResponseObserver(String uploadId, long writeOffset) {
-        this.uploadId = uploadId;
-        this.writeOffset = writeOffset;
-      }
-
-      public WriteObjectResponse getResponseOrThrow() throws IOException {
-        if (hasNonTransientError()) {
-          throw new IOException(
-              String.format(
-                  "Resumable upload failed for '%s' , uploadId : %s ", resourceId, uploadId),
-              nonTransientError);
-        }
-        return checkNotNull(response, "Response not present for '%s'", resourceId);
-      }
-
-      boolean hasTransientError() {
-        return transientError != null;
-      }
-
-      boolean hasNonTransientError() {
-        return response == null && nonTransientError != null;
-      }
-
-      @Override
-      public void onNext(WriteObjectResponse response) {
-        this.response = response;
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        Status status = Status.fromThrowable(t);
-        Status.Code statusCode = status.getCode();
-        if (TRANSIENT_ERRORS.contains(statusCode)) {
-          transientError = t;
-        }
-        if (transientError == null) {
-          nonTransientError =
-              new IOException(
-                  String.format(
-                      "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
-                          + " Status: %s",
-                      resourceId, uploadId, writeOffset, status.getDescription()),
-                  t);
-        }
-        done.countDown();
-      }
-
-      @Override
-      public void onCompleted() {
-        done.countDown();
-      }
-
-      @Override
-      public void beforeStart(
-          ClientCallStreamObserver<WriteObjectRequest> clientCallStreamObserver) {
-        clientCallStreamObserver.setOnReadyHandler(ready::countDown);
-      }
-
-      public boolean isComplete() {
-        return done.getCount() == 0 ? true : false;
-      }
     }
 
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
