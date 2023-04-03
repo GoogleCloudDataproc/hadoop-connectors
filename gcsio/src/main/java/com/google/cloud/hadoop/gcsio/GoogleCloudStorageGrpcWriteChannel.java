@@ -26,7 +26,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -46,7 +45,6 @@ import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import com.google.storage.v2.WriteObjectResponse.WriteStatusCase;
 import com.google.storage.v2.WriteObjectSpec;
-import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -67,14 +65,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
-
-  // A set that defines all transient errors on which retry can be attempted.
-  protected static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
-      ImmutableSet.of(
-          Status.Code.DEADLINE_EXCEEDED,
-          Status.Code.INTERNAL,
-          Status.Code.RESOURCE_EXHAUSTED,
-          Status.Code.UNAVAILABLE);
 
   private final StorageStub stub;
   private final StorageResourceId resourceId;
@@ -171,6 +161,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
     private final StorageResourceId resourceId;
     private final boolean tracingEnabled;
+
     private Hasher objectHasher;
     private String uploadId;
     private long writeOffset = 0;

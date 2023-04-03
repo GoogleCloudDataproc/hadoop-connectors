@@ -16,18 +16,19 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcWriteChannel.TRANSIENT_ERRORS;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageStub;
 import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import io.grpc.ClientCall;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.ClientResponseObserver;
@@ -42,6 +43,14 @@ import java.util.concurrent.CountDownLatch;
 @VisibleForTesting
 public class GoogleCloudStorageContentWriteStream {
 
+  // A set that defines all transient errors on which retry can be attempted.
+  protected static final ImmutableSet<Code> TRANSIENT_ERRORS =
+      ImmutableSet.of(
+          Status.Code.DEADLINE_EXCEEDED,
+          Status.Code.INTERNAL,
+          Status.Code.RESOURCE_EXHAUSTED,
+          Status.Code.UNAVAILABLE);
+
   private final StorageResourceId resourceId;
   private final StorageStub stub;
   private final GoogleCloudStorageOptions storageOptions;
@@ -49,10 +58,10 @@ public class GoogleCloudStorageContentWriteStream {
   private final String uploadId;
   private final long writeOffset;
   private final Watchdog watchdog;
+
   private InsertChunkResponseObserver responseObserver;
   private StreamObserver<WriteObjectRequest> requestStreamObserver;
-
-  // Keeps track of inflight request in a stream
+  // Keeps track of number of request sent over stream.
   private int inflightRequests = 0;
 
   public GoogleCloudStorageContentWriteStream(
@@ -185,13 +194,13 @@ public class GoogleCloudStorageContentWriteStream {
 
     private final long writeOffset;
     private final String uploadId;
+
     // The response from the server, populated at the end of a successful streaming RPC.
     private WriteObjectResponse response;
     // The last transient error to occur during the streaming RPC.
     public Throwable transientError = null;
     // The last non-transient error to occur during the streaming RPC.
     public Throwable nonTransientError = null;
-
     // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the
     // request stream is closed.
     final CountDownLatch done = new CountDownLatch(1);
