@@ -51,6 +51,12 @@ import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+/**
+ * Integration test for {@code GoogleCloudStorageContentWriteStream}; Be careful while using
+ * debugger as default values of grpc message timeout {@code AsyncWriteChannelOptions} are very low
+ * and could cause deviation form behaviour tested using unit tests. One can set higher values for
+ * these timeouts while using debugger option.
+ */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageContentWriteStreamTest {
 
@@ -423,7 +429,7 @@ public class GoogleCloudStorageContentWriteStreamTest {
     }
   }
 
-  private class FakeService extends StorageImplBase {
+  private static class FakeService extends StorageImplBase {
 
     private Throwable insertRequestException = null;
 
@@ -458,7 +464,7 @@ public class GoogleCloudStorageContentWriteStreamTest {
     }
   }
 
-  private class InsertRequestObserver implements StreamObserver<WriteObjectRequest> {
+  private static class InsertRequestObserver implements StreamObserver<WriteObjectRequest> {
 
     public volatile int number = 0;
     private StreamObserver<WriteObjectResponse> responseObserver;
@@ -487,7 +493,7 @@ public class GoogleCloudStorageContentWriteStreamTest {
     public void onNext(WriteObjectRequest request) {
       // Handle error cases
       if (insertRequestException != null) {
-        responseObserver.onError(insertRequestException);
+        onError(insertRequestException);
         return;
       }
 

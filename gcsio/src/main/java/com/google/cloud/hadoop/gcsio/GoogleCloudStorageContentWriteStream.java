@@ -132,19 +132,6 @@ public class GoogleCloudStorageContentWriteStream {
     }
   }
 
-  private StorageStub getStorageStubWithTracking(Duration grpcWriteTimeout) {
-    StorageStub stubWithDeadline =
-        stub.withDeadlineAfter(grpcWriteTimeout.toMillis(), MILLISECONDS);
-
-    if (!this.storageOptions.isTraceLogEnabled()) {
-      return stubWithDeadline;
-    }
-
-    return stubWithDeadline.withInterceptors(
-        new GoogleCloudStorageGrpcTracingInterceptor(
-            GrpcRequestTracingInfo.getWriteRequestTraceInfo(this.resourceId.getObjectName())));
-  }
-
   public void writeChunk(WriteObjectRequest request) throws IOException {
     if (!isOpen()) {
       throw new IOException(
@@ -191,7 +178,7 @@ public class GoogleCloudStorageContentWriteStream {
   public WriteObjectResponse closeStream() throws IOException {
     try {
       // RequestStreamObserver might already be completed either
-      // 1. Error was encountered during writing chunks nad eventually onError was called
+      // 1. Error was encountered during writing chunks and eventually onError was called
       // 2. closeStream was called again.
       // It safeguards us from calling onCompleted on an already closed stream.
       if (!requestStreamObserver.isComplete()) {
@@ -220,6 +207,19 @@ public class GoogleCloudStorageContentWriteStream {
           responseObserver.transientError);
     }
     return responseObserver.getResponseOrThrow();
+  }
+
+  private StorageStub getStorageStubWithTracking(Duration grpcWriteTimeout) {
+    StorageStub stubWithDeadline =
+        stub.withDeadlineAfter(grpcWriteTimeout.toMillis(), MILLISECONDS);
+
+    if (!this.storageOptions.isTraceLogEnabled()) {
+      return stubWithDeadline;
+    }
+
+    return stubWithDeadline.withInterceptors(
+        new GoogleCloudStorageGrpcTracingInterceptor(
+            GrpcRequestTracingInfo.getWriteRequestTraceInfo(this.resourceId.getObjectName())));
   }
 
   /** Handler for responses from the Insert streaming RPC. */
