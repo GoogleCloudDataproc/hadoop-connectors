@@ -32,13 +32,10 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
-import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
@@ -185,7 +182,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private long contentChannelCurrentPosition = -1;
     private long contentChannelEnd = -1;
     // Prefetched footer content.
-    private byte[] footerContent;
+    private Footer footer;
     // Used as scratch space when reading bytes just to discard them when trying to perform small
     // in-place seeks.
     private byte[] skipBuffer = null;
@@ -290,7 +287,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           "contentChannel and contentChannelEnd should be not initialized yet for '%s'",
           resourceId);
 
-      if (footerContent != null && currentPosition >= objectSize - footerContent.length) {
+      if (footer != null && footer.offsetInFooter(currentPosition)) {
         return serveFooterContent();
       }
 
@@ -309,7 +306,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           && (contentChannelEnd - contentChannelCurrentPosition)
               <= readOptions.getMinRangeRequestSize()) {
 
-        if (footerContent == null) {
+        if (footer == null) {
           cacheFooter(readableByteChannel);
         }
         return serveFooterContent();
@@ -322,44 +319,30 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private void cacheFooter(ReadableByteChannel readableByteChannel) throws IOException {
       int footerSize = toIntExact(objectSize - contentChannelCurrentPosition);
-      footerContent = new byte[footerSize];
-      try (InputStream footerStream = Channels.newInputStream(readableByteChannel)) {
-        int totalBytesRead = 0;
-        int bytesRead;
-        do {
-          bytesRead = footerStream.read(footerContent, totalBytesRead, footerSize - totalBytesRead);
-          if (bytesRead >= 0) {
-            totalBytesRead += bytesRead;
-          }
-        } while (bytesRead >= 0 && totalBytesRead < footerSize);
-        checkState(
-            bytesRead >= 0,
-            "footerStream shouldn't be empty before reading the footer of size %s, totalBytesRead %s, read via last call %s, for '%s'",
-            footerSize,
-            totalBytesRead,
-            bytesRead,
-            resourceId);
+      byte[] bytes = new byte[footerSize];
+      try {
+        int totalBytesRead = readableByteChannel.read(ByteBuffer.wrap(bytes));
         checkState(
             totalBytesRead == footerSize,
             "totalBytesRead (%s) should equal footerSize (%s) for '%s'",
             totalBytesRead,
             footerSize,
             resourceId);
+        footer = new Footer(contentChannelCurrentPosition, bytes);
+        readableByteChannel.close();
       } catch (Exception e) {
-        footerContent = null;
+        footer = null;
         throw e;
       }
-      logger.atFiner().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
+      logger.atFiner().log("Prefetched %s bytes footer for '%s'", footer.length, resourceId);
     }
 
     private ReadableByteChannel serveFooterContent() {
       contentChannelCurrentPosition = currentPosition;
-      int offset = toIntExact(currentPosition - (objectSize - footerContent.length));
-      int length = footerContent.length - offset;
       logger.atFiner().log(
           "Opened channel (prefetched footer) from %d position for '%s'",
           currentPosition, resourceId);
-      return Channels.newChannel(new ByteArrayInputStream(footerContent, offset, length));
+      return footer.readerFromObjectPosition(currentPosition);
     }
 
     private long getRangeRequestStart() {
@@ -520,10 +503,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
       }
-      if (footerContent != null) {
+      if (footer != null) {
         // If footer is cached open just till footerStart.
         // Remaining content ill be served from cached footer itself.
-        endPosition = min(endPosition, objectSize - footerContent.length);
+        endPosition = min(endPosition, objectSize - footer.length);
       }
       return endPosition;
     }
@@ -588,6 +571,82 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
       throw new ClosedChannelException();
+    }
+  }
+
+  private static final class Footer {
+
+    /**
+     * Offset in the object where this footer starts
+     */
+    private final long objectOffset;
+    /**
+     * The byte content of the footer
+     */
+    private final byte[] bytes;
+    private final int length;
+    private final long objectEndOffset;
+
+    private Footer(long objectOffset, byte[] bytes) {
+      this.objectOffset = objectOffset;
+      this.bytes = bytes;
+      this.length = bytes.length;
+      this.objectEndOffset = objectOffset + bytes.length;
+    }
+
+    boolean offsetInFooter(long offset) {
+      return objectOffset <= offset && offset < objectEndOffset;
+    }
+
+    public ReadableByteChannel readerFromObjectPosition(long currentPosition) {
+      int begin = toIntExact(currentPosition - objectOffset);
+      int length1 = bytes.length - begin;
+      return new Reader(ByteBuffer.wrap(bytes, begin, length1));
+    }
+
+    private static final class Reader implements ReadableByteChannel {
+      private final ByteBuffer content;
+
+      private boolean open = true;
+
+      private Reader(ByteBuffer content) {
+        this.content = content;
+      }
+
+      @Override
+      public int read(ByteBuffer dst) throws IOException {
+        if (!open) {
+          throw new ClosedChannelException();
+        }
+
+        if (!content.hasRemaining()) {
+          open = false;
+          return -1;
+        }
+
+        int start = content.position();
+
+        if (dst.remaining() < content.remaining()) {
+          ByteBuffer dup = content.duplicate();
+          int newLimit = start + dst.remaining();
+          dup.limit(newLimit);
+          dst.put(dup);
+          content.position(newLimit);
+        } else {
+          dst.put(content);
+        }
+        return content.position() - start;
+      }
+
+      @Override
+      public boolean isOpen() {
+        return open;
+      }
+
+      @Override
+      public void close() throws IOException {
+        open = false;
+      }
     }
   }
 }
