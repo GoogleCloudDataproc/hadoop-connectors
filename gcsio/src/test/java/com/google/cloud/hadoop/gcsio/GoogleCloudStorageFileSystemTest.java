@@ -21,7 +21,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -107,7 +106,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
 
   @Test
   public void testClientType() throws IOException {
-    GoogleCredentials cred = GoogleCredentials.create(/* accessToken= */ null);
+    Credentials cred = NoCredentials.getInstance();
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
 
     setDefaultValidOptions(optionsBuilder);
@@ -126,7 +125,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
   @Test
   @SuppressWarnings("CheckReturnValue")
   public void testConstructor() throws IOException {
-    GoogleCredentials cred = GoogleCredentials.create(/* accessToken= */ null);
+    Credentials cred = NoCredentials.getInstance();
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
 
     setDefaultValidOptions(optionsBuilder);
