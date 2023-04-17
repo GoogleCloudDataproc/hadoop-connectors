@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -105,6 +106,8 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testClientType() throws IOException {
     Credentials cred = NoCredentials.getInstance();
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
@@ -123,6 +126,8 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
 
   /** Validates constructor. */
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   @SuppressWarnings("CheckReturnValue")
   public void testConstructor() throws IOException {
     Credentials cred = NoCredentials.getInstance();

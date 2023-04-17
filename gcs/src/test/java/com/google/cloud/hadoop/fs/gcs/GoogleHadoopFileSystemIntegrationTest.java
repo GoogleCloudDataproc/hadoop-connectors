@@ -1655,6 +1655,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testImpersonationServiceAccountUsed() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
@@ -1674,6 +1676,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testImpersonationUserNameIdentifierUsed() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
@@ -1696,6 +1700,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testImpersonationGroupNameIdentifierUsed() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
@@ -1718,6 +1724,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testImpersonationUserAndGroupNameIdentifiersUsed() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
@@ -1744,6 +1752,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testImpersonationServiceAccountAndUserAndGroupNameIdentifierUsed() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
@@ -1787,6 +1797,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void unauthenticatedAccessToPublicBuckets_fsGsProperties() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("fs.gs.auth.type", AuthenticationType.UNAUTHENTICATED);
@@ -1812,6 +1824,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  @Ignore(
+      "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() throws Exception {
     Configuration config = loadConfig(storageClientType);
     config.setEnum("google.cloud.auth.type", AuthenticationType.UNAUTHENTICATED);
