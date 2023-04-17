@@ -21,6 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -109,7 +110,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
   @Ignore(
       "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   public void testClientType() throws IOException {
-    Credentials cred = NoCredentials.getInstance();
+    GoogleCredentials cred = GoogleCredentials.create(/* accessToken= */ null);
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
 
     setDefaultValidOptions(optionsBuilder);
@@ -130,7 +131,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
       "Java-storage direct path have issues over Unauthorized access. https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/993")
   @SuppressWarnings("CheckReturnValue")
   public void testConstructor() throws IOException {
-    Credentials cred = NoCredentials.getInstance();
+    GoogleCredentials cred = GoogleCredentials.create(/* accessToken= */ null);
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder = getDefaultFileSystemOptions();
 
     setDefaultValidOptions(optionsBuilder);
