@@ -34,8 +34,8 @@ import java.nio.channels.Channels;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -82,6 +82,11 @@ public class GoogleCloudStorageJavaStorageNewIntegrationTest
         .setCredentials(httpRequestsInitializer.getCredentials())
         .setHttpRequestInitializer(gcsRequestsTracker)
         .build();
+  }
+
+  @Before
+  public void setup() {
+    isTracingSupported = false;
   }
 
   @Override
@@ -147,22 +152,6 @@ public class GoogleCloudStorageJavaStorageNewIntegrationTest
     IOException e = assertThrows(IOException.class, () -> gcs.open(testFile, readOptions));
     assertThat(e)
         .hasMessageThat()
-        .startsWith("Cannot read GZIP-encoded file (gzip) (not supported via gRPC API):");
+        .startsWith("Cannot read GZIP encoded files - content encoding support is disabled");
   }
-
-  @Ignore("Gzip content read is is not supported via Java-storage yet.")
-  @Test
-  public void open_gzipEncoded_fails_ifContentEncodingSupportDisabled() {}
-
-  @Ignore("Gzip content read is is not supported via Java-storage yet.")
-  @Test
-  public void open_itemInfo_gzipEncoded_fails_ifContentEncodingSupportDisabled() {}
-
-  @Ignore("Gzip content read is is not supported via Java-storage yet.")
-  @Test
-  public void open_gzipEncoded_succeeds_ifContentEncodingSupportEnabled() {}
-
-  @Ignore("Gzip content read is is not supported via Java-storage yet.")
-  @Test
-  public void open_itemInfo_gzipEncoded_succeeds_ifContentEncodingSupportEnabled() {}
 }
