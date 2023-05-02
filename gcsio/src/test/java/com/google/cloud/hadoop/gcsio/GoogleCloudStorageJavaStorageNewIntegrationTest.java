@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
@@ -27,11 +26,9 @@ import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
-import java.util.List;
 import java.util.zip.GZIPOutputStream;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -87,37 +84,6 @@ public class GoogleCloudStorageJavaStorageNewIntegrationTest
   @Before
   public void setup() {
     isTracingSupported = false;
-  }
-
-  @Override
-  @Test
-  public void listObjectInfo_allMetadataFieldsCorrect() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
-
-    String testDirName = name.getMethodName() + "/";
-    StorageResourceId objectId =
-        new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object");
-
-    // Create gzipped file so Content-Encoding will be not null
-    CreateObjectOptions createOptions =
-        GZIP_CREATE_OPTIONS.toBuilder()
-            .setMetadata(ImmutableMap.of("test-key", "val".getBytes(UTF_8)))
-            .build();
-
-    try (OutputStream os =
-        new GZIPOutputStream(
-            Channels.newOutputStream(gcsfsIHelper.gcs.create(objectId, createOptions)))) {
-      os.write((objectId + "-content").getBytes(UTF_8));
-    }
-
-    List<GoogleCloudStorageItemInfo> listedObjects =
-        gcs.listObjectInfo(objectId.getBucketName(), testDirName);
-
-    assertThat(getObjectNames(listedObjects)).containsExactly(objectId.getObjectName());
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                objectId.getBucketName(), testDirName, /* pageToken= */ null));
   }
 
   @Test
