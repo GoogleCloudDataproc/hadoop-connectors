@@ -26,7 +26,6 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import java.io.IOException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -72,11 +71,5 @@ public class GoogleCloudStorageHttpClientNewIntegrationTest
         .setCredentials(httpRequestsInitializer.getCredentials())
         .setHttpRequestInitializer(gcsRequestsTracker)
         .build();
-  }
-
-  @Override
-  @Test
-  public void open_gzipEncoded_succeeds_ifContentEncodingSupportEnabled() throws Exception {
-    super.open_gzipEncoded_succeeds_ifContentEncodingSupportEnabled();
   }
 }

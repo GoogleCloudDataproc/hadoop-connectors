@@ -42,7 +42,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.util.Random;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -320,7 +319,6 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(readChannel.read(readBuffer)).isEqualTo(-1);
   }
 
-  @Ignore
   @Test
   public void gzipEncodedObject_throwWhileChannelCreation() {
     assertThrows(

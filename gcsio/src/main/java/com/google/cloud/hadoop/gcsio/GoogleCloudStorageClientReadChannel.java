@@ -241,8 +241,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               skipInPlace();
             }
             // making sure that currentPosition is in alignment with currentReadPosition before
-            // actual read starts
-            // To avoid read discrepancies.
+            // actual read starts to avoid read discrepancies.
             checkState(
                 contentChannelCurrentPosition == currentPosition,
                 "position of read offset isn't in alignment with channel's read offset");
