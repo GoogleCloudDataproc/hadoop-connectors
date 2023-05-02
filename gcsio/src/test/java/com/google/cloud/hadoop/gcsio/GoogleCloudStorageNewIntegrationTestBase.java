@@ -1096,16 +1096,18 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       os.write("content".getBytes(UTF_8));
     }
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
-            resumableUploadRequestString(
-                testBucket,
-                testFile.getObjectName(),
-                /* generationId= */ 1,
-                /* replaceGenerationId= */ true),
-            resumableUploadChunkRequestString(
-                testBucket, testFile.getObjectName(), /* generationId= */ 2, /* uploadId= */ 1));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(testBucket, testFile.getObjectName()),
+              resumableUploadRequestString(
+                  testBucket,
+                  testFile.getObjectName(),
+                  /* generationId= */ 1,
+                  /* replaceGenerationId= */ true),
+              resumableUploadChunkRequestString(
+                  testBucket, testFile.getObjectName(), /* generationId= */ 2, /* uploadId= */ 1));
+    }
 
     assertThat(gcs.getItemInfo(testFile).getContentEncoding()).isEqualTo("gzip");
   }
