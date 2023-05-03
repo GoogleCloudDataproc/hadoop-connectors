@@ -75,5 +75,6 @@ fi
 export GCS_TEST_PRIVATE_KEYFILE
 export HDFS_ROOT=file:///tmp
 export RUN_INTEGRATION_TESTS=true
+export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true
 
 ./mvnw -B -e -T1C "-P${HADOOP_VERSION}" -Pintegration-test clean verify "${@:5}"

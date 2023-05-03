@@ -62,12 +62,9 @@ import org.apache.hadoop.service.Service;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(Parameterized.class)
-public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
+public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
 
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
