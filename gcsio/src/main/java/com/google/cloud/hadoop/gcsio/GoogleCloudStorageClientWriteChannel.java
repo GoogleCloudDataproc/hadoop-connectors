@@ -70,10 +70,6 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     }
   }
 
-  public String getRequesterPaysProject() {
-    return null;
-  }
-
   private static BlobInfo getBlobInfo(
       StorageResourceId resourceId, CreateObjectOptions createOptions) {
     BlobInfo blobInfo =

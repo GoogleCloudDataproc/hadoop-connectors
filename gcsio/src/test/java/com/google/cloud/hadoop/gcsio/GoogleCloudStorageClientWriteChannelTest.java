@@ -35,6 +35,7 @@ import com.google.auth.Credentials;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
@@ -100,6 +101,47 @@ public class GoogleCloudStorageClientWriteChannelTest {
     } finally {
       EXECUTOR_SERVICE = null;
     }
+  }
+
+  @Test
+  public void verifyRequesterPaysOption() throws IOException {
+    String dummyProjectId = "dummyProjectId";
+    int numberOfChunks = 1;
+    writeChannel =
+        new GoogleCloudStorageClientWriteChannel(
+            mockedStorage,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                .setWriteChannelOptions(
+                    AsyncWriteChannelOptions.DEFAULT.toBuilder()
+                        .setGrpcChecksumsEnabled(true)
+                        .build())
+                .setRequesterPaysOptions(
+                    RequesterPaysOptions.DEFAULT.toBuilder().setProjectId(dummyProjectId).build())
+                .build(),
+            resourceId,
+            CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+                .setContentType(CONTENT_TYPE)
+                .setContentEncoding(CONTENT_ENCODING)
+                .setMetadata(GoogleCloudStorageTestHelper.getDecodedMetadata(metadata))
+                .setKmsKeyName(KMS_KEY)
+                .build(),
+            /*requesterPays=*/ true,
+            EXECUTOR_SERVICE);
+    writeChannel.initialize();
+
+    ByteString data =
+        GoogleCloudStorageTestHelper.createTestData(
+            MAX_WRITE_CHUNK_BYTES.getNumber() * numberOfChunks - 1);
+    writeChannel.write(data.asReadOnlyByteBuffer());
+    writeChannel.close();
+
+    List<BlobWriteOption> optionsList = blobWriteOptionsCapture.getAllValues();
+    assertThat(optionsList).contains(BlobWriteOption.userProject(dummyProjectId));
+    // Fake writer only writes half the buffer at a time
+    verify(fakeWriteChannel, times(numberOfChunks * 2)).write(any());
+    verify(fakeWriteChannel, times(1)).close();
+    verifyBlobInfoProperties(blobInfoCapture, resourceId);
+    assertThat(writeChannel.isUploadSuccessful()).isTrue();
   }
 
   @Test

@@ -33,13 +33,17 @@ import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.util.List;
 import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
@@ -59,6 +63,10 @@ public class GoogleCloudStorageClientReadChannelTest {
       new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME);
   private static final ByteString CONTENT =
       GoogleCloudStorageTestHelper.createTestData(OBJECT_SIZE);
+
+  private ArgumentCaptor<BlobId> blobIdCaptor = ArgumentCaptor.forClass(BlobId.class);
+  private ArgumentCaptor<BlobSourceOption> blobSourceOptionCaptor =
+      ArgumentCaptor.forClass(BlobSourceOption.class);
 
   private static final GoogleCloudStorageReadOptions DEFAULT_READ_OPTION =
       GoogleCloudStorageReadOptions.builder()
@@ -88,9 +96,46 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Before
   public void setUp() throws IOException {
+
     fakeReadChannel = spy(new FakeReadChannel(CONTENT));
-    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    when(mockedStorage.reader(blobIdCaptor.capture(), blobSourceOptionCaptor.capture()))
+        .thenReturn(fakeReadChannel);
     readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+  }
+
+  @Test
+  public void verifyRequesterPaysOption() throws IOException {
+    String dummyProjectId = "dummyProjectId";
+    int readBytes = 100;
+    fakeReadChannel = spy(new FakeReadChannel(CONTENT));
+    when(mockedStorage.reader(blobIdCaptor.capture(), blobSourceOptionCaptor.capture()))
+        .thenReturn(fakeReadChannel);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            DEFAULT_ITEM_INFO,
+            DEFAULT_READ_OPTION,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                .setRequesterPaysOptions(
+                    RequesterPaysOptions.DEFAULT.toBuilder().setProjectId(dummyProjectId).build())
+                .build(), /*requesterPays*/
+            true);
+    getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+    int startPosition = 0;
+    readChannel.position(startPosition);
+    assertThat(readChannel.position()).isEqualTo(startPosition);
+
+    ByteBuffer buffer = ByteBuffer.allocate(readBytes);
+    readChannel.read(buffer);
+    verifyContent(buffer, startPosition, readBytes);
+    List<BlobSourceOption> optionsList = blobSourceOptionCaptor.getAllValues();
+    assertThat(optionsList).contains(BlobSourceOption.userProject(dummyProjectId));
+    verify(fakeReadChannel, times(1)).seek(anyLong());
+    verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).read(any());
+
+    verifyNoMoreInteractions(fakeReadChannel);
   }
 
   @Test
