@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createF
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
@@ -44,6 +45,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /** Provides seekable read access to GCS via java-storage library. */
 @VisibleForTesting
@@ -51,15 +53,17 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  private static final String GZIP_ENCODING = "gzip";
+
   private final StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
   // The size of this object generation, in bytes.
-  private final long objectSize;
+  private long objectSize;
   private final ErrorTypeExtractor errorExtractor;
   private ContentReadChannel contentReadChannel;
-
+  private boolean gzipEncoded = false;
   private boolean open = true;
 
   // Current position in this channel, it could be different from contentChannelCurrentPosition if
@@ -81,8 +85,17 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
     this.readOptions = readOptions;
     this.storageOptions = storageOptions;
-    this.objectSize = itemInfo.getSize();
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
+    initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+  }
+
+  protected void initMetadata(@Nullable String encoding, long sizeFromMetadata) throws IOException {
+    gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
+    if (gzipEncoded && !readOptions.isGzipEncodingSupportEnabled()) {
+      throw new IOException(
+          "Cannot read GZIP encoded files - content encoding support is disabled.");
+    }
+    objectSize = gzipEncoded ? Long.MAX_VALUE : sizeFromMetadata;
   }
 
   @Override
@@ -219,6 +232,19 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         try {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
+            // We adjust the start index of content channel in following cases
+            // 1. request range is in footer boundaries --> request the whole footer
+            // 2. requested content is gzip encoded -> request always from start of file.
+            // Case(1) is handled with reading and caching the extra read bytes, for all other cases
+            // we need to skip all the unrequested bytes before start reading from current position.
+            if (currentPosition > contentChannelCurrentPosition) {
+              skipInPlace();
+            }
+            // making sure that currentPosition is in alignment with currentReadPosition before
+            // actual read starts to avoid read discrepancies.
+            checkState(
+                contentChannelCurrentPosition == currentPosition,
+                "position of read offset isn't in alignment with channel's read offset");
           }
           int bytesRead = byteChannel.read(dst);
 
@@ -228,6 +254,13 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           }
 
           if (bytesRead < 0) {
+            // Because we don't know decompressed object size for gzip-encoded objects,
+            // assume that this is an object end.
+            if (gzipEncoded) {
+              objectSize = currentPosition;
+              contentChannelEnd = currentPosition;
+            }
+
             if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
               throw new IOException(
                   String.format(
@@ -275,7 +308,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private boolean shouldDetectRandomAccess() {
-      return !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
+      return !gzipEncoded && !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
     }
 
     private void setRandomAccess() {
@@ -294,13 +327,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return serveFooterContent();
       }
 
-      contentChannelCurrentPosition = getRangeRequestStart();
-      contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
-      checkState(
-          contentChannelEnd >= contentChannelCurrentPosition,
-          String.format(
-              "Start position should be <= endPosition startPosition:%d, endPosition: %d",
-              contentChannelCurrentPosition, contentChannelEnd));
+      setChannelBoundaries(bytesToRead);
 
       ReadableByteChannel readableByteChannel =
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
@@ -314,10 +341,17 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         }
         return serveFooterContent();
       }
-      checkState(
-          contentChannelCurrentPosition == currentPosition,
-          "position of read offset isn't in alignment with channel's read offset");
       return readableByteChannel;
+    }
+
+    private void setChannelBoundaries(long bytesToRead) {
+      contentChannelCurrentPosition = getRangeRequestStart();
+      contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
+      checkState(
+          contentChannelEnd >= contentChannelCurrentPosition,
+          String.format(
+              "Start position should be <= endPosition startPosition:%d, endPosition: %d",
+              contentChannelCurrentPosition, contentChannelEnd));
     }
 
     private void cacheFooter(ReadableByteChannel readableByteChannel) throws IOException {
@@ -363,11 +397,34 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private long getRangeRequestStart() {
+      if (gzipEncoded) {
+        return 0;
+      }
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
       return currentPosition;
+    }
+
+    private long getRangeRequestEnd(long startPosition, long bytesToRead) {
+      // Always read gzip-encoded files till the end - they do not support range reads.
+      if (gzipEncoded) {
+        return objectSize;
+      }
+
+      long endPosition = objectSize;
+      if (randomAccess) {
+        // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
+        // for further reads.
+        endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
+      }
+      if (footerContent != null) {
+        // If footer is cached open just till footerStart.
+        // Remaining content ill be served from cached footer itself.
+        endPosition = min(endPosition, objectSize - footerContent.length);
+      }
+      return endPosition;
     }
 
     public void closeContentChannel() {
@@ -395,7 +452,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       long seekDistance = currentPosition - contentChannelCurrentPosition;
       if (byteChannel != null
           && seekDistance > 0
-          && seekDistance <= readOptions.getInplaceSeekLimit()
+          // for gzip encoded content always seek in place
+          && (gzipEncoded || seekDistance <= readOptions.getInplaceSeekLimit())
           && currentPosition < contentChannelEnd) {
         return true;
       }
@@ -499,6 +557,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private BlobSourceOption[] generateReadOptions(BlobId blobId) {
       List<BlobSourceOption> blobReadOptions = new ArrayList<>();
+      // To get decoded content
+      blobReadOptions.add(BlobSourceOption.shouldReturnRawInputStream(false));
+
       if (blobId.getGeneration() != null) {
         blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
       }
@@ -511,21 +572,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private boolean isFooterRead() {
       return objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
-    }
-
-    private long getRangeRequestEnd(long startPosition, long bytesToRead) {
-      long endPosition = objectSize;
-      if (randomAccess) {
-        // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
-        // for further reads.
-        endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
-      }
-      if (footerContent != null) {
-        // If footer is cached open just till footerStart.
-        // Remaining content ill be served from cached footer itself.
-        endPosition = min(endPosition, objectSize - footerContent.length);
-      }
-      return endPosition;
     }
   }
 
@@ -541,16 +587,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         resourceId.isStorageObject(), "Can not open a non-file object for read: %s", resourceId);
     if (!itemInfo.exists()) {
       throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
-    }
-    // The non-gRPC read channel has special support for gzip.
-    // TODO: enable support for gzip if required.
-    String contentEncoding = itemInfo.getContentEncoding();
-    if (contentEncoding != null && contentEncoding.contains("gzip")) {
-
-      throw new IOException(
-          String.format(
-              "Cannot read GZIP-encoded file (%s) (not supported via gRPC API): %s",
-              contentEncoding, resourceId));
     }
   }
 
