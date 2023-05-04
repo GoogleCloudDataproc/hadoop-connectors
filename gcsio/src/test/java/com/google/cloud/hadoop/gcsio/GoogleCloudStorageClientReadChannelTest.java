@@ -339,7 +339,10 @@ public class GoogleCloudStorageClientReadChannelTest {
                     /* contentGeneration= */ 1,
                     /* metaGeneration= */ 2L,
                     /* verificationAttributes= */ null),
-                GoogleCloudStorageReadOptions.DEFAULT));
+                GoogleCloudStorageReadOptions.DEFAULT
+                    .toBuilder()
+                    .setSupportGzipEncoding(false)
+                    .build()));
   }
 
   @Test
