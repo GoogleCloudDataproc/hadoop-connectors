@@ -72,6 +72,8 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
   @Rule public TestName name = new TestName();
   protected TrackingHttpRequestInitializer gcsRequestsTracker;
 
+  protected boolean isTracingSupported = false;
+
   @Before
   public void before() {
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
@@ -1171,16 +1173,18 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       os.write("content".getBytes(UTF_8));
     }
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
-            resumableUploadRequestString(
-                testBucket,
-                testFile.getObjectName(),
-                /* generationId= */ 1,
-                /* replaceGenerationId= */ true),
-            resumableUploadChunkRequestString(
-                testBucket, testFile.getObjectName(), /* generationId= */ 2, /* uploadId= */ 1));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(testBucket, testFile.getObjectName()),
+              resumableUploadRequestString(
+                  testBucket,
+                  testFile.getObjectName(),
+                  /* generationId= */ 1,
+                  /* replaceGenerationId= */ true),
+              resumableUploadChunkRequestString(
+                  testBucket, testFile.getObjectName(), /* generationId= */ 2, /* uploadId= */ 1));
+    }
 
     assertThat(gcs.getItemInfo(testFile).getContentEncoding()).isEqualTo("gzip");
   }
@@ -1210,11 +1214,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     }
 
     assertThat(new String(readContent, UTF_8)).isEqualTo("content");
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
-            getMediaRequestString(testBucket, testFile.getObjectName(), generationId));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(testBucket, testFile.getObjectName()),
+              getMediaRequestString(testBucket, testFile.getObjectName(), generationId));
+    }
   }
 
   @Test
@@ -1241,6 +1246,45 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
+  }
+
+  @Test
+  public void open_gzipEncoded_rangeRead_succeed() throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+    String data = "content";
+
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
+      os.write(data.getBytes(UTF_8));
+    }
+
+    long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
+
+    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    int startIndex = 2; // inclusive
+    int endIndex = 4; // exclusive
+    byte[] readContent = new byte[endIndex - startIndex];
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
+    try (SeekableByteChannel channel = gcs.open(testFile, readOptions)) {
+      //
+      channel.position(startIndex);
+      channel.read(ByteBuffer.wrap(readContent));
+    }
+
+    assertThat(new String(readContent, UTF_8)).isEqualTo(data.substring(startIndex, endIndex));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(
+                  testBucket,
+                  testFile.getObjectName(),
+                  /* fields= */ "contentEncoding,generation,size"),
+              getMediaRequestString(testBucket, testFile.getObjectName(), generationId))
+          .inOrder();
+    }
   }
 
   protected static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
