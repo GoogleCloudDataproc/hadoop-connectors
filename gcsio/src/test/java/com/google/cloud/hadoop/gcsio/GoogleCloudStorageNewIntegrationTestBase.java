@@ -1246,14 +1246,6 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
-    if (isTracingSupported) {
-      assertThat(gcsRequestsTracker.getAllRequestStrings())
-          .containsExactly(
-              getRequestString(
-                  testBucket,
-                  testFile.getObjectName(),
-                  /* fields= */ "contentEncoding,generation,size"));
-    }
   }
 
   @Test
