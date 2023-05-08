@@ -22,6 +22,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+// TODO: Ignored test for gRPC-directpath
+// https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/998
 @RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemJavaStorageClientIntegrationTest
     extends GoogleHadoopFileSystemIntegrationTest {
