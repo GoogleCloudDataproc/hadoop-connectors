@@ -280,7 +280,7 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<PipeType> GCS_OUTPUT_STREAM_PIPE_TYPE =
       new HadoopConfigurationProperty<>(
           "fs.gs.outputstream.pipe.type", AsyncWriteChannelOptions.DEFAULT.getPipeType());
-
+]
   /** Configuration key for setting GCS upload chunk size. */
   // chunk size etc. Get the following value from GCSWC class in a better way. For now, we hard code
   // it to a known good value.

@@ -432,7 +432,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // At o1.
     validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
-        || getClass().equals(GoogleCloudStorageFileSystemTest.class)) {
+        || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
@@ -447,7 +448,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // At d1/o12.
     validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
-        || getClass().equals(GoogleCloudStorageFileSystemTest.class)) {
+        || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
