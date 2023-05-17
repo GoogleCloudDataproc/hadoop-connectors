@@ -107,7 +107,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
               GoogleCloudStorageOptions.builder()
                   .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                   .setProjectId(projectId)
-                  .setDirectPathPreferred(isDirectPathAllowed())
+                  .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
                   .setWriteChannelOptions(
                       AsyncWriteChannelOptions.builder()
                           .setUploadChunkSize(64 * 1024 * 1024)
@@ -132,15 +132,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       gcsfs.close();
       gcsfs = null;
     }
-  }
-
-  public boolean isDirectPathAllowed() {
-    String envVar = System.getProperty("GCS_TEST_DIRECT_PATH_PREFERRED");
-    // if env variable is not configured default behaviour is to attempt directPath
-    if (envVar == null) {
-      return true;
-    }
-    return Boolean.parseBoolean(envVar);
   }
 
   public void postCreateInit() throws IOException {
