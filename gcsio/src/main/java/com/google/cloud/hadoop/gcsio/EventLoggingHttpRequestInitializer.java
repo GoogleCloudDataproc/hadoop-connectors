@@ -26,6 +26,7 @@ import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
@@ -67,6 +68,19 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   // executing the HttpRequest.
   private final ConcurrentMap<HttpRequest, HttpRequestResponseTimeTracker> requestTracker =
       new MapMaker().weakKeys().makeMap();
+  private final long timeThresholdMs;
+  private final ImmutableSet<String> filterProperties;
+
+  public EventLoggingHttpRequestInitializer() {
+    this(0L, ImmutableSet.of());
+  }
+
+  public EventLoggingHttpRequestInitializer(
+      long timeThresholdMs, ImmutableSet<String> filterProperties) {
+
+    this.timeThresholdMs = timeThresholdMs;
+    this.filterProperties = filterProperties;
+  }
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
@@ -80,26 +94,50 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
     HttpRequest request = httpResponse.getRequest();
 
     Map<String, Object> jsonMap = new HashMap<>();
-    jsonMap.put("request_method", request.getRequestMethod());
-    jsonMap.put("request_url", request.getUrl().toString());
-    jsonMap.put("request_headers", filterMap(request.getHeaders(), REDACTED_REQUEST_HEADERS));
-    jsonMap.put(
-        "response_headers", filterMap(httpResponse.getHeaders(), REDACTED_RESPONSE_HEADERS));
-    jsonMap.put("response_status_code", httpResponse.getStatusCode());
-    jsonMap.put("response_status_message", httpResponse.getStatusMessage());
-    jsonMap.put("thread_name", Thread.currentThread().getName());
-
     HttpRequestResponseTimeTracker tracker = requestTracker.remove(request);
     if (tracker != null) {
-      jsonMap.put("response_time", tracker.getResponseTime());
-      jsonMap.put("request_start_time_utc", tracker.getStartTimeUtc());
-      jsonMap.put("request_finish_time_utc", tracker.getCurrentTimeUtc());
+      long responseTime = tracker.getResponseTime();
+      if (responseTime < this.timeThresholdMs) {
+        return;
+      }
+
+      addLogProperty("response_time", responseTime, jsonMap);
+      addLogProperty("request_start_time_utc", tracker.getStartTimeUtc(), jsonMap);
+      addLogProperty("request_finish_time_utc", tracker.getCurrentTimeUtc(), jsonMap);
     } else {
-      jsonMap.put("response_time", Integer.MAX_VALUE);
-      jsonMap.put("unexpected_error", "Unknown request. This is unexpected.");
+      addLogProperty("response_time", Integer.MAX_VALUE, jsonMap);
+      addLogProperty("unexpected_error", "Unknown request. This is unexpected.", jsonMap);
     }
 
+    addLogProperty("request_method", request.getRequestMethod(), jsonMap);
+    addLogProperty("request_url", request.getUrl().toString(), jsonMap);
+    addLogProperty(
+        "request_headers", filterMap(request.getHeaders(), REDACTED_REQUEST_HEADERS), jsonMap);
+    addLogProperty(
+        "response_headers",
+        filterMap(httpResponse.getHeaders(), REDACTED_RESPONSE_HEADERS),
+        jsonMap);
+    addLogProperty("response_status_code", httpResponse.getStatusCode(), jsonMap);
+    addLogProperty("response_status_message", httpResponse.getStatusMessage(), jsonMap);
+    addLogProperty("thread_name", Thread.currentThread().getName(), jsonMap);
+    addLogProperty(InvocationIdInterceptor.GOOG_API_CLIENT, getInvocationId(request), jsonMap);
+
     logDetails(jsonMap);
+  }
+
+  private Object getInvocationId(HttpRequest request) {
+    HttpHeaders headers = request.getHeaders();
+    if (headers == null) {
+      return "";
+    }
+
+    return headers.get(InvocationIdInterceptor.GOOG_API_CLIENT);
+  }
+
+  private void addLogProperty(String propertyName, Object value, Map<String, Object> jsonMap) {
+    if (!filterProperties.contains(propertyName.toLowerCase(Locale.US))) {
+      jsonMap.put(propertyName, value);
+    }
   }
 
   private void logDetails(Map<String, Object> jsonMap) {

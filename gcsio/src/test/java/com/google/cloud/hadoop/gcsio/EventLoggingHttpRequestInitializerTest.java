@@ -28,6 +28,7 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Level;
@@ -164,6 +165,42 @@ public class EventLoggingHttpRequestInitializerTest {
     Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
     verifyFields(logRecord, 200);
     assertThat(logRecord.get("unexpected_error")).isEqualTo("Unknown request. This is unexpected.");
+  }
+
+  @Test
+  public void testTracingTimeBasedFiltering() throws IOException {
+    EventLoggingHttpRequestInitializer initializer =
+        new EventLoggingHttpRequestInitializer(1000, ImmutableSet.of());
+    HttpRequest httpRequest =
+        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(201));
+    initializer.initialize(httpRequest);
+
+    HttpResponse res = httpRequest.execute();
+
+    assertThat(res).isNotNull();
+    assertingHandler.assertLogCount(0);
+  }
+
+  @Test
+  public void testTracingPropertyFiltering() throws IOException {
+    int expectedStatusCode = 201;
+    EventLoggingHttpRequestInitializer initializer =
+        new EventLoggingHttpRequestInitializer(0, ImmutableSet.of("request_start_time_utc"));
+    HttpRequest httpRequest =
+        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(expectedStatusCode));
+    initializer.initialize(httpRequest);
+
+    HttpResponse res = httpRequest.execute();
+
+    assertThat(res).isNotNull();
+    assertThat(res.getStatusCode()).isEqualTo(expectedStatusCode);
+
+    assertingHandler.assertLogCount(1);
+    Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
+
+    assertThat(logRecord.get("request_start_time_utc")).isNull();
+    assertThat(logRecord.get("request_finish_time_utc")).isNotNull();
+    assertThat(logRecord.get("unexpected_error")).isNull();
   }
 
   private static void verifyFields(Map<String, Object> logRecord, int expectedStatusCode) {

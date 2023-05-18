@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableSet;
 
 /**
  * Advanced options for reading GoogleCloudStorage objects. Immutable; callers must use the inner
@@ -72,7 +73,9 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGrpcReadMetadataTimeoutMillis(DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS)
         .setGrpcReadZeroCopyEnabled(DEFAULT_GRPC_READ_ZEROCOPY_ENABLED)
         .setGrpcReadMessageTimeoutMillis(DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS)
-        .setTraceLogEnabled(TRACE_LOGGING_ENABLED_DEFAULT);
+        .setTraceLogEnabled(TRACE_LOGGING_ENABLED_DEFAULT)
+        .setTraceLogTimeThreshold(0L)
+        .setTraceLogExcludeProperties(ImmutableSet.of());
   }
 
   public abstract Builder toBuilder();
@@ -124,6 +127,11 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setTraceLogEnabled(boolean)} . */
   public abstract boolean isTraceLogEnabled();
+
+  public abstract ImmutableSet<String> getTraceLogExcludeProperties();
+
+  /** See {@link Builder#setTraceLogTimeThreshold(long)} . */
+  public abstract long getTraceLogTimeThreshold();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -225,6 +233,11 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property to enable trace logging */
     public abstract Builder setTraceLogEnabled(boolean enable);
+
+    /** Sets the property to enable trace logging */
+    public abstract Builder setTraceLogTimeThreshold(long threshold);
+
+    public abstract Builder setTraceLogExcludeProperties(ImmutableSet<String> properties);
 
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeoutMillis(long grpcMessageTimeout);

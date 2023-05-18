@@ -20,6 +20,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LazyArgs;
 import com.google.gson.Gson;
@@ -29,10 +30,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileSystem.Statistics;
 
 /** A seekable and positionable FSInputStream that provides read access to a file. */
 class GoogleHadoopFSInputStream extends FSInputStream {
@@ -56,6 +60,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
   // All store IO access goes through this.
   private final SeekableByteChannel channel;
+
+  // This is used to only log operations which took more time than the specified threshold. This can
+  // be used to reduce the amount of logs which is getting logged.
+  private final long logThreshold;
+
+  // This is used to control which all log properties are getting logged. This can be used to reduce
+  // the amount of logs which is getting logged.
+  private final ImmutableSet<String> logFilterProperties;
 
   // Path of the file to read.
   private URI gcsPath;
@@ -82,7 +94,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       GoogleCloudStorageReadOptions readOptions,
-      FileSystem.Statistics statistics)
+      Statistics statistics)
       throws IOException {
     logger.atFiner().log(
         "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
@@ -91,6 +103,8 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.totalBytesRead = 0;
     this.isTraceLoggingEnabled = readOptions.isTraceLogEnabled();
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
+    this.logThreshold = readOptions.getTraceLogTimeThreshold();
+    this.logFilterProperties = readOptions.getTraceLogExcludeProperties();
   }
 
   /**
@@ -141,7 +155,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     }
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
 
-    readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead);
+    readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead, Level.INFO);
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
@@ -171,7 +185,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     Stopwatch stopwatch = Stopwatch.createStarted();
 
     int result = super.read(position, buf, offset, length);
-    readAPITrace(POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result);
+    readAPITrace(POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result, Level.FINE);
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
@@ -259,44 +273,63 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   }
 
   private void readAPITrace(
-      String method, Stopwatch stopwatch, long position, int offset, int length, int bytesRead) {
-    if (isTraceLoggingEnabled) {
+      String method,
+      Stopwatch stopwatch,
+      long position,
+      int offset,
+      int length,
+      int bytesRead,
+      Level logLevel) {
+    if (shouldLog(stopwatch)) {
       Map<String, Object> jsonMap = new HashMap<>();
-      jsonMap.put(METHOD, method);
-      jsonMap.put(GCS_PATH, gcsPath);
-      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
-      jsonMap.put(POSITION, position);
-      jsonMap.put(OFFSET, offset);
-      jsonMap.put(LENGTH, length);
-      jsonMap.put(BYTES_READ, bytesRead);
-      captureAPITraces(jsonMap);
+      addLogProperty(METHOD, method, jsonMap);
+      addLogProperty(GCS_PATH, gcsPath, jsonMap);
+      addLogProperty(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS), jsonMap);
+      addLogProperty(POSITION, position, jsonMap);
+      addLogProperty(OFFSET, offset, jsonMap);
+      addLogProperty(LENGTH, length, jsonMap);
+      addLogProperty(BYTES_READ, bytesRead, jsonMap);
+      captureAPITraces(jsonMap, logLevel);
     }
   }
 
   private void seekAPITrace(String method, Stopwatch stopwatch, long pos) {
     if (isTraceLoggingEnabled) {
       Map<String, Object> jsonMap = new HashMap<>();
-      jsonMap.put(METHOD, method);
-      jsonMap.put(GCS_PATH, gcsPath);
-      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
-      jsonMap.put(POSITION, pos);
-      captureAPITraces(jsonMap);
+      addLogProperty(METHOD, method, jsonMap);
+      addLogProperty(GCS_PATH, gcsPath, jsonMap);
+      addLogProperty(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS), jsonMap);
+      addLogProperty(POSITION, pos, jsonMap);
+      captureAPITraces(jsonMap, Level.FINE);
     }
+  }
+
+  private void addLogProperty(
+      String propertyName, Object propertyValue, Map<String, Object> jsonMap) {
+    if (logFilterProperties.contains(propertyName.toLowerCase(Locale.US))) {
+      return;
+    }
+
+    jsonMap.put(propertyName, propertyValue);
+  }
+
+  private boolean shouldLog(Stopwatch stopwatch) {
+    return isTraceLoggingEnabled && stopwatch.elapsed(TimeUnit.MILLISECONDS) >= logThreshold;
   }
 
   private void closeAPITrace(String method, Stopwatch stopwatch) {
-    if (isTraceLoggingEnabled) {
+    if (shouldLog(stopwatch)) {
       Map<String, Object> jsonMap = new HashMap<>();
-      jsonMap.put(METHOD, method);
-      jsonMap.put(GCS_PATH, gcsPath);
-      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
-      captureAPITraces(jsonMap);
+      addLogProperty(METHOD, method, jsonMap);
+      addLogProperty(GCS_PATH, gcsPath, jsonMap);
+      addLogProperty(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS), jsonMap);
+      captureAPITraces(jsonMap, Level.INFO);
     }
   }
 
-  private void captureAPITraces(Map<String, Object> apiTraces) {
+  private void captureAPITraces(Map<String, Object> apiTraces, Level logLevel) {
     if (isTraceLoggingEnabled) {
-      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(apiTraces)));
+      logger.at(logLevel).log("%s", LazyArgs.lazy(() -> gson.toJson(apiTraces)));
     }
   }
 }

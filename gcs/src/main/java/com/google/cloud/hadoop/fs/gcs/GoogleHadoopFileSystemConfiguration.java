@@ -459,6 +459,21 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
 
+  /**
+   * Configuration key to control trace logging of operations which exceeded the provided threshold.
+   * Set this to 0 to log everything. This config is applied only if fs.gs.tracelog.enable is set to
+   * true.
+   */
+  public static final HadoopConfigurationProperty<Long> GCS_TRACE_LOG_TIME_THRESHOLD_MS =
+      new HadoopConfigurationProperty<>("fs.gs.tracelog.time.filter.threshold.ms", 0L);
+
+  /**
+   * Configuration key to control the properties to log for a given trace. This config is applied
+   * only if fs.gs.tracelog.enable is set to true.
+   */
+  public static final HadoopConfigurationProperty<String> GCS_TRACE_LOG_EXCLUDE_PROPERTIES =
+      new HadoopConfigurationProperty<>("fs.gs.tracelog.exclude.properties", "");
+
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
       new HadoopConfigurationProperty<>("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
@@ -531,7 +546,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
-        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
+        .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
+        .setTraceLogExcludeProperties(
+            Utils.convertToSet(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.get(config, config::get)));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
@@ -566,6 +584,9 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
+        .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
+        .setTraceLogExcludeProperties(
+            Utils.convertToSet(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.get(config, config::get)))
         .build();
   }
 

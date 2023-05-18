@@ -469,7 +469,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (options.isTraceLogEnabled()) {
       requestInitializer =
           new ChainingHttpRequestInitializer(
-              httpRequestInitializer, new EventLoggingHttpRequestInitializer());
+              httpRequestInitializer,
+              new EventLoggingHttpRequestInitializer(
+                  options.getTraceLogTimeThreshold(), options.getTraceLogExcludeProperties()));
     }
 
     return new Storage.Builder(httpTransport, JSON_FACTORY, requestInitializer)
