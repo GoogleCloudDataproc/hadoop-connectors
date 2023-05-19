@@ -71,7 +71,5 @@ fi
 export GCS_TEST_JSON_KEYFILE
 export HDFS_ROOT=file:///tmp
 export RUN_INTEGRATION_TESTS=true
-# Env variable to enable direct path over gRPC
-export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true
 
 ./mvnw -B -e -T1C -Pintegration-test clean verify "${@:3}"
