@@ -37,7 +37,7 @@ public abstract class TestConfiguration {
 
     @Override
     public boolean isDirectPathPreferred() {
-      String envVar = System.getProperty(GCS_TEST_DIRECT_PATH_PREFERRED);
+      String envVar = System.getenv(GCS_TEST_DIRECT_PATH_PREFERRED);
       // if env variable is not configured default behaviour is to attempt directPath
       if (envVar == null) {
         return true;
