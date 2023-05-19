@@ -120,7 +120,7 @@
 
 1.  Upgrade Hadoop to 3.3.5.
 
-1. Upgrade java-storage to 2.22.2
+1.  Upgrade java-storage to 2.22.2
 
 ### 2.2.2 - 2021-06-25
 
