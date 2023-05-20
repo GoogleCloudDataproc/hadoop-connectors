@@ -62,8 +62,8 @@ steps:
       - 'TRAFFIC_DIRECTOR_ENABLED=false'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
-# Tests take on average 25 minutes to run
-timeout: 2400s
+# Tests take on average 40 minutes to run
+timeout: 3000s
 
 options:
   machineType: 'N1_HIGHCPU_32'
