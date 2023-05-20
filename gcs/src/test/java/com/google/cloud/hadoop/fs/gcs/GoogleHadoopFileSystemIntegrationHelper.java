@@ -58,6 +58,8 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
           testConf.getPrivateKeyFile());
     }
 
+    config.setBoolean("fs.gs.grpc.directpath.enable", testConf.isDirectPathPreferred());
+
     return config;
   }
 

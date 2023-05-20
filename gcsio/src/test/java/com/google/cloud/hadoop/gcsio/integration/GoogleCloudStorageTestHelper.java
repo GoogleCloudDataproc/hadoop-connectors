@@ -115,6 +115,7 @@ public class GoogleCloudStorageTestHelper {
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
     return GoogleCloudStorageOptions.builder()
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
+        .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
         .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
   }
 

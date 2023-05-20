@@ -21,8 +21,8 @@ public abstract class TestConfiguration {
   public static final String GCS_TEST_PRIVATE_KEYFILE = "GCS_TEST_PRIVATE_KEYFILE";
 
   public static final String GCS_TEST_JSON_KEYFILE = "GCS_TEST_JSON_KEYFILE";
-
   public static final String TRAFFIC_DIRECTOR_ENABLED = "TRAFFIC_DIRECTOR_ENABLED";
+  public static final String GCS_TEST_DIRECT_PATH_PREFERRED = "GCS_TEST_DIRECT_PATH_PREFERRED";
 
   /** Environment-based test configuration. */
   public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
@@ -55,6 +55,16 @@ public abstract class TestConfiguration {
       }
       return true;
     }
+
+    @Override
+    public boolean isDirectPathPreferred() {
+      String envVar = System.getenv(GCS_TEST_DIRECT_PATH_PREFERRED);
+      // if env variable is not configured default behaviour is to attempt directPath
+      if (envVar == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(envVar);
+    }
   }
 
   public static TestConfiguration getInstance() {
@@ -74,4 +84,6 @@ public abstract class TestConfiguration {
   public abstract String getServiceAccountJsonKeyFile();
 
   public abstract boolean isTrafficDirector();
+
+  public abstract boolean isDirectPathPreferred();
 }
