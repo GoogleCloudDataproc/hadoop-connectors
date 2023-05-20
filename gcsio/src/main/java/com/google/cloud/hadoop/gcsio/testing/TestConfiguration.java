@@ -21,6 +21,8 @@ public abstract class TestConfiguration {
   public static final String GCS_TEST_PROJECT_ID = "GCS_TEST_PROJECT_ID";
   public static final String GCS_TEST_JSON_KEYFILE = "GCS_TEST_JSON_KEYFILE";
 
+  public static final String GCS_TEST_DIRECT_PATH_PREFERRED = "GCS_TEST_DIRECT_PATH_PREFERRED";
+
   /** Environment-based test configuration. */
   public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
     @Override
@@ -31,6 +33,16 @@ public abstract class TestConfiguration {
     @Override
     public String getServiceAccountJsonKeyFile() {
       return System.getenv(GCS_TEST_JSON_KEYFILE);
+    }
+
+    @Override
+    public boolean isDirectPathPreferred() {
+      String envVar = System.getenv(GCS_TEST_DIRECT_PATH_PREFERRED);
+      // if env variable is not configured default behaviour is to attempt directPath
+      if (envVar == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(envVar);
     }
   }
 
@@ -45,4 +57,6 @@ public abstract class TestConfiguration {
   public abstract String getProjectId();
 
   public abstract String getServiceAccountJsonKeyFile();
+
+  public abstract boolean isDirectPathPreferred();
 }

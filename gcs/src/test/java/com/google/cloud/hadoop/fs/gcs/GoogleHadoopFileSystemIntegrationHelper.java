@@ -54,6 +54,8 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
           "fs.gs.auth.service.account.json.keyfile", testConf.getServiceAccountJsonKeyFile());
     }
 
+    config.setBoolean("fs.gs.grpc.directpath.enable", testConf.isDirectPathPreferred());
+
     return config;
   }
 
