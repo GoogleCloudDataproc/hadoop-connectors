@@ -579,19 +579,27 @@ permissions (not authorized) to execute these requests.
 
 *   `fs.gs.tracelog.enable` (default: `false`)
 
-    Configuration key to enable logging of additional details. If enabled, it
-    will log GCS API request details, latency of the request etc.
+    Enables or disables the logging of trace logs. The trace logs contain 
+    additional details (latency, headers etc) about the operations that are 
+    performed on the Google Cloud Storage.
 
 *   `fs.gs.tracelog.time.filter.threshold.ms` (default: `0`)
 
-    Configuration key to control trace logging of operations which exceeded the
-    provided time threshold. Set this to 0 to log everything. This config is
-    applied only if fs.gs.tracelog.enable is set to true. This can be used to
-    log only the outlier requests, there by reducing the amount of logs.
+    When this configuration is set, only operations that take longer than the 
+    specified duration will be logged. This flag can be used to reduce the size 
+    of the trace logs by only logging operations that take a significant amount 
+    of time. This config is applied only if `fs.gs.tracelog.enable` is set to true.
 
-*   `fs.gs.tracelog.exclude.properties` (default: `false`)
+*   `fs.gs.tracelog.exclude.properties` (not set by default)
 
-    Configuration key to control the properties to log for a given trace log.
-    This config is applied only if fs.gs.tracelog.enable is set to true. This
-    can be used to limit the amount of data that get logged for a given log
-    message, thereby reducing the amount of logs.
+    A comma-separated list of property names to exclude from trace logs. When 
+    this flag is set, the specified properties are removed before logging. This 
+    flag can be used to reduce the size of the trace logs by excluding properties
+    that are not relevant to your debugging session. This config is applied only 
+    if `fs.gs.tracelog.enable` is set to true.
+
+    Example:
+
+    ```
+    fs.gs.tracelog.exclude.properties=request_headers,response_headers
+    ```
