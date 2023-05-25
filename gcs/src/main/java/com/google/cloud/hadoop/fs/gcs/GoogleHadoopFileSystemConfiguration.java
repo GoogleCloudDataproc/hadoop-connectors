@@ -43,6 +43,7 @@ import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.util.Collection;
 import java.util.List;
@@ -471,8 +472,10 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key to control the properties to log for a given trace. This config is applied
    * only if fs.gs.tracelog.enable is set to true.
    */
-  public static final HadoopConfigurationProperty<String> GCS_TRACE_LOG_EXCLUDE_PROPERTIES =
-      new HadoopConfigurationProperty<>("fs.gs.tracelog.exclude.properties", "");
+  public static final HadoopConfigurationProperty<Collection<String>>
+      GCS_TRACE_LOG_EXCLUDE_PROPERTIES =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.tracelog.exclude.properties", ImmutableList.of());
 
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
@@ -549,7 +552,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
         .setTraceLogExcludeProperties(
-            Utils.convertToSet(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.get(config, config::get)));
+            ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
@@ -586,7 +589,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
         .setTraceLogExcludeProperties(
-            Utils.convertToSet(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.get(config, config::get)))
+            ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)))
         .build();
   }
 
