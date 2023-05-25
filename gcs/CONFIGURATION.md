@@ -574,3 +574,24 @@ permissions (not authorized) to execute these requests.
 
     Maximum number of concurrent directory modification operations per bucket
     guarded by cooperative locking feature.
+
+### Logging Configuration
+
+*   `fs.gs.tracelog.enable` (default: `false`)
+
+    Configuration key to enable logging of additional details. If enabled, it
+    will log GCS API request details, latency of the request etc.
+
+*   `fs.gs.tracelog.time.filter.threshold.ms` (default: `0`)
+
+    Configuration key to control trace logging of operations which exceeded the
+    provided time threshold. Set this to 0 to log everything. This config is
+    applied only if fs.gs.tracelog.enable is set to true. This can be used to
+    log only the outlier requests, there by reducing the amount of logs.
+
+*   `fs.gs.tracelog.exclude.properties` (default: `false`)
+
+    Configuration key to control the properties to log for a given trace log.
+    This config is applied only if fs.gs.tracelog.enable is set to true. This
+    can be used to limit the amount of data that get logged for a given log
+    message, thereby reducing the amount of logs.
