@@ -115,6 +115,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobPattern;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
@@ -276,6 +277,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
+
+  private GhfsStorageStatistics storageStatistics;
 
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -468,6 +471,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     initializeDelegationTokenSupport(config, path);
 
     configure(config);
+
+    // Inserts in to GlobalStorageStatistics. Spark Plugin for e.g. can query this and register to
+    // Spark metrics system.
+    storageStatistics =
+        (GhfsStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.put(
+                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics());
   }
 
   /**
@@ -550,6 +560,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_OPEN);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -592,6 +604,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
     checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
     checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
@@ -653,6 +667,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 GCS_OUTPUT_STREAM_TYPE.getKey(), type));
     }
 
+    incrementStatistic(GhfsStatistic.FILES_CREATED);
     return new FSDataOutputStream(out, /* stats= */ null);
   }
 
@@ -667,6 +682,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
+
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
     if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
@@ -761,6 +778,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_RENAME);
+
     checkArgument(src != null, "src must not be null");
     checkArgument(dst != null, "dst must not be null");
 
@@ -815,6 +834,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_DELETE);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -915,6 +936,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_MKDIRS);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -1725,6 +1748,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** {@inheritDoc} */
   @Override
   public byte[] getXAttr(Path path, String name) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_XATTR_GET_NAMED);
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
 
@@ -1741,6 +1765,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** {@inheritDoc} */
   @Override
   public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_XATTR_GET_MAP);
+
     checkNotNull(path, "path should not be null");
 
     FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
@@ -1759,6 +1785,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** {@inheritDoc} */
   @Override
   public Map<String, byte[]> getXAttrs(Path path, List<String> names) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_XATTR_GET_MAP);
+
     checkNotNull(path, "path should not be null");
     checkNotNull(names, "names should not be null");
 
@@ -1780,6 +1808,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** {@inheritDoc} */
   @Override
   public List<String> listXAttrs(Path path) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_OP_XATTR_LIST);
+
     checkNotNull(path, "path should not be null");
 
     FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
@@ -1844,6 +1874,52 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
             xAttrToRemove);
     getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+  }
+
+  /**
+   * Increment a statistic by 1.
+   *
+   * @param statistic The operation to increment
+   */
+  protected void incrementStatistic(GhfsStatistic statistic) {
+    incrementStatistic(statistic, 1);
+  }
+
+  /**
+   * Increment a statistic by a specific value.
+   *
+   * @param statistic The operation to increment
+   * @param count the count to increment
+   */
+  protected void incrementStatistic(GhfsStatistic statistic, long count) {
+    if (storageStatistics == null) {
+      return; // can be null if initialize() is not called.
+    }
+
+    storageStatistics.incrementCounter(statistic, count);
+  }
+
+  /**
+   * Get the storage statistics of this filesystem.
+   *
+   * @return the storage statistics
+   */
+  @Override
+  public GhfsStorageStatistics getStorageStatistics() {
+    return storageStatistics;
+  }
+
+  /** Increment read operations. */
+  public void incrementReadOperations() {
+    statistics.incrementReadOps(1);
+  }
+
+  /**
+   * Increment the write operation counter. This is somewhat inaccurate, as it appears to be invoked
+   * more often than needed in progress callbacks.
+   */
+  public void incrementWriteOperations() {
+    statistics.incrementWriteOps(1);
   }
 
   private boolean isXAttr(String key) {
