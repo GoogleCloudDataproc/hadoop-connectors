@@ -58,9 +58,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return the new value
    */
   public long incrementCounter(GhfsStatistic op, long count) {
-    long updated = opsCount.get(op).addAndGet(count);
-    // LOG.debug("{} += {}  ->  {}", op, count, updated);
-    return updated;
+    return opsCount.get(op).addAndGet(count);
   }
 
   @Override
