@@ -2,6 +2,10 @@
 
 ## Next
 
+1. Upgrade java-storage to 2.22.3.
+
+1. Add more instrumentation to GCS connector.
+
 ## 2.2.14 - 2023-05-20
 
 1. Upgrade java-storage to 2.22.2
