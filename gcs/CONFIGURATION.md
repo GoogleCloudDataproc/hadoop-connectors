@@ -579,23 +579,23 @@ permissions (not authorized) to execute these requests.
 
 *   `fs.gs.tracelog.enable` (default: `false`)
 
-    Enables or disables the logging of trace logs. The trace logs contain 
-    additional details (latency, headers etc) about the operations that are 
+    Enables or disables the logging of trace logs. The trace logs contain
+    additional details (latency, headers etc) about the operations that are
     performed on the Google Cloud Storage.
 
 *   `fs.gs.tracelog.time.filter.threshold.ms` (default: `0`)
 
-    When this configuration is set, only operations that take longer than the 
-    specified duration will be logged. This flag can be used to reduce the size 
-    of the trace logs by only logging operations that take a significant amount 
+    When this configuration is set, only operations that take longer than the
+    specified duration will be logged. This flag can be used to reduce the size
+    of the trace logs by only logging operations that take a significant amount
     of time. This config is applied only if `fs.gs.tracelog.enable` is set to true.
 
 *   `fs.gs.tracelog.exclude.properties` (not set by default)
 
-    A comma-separated list of property names to exclude from trace logs. When 
-    this flag is set, the specified properties are removed before logging. This 
+    A comma-separated list of property names to exclude from trace logs. When
+    this flag is set, the specified properties are removed before logging. This
     flag can be used to reduce the size of the trace logs by excluding properties
-    that are not relevant to your debugging session. This config is applied only 
+    that are not relevant to your debugging session. This config is applied only
     if `fs.gs.tracelog.enable` is set to true.
 
     Example:
