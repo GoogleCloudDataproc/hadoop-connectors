@@ -2,6 +2,14 @@
 
 ## Next
 
+1. Upgrade java-storage to 2.22.3.
+
+1. Add more instrumentation to GCS connector.
+
+## 2.2.14 - 2023-05-20
+
+1. Upgrade java-storage to 2.22.2
+
 ## 2.2.13 - 2023-05-08
 
 1.  Upgrade Hadoop to 2.10.2/3.2.4.

@@ -108,6 +108,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
               GoogleCloudStorageOptions.builder()
                   .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                   .setProjectId(projectId)
+                  .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
                   .setWriteChannelOptions(
                       AsyncWriteChannelOptions.builder()
                           .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
