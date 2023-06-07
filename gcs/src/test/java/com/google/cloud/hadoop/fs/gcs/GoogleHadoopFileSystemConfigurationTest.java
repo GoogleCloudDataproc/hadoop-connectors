@@ -138,6 +138,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
+          put("fs.gs.tracelog.time.filter.threshold.ms", 0L);
+          put("fs.gs.tracelog.exclude.properties", ImmutableList.of());
         }
       };
 

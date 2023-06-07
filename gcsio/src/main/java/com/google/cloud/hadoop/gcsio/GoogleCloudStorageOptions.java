@@ -28,6 +28,7 @@ import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.storage.v2.StorageProto;
 import java.time.Duration;
 import java.util.Map;
@@ -141,7 +142,9 @@ public abstract class GoogleCloudStorageOptions {
         .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
         .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT)
         .setMetricsSink(MetricsSink.NONE)
-        .setTraceLogEnabled(false);
+        .setTraceLogEnabled(false)
+        .setTraceLogTimeThreshold(0)
+        .setTraceLogExcludeProperties(ImmutableSet.of());
   }
 
   public abstract Builder toBuilder();
@@ -219,6 +222,10 @@ public abstract class GoogleCloudStorageOptions {
   public abstract MetricsSink getMetricsSink();
 
   public abstract boolean isTraceLogEnabled();
+
+  public abstract long getTraceLogTimeThreshold();
+
+  public abstract ImmutableSet<String> getTraceLogExcludeProperties();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -317,6 +324,10 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
     public abstract Builder setTraceLogEnabled(Boolean enable);
+
+    public abstract Builder setTraceLogTimeThreshold(long threshold);
+
+    public abstract Builder setTraceLogExcludeProperties(ImmutableSet<String> properties);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

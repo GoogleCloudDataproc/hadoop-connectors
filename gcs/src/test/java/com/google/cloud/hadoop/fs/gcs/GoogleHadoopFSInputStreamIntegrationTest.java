@@ -20,6 +20,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.common.collect.ImmutableSet;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
@@ -42,6 +43,8 @@ import org.junit.runners.JUnit4;
 public class GoogleHadoopFSInputStreamIntegrationTest {
 
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
+  private final String testContent = "test content";
+  private final byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
   private AssertingLogHandler assertingHandler = new AssertingLogHandler();
   private Logger grpcTracingLogger;
 
@@ -61,7 +64,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     grpcTracingLogger = Logger.getLogger(GoogleHadoopFSInputStream.class.getName());
     grpcTracingLogger.setUseParentHandlers(false);
     grpcTracingLogger.addHandler(assertingHandler);
-    grpcTracingLogger.setLevel(Level.INFO);
+    grpcTracingLogger.setLevel(Level.FINE);
   }
 
   @After
@@ -77,7 +80,6 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
 
-    String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
 
     GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
@@ -95,11 +97,9 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
 
-    String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
 
     byte[] value = new byte[2];
-    byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
     // enabled trace logging
     GoogleCloudStorageReadOptions options =
@@ -165,7 +165,6 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
 
-    String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
 
     GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
@@ -174,6 +173,74 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     }
 
     assertThrows(ClosedChannelException.class, in::available);
+  }
+
+  @Test
+  public void testTracingTimeBasedFiltering() throws Exception {
+    URI path = createFileWithTestContentAndGetPath("read_singleBytes");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    byte[] value = new byte[2];
+
+    int highThreshold = 100_000;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setTraceLogEnabled(true)
+            .setTraceLogTimeThreshold(highThreshold)
+            .build();
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    try (GoogleHadoopFSInputStream in =
+        new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
+
+      assertThat(in.read(value, 0, 1)).isEqualTo(1);
+      assertThat(statistics.getReadOps()).isEqualTo(1);
+      assertingHandler.assertLogCount(0);
+      assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+      assertThat(statistics.getReadOps()).isEqualTo(2);
+    }
+
+    assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
+  public void testTracingLogPropertyFiltering() throws Exception {
+    URI path = createFileWithTestContentAndGetPath("read_singleBytes");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    byte[] value = new byte[2];
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setTraceLogEnabled(true)
+            .setTraceLogTimeThreshold(0)
+            .setTraceLogExcludeProperties(ImmutableSet.of("durationns"))
+            .build();
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    try (GoogleHadoopFSInputStream in =
+        new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
+
+      assertThat(in.read(value, 0, 1)).isEqualTo(1);
+      assertThat(statistics.getReadOps()).isEqualTo(1);
+      assertingHandler.assertLogCount(1);
+      Map<String, Object> logRecord =
+          assertingHandler.getLogRecord(
+              GoogleHadoopFSInputStream.METHOD, GoogleHadoopFSInputStream.READ_METHOD);
+      assertThat(logRecord).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.BYTES_READ)).isEqualTo(1);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.POSITION)).isEqualTo(0);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.DURATION_NS)).isNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.GCS_PATH)).isNotNull();
+    }
+  }
+
+  private URI createFileWithTestContentAndGetPath(String fileName) throws IOException {
+    URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), fileName);
+    gcsFsIHelper.writeTextFile(path, testContent);
+    return path;
   }
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(
