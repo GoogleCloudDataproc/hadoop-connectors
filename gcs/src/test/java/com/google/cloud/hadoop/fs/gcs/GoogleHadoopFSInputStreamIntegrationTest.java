@@ -14,6 +14,15 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS_INCOMPLETE;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -96,6 +105,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+    GhfsStorageStatistics stats = TestUtils.getStorageStatistics();
 
     gcsFsIHelper.writeTextFile(path, testContent);
 
@@ -235,6 +245,59 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       assertThat(logRecord.get(GoogleHadoopFSInputStream.DURATION_NS)).isNull();
       assertThat(logRecord.get(GoogleHadoopFSInputStream.GCS_PATH)).isNotNull();
     }
+  }
+
+  @Test
+  public void operation_durationMetric_tests() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+    GhfsStorageStatistics stats = TestUtils.getStorageStatistics();
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    byte[] value = new byte[2];
+    byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+
+    assertThat(in.read(value, 0, 1)).isEqualTo(1);
+    assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+    assertThat(value).isEqualTo(expected);
+
+    // One seek is to seek to the position and another seek to seek back to the original position.
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_OPERATIONS, 2);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 2);
+
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 2);
+
+    in.seek(0);
+
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 3);
+
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS, 1);
+
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS, 2);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 4);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 2);
+
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 3);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_BACKWARDS, 2);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_FORWARD_OPERATIONS, 0);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_SKIPPED, 0);
+
+    int expectedSeek = 5;
+    in.seek(expectedSeek);
+    in.close();
+
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_FORWARD_OPERATIONS, 1);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_SKIPPED, expectedSeek);
+
+    TestUtils.verifyCounter(stats, STREAM_READ_BYTES, 2);
+    TestUtils.verifyCounter(stats, STREAM_READ_OPERATIONS_INCOMPLETE, 0);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS, 1);
   }
 
   private URI createFileWithTestContentAndGetPath(String fileName) throws IOException {

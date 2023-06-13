@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStorageStatistics.incrementStatistic;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
@@ -560,20 +561,36 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_OPEN);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_OPEN,
+        hadoopPath,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
 
-    checkOpen();
+          logger.atFiner().log(
+              "open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
+          URI gcsPath = getGcsPath(hadoopPath);
+          GoogleCloudStorageReadOptions readChannelOptions =
+              getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
+          GoogleHadoopFSInputStream in =
+              new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
-    logger.atFiner().log("open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
-    URI gcsPath = getGcsPath(hadoopPath);
-    GoogleCloudStorageReadOptions readChannelOptions =
-        getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    GoogleHadoopFSInputStream in =
-        new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
+          return new FSDataInputStream(in);
+        });
+  }
 
-    return new FSDataInputStream(in);
+  @FunctionalInterface
+  public interface InvocationRaisingIOE<R> {
+
+    /**
+     * Apply the operation.
+     *
+     * @throws IOException Any IO failure
+     */
+    R apply() throws IOException;
   }
 
   /**
@@ -604,71 +621,78 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
+    // incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_CREATE,
+        hadoopPath,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
+          checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
 
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
-    checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
-    checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
+          checkOpen();
 
-    checkOpen();
+          logger.atFiner().log(
+              "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
+              hadoopPath, overwrite, bufferSize);
 
-    logger.atFiner().log(
-        "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
-        hadoopPath, overwrite, bufferSize);
+          URI gcsPath = getGcsPath(hadoopPath);
 
-    URI gcsPath = getGcsPath(hadoopPath);
+          OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum);
+          OutputStream out;
+          switch (type) {
+            case BASIC:
+              out =
+                  new GoogleHadoopOutputStream(
+                      this,
+                      gcsPath,
+                      statistics,
+                      CreateFileOptions.builder().setOverwriteExisting(overwrite).build());
+              break;
+            case FLUSHABLE_COMPOSITE:
+              SyncableOutputStreamOptions flushableOutputStreamOptions =
+                  SyncableOutputStreamOptions.builder()
+                      .setMinSyncInterval(
+                          Duration.ofMillis(
+                              GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                  getConf(), getConf()::getInt)))
+                      .setSyncOnFlushEnabled(true)
+                      .build();
+              out =
+                  new GoogleHadoopSyncableOutputStream(
+                      this,
+                      gcsPath,
+                      statistics,
+                      CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
+                      flushableOutputStreamOptions);
+              break;
+            case SYNCABLE_COMPOSITE:
+              SyncableOutputStreamOptions syncableOutputStreamOptions =
+                  SyncableOutputStreamOptions.builder()
+                      .setMinSyncInterval(
+                          Duration.ofMillis(
+                              GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                  getConf(), getConf()::getInt)))
+                      .build();
+              out =
+                  new GoogleHadoopSyncableOutputStream(
+                      this,
+                      gcsPath,
+                      statistics,
+                      CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
+                      syncableOutputStreamOptions);
+              break;
+            default:
+              throw new IOException(
+                  String.format(
+                      "Unsupported output stream type given for key '%s': '%s'",
+                      GCS_OUTPUT_STREAM_TYPE.getKey(), type));
+          }
 
-    OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum);
-    OutputStream out;
-    switch (type) {
-      case BASIC:
-        out =
-            new GoogleHadoopOutputStream(
-                this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build());
-        break;
-      case FLUSHABLE_COMPOSITE:
-        SyncableOutputStreamOptions flushableOutputStreamOptions =
-            SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-                .setSyncOnFlushEnabled(true)
-                .build();
-        out =
-            new GoogleHadoopSyncableOutputStream(
-                this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                flushableOutputStreamOptions);
-        break;
-      case SYNCABLE_COMPOSITE:
-        SyncableOutputStreamOptions syncableOutputStreamOptions =
-            SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-                .build();
-        out =
-            new GoogleHadoopSyncableOutputStream(
-                this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                syncableOutputStreamOptions);
-        break;
-      default:
-        throw new IOException(
-            String.format(
-                "Unsupported output stream type given for key '%s': '%s'",
-                GCS_OUTPUT_STREAM_TYPE.getKey(), type));
-    }
-
-    incrementStatistic(GhfsStatistic.FILES_CREATED);
-    return new FSDataOutputStream(out, /* stats= */ null);
+          GhfsStorageStatistics.incrementStatistic(GhfsStatistic.FILES_CREATED, storageStatistics);
+          return new FSDataOutputStream(out, /* stats= */ null);
+        });
   }
 
   /** {@inheritDoc} */
@@ -682,24 +706,29 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
 
-    URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
-    URI parentGcsPath = UriPaths.getParentPath(gcsPath);
-    if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
-      throw new FileNotFoundException(
-          String.format(
-              "Can not create '%s' file, because parent folder does not exist: %s",
-              gcsPath, parentGcsPath));
-    }
-    return create(
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE,
         hadoopPath,
-        permission,
-        flags.contains(org.apache.hadoop.fs.CreateFlag.OVERWRITE),
-        bufferSize,
-        replication,
-        blockSize,
-        progress);
+        () -> {
+          URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
+          URI parentGcsPath = UriPaths.getParentPath(gcsPath);
+          if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
+            throw new FileNotFoundException(
+                String.format(
+                    "Can not create '%s' file, because parent folder does not exist: %s",
+                    gcsPath, parentGcsPath));
+          }
+          return create(
+              hadoopPath,
+              permission,
+              flags.contains(org.apache.hadoop.fs.CreateFlag.OVERWRITE),
+              bufferSize,
+              replication,
+              blockSize,
+              progress);
+        });
   }
 
   /**
@@ -778,28 +807,34 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_RENAME);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_RENAME,
+        String.format("rename(%s -> %s)", src, dst),
+        () -> {
+          checkArgument(src != null, "src must not be null");
+          checkArgument(dst != null, "dst must not be null");
 
-    checkArgument(src != null, "src must not be null");
-    checkArgument(dst != null, "dst must not be null");
-
-    // Even though the underlying GCSFS will also throw an IAE if src is root, since our filesystem
-    // root happens to equal the global root, we want to explicitly check it here since derived
-    // classes may not have filesystem roots equal to the global root.
-    if (src.makeQualified(this).equals(getFileSystemRoot())) {
-      logger.atFiner().log("rename(src: %s, dst: %s): false [src is a root]", src, dst);
-      return false;
-    }
-    try {
-      renameInternal(src, dst);
-    } catch (IOException e) {
-      if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        throw e;
-      }
-      logger.atFiner().withCause(e).log("rename(src: %s, dst: %s): false [failed]", src, dst);
-      return false;
-    }
-    return true;
+          // Even though the underlying GCSFS will also throw an IAE if src is root, since our
+          // filesystem
+          // root happens to equal the global root, we want to explicitly check it here since
+          // derived
+          // classes may not have filesystem roots equal to the global root.
+          if (src.makeQualified(this).equals(getFileSystemRoot())) {
+            logger.atFiner().log("rename(src: %s, dst: %s): false [src is a root]", src, dst);
+            return false;
+          }
+          try {
+            renameInternal(src, dst);
+          } catch (IOException e) {
+            if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+              throw e;
+            }
+            logger.atFiner().withCause(e).log("rename(src: %s, dst: %s): false [failed]", src, dst);
+            return false;
+          }
+          return true;
+        });
   }
 
   /**
@@ -834,27 +869,32 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_DELETE);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_DELETE,
+        hadoopPath,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
 
-    checkOpen();
-
-    URI gcsPath = getGcsPath(hadoopPath);
-    try {
-      getGcsFs().delete(gcsPath, recursive);
-    } catch (DirectoryNotEmptyException e) {
-      throw e;
-    } catch (IOException e) {
-      if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        throw e;
-      }
-      logger.atFiner().withCause(e).log(
-          "delete(hadoopPath: %s, recursive: %b): false [failed]", hadoopPath, recursive);
-      return false;
-    }
-    logger.atFiner().log("delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
-    return true;
+          URI gcsPath = getGcsPath(hadoopPath);
+          try {
+            getGcsFs().delete(gcsPath, recursive);
+          } catch (DirectoryNotEmptyException e) {
+            throw e;
+          } catch (IOException e) {
+            if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+              throw e;
+            }
+            logger.atFiner().withCause(e).log(
+                "delete(hadoopPath: %s, recursive: %b): false [failed]", hadoopPath, recursive);
+            return false;
+          }
+          logger.atFiner().log(
+              "delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
+          return true;
+        });
   }
 
   /**
@@ -936,25 +976,31 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_MKDIRS);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_MKDIRS,
+        hadoopPath,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
 
-    checkOpen();
-
-    URI gcsPath = getGcsPath(hadoopPath);
-    try {
-      getGcsFs().mkdirs(gcsPath);
-    } catch (java.nio.file.FileAlreadyExistsException faee) {
-      // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
-      throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException(
-                  String.format(
-                      "mkdirs(hadoopPath: %s, permission: %s): failed", hadoopPath, permission))
-              .initCause(faee);
-    }
-    logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
-    return true;
+          URI gcsPath = getGcsPath(hadoopPath);
+          try {
+            getGcsFs().mkdirs(gcsPath);
+          } catch (java.nio.file.FileAlreadyExistsException faee) {
+            // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
+            throw (FileAlreadyExistsException)
+                new FileAlreadyExistsException(
+                        String.format(
+                            "mkdirs(hadoopPath: %s, permission: %s): failed",
+                            hadoopPath, permission))
+                    .initCause(faee);
+          }
+          logger.atFiner().log(
+              "mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
+          return true;
+        });
   }
 
   /** Gets the default replication factor. */
@@ -973,19 +1019,25 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus getFileStatus(Path hadoopPath) throws IOException {
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_GET_FILE_STATUS,
+        hadoopPath,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkOpen();
+          checkOpen();
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
-    if (!fileInfo.exists()) {
-      throw new FileNotFoundException(
-          String.format(
-              "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
-    }
-    String userName = getUgiUserName();
-    return getFileStatus(fileInfo, userName);
+          URI gcsPath = getGcsPath(hadoopPath);
+          FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+          if (!fileInfo.exists()) {
+            throw new FileNotFoundException(
+                String.format(
+                    "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+          }
+          String userName = getUgiUserName();
+          return getFileStatus(fileInfo, userName);
+        });
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
@@ -1099,29 +1151,36 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
-    checkOpen();
 
-    logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
-    // URI does not handle glob expressions nicely, for the purpose of
-    // fully-qualifying a path we can URI-encode them.
-    // Using toString() to avoid Path(URI) constructor.
-    Path encodedPath = new Path(pathPattern.toUri().toString());
-    // We convert pathPattern to GCS path and then to Hadoop path to ensure that it ends up in
-    // the correct format. See note in getHadoopPath for more information.
-    Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
-    // Decode URI-encoded path back into a glob path.
-    Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
-    logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_GLOB_STATUS,
+        String.format("path=%s; pattern=%s", pathPattern, filter),
+        () -> {
+          checkOpen();
 
-    if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
-      return concurrentGlobInternal(fixedPath, filter);
-    }
+          logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
+          // URI does not handle glob expressions nicely, for the purpose of
+          // fully-qualifying a path we can URI-encode them.
+          // Using toString() to avoid Path(URI) constructor.
+          Path encodedPath = new Path(pathPattern.toUri().toString());
+          // We convert pathPattern to GCS path and then to Hadoop path to ensure that it ends up in
+          // the correct format. See note in getHadoopPath for more information.
+          Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
+          // Decode URI-encoded path back into a glob path.
+          Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
+          logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
-    if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
-      return flatGlobInternal(fixedPath, filter);
-    }
+          if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
+            return concurrentGlobInternal(fixedPath, filter);
+          }
 
-    return super.globStatus(fixedPath, filter);
+          if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
+            return flatGlobInternal(fixedPath, filter);
+          }
+
+          return super.globStatus(fixedPath, filter);
+        });
   }
 
   /**
@@ -1691,6 +1750,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
+    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM, storageStatistics);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -1748,80 +1809,97 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** {@inheritDoc} */
   @Override
   public byte[] getXAttr(Path path, String name) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_XATTR_GET_NAMED);
-    checkNotNull(path, "path should not be null");
-    checkNotNull(name, "name should not be null");
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_XATTR_GET_NAMED,
+        path,
+        () -> {
+          checkNotNull(path, "path should not be null");
+          checkNotNull(name, "name should not be null");
 
-    Map<String, byte[]> attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
-    String xAttrKey = getXAttrKey(name);
-    byte[] xAttr =
-        attributes.containsKey(xAttrKey) ? getXAttrValue(attributes.get(xAttrKey)) : null;
+          Map<String, byte[]> attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
+          String xAttrKey = getXAttrKey(name);
+          byte[] xAttr =
+              attributes.containsKey(xAttrKey) ? getXAttrValue(attributes.get(xAttrKey)) : null;
 
-    logger.atFiner().log(
-        "getXAttr(path: %s, name: %s): %s", path, name, lazy(() -> new String(xAttr, UTF_8)));
-    return xAttr;
+          logger.atFiner().log(
+              "getXAttr(path: %s, name: %s): %s", path, name, lazy(() -> new String(xAttr, UTF_8)));
+          return xAttr;
+        });
   }
 
   /** {@inheritDoc} */
   @Override
   public Map<String, byte[]> getXAttrs(Path path) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_XATTR_GET_MAP);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_XATTR_GET_MAP,
+        path,
+        () -> {
+          checkNotNull(path, "path should not be null");
 
-    checkNotNull(path, "path should not be null");
+          FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+          Map<String, byte[]> xAttrs =
+              fileInfo.getAttributes().entrySet().stream()
+                  .filter(a -> isXAttr(a.getKey()))
+                  .collect(
+                      HashMap::new,
+                      (m, a) -> m.put(getXAttrName(a.getKey()), getXAttrValue(a.getValue())),
+                      Map::putAll);
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
-    Map<String, byte[]> xAttrs =
-        fileInfo.getAttributes().entrySet().stream()
-            .filter(a -> isXAttr(a.getKey()))
-            .collect(
-                HashMap::new,
-                (m, a) -> m.put(getXAttrName(a.getKey()), getXAttrValue(a.getValue())),
-                Map::putAll);
-
-    logger.atFiner().log("getXAttrs(path: %s): %s", path, xAttrs);
-    return xAttrs;
+          logger.atFiner().log("getXAttrs(path: %s): %s", path, xAttrs);
+          return xAttrs;
+        });
   }
 
   /** {@inheritDoc} */
   @Override
   public Map<String, byte[]> getXAttrs(Path path, List<String> names) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_XATTR_GET_MAP);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_XATTR_GET_MAP,
+        path,
+        () -> {
+          checkNotNull(path, "path should not be null");
+          checkNotNull(names, "names should not be null");
 
-    checkNotNull(path, "path should not be null");
-    checkNotNull(names, "names should not be null");
+          Map<String, byte[]> xAttrs;
+          if (names.isEmpty()) {
+            xAttrs = new HashMap<>();
+          } else {
+            Set<String> namesSet = new HashSet<>(names);
+            xAttrs =
+                getXAttrs(path).entrySet().stream()
+                    .filter(a -> namesSet.contains(a.getKey()))
+                    .collect(HashMap::new, (m, a) -> m.put(a.getKey(), a.getValue()), Map::putAll);
+          }
 
-    Map<String, byte[]> xAttrs;
-    if (names.isEmpty()) {
-      xAttrs = new HashMap<>();
-    } else {
-      Set<String> namesSet = new HashSet<>(names);
-      xAttrs =
-          getXAttrs(path).entrySet().stream()
-              .filter(a -> namesSet.contains(a.getKey()))
-              .collect(HashMap::new, (m, a) -> m.put(a.getKey(), a.getValue()), Map::putAll);
-    }
-
-    logger.atFiner().log("getXAttrs(path: %s, names: %s): %s", path, names, xAttrs);
-    return xAttrs;
+          logger.atFiner().log("getXAttrs(path: %s, names: %s): %s", path, names, xAttrs);
+          return xAttrs;
+        });
   }
 
   /** {@inheritDoc} */
   @Override
   public List<String> listXAttrs(Path path) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_OP_XATTR_LIST);
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_OP_XATTR_LIST,
+        path,
+        () -> {
+          checkNotNull(path, "path should not be null");
 
-    checkNotNull(path, "path should not be null");
+          FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+          List<String> xAttrs =
+              fileInfo.getAttributes().keySet().stream()
+                  .filter(this::isXAttr)
+                  .map(this::getXAttrName)
+                  .collect(Collectors.toCollection(ArrayList::new));
 
-    List<String> xAttrs =
-        fileInfo.getAttributes().keySet().stream()
-            .filter(this::isXAttr)
-            .map(this::getXAttrName)
-            .collect(Collectors.toCollection(ArrayList::new));
-
-    logger.atFiner().log("listXAttrs(path: %s): %s", path, xAttrs);
-    return xAttrs;
+          logger.atFiner().log("listXAttrs(path: %s): %s", path, xAttrs);
+          return xAttrs;
+        });
   }
 
   /** {@inheritDoc} */
@@ -1874,29 +1952,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
             xAttrToRemove);
     getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
-  }
-
-  /**
-   * Increment a statistic by 1.
-   *
-   * @param statistic The operation to increment
-   */
-  protected void incrementStatistic(GhfsStatistic statistic) {
-    incrementStatistic(statistic, 1);
-  }
-
-  /**
-   * Increment a statistic by a specific value.
-   *
-   * @param statistic The operation to increment
-   * @param count the count to increment
-   */
-  protected void incrementStatistic(GhfsStatistic statistic, long count) {
-    if (storageStatistics == null) {
-      return; // can be null if initialize() is not called.
-    }
-
-    storageStatistics.incrementCounter(statistic, count);
   }
 
   /**

@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.FileSystem;
 class GoogleHadoopOutputStream extends OutputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  private final GhfsStorageStatistics storageStatistics;
 
   // All store IO access goes through this.
   private WritableByteChannel channel;
@@ -69,6 +70,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
     this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
     this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
+    this.storageStatistics = ghfs.getStorageStatistics();
   }
 
   private static WritableByteChannel createChannel(
@@ -93,10 +95,19 @@ class GoogleHadoopOutputStream extends OutputStream {
   /** Writes the specified byte to this output stream. */
   @Override
   public void write(int b) throws IOException {
-    throwIfNotOpen();
-    out.write(b);
-    statistics.incrementBytesWritten(1);
-    statistics.incrementWriteOps(1);
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_WRITE_OPERATIONS,
+        gcsPath,
+        () -> {
+          throwIfNotOpen();
+          out.write(b);
+          statistics.incrementBytesWritten(1);
+          statistics.incrementWriteOps(1);
+
+          storageStatistics.streamWriteBytes(1);
+          return null;
+        });
   }
 
   /**
@@ -104,24 +115,41 @@ class GoogleHadoopOutputStream extends OutputStream {
    */
   @Override
   public void write(byte[] b, int offset, int len) throws IOException {
-    throwIfNotOpen();
-    out.write(b, offset, len);
-    statistics.incrementBytesWritten(len);
-    statistics.incrementWriteOps(1);
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_WRITE_OPERATIONS,
+        gcsPath,
+        () -> {
+          throwIfNotOpen();
+          out.write(b, offset, len);
+          statistics.incrementBytesWritten(len);
+          statistics.incrementWriteOps(1);
+
+          storageStatistics.streamWriteBytes(len);
+          return null;
+        });
   }
 
   /** Closes this output stream and releases any system resources associated with this stream. */
   @Override
   public void close() throws IOException {
-    logger.atFiner().log("close(%s)", gcsPath);
-    if (out != null) {
-      try {
-        out.close();
-      } finally {
-        out = null;
-        channel = null;
-      }
-    }
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS,
+        gcsPath,
+        () -> {
+          logger.atFiner().log("close(%s)", gcsPath);
+          if (out != null) {
+            try {
+              out.close();
+            } finally {
+              out = null;
+              channel = null;
+            }
+          }
+
+          return null;
+        });
   }
 
   private boolean isOpen() {

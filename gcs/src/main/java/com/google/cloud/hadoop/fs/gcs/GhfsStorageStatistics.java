@@ -16,6 +16,12 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
+import com.google.common.base.Stopwatch;
+import com.google.common.flogger.GoogleLogger;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Iterator;
@@ -31,22 +37,43 @@ import org.apache.hadoop.fs.StorageStatistics;
 @InterfaceStability.Unstable
 public class GhfsStorageStatistics extends StorageStatistics {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   /** {@value} The key that stores all the registered metrics */
   public static final String NAME = "GhfsStorageStatistics";
 
-  /** Exention for minimum */
-  private static final String MINIMUM = ".min";
-  /** Exention for maximum */
-  private static final String MAXIMUM = ".max";
-  /** Exention for mean */
-  private static final String MEAN = ".max";
+  public static final int LATENCY_LOGGING_THRESHOLD_MS = 100;
 
   private final Map<GhfsStatistic, AtomicLong> opsCount = new EnumMap<>(GhfsStatistic.class);
+  private final Map<GhfsStatistic, AtomicLong> minimums = new EnumMap<>(GhfsStatistic.class);
+  private final Map<GhfsStatistic, AtomicLong> maximums = new EnumMap<>(GhfsStatistic.class);
+  private final Map<GhfsStatistic, MeanStatistic> means = new EnumMap<>(GhfsStatistic.class);
 
   public GhfsStorageStatistics() {
     super(NAME);
     for (GhfsStatistic opType : GhfsStatistic.values()) {
       opsCount.put(opType, new AtomicLong(0));
+
+      if (opType.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+        minimums.put(opType, null);
+        maximums.put(opType, new AtomicLong(0));
+        means.put(opType, new MeanStatistic());
+      }
+    }
+  }
+
+  static <B> B trackDuration(
+      GhfsStorageStatistics stats,
+      GhfsStatistic statistic,
+      Object context,
+      InvocationRaisingIOE<B> operation)
+      throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      incrementStatistic(statistic, stats);
+      return operation.apply();
+    } finally {
+      incrementDuration(statistic, stopwatch.elapsed().toMillis(), stats, context);
     }
   }
 
@@ -68,7 +95,67 @@ public class GhfsStorageStatistics extends StorageStatistics {
     }
   }
 
+  public void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
+    checkArgument(
+        statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
+        String.format("Unexpected instrumentation type %s", statistic));
+    AtomicLong minVal = minimums.get(statistic);
+    if (minVal == null) {
+      // There can be race here. It is ok to have the last write win.
+      minimums.put(statistic, new AtomicLong(durationMs));
+    } else if (durationMs < minVal.get()) {
+      minVal.set(durationMs);
+    }
+
+    AtomicLong maxVal = maximums.get(statistic);
+    if (durationMs > maxVal.get()) {
+      if (durationMs > LATENCY_LOGGING_THRESHOLD_MS) {
+        logger.atWarning().log(
+            "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
+            statistic, durationMs, maxVal.get(), opsCount.get(statistic), context);
+      }
+
+      // There can be race here and can have some data points get missed. This is a corner case.
+      // Since this function can be called quite frequently, opting for performance over consistency
+      // here.
+      maxVal.set(durationMs);
+    }
+
+    if (means.containsKey(statistic)) {
+      means.get(statistic).addSample(durationMs);
+    }
+  }
+
+  public void streamReadBytes(int bytesRead) {
+    incrementCounter(GhfsStatistic.STREAM_READ_BYTES, bytesRead);
+  }
+
+  /** If more data was requested than was actually returned, this was an incomplete read. */
+  public void streamReadOperationInComplete(int requested, int actual) {
+    if (requested > actual) {
+      incrementCounter(GhfsStatistic.STREAM_READ_OPERATIONS_INCOMPLETE, 1);
+    }
+  }
+
+  public void streamReadSeekBackward(long negativeOffset) {
+    incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS, 1);
+    incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS, -negativeOffset);
+  }
+
+  public void streamReadSeekForward(long skipped) {
+    if (skipped > 0) {
+      incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED, skipped);
+    }
+
+    incrementCounter(GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS, 1);
+  }
+
+  public void streamWriteBytes(int bytesWritten) {
+    incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
+  }
+
   private class LongIterator implements Iterator<LongStatistic> {
+    // TODO: Include statistic related metrics as well.
     private Iterator<Map.Entry<GhfsStatistic, AtomicLong>> iterator =
         Collections.unmodifiableSet(opsCount.entrySet()).iterator();
 
@@ -100,12 +187,12 @@ public class GhfsStorageStatistics extends StorageStatistics {
   @Override
   public Long getLong(String key) {
     final GhfsStatistic type = GhfsStatistic.fromSymbol(key);
-    return type == null ? null : opsCount.get(type).get();
+    return type == null ? 0L : opsCount.get(type).get();
   }
 
   @Override
   public boolean isTracked(String key) {
-    return GhfsStatistic.fromSymbol(key) == null;
+    return GhfsStatistic.fromSymbol(key) != null;
   }
 
   /**
@@ -115,7 +202,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return minimum statistic value
    */
   public Long getMin(String symbol) {
-    return 0L; // TODO: Update this once duration instrumentations are added
+    return getStatisticValue(symbol, minimums);
   }
 
   /**
@@ -125,7 +212,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return maximum statistic value
    */
   public Long getMax(String symbol) {
-    return 0L; // TODO: Update this once duration instrumentations are added
+    return getStatisticValue(symbol, maximums);
   }
 
   /**
@@ -134,25 +221,81 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @param symbol
    * @return mean statistic value
    */
-  public double getMean(String symbol) {
-    return 0L; // TODO: Update this once duration instrumentations are added
+  public double getMean(String key) {
+    final GhfsStatistic type = GhfsStatistic.fromSymbol(key);
+    MeanStatistic val = means.get(type);
+    if (val == null) {
+      return 0;
+    }
+
+    return val.getValue();
+  }
+
+  private static void incrementDuration(
+      GhfsStatistic statistic, long toMillis, GhfsStorageStatistics stats, Object context) {
+    if (stats == null) {
+      return; // can be null if initialize() is not called.
+    }
+
+    stats.updateStats(statistic, toMillis, context);
   }
 
   /**
-   * Map of minimums
+   * Increment a statistic by 1.
    *
-   * @return current map of minimums
+   * @param statistic The operation to increment
+   * @param stats
    */
-  private Map<String, Long> minimums() {
-    return null; // TODO: Update this once duration instrumentations are added
+  static void incrementStatistic(GhfsStatistic statistic, GhfsStorageStatistics stats) {
+    incrementStatistic(statistic, 1, stats);
   }
 
   /**
-   * Map of maximums
+   * Increment a statistic by a specific value.
    *
-   * @return current map of maximums
+   * @param statistic The operation to increment
+   * @param count the count to increment
+   * @param stats
    */
-  private Map<String, Long> maximums() {
-    return null; // TODO: Update this once duration instrumentations are added
+  static void incrementStatistic(GhfsStatistic statistic, long count, GhfsStorageStatistics stats) {
+    if (stats == null) {
+      return; // can be null if initialize() is not called.
+    }
+
+    stats.incrementCounter(statistic, count);
+  }
+
+  private long getStatisticValue(String key, Map<GhfsStatistic, AtomicLong> stats) {
+    final GhfsStatistic stat = GhfsStatistic.fromSymbol(key);
+    if (stat == null) {
+      return 0L;
+    }
+
+    AtomicLong val = stats.get(stat);
+    if (val == null) {
+      return 0L;
+    }
+
+    return val.get();
+  }
+
+  /** This class keeps track of mean statistics by keeping track of sum and number of samples. */
+  static class MeanStatistic {
+    private int sample;
+
+    private long sum;
+
+    public synchronized void addSample(long val) {
+      sample++;
+      sum += val;
+    }
+
+    public double getValue() {
+      if (sample == 0) {
+        return 0;
+      }
+
+      return sum / sample;
+    }
   }
 }
