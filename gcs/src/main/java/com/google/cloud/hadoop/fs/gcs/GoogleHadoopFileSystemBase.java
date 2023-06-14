@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStorageStatistics.incrementStatistic;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
@@ -279,7 +278,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
-  private GhfsStorageStatistics storageStatistics;
+  private final GhfsStorageStatistics storageStatistics;
 
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -335,7 +334,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * Constructs an instance of GoogleHadoopFileSystemBase; the internal {@link
    * GoogleCloudStorageFileSystem} will be set up with config settings when initialize() is called.
    */
-  public GoogleHadoopFileSystemBase() {}
+  public GoogleHadoopFileSystemBase() {
+    // Inserts in to GlobalStorageStatistics. Spark Plugin for e.g. can query this and register to
+    // Spark metrics system.
+    storageStatistics =
+        (GhfsStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.put(
+                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics());
+  }
 
   /**
    * Constructs an instance of {@link GoogleHadoopFileSystemBase} using the provided
@@ -345,6 +351,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
   GoogleHadoopFileSystemBase(GoogleCloudStorageFileSystem gcsFs) {
+    this();
     checkNotNull(gcsFs, "gcsFs must not be null");
     setGcsFs(gcsFs);
   }
@@ -472,13 +479,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     initializeDelegationTokenSupport(config, path);
 
     configure(config);
-
-    // Inserts in to GlobalStorageStatistics. Spark Plugin for e.g. can query this and register to
-    // Spark metrics system.
-    storageStatistics =
-        (GhfsStorageStatistics)
-            GlobalStorageStatistics.INSTANCE.put(
-                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics());
   }
 
   /**
@@ -621,7 +621,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-    // incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
     return GhfsStorageStatistics.trackDuration(
         storageStatistics,
         GhfsStatistic.INVOCATION_CREATE,
@@ -690,7 +689,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       GCS_OUTPUT_STREAM_TYPE.getKey(), type));
           }
 
-          GhfsStorageStatistics.incrementStatistic(GhfsStatistic.FILES_CREATED, storageStatistics);
+          storageStatistics.filesCreated();
           return new FSDataOutputStream(out, /* stats= */ null);
         });
   }
@@ -1750,7 +1749,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM, storageStatistics);
+    storageStatistics.getFileCheckSum();
 
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -1962,19 +1961,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public GhfsStorageStatistics getStorageStatistics() {
     return storageStatistics;
-  }
-
-  /** Increment read operations. */
-  public void incrementReadOperations() {
-    statistics.incrementReadOps(1);
-  }
-
-  /**
-   * Increment the write operation counter. This is somewhat inaccurate, as it appears to be invoked
-   * more often than needed in progress callbacks.
-   */
-  public void incrementWriteOperations() {
-    statistics.incrementWriteOps(1);
   }
 
   private boolean isXAttr(String key) {

@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
@@ -28,6 +30,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.StorageStatistics;
@@ -63,18 +66,22 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
 
   static <B> B trackDuration(
-      GhfsStorageStatistics stats,
+      @Nonnull GhfsStorageStatistics stats,
       GhfsStatistic statistic,
       Object context,
       InvocationRaisingIOE<B> operation)
       throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
-      incrementStatistic(statistic, stats);
+      stats.increment(statistic);
       return operation.apply();
     } finally {
-      incrementDuration(statistic, stopwatch.elapsed().toMillis(), stats, context);
+      stats.updateStats(statistic, stopwatch.elapsed().toMillis(), context);
     }
+  }
+
+  private long increment(GhfsStatistic statistic) {
+    return incrementCounter(statistic, 1);
   }
 
   /**
@@ -84,7 +91,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @param count increment value
    * @return the new value
    */
-  public long incrementCounter(GhfsStatistic op, long count) {
+  long incrementCounter(GhfsStatistic op, long count) {
     return opsCount.get(op).addAndGet(count);
   }
 
@@ -95,7 +102,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
     }
   }
 
-  public void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
+  void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
     checkArgument(
         statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
@@ -126,32 +133,40 @@ public class GhfsStorageStatistics extends StorageStatistics {
     }
   }
 
-  public void streamReadBytes(int bytesRead) {
+  void streamReadBytes(int bytesRead) {
     incrementCounter(GhfsStatistic.STREAM_READ_BYTES, bytesRead);
   }
 
   /** If more data was requested than was actually returned, this was an incomplete read. */
-  public void streamReadOperationInComplete(int requested, int actual) {
+  void streamReadOperationInComplete(int requested, int actual) {
     if (requested > actual) {
-      incrementCounter(GhfsStatistic.STREAM_READ_OPERATIONS_INCOMPLETE, 1);
+      increment(GhfsStatistic.STREAM_READ_OPERATIONS_INCOMPLETE);
     }
   }
 
-  public void streamReadSeekBackward(long negativeOffset) {
-    incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS, 1);
+  void streamReadSeekBackward(long negativeOffset) {
+    increment(GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
     incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS, -negativeOffset);
   }
 
-  public void streamReadSeekForward(long skipped) {
+  void streamReadSeekForward(long skipped) {
     if (skipped > 0) {
       incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED, skipped);
     }
 
-    incrementCounter(GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS, 1);
+    increment(GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS);
   }
 
-  public void streamWriteBytes(int bytesWritten) {
+  void streamWriteBytes(int bytesWritten) {
     incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
+  }
+
+  void filesCreated() {
+    increment(FILES_CREATED);
+  }
+
+  void getFileCheckSum() {
+    increment(INVOCATION_GET_FILE_CHECKSUM);
   }
 
   private class LongIterator implements Iterator<LongStatistic> {
@@ -231,40 +246,6 @@ public class GhfsStorageStatistics extends StorageStatistics {
     return val.getValue();
   }
 
-  private static void incrementDuration(
-      GhfsStatistic statistic, long toMillis, GhfsStorageStatistics stats, Object context) {
-    if (stats == null) {
-      return; // can be null if initialize() is not called.
-    }
-
-    stats.updateStats(statistic, toMillis, context);
-  }
-
-  /**
-   * Increment a statistic by 1.
-   *
-   * @param statistic The operation to increment
-   * @param stats
-   */
-  static void incrementStatistic(GhfsStatistic statistic, GhfsStorageStatistics stats) {
-    incrementStatistic(statistic, 1, stats);
-  }
-
-  /**
-   * Increment a statistic by a specific value.
-   *
-   * @param statistic The operation to increment
-   * @param count the count to increment
-   * @param stats
-   */
-  static void incrementStatistic(GhfsStatistic statistic, long count, GhfsStorageStatistics stats) {
-    if (stats == null) {
-      return; // can be null if initialize() is not called.
-    }
-
-    stats.incrementCounter(statistic, count);
-  }
-
   private long getStatisticValue(String key, Map<GhfsStatistic, AtomicLong> stats) {
     final GhfsStatistic stat = GhfsStatistic.fromSymbol(key);
     if (stat == null) {
@@ -285,12 +266,12 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
     private long sum;
 
-    public synchronized void addSample(long val) {
+    synchronized void addSample(long val) {
       sample++;
       sum += val;
     }
 
-    public double getValue() {
+    double getValue() {
       if (sample == 0) {
         return 0;
       }
