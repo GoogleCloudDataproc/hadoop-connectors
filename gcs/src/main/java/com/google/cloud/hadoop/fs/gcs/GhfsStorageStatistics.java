@@ -185,7 +185,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
         throw new NoSuchElementException();
       }
       final Map.Entry<GhfsStatistic, AtomicLong> entry = iterator.next();
-      return new LongStatistic(entry.getKey().name(), entry.getValue().get());
+      return new LongStatistic(entry.getKey().getSymbol(), entry.getValue().get());
     }
 
     @Override

@@ -117,25 +117,31 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read() throws IOException {
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_OPERATIONS,
+        gcsPath,
+        () -> {
+          // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
+          // underlying channel.
+          int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
+          if (numRead == -1) {
+            return -1;
+          }
+          if (numRead != 1) {
+            throw new IOException(
+                String.format(
+                    "Somehow read %d bytes using single-byte buffer for path %s ending in position %d!",
+                    numRead, gcsPath, channel.position()));
+          }
+          byte b = singleReadBuf[0];
 
-    // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
-    // underlying channel.
-    int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
-    if (numRead == -1) {
-      return -1;
-    }
-    if (numRead != 1) {
-      throw new IOException(
-          String.format(
-              "Somehow read %d bytes using single-byte buffer for path %s ending in position %d!",
-              numRead, gcsPath, channel.position()));
-    }
-    byte b = singleReadBuf[0];
-
-    totalBytesRead++;
-    statistics.incrementBytesRead(1);
-    statistics.incrementReadOps(1);
-    return (b & 0xff);
+          totalBytesRead++;
+          statistics.incrementBytesRead(1);
+          statistics.incrementReadOps(1);
+          storageStatistics.streamReadBytes(1);
+          return (b & 0xff);
+        });
   }
 
   /**
@@ -170,7 +176,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
             statistics.incrementBytesRead(numRead);
             statistics.incrementReadOps(1);
             totalBytesRead += numRead;
-            storageStatistics.streamReadBytes(Math.max(numRead, 0));
+            storageStatistics.streamReadBytes(numRead);
           }
 
           storageStatistics.streamReadOperationInComplete(length, Math.max(numRead, 0));
@@ -194,24 +200,17 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
-    return GhfsStorageStatistics.trackDuration(
-        storageStatistics,
-        GhfsStatistic.STREAM_READ_OPERATIONS,
-        gcsPath,
-        () -> {
-          Stopwatch stopwatch = Stopwatch.createStarted();
+    Stopwatch stopwatch = Stopwatch.createStarted();
 
-          int result = super.read(position, buf, offset, length);
-          readAPITrace(
-              POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result, Level.FINE);
-          if (result > 0) {
-            // -1 means we actually read 0 bytes, but requested at least one byte.
-            statistics.incrementBytesRead(result);
-            totalBytesRead += result;
-          }
+    int result = super.read(position, buf, offset, length);
+    readAPITrace(POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result, Level.FINE);
+    if (result > 0) {
+      // -1 means we actually read 0 bytes, but requested at least one byte.
+      statistics.incrementBytesRead(result);
+      totalBytesRead += result;
+    }
 
-          return result;
-        });
+    return result;
   }
 
   /**
