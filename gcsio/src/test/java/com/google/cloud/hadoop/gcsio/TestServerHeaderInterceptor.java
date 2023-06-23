@@ -43,7 +43,7 @@ class TestServerHeaderInterceptor implements ServerInterceptor {
     assertThat(allMeta).hasSize(expectedCallCount);
     for (Metadata metadata : allMeta) {
       assertThat(metadata.get(StorageStubProvider.GOOG_REQUEST_PARAMS))
-          .isEqualTo("bucket=" + bucket);
+          .isEqualTo("bucket=projects/_/buckets/" + bucket);
     }
   }
 }
