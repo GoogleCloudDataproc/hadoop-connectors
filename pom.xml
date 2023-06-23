@@ -91,7 +91,7 @@
     <google.api-storage.version>v1-rev20220705-${google.api-client-libraries.version}</google.api-storage.version>
     <google.auth.version>1.12.1</google.auth.version>
     <google.auto-value.version>1.10.1</google.auto-value.version>
-    <google.cloud-bigquerystorage.version>2.37.2</google.cloud-bigquerystorage.version>
+    <google.cloud-bigquerystorage.version>2.39.1</google.cloud-bigquerystorage.version>
     <google.cloud-core.version>2.5.4</google.cloud-core.version>
     <google.cloud-storage.bom.version>2.23.0</google.cloud-storage.bom.version>
     <google.flogger.version>0.7.1</google.flogger.version>
@@ -374,6 +374,12 @@
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-bigquerystorage</artifactId>
         <version>${google.cloud-bigquerystorage.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>io.grpc</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
