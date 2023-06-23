@@ -65,13 +65,15 @@ public enum GhfsStatistic {
       "op_create_non_recursive", "Calls of createNonRecursive()", TYPE_DURATION),
   INVOCATION_DELETE("op_delete", "Calls of delete()", TYPE_DURATION),
   INVOCATION_EXISTS("op_exists", "Calls of exists()", TYPE_COUNTER),
-  INVOCATION_GET_FILE_STATUS("op_get_file_status", "Calls of getFileStatus()", TYPE_COUNTER),
-  INVOCATION_GLOB_STATUS("op_glob_status", "Calls of globStatus()", TYPE_COUNTER),
+  INVOCATION_GET_FILE_STATUS("op_get_file_status", "Calls of getFileStatus()", TYPE_DURATION),
+
+  INVOCATION_GET_FILE_CHECKSUM("op_get_file_checksum", "Calls of getFileChecksum()", TYPE_COUNTER),
+  INVOCATION_GLOB_STATUS("op_glob_status", "Calls of globStatus()", TYPE_DURATION),
   INVOCATION_HFLUSH("op_hflush", "Calls of hflush()", TYPE_DURATION),
   INVOCATION_HSYNC("op_hsync", "Calls of hsync()", TYPE_DURATION),
   INVOCATION_LIST_FILES("op_list_files", "Calls of listFiles()", TYPE_COUNTER),
   INVOCATION_LIST_STATUS("op_list_status", "Calls of listStatus()", TYPE_COUNTER),
-  INVOCATION_MKDIRS("op_mkdirs", "Calls of mkdirs()", TYPE_COUNTER),
+  INVOCATION_MKDIRS("op_mkdirs", "Calls of mkdirs()", TYPE_DURATION),
   INVOCATION_OPEN("op_open", "Calls of open()", TYPE_DURATION),
   INVOCATION_RENAME("op_rename", "Calls of rename()", TYPE_DURATION),
 
@@ -85,6 +87,7 @@ public enum GhfsStatistic {
       "Count of exceptions raised during input stream reads",
       TYPE_COUNTER),
   STREAM_READ_OPERATIONS("stream_read_operations", "Calls of read()", TYPE_DURATION),
+
   STREAM_READ_OPERATIONS_INCOMPLETE(
       "stream_read_operations_incomplete",
       "Count of incomplete read() operations in an input stream",

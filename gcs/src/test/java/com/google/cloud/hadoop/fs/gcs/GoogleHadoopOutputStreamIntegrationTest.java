@@ -104,4 +104,34 @@ public class GoogleHadoopOutputStreamIntegrationTest {
 
     assertThat(fileStatus.getLen()).isEqualTo(1);
   }
+
+  @Test
+  public void time_statistics() throws Exception {
+    URI testFile = gcsFsIHelper.getUniqueObjectUri("GHFSOutputStream_time_statistics");
+
+    Configuration config = getTestConfig();
+    config.setInt(GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(testFile, config);
+    GhfsStorageStatistics stats = (GhfsStorageStatistics) TestUtils.getStorageStatistics();
+
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            ghfs, testFile, statistics, CreateFileOptions.DEFAULT_OVERWRITE);
+
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+
+    fout.write(data1, 0, data1.length);
+    fout.write(data2, 0, data2.length);
+
+    fout.close();
+
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, 1);
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, 4);
+    TestUtils.verifyDurationMetric(
+        stats, GhfsStatistic.STREAM_WRITE_BYTES, data1.length + data2.length);
+  }
 }
