@@ -118,6 +118,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   private final RateLimiter syncRateLimiter;
 
   private final ExecutorService cleanupThreadpool;
+  private final GhfsStorageStatistics storageStatistics;
 
   // Current GCS path pointing at the "tail" file which will be appended to the destination
   // on each hsync() call.
@@ -181,6 +182,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
+
+    this.storageStatistics = ghfs.getStorageStatistics();
   }
 
   private static RateLimiter createRateLimiter(Duration minSyncInterval) {
@@ -246,35 +249,51 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
    */
   @Override
   public void hflush() throws IOException {
-    long startTimeNs = System.nanoTime();
-    if (!options.isSyncOnFlushEnabled()) {
-      logger.atWarning().log(
-          "hflush(): No-op: readers will *not* yet see flushed data for %s", finalGcsPath);
-      throwIfNotOpen();
-      return;
-    }
-    // If rate limit not set or permit acquired than use hsync()
-    if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
-      logger.atFine().log("hflush() uses hsync() for %s", finalGcsPath);
-      hsyncInternal(startTimeNs);
-      return;
-    }
-    logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
-        "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
-        syncRateLimiter, finalGcsPath);
-    throwIfNotOpen();
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_HFLUSH,
+        finalGcsPath,
+        () -> {
+          long startTimeNs = System.nanoTime();
+          if (!options.isSyncOnFlushEnabled()) {
+            logger.atWarning().log(
+                "hflush(): No-op: readers will *not* yet see flushed data for %s", finalGcsPath);
+            throwIfNotOpen();
+            return null;
+          }
+          // If rate limit not set or permit acquired than use hsync()
+          if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
+            logger.atFine().log("hflush() uses hsync() for %s", finalGcsPath);
+            hsyncInternal(startTimeNs);
+            return null;
+          }
+          logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
+              "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
+              syncRateLimiter, finalGcsPath);
+          throwIfNotOpen();
+
+          return null;
+        });
   }
 
   @Override
   public void hsync() throws IOException {
-    long startTimeNs = System.nanoTime();
-    if (syncRateLimiter != null) {
-      logger.atFiner().log(
-          "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
-          syncRateLimiter, finalGcsPath);
-      syncRateLimiter.acquire();
-    }
-    hsyncInternal(startTimeNs);
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_HSYNC,
+        finalGcsPath,
+        () -> {
+          long startTimeNs = System.nanoTime();
+          if (syncRateLimiter != null) {
+            logger.atFiner().log(
+                "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
+                syncRateLimiter, finalGcsPath);
+            syncRateLimiter.acquire();
+          }
+          hsyncInternal(startTimeNs);
+
+          return null;
+        });
   }
 
   /** Internal implementation of hsync, can be reused by hflush() as well. */

@@ -66,6 +66,7 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri("hsync");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
+    GhfsStorageStatistics stats = TestUtils.getStorageStatistics();
 
     // test composing of 5 1-byte writes into 5-byte object
     byte[] expected = new byte[5];
@@ -85,6 +86,12 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
 
     assertThat(fs.getFileStatus(hadoopPath).getLen()).isEqualTo(expected.length);
     assertThat(gcsFsIHelper.readFile(path)).isEqualTo(expected);
+
+    TestUtils.verifyDurationMetric(
+        stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, expected.length);
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, expected.length);
+    TestUtils.verifyCounter(stats, GhfsStatistic.STREAM_WRITE_BYTES, expected.length);
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.INVOCATION_HSYNC, expected.length);
   }
 
   @Test
@@ -198,6 +205,7 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
     Configuration config = getTestConfig();
     config.setEnum(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE);
     FileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
+    GhfsStorageStatistics stats = TestUtils.getStorageStatistics();
 
     byte[] testData = new byte[5];
     new Random().nextBytes(testData);
@@ -218,6 +226,12 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
     // Assert that data was fully written after close
     assertThat(ghfs.getFileStatus(hadoopPath).getLen()).isEqualTo(testData.length);
     assertThat(gcsFsIHelper.readFile(path)).isEqualTo(testData);
+
+    TestUtils.verifyDurationMetric(
+        stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, testData.length);
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, testData.length);
+    TestUtils.verifyCounter(stats, GhfsStatistic.STREAM_WRITE_BYTES, testData.length);
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.INVOCATION_HFLUSH, testData.length);
   }
 
   @Test

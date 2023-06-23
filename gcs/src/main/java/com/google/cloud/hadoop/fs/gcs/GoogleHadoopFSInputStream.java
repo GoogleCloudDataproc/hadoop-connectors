@@ -68,6 +68,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   // This is used to control which all log properties are getting logged. This can be used to reduce
   // the amount of logs which is getting logged.
   private final ImmutableSet<String> logFilterProperties;
+  private final GhfsStorageStatistics storageStatistics;
 
   // Path of the file to read.
   private URI gcsPath;
@@ -105,6 +106,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
     this.logThreshold = readOptions.getTraceLogTimeThreshold();
     this.logFilterProperties = readOptions.getTraceLogExcludeProperties();
+    this.storageStatistics = ghfs.getStorageStatistics();
   }
 
   /**
@@ -115,24 +117,31 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read() throws IOException {
-    // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
-    // underlying channel.
-    int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
-    if (numRead == -1) {
-      return -1;
-    }
-    if (numRead != 1) {
-      throw new IOException(
-          String.format(
-              "Somehow read %d bytes using single-byte buffer for path %s ending in position %d!",
-              numRead, gcsPath, channel.position()));
-    }
-    byte b = singleReadBuf[0];
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_OPERATIONS,
+        gcsPath,
+        () -> {
+          // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
+          // underlying channel.
+          int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
+          if (numRead == -1) {
+            return -1;
+          }
+          if (numRead != 1) {
+            throw new IOException(
+                String.format(
+                    "Somehow read %d bytes using single-byte buffer for path %s ending in position %d!",
+                    numRead, gcsPath, channel.position()));
+          }
+          byte b = singleReadBuf[0];
 
-    totalBytesRead++;
-    statistics.incrementBytesRead(1);
-    statistics.incrementReadOps(1);
-    return (b & 0xff);
+          totalBytesRead++;
+          statistics.incrementBytesRead(1);
+          statistics.incrementReadOps(1);
+          storageStatistics.streamReadBytes(1);
+          return (b & 0xff);
+        });
   }
 
   /**
@@ -147,24 +156,33 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
-    Stopwatch stopwatch = Stopwatch.createStarted();
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_OPERATIONS,
+        gcsPath,
+        () -> {
+          Stopwatch stopwatch = Stopwatch.createStarted();
 
-    Preconditions.checkNotNull(buf, "buf must not be null");
-    if (offset < 0 || length < 0 || length > buf.length - offset) {
-      throw new IndexOutOfBoundsException();
-    }
-    int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
+          Preconditions.checkNotNull(buf, "buf must not be null");
+          if (offset < 0 || length < 0 || length > buf.length - offset) {
+            throw new IndexOutOfBoundsException();
+          }
+          int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
 
-    readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead, Level.INFO);
+          readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead, Level.INFO);
 
-    if (numRead > 0) {
-      // -1 means we actually read 0 bytes, but requested at least one byte.
-      statistics.incrementBytesRead(numRead);
-      statistics.incrementReadOps(1);
-      totalBytesRead += numRead;
-    }
+          if (numRead > 0) {
+            // -1 means we actually read 0 bytes, but requested at least one byte.
+            statistics.incrementBytesRead(numRead);
+            statistics.incrementReadOps(1);
+            totalBytesRead += numRead;
+            storageStatistics.streamReadBytes(numRead);
+          }
 
-    return numRead;
+          storageStatistics.streamReadOperationInComplete(length, Math.max(numRead, 0));
+
+          return numRead;
+        });
   }
 
   /**
@@ -191,6 +209,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       statistics.incrementBytesRead(result);
       totalBytesRead += result;
     }
+
     return result;
   }
 
@@ -215,15 +234,31 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    logger.atFiner().log("seek(%d)", pos);
-    Stopwatch stopwatch = Stopwatch.createStarted();
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_SEEK_OPERATIONS,
+        gcsPath,
+        () -> {
+          logger.atFiner().log("seek(%d)", pos);
+          Stopwatch stopwatch = Stopwatch.createStarted();
 
-    try {
-      channel.position(pos);
-      seekAPITrace(SEEK_METHOD, stopwatch, pos);
-    } catch (IllegalArgumentException e) {
-      throw new IOException(e);
-    }
+          long curPos = getPos();
+          long diff = pos - curPos;
+          if (diff > 0) {
+            storageStatistics.streamReadSeekForward(diff);
+          } else {
+            storageStatistics.streamReadSeekBackward(diff);
+          }
+
+          try {
+            channel.position(pos);
+            seekAPITrace(SEEK_METHOD, stopwatch, pos);
+          } catch (IllegalArgumentException e) {
+            throw new IOException(e);
+          }
+
+          return null;
+        });
   }
 
   /**
@@ -243,14 +278,23 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized void close() throws IOException {
-    logger.atFiner().log("close(): %s", gcsPath);
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    Map<String, Object> apiTraces = new HashMap<>();
-    if (channel != null) {
-      logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-      channel.close();
-      closeAPITrace(CLOSE_METHOD, stopwatch);
-    }
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS,
+        gcsPath,
+        () -> {
+          logger.atFiner().log("close(): %s", gcsPath);
+          Stopwatch stopwatch = Stopwatch.createStarted();
+          Map<String, Object> apiTraces = new HashMap<>();
+          if (channel != null) {
+            logger.atFiner().log(
+                "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+            channel.close();
+            closeAPITrace(CLOSE_METHOD, stopwatch);
+          }
+
+          return null;
+        });
   }
 
   /**
