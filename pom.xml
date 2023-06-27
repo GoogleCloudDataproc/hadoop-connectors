@@ -374,6 +374,7 @@
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-bigquerystorage</artifactId>
         <version>${google.cloud-bigquerystorage.version}</version>
+        <!-- TODO: https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/1020 -->
         <exclusions>
           <exclusion>
             <groupId>io.grpc</groupId>
