@@ -267,7 +267,12 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return minimum statistic value
    */
   public Long getMin(String symbol) {
-    return minimums.get(getMinKey(symbol)).longValue();
+    AtomicLong minValue = minimums.get(getMinKey(symbol));
+    if (minValue == null) {
+      return 0L;
+    }
+
+    return minValue.longValue();
   }
 
   private String getMinKey(String symbol) {
@@ -289,7 +294,12 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return maximum statistic value
    */
   public Long getMax(String symbol) {
-    return maximums.get(getMaxKey(symbol)).longValue();
+    AtomicLong maxValue = maximums.get(getMaxKey(symbol));
+    if (maxValue == null) {
+      return 0L;
+    }
+
+    return maxValue.longValue();
   }
 
   /**
@@ -299,7 +309,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return mean statistic value
    */
   public double getMean(String key) {
-    MeanStatistic val = means.get(getMaxKey(key));
+    MeanStatistic val = means.get(getMeanKey(key));
     if (val == null) {
       return 0;
     }
