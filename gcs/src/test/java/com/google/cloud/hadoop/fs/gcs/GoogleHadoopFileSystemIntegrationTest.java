@@ -1405,7 +1405,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     StorageStatistics statistics = new GhfsStorageStatistics();
     ArrayList<LongStatistic> metrics = Lists.newArrayList(statistics.getLongStatistics());
     HashSet<String> metricNames = new HashSet<>();
-    for(LongStatistic longStatistic : metrics) {
+    for (LongStatistic longStatistic : metrics) {
       metricNames.add(longStatistic.getName());
     }
 
@@ -1431,7 +1431,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertEquals(0, statistics.getLong("invalid").longValue());
   }
 
-  private void checkMetric(String name, StorageStatistics statistics, HashSet<String> metricNames, String statsString) {
+  private void checkMetric(
+      String name, StorageStatistics statistics, HashSet<String> metricNames, String statsString) {
     assertThat(metricNames.contains(name)).isTrue();
     assertThat(statistics.isTracked(name)).isTrue();
     assertThat(statsString.contains(name + "="));
