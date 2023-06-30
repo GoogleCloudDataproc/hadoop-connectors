@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.16 - 2023-06-30
 
 1. Upgrade java-storage to 2.23.0
