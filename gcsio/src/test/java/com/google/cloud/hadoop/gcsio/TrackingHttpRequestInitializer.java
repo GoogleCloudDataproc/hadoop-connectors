@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
-  private static final String OBJECT_FIELDS =
+  public static final String OBJECT_FIELDS =
       "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding"
           + ",md5Hash,crc32c,metadata";
 
