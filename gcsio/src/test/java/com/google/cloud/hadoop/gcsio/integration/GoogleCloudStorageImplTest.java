@@ -647,7 +647,8 @@ public class GoogleCloudStorageImplTest {
     double contentLength = (double) partition.length * partitionsCount;
     int effectiveChunkSize;
     if (testStorageClientImpl) {
-      //Unlike Apiary, java-storage library always send chunk of size 2MiB or configuredChunkSize. Whichever is lower.
+      // Unlike Apiary, java-storage library always send chunk of size 2MiB or configuredChunkSize.
+      // Whichever is lower.
       effectiveChunkSize = Math.min(uploadChunkSize, 2 * 1024 * 1024);
     } else {
       effectiveChunkSize = uploadChunkSize;
