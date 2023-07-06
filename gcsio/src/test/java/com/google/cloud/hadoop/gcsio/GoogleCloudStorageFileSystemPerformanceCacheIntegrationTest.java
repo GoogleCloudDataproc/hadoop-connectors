@@ -276,7 +276,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     return new TrackingStorageWrapper<>(
         gcsfsOptions.getCloudStorageOptions(),
-        httpRequestInitializer ->
+        (httpRequestInitializer, gRPCInterceptors) ->
             new GoogleCloudStorageFileSystemImpl(
                 gcsOptions ->
                     new PerformanceCachingGoogleCloudStorage(
