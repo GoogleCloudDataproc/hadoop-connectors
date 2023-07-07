@@ -24,8 +24,8 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisi
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.EnumMap;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -47,20 +47,21 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
   public static final int LATENCY_LOGGING_THRESHOLD_MS = 100;
 
-  private final Map<GhfsStatistic, AtomicLong> opsCount = new EnumMap<>(GhfsStatistic.class);
-  private final Map<GhfsStatistic, AtomicLong> minimums = new EnumMap<>(GhfsStatistic.class);
-  private final Map<GhfsStatistic, AtomicLong> maximums = new EnumMap<>(GhfsStatistic.class);
-  private final Map<GhfsStatistic, MeanStatistic> means = new EnumMap<>(GhfsStatistic.class);
+  private final Map<String, AtomicLong> opsCount = new HashMap<>();
+  private final Map<String, AtomicLong> minimums = new HashMap<>();
+  private final Map<String, AtomicLong> maximums = new HashMap<>();
+  private final Map<String, MeanStatistic> means = new HashMap<>();
 
   public GhfsStorageStatistics() {
     super(NAME);
     for (GhfsStatistic opType : GhfsStatistic.values()) {
-      opsCount.put(opType, new AtomicLong(0));
+      String symbol = opType.getSymbol();
+      opsCount.put(symbol, new AtomicLong(0));
 
       if (opType.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
-        minimums.put(opType, null);
-        maximums.put(opType, new AtomicLong(0));
-        means.put(opType, new MeanStatistic());
+        minimums.put(getMinKey(symbol), null);
+        maximums.put(getMaxKey(symbol), new AtomicLong(0));
+        means.put(getMeanKey(symbol), new MeanStatistic());
       }
     }
   }
@@ -92,12 +93,25 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return the new value
    */
   long incrementCounter(GhfsStatistic op, long count) {
-    return opsCount.get(op).addAndGet(count);
+    return opsCount.get(op.getSymbol()).addAndGet(count);
   }
 
   @Override
   public void reset() {
-    for (AtomicLong value : opsCount.values()) {
+    resetMetrics(opsCount);
+    resetMetrics(maximums);
+
+    for (String ms : means.keySet()) {
+      means.get(ms).reset();
+    }
+
+    for (String ms : minimums.keySet()) {
+      minimums.put(ms, null);
+    }
+  }
+
+  private void resetMetrics(Map<String, AtomicLong> metrics) {
+    for (AtomicLong value : metrics.values()) {
       value.set(0);
     }
   }
@@ -106,20 +120,23 @@ public class GhfsStorageStatistics extends StorageStatistics {
     checkArgument(
         statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
-    AtomicLong minVal = minimums.get(statistic);
+    String minKey = getMinKey(statistic.getSymbol());
+
+    AtomicLong minVal = minimums.get(minKey);
     if (minVal == null) {
       // There can be race here. It is ok to have the last write win.
-      minimums.put(statistic, new AtomicLong(durationMs));
+      minimums.put(minKey, new AtomicLong(durationMs));
     } else if (durationMs < minVal.get()) {
       minVal.set(durationMs);
     }
 
-    AtomicLong maxVal = maximums.get(statistic);
+    String maxKey = getMaxKey(statistic.getSymbol());
+    AtomicLong maxVal = maximums.get(maxKey);
     if (durationMs > maxVal.get()) {
       if (durationMs > LATENCY_LOGGING_THRESHOLD_MS) {
         logger.atWarning().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
-            statistic, durationMs, maxVal.get(), opsCount.get(statistic), context);
+            statistic, durationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
       }
 
       // There can be race here and can have some data points get missed. This is a corner case.
@@ -128,8 +145,9 @@ public class GhfsStorageStatistics extends StorageStatistics {
       maxVal.set(durationMs);
     }
 
-    if (means.containsKey(statistic)) {
-      means.get(statistic).addSample(durationMs);
+    String meanKey = getMeanKey(statistic.getSymbol());
+    if (means.containsKey(meanKey)) {
+      means.get(meanKey).addSample(durationMs);
     }
   }
 
@@ -170,9 +188,18 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
 
   private class LongIterator implements Iterator<LongStatistic> {
-    // TODO: Include statistic related metrics as well.
-    private Iterator<Map.Entry<GhfsStatistic, AtomicLong>> iterator =
-        Collections.unmodifiableSet(opsCount.entrySet()).iterator();
+    private Iterator<String> iterator = getMetricNames();
+
+    private Iterator<String> getMetricNames() {
+      ArrayList<String> metrics = new ArrayList<>();
+
+      metrics.addAll(opsCount.keySet());
+      metrics.addAll(minimums.keySet());
+      metrics.addAll(maximums.keySet());
+      metrics.addAll(means.keySet());
+
+      return metrics.iterator();
+    }
 
     @Override
     public boolean hasNext() {
@@ -184,14 +211,35 @@ public class GhfsStorageStatistics extends StorageStatistics {
       if (!iterator.hasNext()) {
         throw new NoSuchElementException();
       }
-      final Map.Entry<GhfsStatistic, AtomicLong> entry = iterator.next();
-      return new LongStatistic(entry.getKey().getSymbol(), entry.getValue().get());
+
+      final String entry = iterator.next();
+      return new LongStatistic(entry, getValue(entry));
     }
 
     @Override
     public void remove() {
       throw new UnsupportedOperationException();
     }
+  }
+
+  private long getValue(String key) {
+    if (opsCount.containsKey(key)) {
+      return opsCount.get(key).longValue();
+    }
+
+    if (maximums.containsKey(key)) {
+      return maximums.get(key).longValue();
+    }
+
+    if (minimums.containsKey(key) && minimums.get(key) != null) {
+      return minimums.get(key).longValue();
+    }
+
+    if (means.containsKey(key)) {
+      return Math.round(means.get(key).getValue());
+    }
+
+    return 0L;
   }
 
   @Override
@@ -201,13 +249,15 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
   @Override
   public Long getLong(String key) {
-    final GhfsStatistic type = GhfsStatistic.fromSymbol(key);
-    return type == null ? 0L : opsCount.get(type).get();
+    return this.getValue(key);
   }
 
   @Override
   public boolean isTracked(String key) {
-    return GhfsStatistic.fromSymbol(key) != null;
+    return opsCount.containsKey(key)
+        || maximums.containsKey(key)
+        || minimums.containsKey(key)
+        || means.containsKey(key);
   }
 
   /**
@@ -217,7 +267,24 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return minimum statistic value
    */
   public Long getMin(String symbol) {
-    return getStatisticValue(symbol, minimums);
+    AtomicLong minValue = minimums.get(getMinKey(symbol));
+    if (minValue == null) {
+      return 0L;
+    }
+
+    return minValue.longValue();
+  }
+
+  private String getMinKey(String symbol) {
+    return symbol + "_min";
+  }
+
+  private String getMaxKey(String symbol) {
+    return symbol + "_max";
+  }
+
+  private String getMeanKey(String symbol) {
+    return symbol + "_mean";
   }
 
   /**
@@ -227,37 +294,27 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return maximum statistic value
    */
   public Long getMax(String symbol) {
-    return getStatisticValue(symbol, maximums);
+    AtomicLong maxValue = maximums.get(getMaxKey(symbol));
+    if (maxValue == null) {
+      return 0L;
+    }
+
+    return maxValue.longValue();
   }
 
   /**
    * To get the mean value which is stored with MEAN extension
    *
-   * @param symbol
+   * @param key
    * @return mean statistic value
    */
   public double getMean(String key) {
-    final GhfsStatistic type = GhfsStatistic.fromSymbol(key);
-    MeanStatistic val = means.get(type);
+    MeanStatistic val = means.get(getMeanKey(key));
     if (val == null) {
       return 0;
     }
 
     return val.getValue();
-  }
-
-  private long getStatisticValue(String key, Map<GhfsStatistic, AtomicLong> stats) {
-    final GhfsStatistic stat = GhfsStatistic.fromSymbol(key);
-    if (stat == null) {
-      return 0L;
-    }
-
-    AtomicLong val = stats.get(stat);
-    if (val == null) {
-      return 0L;
-    }
-
-    return val.get();
   }
 
   /** This class keeps track of mean statistics by keeping track of sum and number of samples. */
@@ -276,7 +333,27 @@ public class GhfsStorageStatistics extends StorageStatistics {
         return 0;
       }
 
-      return sum / sample;
+      return sum / Math.max(1, sample); // to protect against the race with reset().
     }
+
+    public void reset() {
+      sum = 0;
+      sample = 0;
+    }
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    for (Iterator<LongStatistic> it = this.getLongStatistics(); it.hasNext(); ) {
+      LongStatistic statistic = it.next();
+      if (sb.length() != 0) {
+        sb.append(", ");
+      }
+
+      sb.append(String.format("%s=%s", statistic.getName(), statistic.getValue()));
+    }
+
+    return String.format("[%s]", sb);
   }
 }

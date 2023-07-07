@@ -36,8 +36,10 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.util.Lists;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
@@ -57,6 +59,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
@@ -67,6 +70,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.fs.StorageStatistics.LongStatistic;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
@@ -1394,6 +1398,45 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
         (GhfsStorageStatistics) stats, GhfsStatistic.INVOCATION_OP_XATTR_LIST, 1);
 
     assertThat(myGhfs.delete(testRoot, true)).isTrue();
+  }
+
+  @Test
+  public void verify_storage_statistics_metrics() {
+    StorageStatistics statistics = new GhfsStorageStatistics();
+    ArrayList<LongStatistic> metrics = Lists.newArrayList(statistics.getLongStatistics());
+    HashSet<String> metricNames = new HashSet<>();
+    for (LongStatistic longStatistic : metrics) {
+      metricNames.add(longStatistic.getName());
+    }
+
+    String statsString = statistics.toString();
+    int expected = 0;
+    for (GhfsStatistic ghfsStatistic : GhfsStatistic.values()) {
+      expected++;
+
+      String metricName = ghfsStatistic.getSymbol();
+
+      checkMetric(metricName, statistics, metricNames, statsString);
+      if (ghfsStatistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+        expected += 3;
+
+        for (String suffix : ImmutableList.of("_min", "_max", "_mean")) {
+          checkMetric(metricName + suffix, statistics, metricNames, statsString);
+        }
+      }
+    }
+
+    assertEquals(expected, metricNames.size());
+    assertThat(statistics.isTracked("invalid")).isFalse();
+    assertEquals(0, statistics.getLong("invalid").longValue());
+  }
+
+  private void checkMetric(
+      String name, StorageStatistics statistics, HashSet<String> metricNames, String statsString) {
+    assertThat(metricNames.contains(name)).isTrue();
+    assertThat(statistics.isTracked(name)).isTrue();
+    assertThat(statsString.contains(name + "="));
+    assertEquals(0, statistics.getLong(name).longValue());
   }
 
   private static Long getMetricValue(StorageStatistics stats, GhfsStatistic invocationCreate) {
