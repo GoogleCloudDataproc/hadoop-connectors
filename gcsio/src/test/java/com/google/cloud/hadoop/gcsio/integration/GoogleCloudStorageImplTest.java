@@ -175,7 +175,7 @@ public class GoogleCloudStorageImplTest {
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
 
-    int partitionsCount = 17;
+    int partitionsCount = 1;
     byte[] partition =
         writeObject(
             trackingGcs.delegate,

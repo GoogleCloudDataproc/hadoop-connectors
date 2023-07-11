@@ -43,6 +43,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import javax.annotation.Nonnull;
 
+/** Interceptor to create a trace of the lifecycle of GRPC api calls. */
 @VisibleForTesting
 public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -108,6 +109,12 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
   }
 
+  /**
+   * ClientStreamTracer support added in grpc helps in tracing the flow of messages over socket and
+   * have less control over the actual message. Via this customised Tracer of every stream type we
+   * added support to trace the messages sent over stream and also extract and log the meaningful
+   * information from it i.e. invocationId header, request parameters. reponse values etc.
+   */
   private class TrackingStreamTracer extends ClientStreamTracer {
 
     private final Gson gson = new Gson();
@@ -136,24 +143,24 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getRequestContext()
-                  .put(GoogleCloudStorageTracingFields.STATUS.name(), status.toString())
+                  .put(GoogleCloudStorageTracingFields.STATUS.name, status.toString())
                   .build()));
     }
 
     private ImmutableMap.Builder<String, Object> getRequestContext() {
       return new ImmutableMap.Builder<String, Object>()
-          .put(GoogleCloudStorageTracingFields.RPC_METHOD.name(), rpcMethod)
-          .put(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name(), getInvocationId());
+          .put(GoogleCloudStorageTracingFields.RPC_METHOD.name, rpcMethod)
+          .put(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name, getInvocationId());
     }
 
     protected ImmutableMap.Builder<String, Object> getRequestTrackingInfo() {
       return getRequestContext()
-          .put(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name(), requestMessageCounter);
+          .put(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name, requestMessageCounter);
     }
 
     protected ImmutableMap.Builder<String, Object> getResponseTrackingInfo() {
       return getRequestContext()
-          .put(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name(), responseMessageCounter);
+          .put(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name, responseMessageCounter);
     }
 
     protected String toJson(ImmutableMap<String, Object> eventDetails) {
@@ -166,6 +173,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       return headers != null ? headers.get(key) : "";
     }
 
+    /** The stream is being created on a ready transport. */
     @Override
     public void streamCreated(Attributes transportAttrs, Metadata headers) {
       this.headers = headers;
@@ -180,6 +188,14 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       super(rpcMethod);
     }
 
+    /**
+     * An outbound message has been passed to the stream. This is called as soon as the stream knows
+     * about the message, but doesn't have further guarantee such as whether the message is
+     * serialized or not.
+     *
+     * @param seqNo the sequential number of the message within the stream, starting from 0. It can
+     *     be used to correlate with outboundMessageSent(int, long, long) for the same message.
+     */
     @Override
     public void outboundMessage(int seqNo) {
       StartResumableWriteRequest request = (StartResumableWriteRequest) requestMessage;
@@ -193,7 +209,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name(), resourceId.toString())
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
                   .build()));
     }
 
@@ -205,8 +221,8 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
             "%s",
             toJson(
                 getResponseTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.RESOURCE.name(), resourceId.toString())
-                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name(), response.getUploadId())
+                    .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
+                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, response.getUploadId())
                     .build()));
       } finally {
         super.traceResponseMessage(message);
@@ -231,6 +247,14 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "Write stream should have unique uploadId associated with each chunk request.");
     }
 
+    /**
+     * An outbound message has been passed to the stream. This is called as soon as the stream knows
+     * about the message, but doesn't have further guarantee such as whether the message is
+     * serialized or not.
+     *
+     * @param seqNo the sequential number of the message within the stream, starting from 0. It can
+     *     be used to correlate with outboundMessageSent(int, long, long) for the same message.
+     */
     @Override
     public void outboundMessage(int seqNo) {
       WriteObjectRequest request = (WriteObjectRequest) requestMessage;
@@ -239,14 +263,12 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name(), request.getUploadId())
+                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, request.getUploadId())
+                  .put(GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
                   .put(
-                      GoogleCloudStorageTracingFields.WRITE_OFFSET.name(), request.getWriteOffset())
+                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name, request.getFinishWrite())
                   .put(
-                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name(),
-                      request.getFinishWrite())
-                  .put(
-                      GoogleCloudStorageTracingFields.CONTENT_LENGTH.name(),
+                      GoogleCloudStorageTracingFields.CONTENT_LENGTH.name,
                       request.getChecksummedData().getContent().size())
                   .build()));
     }
@@ -259,9 +281,9 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
             "%s",
             toJson(
                 getResponseTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name(), streamUploadId)
+                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, streamUploadId)
                     .put(
-                        GoogleCloudStorageTracingFields.PERSISTED_SIZE.name(),
+                        GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
                         response.getPersistedSize())
                     .build()));
       } finally {
@@ -288,6 +310,14 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       this.readLimit = request.getReadLimit();
     }
 
+    /**
+     * An outbound message has been passed to the stream. This is called as soon as the stream knows
+     * about the message, but doesn't have further guarantee such as whether the message is
+     * serialized or not.
+     *
+     * @param seqNo the sequential number of the message within the stream, starting from 0. It can
+     *     be used to correlate with outboundMessageSent(int, long, long) for the same message.
+     */
     @Override
     public void outboundMessage(int seqNo) {
       ReadObjectRequest request = (ReadObjectRequest) requestMessage;
@@ -297,9 +327,9 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name(), resourceId.toString())
-                  .put(GoogleCloudStorageTracingFields.READ_OFFSET.name(), readOffset)
-                  .put(GoogleCloudStorageTracingFields.READ_LIMIT.name(), readLimit)
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
+                  .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
+                  .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
                   .build()));
     }
 
@@ -312,12 +342,11 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
             "%s",
             toJson(
                 getResponseTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.RESOURCE.name(), resourceId.toString())
-                    .put(GoogleCloudStorageTracingFields.READ_OFFSET.name(), readOffset)
-                    .put(GoogleCloudStorageTracingFields.READ_LIMIT.name(), readLimit)
-                    .put(
-                        GoogleCloudStorageTracingFields.REQUEST_START_OFFSET.name(), totalBytesRead)
-                    .put(GoogleCloudStorageTracingFields.BYTES_READ.name(), bytesRead)
+                    .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
+                    .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
+                    .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
+                    .put(GoogleCloudStorageTracingFields.REQUEST_START_OFFSET.name, totalBytesRead)
+                    .put(GoogleCloudStorageTracingFields.BYTES_READ.name, bytesRead)
                     .build()));
         totalBytesRead += bytesRead;
       } finally {

@@ -28,7 +28,7 @@ public enum GrpcStreamType {
   READ_OBJECT("ReadObject"),
   OTHER("Other");
 
-  private final String name;
+  public final String name;
 
   GrpcStreamType(String name) {
     this.name = name;
