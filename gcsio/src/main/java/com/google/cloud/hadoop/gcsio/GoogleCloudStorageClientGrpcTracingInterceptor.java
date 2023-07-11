@@ -53,6 +53,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
     String rpcMethodName = method.getBareMethodName();
+
     TrackingStreamTracer streamTracer =
         getStreamTracer(GrpcStreamType.getTypeFromName(rpcMethodName), rpcMethodName);
     return new SimpleForwardingClientCall<ReqT, RespT>(
@@ -114,6 +115,11 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
    * have less control over the actual message. Via this customised Tracer of every stream type we
    * added support to trace the messages sent over stream and also extract and log the meaningful
    * information from it i.e. invocationId header, request parameters. reponse values etc.
+   *
+   * <p>Via {@link #traceRequestMessage(MessageLite)} and {@link #traceRequestMessage(MessageLite)}
+   * hooks we associate request and response messages to a stream.
+   *
+   * <p>{@link #statusOnClose(Status)} helps in tracing the closing status of stream.
    */
   private class TrackingStreamTracer extends ClientStreamTracer {
 
@@ -129,11 +135,27 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       this.rpcMethod = rpcMethod;
     }
 
+    /**
+     * This helps in tracing the actual message sent over the stream. By adding this hook in {@link
+     * ClientCall#sendMessage(Object)} of ClientCall we can associate request to a stream tracer. We
+     * still need to maintain a copy of this request because this message is still not sent over the
+     * wire and StreamTracer will be notified for the same vis {@link #outboundMessage(int)} call.
+     * Once that is triggered will use it to log useful information.
+     *
+     * @param message Message which is supposed to be sent over the wire.
+     */
     public void traceRequestMessage(MessageLite message) {
       this.requestMessage = message;
       requestMessageCounter++;
     }
 
+    /**
+     * This helps in tracing actual message received over the stream by adding a hook in {@link
+     * ClientCall.Listener#onMessage(Object)} of ResponseListener. This hook helps in mapping the
+     * response message to StreamTracer.
+     *
+     * @param message Message which was received and flowed to
+     */
     public void traceResponseMessage(MessageLite message) {
       responseMessageCounter++;
     }

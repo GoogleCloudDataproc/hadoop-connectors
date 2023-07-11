@@ -217,8 +217,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   public static Builder builder() {
-    return new AutoBuilder_GoogleCloudStorageClientImpl_Builder()
-        .setGRPCInterceptors(ImmutableList.of());
+    return new AutoBuilder_GoogleCloudStorageClientImpl_Builder();
   }
 
   @AutoBuilder(ofClass = GoogleCloudStorageClientImpl.class)
