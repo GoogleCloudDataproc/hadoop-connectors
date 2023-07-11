@@ -36,6 +36,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -84,6 +85,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
   // Number of bytes read through this channel.
   private long totalBytesRead;
+  private String uuid;
 
   // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
   // numbers of bytes read.
@@ -117,11 +119,8 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.ghfs = ghfs;
     this.unboundedThreadPool =
         new ThreadPoolExecutor(
-            maxReadVectoredParallelism,
-            10000000,
-            3L,
-            TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>());
+            maxReadVectoredParallelism, 8, 3L, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    this.uuid = UUID.randomUUID().toString();
   }
 
   /**
@@ -146,11 +145,15 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   private void readSingleRange(FileRange range, ByteBuffer buffer) {
     try {
+      Stopwatch stopwatch = Stopwatch.createStarted();
       VectoredReadUtils.validateRangeRequest(range);
       try (SeekableByteChannel channel = ghfs.getGcsFs().open(gcsPath, readVectoredOptions)) {
         channel.position(range.getOffset());
         int numRead = channel.read(ByteBuffer.wrap(buffer.array(), 0, range.getLength()));
         range.getData().complete(buffer);
+        stopwatch.stop();
+
+        readSingleRangeTrace("readSingleRange", stopwatch, range.getOffset(), numRead);
       }
     } catch (Exception ex) {
       logger.atInfo().withCause(ex).log("Exception while reading a range %s", range.toString());
@@ -184,7 +187,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     }
     return r;
   }
-
   /**
    * Splits and reads the ranges in parallel, combining the split ranges into the original ranges.
    *
@@ -485,7 +487,18 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized void close() throws IOException {
     logger.atFiner().log("close(): %s", gcsPath);
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Map<String, Object> apiTraces = new HashMap<>();
+    unboundedThreadPool.shutdown();
+    try {
+      if (!unboundedThreadPool.awaitTermination(10, TimeUnit.SECONDS)) {
+        logger.atWarning().log(
+            "Executor did not terminate within timeout. Forcibly shutting down.");
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } finally {
+      unboundedThreadPool.shutdownNow();
+    }
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
@@ -523,6 +536,21 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       jsonMap.put(OFFSET, offset);
       jsonMap.put(LENGTH, length);
       jsonMap.put(BYTES_READ, bytesRead);
+      jsonMap.put("UUID", uuid);
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void readSingleRangeTrace(
+      String method, Stopwatch stopwatch, long offset, int bytesRead) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      jsonMap.put(OFFSET, offset);
+      jsonMap.put("UUID", uuid);
+      jsonMap.put(BYTES_READ, bytesRead);
       captureAPITraces(jsonMap);
     }
   }
@@ -534,6 +562,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       jsonMap.put(GCS_PATH, gcsPath);
       jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
       jsonMap.put(POSITION, pos);
+      jsonMap.put("UUID", uuid);
       captureAPITraces(jsonMap);
     }
   }
@@ -545,6 +574,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       jsonMap.put(GCS_PATH, gcsPath);
       jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
       jsonMap.put(BYTES_READ, bytesRead);
+      jsonMap.put("UUID", uuid);
       captureAPITraces(jsonMap);
     }
   }
@@ -555,6 +585,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       jsonMap.put(METHOD, method);
       jsonMap.put(GCS_PATH, gcsPath);
       jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      jsonMap.put("UUID", uuid);
       captureAPITraces(jsonMap);
     }
   }
