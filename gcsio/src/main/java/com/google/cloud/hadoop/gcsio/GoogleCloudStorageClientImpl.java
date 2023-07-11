@@ -194,7 +194,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptorsList) {
-    StorageOptions.Builder storageOprionBuilder = StorageOptions.newBuilder();
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
@@ -203,6 +202,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               List<ClientInterceptor> interceptors = new ArrayList<>();
               if (interceptorsList != null && !interceptorsList.isEmpty()) {
                 interceptors.addAll(interceptorsList);
+              }
+              if (storageOptions.isTraceLogEnabled()) {
+                interceptors.add(new GrpcRequestInterceptor());
               }
               return interceptors;
             })

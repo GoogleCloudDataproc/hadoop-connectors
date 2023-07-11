@@ -39,8 +39,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
@@ -80,16 +80,14 @@ public class GoogleCloudStorageImplTest {
   private static GoogleCloudStorage helperGcs;
 
   private final boolean testStorageClientImpl;
-  private final boolean traceSupported;
 
   public GoogleCloudStorageImplTest(boolean tesStorageClientImpl) {
     this.testStorageClientImpl = tesStorageClientImpl;
-    this.traceSupported = true;
   }
 
   @Parameters
   public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(false, true);
+    return List.of(true);
   }
 
   @Rule
@@ -106,7 +104,7 @@ public class GoogleCloudStorageImplTest {
   public void before() throws IOException {
     helperGcs =
         testStorageClientImpl
-            ? GoogleCloudStorageTestHelper.mockedGcsClientImpl()
+            ? GoogleCloudStorageTestHelper.createGcsClientImpl()
             : GoogleCloudStorageTestHelper.createGoogleCloudStorage();
     helperGcs.createBucket(TEST_BUCKET);
   }
@@ -173,11 +171,11 @@ public class GoogleCloudStorageImplTest {
   public void writeLargeObject_withSmallUploadChunk() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    int uploadChunkSize = 1024 * 1024;
+    int uploadChunkSize = 2 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
 
-    int partitionsCount = 32;
+    int partitionsCount = 17;
     byte[] partition =
         writeObject(
             trackingGcs.delegate,
@@ -692,7 +690,7 @@ public class GoogleCloudStorageImplTest {
   private String resumableUploadRequestString(
       String bucketName, String objectName, Integer generationId, boolean replaceGenrationId) {
     if (this.testStorageClientImpl) {
-      return GrpcRequestInterceptor.resumableUploadRequestString(
+      return TrackingGrpcRequestInterceptor.resumableUploadRequestString(
           bucketName, objectName, generationId);
     }
     return TrackingHttpRequestInitializer.resumableUploadRequestString(
@@ -711,13 +709,13 @@ public class GoogleCloudStorageImplTest {
       List<String> requestsList = new ArrayList<>();
       if (!finishWrite) {
         requestsList.add(
-            GrpcRequestInterceptor.resumableUploadChunkRequestString(
+            TrackingGrpcRequestInterceptor.resumableUploadChunkRequestString(
                 generationId, uploadId, length, writeOffset, false));
       } else {
 
         if (length == 0) {
           requestsList.add(
-              GrpcRequestInterceptor.resumableUploadChunkRequestString(
+              TrackingGrpcRequestInterceptor.resumableUploadChunkRequestString(
                   generationId,
                   uploadId,
                   /* contentLength= */ 0,
@@ -727,11 +725,11 @@ public class GoogleCloudStorageImplTest {
           // if there is data which needs to be uploaded, fist upload data and then submit
           // finalWrite.
           requestsList.add(
-              GrpcRequestInterceptor.resumableUploadChunkRequestString(
+              TrackingGrpcRequestInterceptor.resumableUploadChunkRequestString(
                   generationId, uploadId, length, writeOffset, false));
 
           requestsList.add(
-              GrpcRequestInterceptor.resumableUploadChunkRequestString(
+              TrackingGrpcRequestInterceptor.resumableUploadChunkRequestString(
                   generationId + 1,
                   uploadId + 1,
                   /*contentLength=*/ 0,

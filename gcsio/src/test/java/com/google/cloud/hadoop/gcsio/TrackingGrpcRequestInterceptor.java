@@ -15,6 +15,7 @@ import io.grpc.ClientInterceptor;
 import io.grpc.ClientStreamTracer;
 import io.grpc.ClientStreamTracer.StreamInfo;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
+import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import java.util.ArrayList;
@@ -25,7 +26,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
-public class GrpcRequestInterceptor implements ClientInterceptor {
+public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
 
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
   public static final String REQUEST_PREFIX_FORMAT = "rpcMethod:%s";
@@ -63,6 +64,19 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
         streamTracer.traceMessage((MessageLite) message);
         super.sendMessage(message);
       }
+
+      @Override
+      public void start(Listener<RespT> responseListener, Metadata headers) {
+        super.start(
+            new SimpleForwardingClientCallListener<RespT>(responseListener) {
+              @Override
+              public void onMessage(RespT message) {
+                // streamTracer.traceMessage((MessageLite) message);
+                super.onMessage(message);
+              }
+            },
+            headers);
+      }
     };
   }
 
@@ -80,6 +94,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
   private enum StreamType {
     START_RESUMABLE_WRITE("StartResumableWrite"),
     WRITE_OBJECT("WriteObject"),
+    READ_OBJECT("ReadObject"),
     OTHER("Other");
 
     private final String name;
