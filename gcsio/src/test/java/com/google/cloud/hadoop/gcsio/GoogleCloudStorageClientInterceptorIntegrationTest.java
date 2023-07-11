@@ -141,7 +141,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertingHandler.assertLogCount(3 * 3);
     assertingHandler.flush();
 
-    assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+    assertObjectContent(gcsImpl, resourceId, partition, partitionsCount);
 
     // One for Read Request
     // One for Read Response ( it can vary, request can be split into two chunks as well).
