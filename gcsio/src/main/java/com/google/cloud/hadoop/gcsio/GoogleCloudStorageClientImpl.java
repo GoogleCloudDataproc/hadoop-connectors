@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
@@ -43,6 +44,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -77,7 +79,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable Credentials credentials,
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
-      @Nullable List<ClientInterceptor> gRPCInterceptors,
+      @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     super(
@@ -193,18 +195,21 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptorsList) {
-    StorageOptions.Builder storageOprionBuilder = StorageOptions.newBuilder();
+      List<ClientInterceptor> interceptors) {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
         .setGrpcInterceptorProvider(
             () -> {
-              List<ClientInterceptor> interceptors = new ArrayList<>();
-              if (interceptorsList != null && !interceptorsList.isEmpty()) {
-                interceptors.addAll(interceptorsList);
+              List<ClientInterceptor> list = new ArrayList<>();
+              if (interceptors != null && !interceptors.isEmpty()) {
+                list.addAll(
+                    interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
               }
-              return interceptors;
+              if (storageOptions.isTraceLogEnabled()) {
+                list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
+              }
+              return ImmutableList.copyOf(list);
             })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
         .build()
@@ -212,7 +217,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   public static Builder builder() {
-    return new AutoBuilder_GoogleCloudStorageClientImpl_Builder();
+    return new AutoBuilder_GoogleCloudStorageClientImpl_Builder()
+        .setGRPCInterceptors(ImmutableList.of());
   }
 
   @AutoBuilder(ofClass = GoogleCloudStorageClientImpl.class)
@@ -231,7 +237,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
 
-    public abstract Builder setGRPCInterceptors(@Nullable List<ClientInterceptor> gRPCInterceptors);
+    public abstract Builder setGRPCInterceptors(
+        @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);

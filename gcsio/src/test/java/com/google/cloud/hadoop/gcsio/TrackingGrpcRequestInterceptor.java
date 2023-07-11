@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -15,17 +31,16 @@ import io.grpc.ClientInterceptor;
 import io.grpc.ClientStreamTracer;
 import io.grpc.ClientStreamTracer.StreamInfo;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
+import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
-public class GrpcRequestInterceptor implements ClientInterceptor {
+public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
 
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
   public static final String REQUEST_PREFIX_FORMAT = "rpcMethod:%s";
@@ -45,7 +60,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
       MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
     String rpcMethodName = method.getBareMethodName();
     TrackingStreamTracer streamTracer =
-        getStreamTracer(StreamType.getTypeFromName(rpcMethodName), rpcMethodName);
+        getStreamTracer(GrpcStreamType.getTypeFromName(rpcMethodName), rpcMethodName);
     streamTracerList.add(streamTracer);
     return new SimpleForwardingClientCall<ReqT, RespT>(
         next.newCall(
@@ -63,10 +78,23 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
         streamTracer.traceMessage((MessageLite) message);
         super.sendMessage(message);
       }
+
+      @Override
+      public void start(Listener<RespT> responseListener, Metadata headers) {
+        super.start(
+            new SimpleForwardingClientCallListener<RespT>(responseListener) {
+              @Override
+              public void onMessage(RespT message) {
+                // streamTracer.traceMessage((MessageLite) message);
+                super.onMessage(message);
+              }
+            },
+            headers);
+      }
     };
   }
 
-  private TrackingStreamTracer getStreamTracer(StreamType type, String rpcMethodName) {
+  private TrackingStreamTracer getStreamTracer(GrpcStreamType type, String rpcMethodName) {
     switch (type) {
       case START_RESUMABLE_WRITE:
         return new StartResumableUploadStreamTracer(type, rpcMethodName);
@@ -77,42 +105,21 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
     }
   }
 
-  private enum StreamType {
-    START_RESUMABLE_WRITE("StartResumableWrite"),
-    WRITE_OBJECT("WriteObject"),
-    OTHER("Other");
-
-    private final String name;
-
-    StreamType(String name) {
-      this.name = name;
-    }
-
-    private static final Map<String, StreamType> names =
-        Arrays.stream(StreamType.values())
-            .collect(Collectors.toMap(x -> x.name.toUpperCase(), x -> x));
-
-    public static StreamType getTypeFromName(String name) {
-      StreamType type = names.get(name.toUpperCase());
-      if (type == null) {
-        type = StreamType.OTHER;
-      }
-      return type;
-    }
-  }
-
   private class TrackingStreamTracer extends ClientStreamTracer {
-    private final StreamType type;
+    private final GrpcStreamType type;
     private final String rpcMethod;
+
+    Metadata.Key<String> idempotencyKey =
+        Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
     protected List<MessageLite> streamMessages = new ArrayList<>();
     private Metadata headers;
 
-    TrackingStreamTracer(StreamType type, String rpcMethod) {
+    TrackingStreamTracer(GrpcStreamType type, String rpcMethod) {
       this.type = type;
       this.rpcMethod = rpcMethod;
     }
 
-    public StreamType getStreamType() {
+    public GrpcStreamType getStreamType() {
       return type;
     }
 
@@ -125,9 +132,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
     }
 
     protected String getInvocationId() {
-      Metadata.Key<String> key =
-          Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
-      return headers.get(key);
+      return headers.get(idempotencyKey);
     }
 
     public List<String> requestStringList() {
@@ -148,7 +153,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
 
   private class StartResumableUploadStreamTracer extends TrackingStreamTracer {
 
-    StartResumableUploadStreamTracer(StreamType type, String rpcMethod) {
+    StartResumableUploadStreamTracer(GrpcStreamType type, String rpcMethod) {
       super(type, rpcMethod);
     }
 
@@ -161,7 +166,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
   }
 
   private class WriteObjectStreamTracer extends TrackingStreamTracer {
-    WriteObjectStreamTracer(StreamType type, String rpcMethod) {
+    WriteObjectStreamTracer(GrpcStreamType type, String rpcMethod) {
       super(type, rpcMethod);
     }
 
@@ -236,7 +241,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
 
   public static String resumableUploadRequestString(
       String bucketName, String object, Integer generationId) {
-    String requestPrefixString = requestPrefixString(StreamType.START_RESUMABLE_WRITE.name);
+    String requestPrefixString = requestPrefixString(GrpcStreamType.START_RESUMABLE_WRITE.name());
     String requestString =
         String.format(
             RESUMABLE_UPLOAD_REQUEST_FORMAT,
@@ -254,7 +259,7 @@ public class GrpcRequestInterceptor implements ClientInterceptor {
       long contentLength,
       long writeOffset,
       boolean finishWrite) {
-    String requestPrefixString = requestPrefixString(StreamType.WRITE_OBJECT.name);
+    String requestPrefixString = requestPrefixString(GrpcStreamType.WRITE_OBJECT.name());
     String requestString =
         String.format(
             RESUMABLE_UPLOAD_CHUNK_REQUEST_FORMAT,

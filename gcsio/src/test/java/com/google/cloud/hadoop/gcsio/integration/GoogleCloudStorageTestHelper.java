@@ -36,9 +36,9 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -86,7 +86,7 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
-  public static GoogleCloudStorage mockedGcsClientImpl() {
+  public static GoogleCloudStorage createGcsClientImpl() {
     try {
       return GoogleCloudStorageClientImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
@@ -419,19 +419,20 @@ public class GoogleCloudStorageTestHelper {
 
   public static class TrackingStorageWrapper<T> {
 
-    public final GrpcRequestInterceptor grpcRequestInterceptor;
+    public final TrackingGrpcRequestInterceptor grpcRequestInterceptor;
     public final TrackingHttpRequestInitializer requestsTracker;
     public final T delegate;
 
     public TrackingStorageWrapper(
         GoogleCloudStorageOptions options,
-        CheckedFunction2<TrackingHttpRequestInitializer, List, T, IOException> delegateStorageFn,
+        CheckedFunction2<TrackingHttpRequestInitializer, ImmutableList, T, IOException>
+            delegateStorageFn,
         Credentials credentials)
         throws IOException {
       this.requestsTracker =
           new TrackingHttpRequestInitializer(
               new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
-      this.grpcRequestInterceptor = new GrpcRequestInterceptor();
+      this.grpcRequestInterceptor = new TrackingGrpcRequestInterceptor();
       this.delegate =
           delegateStorageFn.apply(this.requestsTracker, ImmutableList.of(grpcRequestInterceptor));
     }
