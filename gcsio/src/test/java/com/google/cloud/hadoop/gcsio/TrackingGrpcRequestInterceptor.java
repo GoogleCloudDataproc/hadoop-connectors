@@ -31,7 +31,6 @@ import io.grpc.ClientInterceptor;
 import io.grpc.ClientStreamTracer;
 import io.grpc.ClientStreamTracer.StreamInfo;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
-import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import java.util.ArrayList;
@@ -76,19 +75,6 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
       public void sendMessage(ReqT message) {
         streamTracer.traceMessage((MessageLite) message);
         super.sendMessage(message);
-      }
-
-      @Override
-      public void start(Listener<RespT> responseListener, Metadata headers) {
-        super.start(
-            new SimpleForwardingClientCallListener<RespT>(responseListener) {
-              @Override
-              public void onMessage(RespT message) {
-                // streamTracer.traceMessage((MessageLite) message);
-                super.onMessage(message);
-              }
-            },
-            headers);
       }
     };
   }
