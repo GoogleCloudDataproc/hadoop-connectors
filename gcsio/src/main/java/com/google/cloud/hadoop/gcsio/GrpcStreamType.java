@@ -39,10 +39,6 @@ public enum GrpcStreamType {
           .collect(Collectors.toMap(x -> x.name.toUpperCase(), x -> x));
 
   public static GrpcStreamType getTypeFromName(String name) {
-    GrpcStreamType type = names.get(name.toUpperCase());
-    if (type == null) {
-      type = GrpcStreamType.OTHER;
-    }
-    return type;
+    return names.getOrDefault(name.toUpperCase(), GrpcStreamType.OTHER);
   }
 }

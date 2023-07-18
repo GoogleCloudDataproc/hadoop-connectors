@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTracingFields;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.gson.Gson;
 import com.google.storage.v2.BucketName;
 import io.grpc.Status;
 import java.io.IOException;
@@ -62,6 +63,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
   private static GoogleCloudStorage helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
 
   private AssertingLogHandler assertingHandler;
+
+  private final Gson gson = new Gson();
 
   @Rule
   public TestName name =
@@ -212,8 +215,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
   private void verifyCloseStatus(Map<String, Object> logRecord, String rpcMethod, Status status) {
     verifyCommonFields(logRecord, rpcMethod);
-    assertThat(logRecord.get(GoogleCloudStorageTracingFields.STATUS.name))
-        .isEqualTo(status.toString());
+    assertThat(logRecord.get(GoogleCloudStorageTracingFields.STATUS.name).toString())
+        .contains(status.getCode().toString());
   }
 
   private StorageResourceId derivedResourceId(StorageResourceId resourceId) {
@@ -236,13 +239,15 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
     // logging assertions for request
     verifyCommonFields(logRecord.get(0), rpcMethod);
+
     assertThat(logRecord.get(0).get(GoogleCloudStorageTracingFields.RESOURCE.name))
         .isEqualTo(derivedResourceId.toString());
     assertThat(logRecord.get(0).get(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name))
-        .isEqualTo(1);
+        .isEqualTo(0);
 
     // logging assertions for response
     verifyCommonFields(logRecord.get(1), rpcMethod);
+
     assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESOURCE.name))
         .isEqualTo(derivedResourceId.toString());
     assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name))

@@ -16,6 +16,9 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.annotations.VisibleForTesting;
+
+@VisibleForTesting
 public enum GoogleCloudStorageTracingFields {
 
   // GRPC specific fields
@@ -36,6 +39,7 @@ public enum GoogleCloudStorageTracingFields {
   READ_LIMIT("readLimit"),
   REQUEST_START_OFFSET("requestStartOffset"),
   BYTES_READ("bytesRead"),
+  STREAM_OPERATION("streamOperation"),
   STATUS("status");
 
   public final String name;
