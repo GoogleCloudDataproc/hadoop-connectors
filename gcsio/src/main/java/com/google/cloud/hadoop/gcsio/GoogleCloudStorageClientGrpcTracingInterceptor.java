@@ -49,14 +49,16 @@ import javax.annotation.Nonnull;
 public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
+  private static final String DEFAULT_INVOCATION_ID = "NOT-FOUND";
+  private static final Metadata.Key<String> idempotencyKey =
+      Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
 
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
     String rpcMethodName = method.getBareMethodName();
 
-    TrackingStreamTracer streamTracer =
-        getStreamTracer(GrpcStreamType.getTypeFromName(rpcMethodName), rpcMethodName);
+    TrackingStreamTracer streamTracer = getStreamTracer(rpcMethodName);
     return new SimpleForwardingClientCall<ReqT, RespT>(
         next.newCall(
             method,
@@ -70,8 +72,11 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
                 }))) {
       @Override
       public void sendMessage(ReqT message) {
-        streamTracer.traceRequestMessage((MessageLite) message);
-        super.sendMessage(message);
+        try {
+          streamTracer.traceRequestMessage((MessageLite) message);
+        } finally {
+          super.sendMessage(message);
+        }
       }
 
       @Override
@@ -80,8 +85,11 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
             new SimpleForwardingClientCallListener<RespT>(responseListener) {
               @Override
               public void onMessage(RespT message) {
-                streamTracer.traceResponseMessage((MessageLite) message);
-                super.onMessage(message);
+                try {
+                  streamTracer.traceResponseMessage((MessageLite) message);
+                } finally {
+                  super.onMessage(message);
+                }
               }
 
               @Override
@@ -98,7 +106,8 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     };
   }
 
-  private TrackingStreamTracer getStreamTracer(GrpcStreamType type, String rpcMethodName) {
+  private TrackingStreamTracer getStreamTracer(String rpcMethodName) {
+    GrpcStreamType type = GrpcStreamType.getTypeFromName(rpcMethodName);
     /**
      * We are choosing a tracer based on stream type. A designated stream tracer for specific type
      * of stream helps in casting the request/responses to desired types. It also helps in adding
@@ -123,7 +132,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
    * added support to trace the messages sent over stream and also extract and log the meaningful
    * information from it i.e. invocationId header, request parameters. reponse values etc.
    *
-   * <p>Via {@link #traceRequestMessage(MessageLite)} and {@link #traceRequestMessage(MessageLite)}
+   * <p>Via {@link #logRequestMessage(MessageLite)} and {@link #logRequestMessage(MessageLite)}
    * hooks we associate request and response messages to a stream.
    *
    * <p>{@link #statusOnClose(Status)} helps in tracing the closing status of stream.
@@ -132,17 +141,20 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
     private final Gson gson = new Gson();
     private final String rpcMethod;
-    private final Metadata.Key<String> idempotencyKey =
-        Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
-    private final String DEFAULT_INVOCATION_ID = "NOT-FOUND";
-
     private Metadata headers;
-    protected MessageLite requestMessage;
     protected int requestMessageCounter = 0;
     protected int responseMessageCounter = 0;
 
     TrackingStreamTracer(String rpcMethod) {
       this.rpcMethod = rpcMethod;
+    }
+
+    private void updateRequestCounter() {
+      requestMessageCounter++;
+    }
+
+    private void updateResponseCounter() {
+      responseMessageCounter++;
     }
 
     /**
@@ -152,7 +164,8 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
      * @param message Message which is supposed to be sent over the wire.
      */
     public void traceRequestMessage(MessageLite message) {
-      requestMessageCounter++;
+      logRequestMessage(message);
+      updateRequestCounter();
     }
 
     /**
@@ -163,8 +176,13 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
      * @param message Message which was received from server.
      */
     public void traceResponseMessage(MessageLite message) {
-      responseMessageCounter++;
+      logResponseMessage(message);
+      updateResponseCounter();
     }
+
+    public void logRequestMessage(MessageLite message) {}
+
+    public void logResponseMessage(MessageLite message) {}
 
     public void statusOnClose(Status status) {
       logger.atInfo().log(
@@ -218,40 +236,31 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     @Override
-    public void traceRequestMessage(MessageLite message) {
-      try {
-        StartResumableWriteRequest request = (StartResumableWriteRequest) message;
-
-        this.resourceId =
-            new StorageResourceId(
-                request.getWriteObjectSpec().getResource().getBucket(),
-                request.getWriteObjectSpec().getResource().getName(),
-                request.getWriteObjectSpec().getIfGenerationMatch());
-        logger.atInfo().log(
-            "%s",
-            toJson(
-                getRequestTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
-                    .build()));
-      } finally {
-        super.traceRequestMessage(message);
-      }
+    public void logRequestMessage(MessageLite message) {
+      StartResumableWriteRequest request = (StartResumableWriteRequest) message;
+      this.resourceId =
+          new StorageResourceId(
+              request.getWriteObjectSpec().getResource().getBucket(),
+              request.getWriteObjectSpec().getResource().getName(),
+              request.getWriteObjectSpec().getIfGenerationMatch());
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getRequestTrackingInfo()
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
+                  .build()));
     }
 
     @Override
-    public void traceResponseMessage(MessageLite message) {
-      try {
-        StartResumableWriteResponse response = (StartResumableWriteResponse) message;
-        logger.atInfo().log(
-            "%s",
-            toJson(
-                getResponseTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
-                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, response.getUploadId())
-                    .build()));
-      } finally {
-        super.traceResponseMessage(message);
-      }
+    public void logResponseMessage(MessageLite message) {
+      StartResumableWriteResponse response = (StartResumableWriteResponse) message;
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getResponseTrackingInfo()
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
+                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, response.getUploadId())
+                  .build()));
     }
   }
 
@@ -264,48 +273,39 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     @Override
-    public void traceRequestMessage(MessageLite message) {
-      try {
-        WriteObjectRequest request = (WriteObjectRequest) message;
-        String uploadId = request.getUploadId();
-        if (!Strings.isNullOrEmpty(uploadId)) {
-          updateUploadId(request.getUploadId());
-        }
-        logger.atInfo().log(
-            "%s",
-            toJson(
-                getRequestTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, request.getUploadId())
-                    .put(
-                        GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
-                    .put(
-                        GoogleCloudStorageTracingFields.FINALIZE_WRITE.name,
-                        request.getFinishWrite())
-                    .put(
-                        GoogleCloudStorageTracingFields.CONTENT_LENGTH.name,
-                        request.getChecksummedData().getContent().size())
-                    .build()));
-      } finally {
-        super.traceRequestMessage(message);
+    public void logRequestMessage(MessageLite message) {
+      WriteObjectRequest request = (WriteObjectRequest) message;
+      String uploadId = request.getUploadId();
+      if (!Strings.isNullOrEmpty(uploadId)) {
+        updateUploadId(request.getUploadId());
       }
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getRequestTrackingInfo()
+                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, request.getUploadId())
+                  .put(GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
+                  .put(
+                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name, request.getFinishWrite())
+                  .put(
+                      GoogleCloudStorageTracingFields.CONTENT_LENGTH.name,
+                      request.getChecksummedData().getContent().size())
+                  .build()));
     }
 
     @Override
-    public void traceResponseMessage(MessageLite message) {
-      try {
-        WriteObjectResponse response = (WriteObjectResponse) message;
-        logger.atInfo().log(
-            "%s",
-            toJson(
-                getResponseTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, streamUploadId)
-                    .put(
-                        GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
-                        response.getPersistedSize())
-                    .build()));
-      } finally {
-        super.traceResponseMessage(message);
-      }
+    public void logResponseMessage(MessageLite message) {
+
+      WriteObjectResponse response = (WriteObjectResponse) message;
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getResponseTrackingInfo()
+                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, streamUploadId)
+                  .put(
+                      GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
+                      response.getPersistedSize())
+                  .build()));
     }
 
     private void updateUploadId(@Nonnull String uploadId) {
@@ -339,7 +339,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     @Override
-    public void traceRequestMessage(MessageLite message) {
+    public void logRequestMessage(MessageLite message) {
       ReadObjectRequest request = (ReadObjectRequest) message;
 
       updateReadRequestContext(request);
@@ -347,31 +347,27 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
                   .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
                   .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
                   .build()));
     }
 
     @Override
-    public void traceResponseMessage(MessageLite message) {
-      try {
-        ReadObjectResponse response = (ReadObjectResponse) message;
-        int bytesRead = response.getChecksummedData().getContent().size();
-        logger.atInfo().log(
-            "%s",
-            toJson(
-                getResponseTrackingInfo()
-                    .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId.toString())
-                    .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
-                    .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
-                    .put(GoogleCloudStorageTracingFields.REQUEST_START_OFFSET.name, totalBytesRead)
-                    .put(GoogleCloudStorageTracingFields.BYTES_READ.name, bytesRead)
-                    .build()));
-        totalBytesRead += bytesRead;
-      } finally {
-        super.traceResponseMessage(message);
-      }
+    public void logResponseMessage(MessageLite message) {
+      ReadObjectResponse response = (ReadObjectResponse) message;
+      int bytesRead = response.getChecksummedData().getContent().size();
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getResponseTrackingInfo()
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
+                  .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
+                  .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
+                  .put(GoogleCloudStorageTracingFields.REQUEST_START_OFFSET.name, totalBytesRead)
+                  .put(GoogleCloudStorageTracingFields.BYTES_READ.name, bytesRead)
+                  .build()));
+      totalBytesRead += bytesRead;
     }
   }
 }

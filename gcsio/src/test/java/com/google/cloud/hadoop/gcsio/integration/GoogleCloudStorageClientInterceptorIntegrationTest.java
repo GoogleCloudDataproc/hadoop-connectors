@@ -176,16 +176,16 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
     Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(0);
-    assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name))
-        .isEqualTo(derivedResourceId.toString());
+    assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+        .contains(derivedResourceId.toString());
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
         .isEqualTo(partition.length);
 
     Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
-    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name))
-        .isEqualTo(derivedResourceId.toString());
+    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+        .contains(derivedResourceId.toString());
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
@@ -240,16 +240,16 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     // logging assertions for request
     verifyCommonFields(logRecord.get(0), rpcMethod);
 
-    assertThat(logRecord.get(0).get(GoogleCloudStorageTracingFields.RESOURCE.name))
-        .isEqualTo(derivedResourceId.toString());
+    assertThat((logRecord.get(0).get(GoogleCloudStorageTracingFields.RESOURCE.name)).toString())
+        .contains(derivedResourceId.toString());
     assertThat(logRecord.get(0).get(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name))
         .isEqualTo(0);
 
     // logging assertions for response
     verifyCommonFields(logRecord.get(1), rpcMethod);
 
-    assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESOURCE.name))
-        .isEqualTo(derivedResourceId.toString());
+    assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+        .contains(derivedResourceId.toString());
     assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name))
         .isEqualTo(0);
     assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.UPLOAD_ID.name)).isNotNull();
