@@ -73,6 +73,7 @@ public class HadoopCredentialsConfigurationTest {
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.refresh.token", null);
           put(".auth.service.account.json.keyfile", null);
+          put(".auth.workload.identity.pool.json.configfile", null);
           put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
           put(".http.read-timeout", 5_000L);
           put(".proxy.address", null);

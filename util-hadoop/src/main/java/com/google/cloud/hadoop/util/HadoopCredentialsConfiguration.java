@@ -22,6 +22,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.client.http.HttpTransport;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.ExternalAccountCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
@@ -80,6 +81,14 @@ public class HadoopCredentialsConfiguration {
    */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
+
+  /**
+   * Key suffix used to configure the path to a JSON file containing a Service Account key and
+   * identifier (email). Technically, this could be a JSON containing a non-service account user,
+   * but this setting is only used in the service account flow and is namespaced as such.
+   */
+  public static final HadoopConfigurationProperty<String> WORKLOAD_IDENTITY_FILE_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.workload.identity.pool.json.configfile");
 
   /**
    * Key suffix used to configure {@link AccessTokenProvider} that will be used to generate {@link
@@ -234,6 +243,11 @@ public class HadoopCredentialsConfiguration {
             .setRefreshToken(refreshToken.value())
             .setHttpTransportFactory(transport::get)
             .build();
+      case WORKLOAD_IDENITY_FIDERATION_KEYFILE:
+        keyFile = WORKLOAD_IDENTITY_FILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+        try (FileInputStream fis = new FileInputStream(keyFile)) {
+          return ExternalAccountCredentials.fromStream(fis, transport::get);
+        }
       case UNAUTHENTICATED:
         return null;
       default:
@@ -382,6 +396,8 @@ public class HadoopCredentialsConfiguration {
     COMPUTE_ENGINE,
     /** Configures JSON keyfile service account authentication */
     SERVICE_ACCOUNT_JSON_KEYFILE,
+    /** Configures workload identity pool key file */
+    WORKLOAD_IDENITY_FIDERATION_KEYFILE,
     /** Configures unauthenticated access */
     UNAUTHENTICATED,
     /** Configures user credentials authentication */
