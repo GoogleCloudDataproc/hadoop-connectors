@@ -270,7 +270,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
           throws IOException {
     return new TrackingStorageWrapper<>(
         gcsfsOptions.getCloudStorageOptions(),
-        httpRequestInitializer ->
+        (httpRequestInitializer, gRPCInterceptors) ->
             new GoogleCloudStorageFileSystem(
                 gcsOptions ->
                     new PerformanceCachingGoogleCloudStorage(

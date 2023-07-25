@@ -90,7 +90,7 @@ public class PerformanceCachingGoogleCloudStorageIntegrationTest {
       newTrackingGoogleCloudStorage(GoogleCloudStorageOptions options) throws IOException {
     return new TrackingStorageWrapper<>(
         options,
-        httpRequestInitializer ->
+        (httpRequestInitializer, gRPCInterceptors) ->
             new PerformanceCachingGoogleCloudStorage(
                 new GoogleCloudStorageImpl(options, httpRequestInitializer),
                 PERF_CACHE_GCS_OPTIONS),

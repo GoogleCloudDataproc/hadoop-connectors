@@ -30,16 +30,20 @@ import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.grpc.ClientInterceptor;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -75,6 +79,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable Credential credential,
       @Nullable com.google.api.services.storage.Storage apiaryClientStorage,
       @Nullable HttpRequestInitializer httpRequestInitializer,
+      @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     super(
@@ -87,7 +92,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             downscopedAccessTokenFn));
     this.storageOptions = options;
     this.storage =
-        clientLibraryStorage == null ? createStorage(credentials, options) : clientLibraryStorage;
+        clientLibraryStorage == null
+            ? createStorage(credentials, options, gRPCInterceptors)
+            : clientLibraryStorage;
   }
 
   @Override
@@ -192,10 +199,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private static Storage createStorage(
-      Credentials credentials, GoogleCloudStorageOptions storageOptions) {
+      Credentials credentials,
+      GoogleCloudStorageOptions storageOptions,
+      List<ClientInterceptor> interceptors) {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
+        .setGrpcInterceptorProvider(
+            () -> {
+              List<ClientInterceptor> list = new ArrayList<>();
+              if (interceptors != null && !interceptors.isEmpty()) {
+                list.addAll(
+                    interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
+              }
+              if (storageOptions.isTraceLogEnabled()) {
+                list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
+              }
+              return ImmutableList.copyOf(list);
+            })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
         .build()
         .getService();
@@ -223,6 +244,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract Builder setGRPCInterceptors(
+        @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
