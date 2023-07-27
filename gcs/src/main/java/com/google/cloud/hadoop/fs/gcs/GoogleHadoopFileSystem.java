@@ -102,6 +102,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -1056,7 +1057,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     URI gcsPath = getGcsPath(hadoopPath);
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
-        parameters.getMandatoryKeys(), Collections.emptySet(), "for " + gcsPath);
+        parameters.getMandatoryKeys(),
+        Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS,
+        "for " + gcsPath);
 
     FileStatus fileStatus = parameters.getStatus();
     FileInfo fileInfo =
