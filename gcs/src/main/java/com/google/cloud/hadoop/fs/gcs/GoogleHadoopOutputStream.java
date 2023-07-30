@@ -49,6 +49,7 @@ class GoogleHadoopOutputStream extends OutputStream {
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
 
+  private final GhfsStreamStats streamStats;
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
    *
@@ -71,6 +72,8 @@ class GoogleHadoopOutputStream extends OutputStream {
     this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
     this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
     this.storageStatistics = ghfs.getStorageStatistics();
+    this.streamStats =
+        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_WRITE_OPERATIONS, gcsPath);
   }
 
   private static WritableByteChannel createChannel(
@@ -95,19 +98,15 @@ class GoogleHadoopOutputStream extends OutputStream {
   /** Writes the specified byte to this output stream. */
   @Override
   public void write(int b) throws IOException {
-    GhfsStorageStatistics.trackDuration(
-        storageStatistics,
-        GhfsStatistic.STREAM_WRITE_OPERATIONS,
-        gcsPath,
-        () -> {
-          throwIfNotOpen();
-          out.write(b);
-          statistics.incrementBytesWritten(1);
-          statistics.incrementWriteOps(1);
+    long start = System.nanoTime();
+    throwIfNotOpen();
+    out.write(b);
+    statistics.incrementBytesWritten(1);
+    statistics.incrementWriteOps(1);
 
-          storageStatistics.streamWriteBytes(1);
-          return null;
-        });
+    // Using a lightweight implementation to update instrumentation. This method can be called quite
+    // frequently and need to be lightweight.
+    streamStats.updateWriteStreamStats(1, start);
   }
 
   /**
@@ -115,19 +114,13 @@ class GoogleHadoopOutputStream extends OutputStream {
    */
   @Override
   public void write(byte[] b, int offset, int len) throws IOException {
-    GhfsStorageStatistics.trackDuration(
-        storageStatistics,
-        GhfsStatistic.STREAM_WRITE_OPERATIONS,
-        gcsPath,
-        () -> {
-          throwIfNotOpen();
-          out.write(b, offset, len);
-          statistics.incrementBytesWritten(len);
-          statistics.incrementWriteOps(1);
+    long start = System.nanoTime();
+    throwIfNotOpen();
+    out.write(b, offset, len);
+    statistics.incrementBytesWritten(len);
+    statistics.incrementWriteOps(1);
 
-          storageStatistics.streamWriteBytes(len);
-          return null;
-        });
+    streamStats.updateWriteStreamStats(len, start);
   }
 
   /** Closes this output stream and releases any system resources associated with this stream. */
@@ -148,6 +141,7 @@ class GoogleHadoopOutputStream extends OutputStream {
             }
           }
 
+          streamStats.close();
           return null;
         });
   }

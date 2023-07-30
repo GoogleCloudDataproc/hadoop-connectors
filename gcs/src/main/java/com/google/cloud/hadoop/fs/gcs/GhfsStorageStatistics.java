@@ -45,7 +45,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
   /** {@value} The key that stores all the registered metrics */
   public static final String NAME = "GhfsStorageStatistics";
 
-  public static final int LATENCY_LOGGING_THRESHOLD_MS = 100;
+  public static final int LATENCY_LOGGING_THRESHOLD_MS = 150;
 
   private final Map<GhfsStatistic, AtomicLong> opsCount = new EnumMap<>(GhfsStatistic.class);
   private final Map<GhfsStatistic, AtomicLong> minimums = new EnumMap<>(GhfsStatistic.class);
@@ -103,33 +103,52 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
 
   void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
+    updateMinAndMax(statistic, durationMs, durationMs, context);
+
+    if (means.containsKey(statistic)) {
+      means.get(statistic).addSample(durationMs);
+    }
+  }
+
+  void updateStats(
+      GhfsStatistic statistic,
+      long minLatency,
+      long maxLatency,
+      long totalDuration,
+      int count,
+      Object context) {
+
+    updateMinAndMax(statistic, minLatency, maxLatency, context);
+    means.get(statistic).addSample(totalDuration, count);
+    opsCount.get(statistic).addAndGet(count);
+  }
+
+  private void updateMinAndMax(
+      GhfsStatistic statistic, long minDuration, long maxDuration, Object context) {
     checkArgument(
         statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
+
     AtomicLong minVal = minimums.get(statistic);
     if (minVal == null) {
       // There can be race here. It is ok to have the last write win.
-      minimums.put(statistic, new AtomicLong(durationMs));
-    } else if (durationMs < minVal.get()) {
-      minVal.set(durationMs);
+      minimums.put(statistic, new AtomicLong(minDuration));
+    } else if (minDuration < minVal.get()) {
+      minVal.set(minDuration);
     }
 
     AtomicLong maxVal = maximums.get(statistic);
-    if (durationMs > maxVal.get()) {
-      if (durationMs > LATENCY_LOGGING_THRESHOLD_MS) {
+    if (maxDuration > maxVal.get()) {
+      if (maxDuration > LATENCY_LOGGING_THRESHOLD_MS) {
         logger.atWarning().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
-            statistic, durationMs, maxVal.get(), opsCount.get(statistic), context);
+            statistic, maxDuration, maxVal.get(), opsCount.get(statistic), context);
       }
 
       // There can be race here and can have some data points get missed. This is a corner case.
       // Since this function can be called quite frequently, opting for performance over consistency
       // here.
-      maxVal.set(durationMs);
-    }
-
-    if (means.containsKey(statistic)) {
-      means.get(statistic).addSample(durationMs);
+      maxVal.set(maxDuration);
     }
   }
 
@@ -267,8 +286,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
     private long sum;
 
     synchronized void addSample(long val) {
-      sample++;
-      sum += val;
+      addSample(val, 1);
     }
 
     double getValue() {
@@ -277,6 +295,11 @@ public class GhfsStorageStatistics extends StorageStatistics {
       }
 
       return sum / sample;
+    }
+
+    synchronized void addSample(long total, int count) {
+      sample += count;
+      sum += total;
     }
   }
 }
