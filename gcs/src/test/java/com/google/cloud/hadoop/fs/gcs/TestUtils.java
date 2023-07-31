@@ -29,7 +29,7 @@ class TestUtils {
     long maxValue = stats.getMax(symbol);
     long meanValue = Double.valueOf(stats.getMean(symbol)).longValue();
 
-    assertThat(stats.getLong(symbol).equals(expected));
+    assertThat(stats.getLong(symbol)).isEqualTo(expected);
     assertThat(minValue).isLessThan(maxValue + 1);
     assertThat(minValue).isLessThan(meanValue + 1);
     assertThat(meanValue).isLessThan(maxValue + 1);

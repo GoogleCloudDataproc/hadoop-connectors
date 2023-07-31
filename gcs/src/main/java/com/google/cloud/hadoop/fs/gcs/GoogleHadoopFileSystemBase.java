@@ -1865,7 +1865,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public Map<String, byte[]> getXAttrs(Path path, List<String> names) throws IOException {
     return GhfsStorageStatistics.trackDuration(
         storageStatistics,
-        GhfsStatistic.INVOCATION_XATTR_GET_MAP,
+        GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP,
         path,
         () -> {
           checkNotNull(path, "path should not be null");

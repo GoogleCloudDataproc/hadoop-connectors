@@ -146,10 +146,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
     updateMinMaxStats(statistic, minLatency, maxLatency, context);
     addMeanStatistic(statistic, totalDuration, count);
-
-    if (opsCount.containsKey(statistic)) {
-      opsCount.get(statistic).addAndGet(count);
-    }
+    opsCount.get(statistic.getSymbol()).addAndGet(count);
   }
 
   private void updateMinMaxStats(

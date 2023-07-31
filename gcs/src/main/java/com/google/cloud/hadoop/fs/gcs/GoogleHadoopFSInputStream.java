@@ -162,7 +162,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
-    Stopwatch stopwatch = Stopwatch.createStarted();
+    long startTimeNs = System.nanoTime();
 
     Preconditions.checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
@@ -170,14 +170,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     }
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
 
-    readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead, Level.INFO);
+    readAPITrace(READ_METHOD, startTimeNs, 0, offset, length, numRead, Level.INFO);
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(numRead);
       statistics.incrementReadOps(1);
       totalBytesRead += numRead;
-      streamStats.updateReadStreamStats(numRead, stopwatch.elapsed().toNanos());
+      streamStats.updateReadStreamStats(numRead, startTimeNs);
     }
 
     storageStatistics.streamReadOperationInComplete(length, Math.max(numRead, 0));
@@ -200,10 +200,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
-    Stopwatch stopwatch = Stopwatch.createStarted();
+    long startTimeNs = System.nanoTime();
 
     int result = super.read(position, buf, offset, length);
-    readAPITrace(POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result, Level.FINE);
+    readAPITrace(POSITIONAL_READ_METHOD, startTimeNs, position, offset, length, result, Level.FINE);
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
@@ -235,7 +235,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized void seek(long pos) throws IOException {
     logger.atFiner().log("seek(%d)", pos);
-    Stopwatch stopwatch = Stopwatch.createStarted();
+    long startTimeNs = System.nanoTime();
 
     long curPos = getPos();
     long diff = pos - curPos;
@@ -247,12 +247,12 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
     try {
       channel.position(pos);
-      seekAPITrace(SEEK_METHOD, stopwatch, pos);
+      seekAPITrace(SEEK_METHOD, startTimeNs, pos);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
 
-    seekStreamStats.updateReadStreamSeekStats(stopwatch.elapsed().getNano());
+    seekStreamStats.updateReadStreamSeekStats(startTimeNs);
   }
 
   /**
@@ -314,17 +314,17 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
   private void readAPITrace(
       String method,
-      Stopwatch stopwatch,
+      long startTimeNs,
       long position,
       int offset,
       int length,
       int bytesRead,
       Level logLevel) {
-    if (shouldLog(stopwatch)) {
+    if (shouldLog(startTimeNs)) {
       Map<String, Object> jsonMap = new HashMap<>();
       addLogProperty(METHOD, method, jsonMap);
       addLogProperty(GCS_PATH, gcsPath, jsonMap);
-      addLogProperty(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS), jsonMap);
+      addLogProperty(DURATION_NS, getElapsedMillisFromStartTime(startTimeNs), jsonMap);
       addLogProperty(POSITION, position, jsonMap);
       addLogProperty(OFFSET, offset, jsonMap);
       addLogProperty(LENGTH, length, jsonMap);
@@ -333,12 +333,12 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     }
   }
 
-  private void seekAPITrace(String method, Stopwatch stopwatch, long pos) {
+  private void seekAPITrace(String method, long startTimeNs, long pos) {
     if (isTraceLoggingEnabled) {
       Map<String, Object> jsonMap = new HashMap<>();
       addLogProperty(METHOD, method, jsonMap);
       addLogProperty(GCS_PATH, gcsPath, jsonMap);
-      addLogProperty(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS), jsonMap);
+      addLogProperty(DURATION_NS, getElapsedMillisFromStartTime(startTimeNs), jsonMap);
       addLogProperty(POSITION, pos, jsonMap);
       captureAPITraces(jsonMap, Level.FINE);
     }
@@ -354,7 +354,15 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   }
 
   private boolean shouldLog(Stopwatch stopwatch) {
-    return isTraceLoggingEnabled && stopwatch.elapsed(TimeUnit.MILLISECONDS) >= logThreshold;
+    return shouldLog(stopwatch.elapsed(TimeUnit.NANOSECONDS));
+  }
+
+  private boolean shouldLog(long startTime) {
+    return isTraceLoggingEnabled && getElapsedMillisFromStartTime(startTime) >= logThreshold;
+  }
+
+  private static long getElapsedMillisFromStartTime(long timeNs) {
+    return (System.nanoTime() - timeNs) / 1000_1000;
   }
 
   private void closeAPITrace(String method, Stopwatch stopwatch) {
