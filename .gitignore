@@ -12,3 +12,6 @@ bin/
 
 # Ignore Maven wrapper jar
 .mvn/wrapper/maven-wrapper.jar
+
+# Ignore dependency-reduced-pom.xml
+gcs/depedency-reduced-pom.xml
