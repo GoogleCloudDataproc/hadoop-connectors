@@ -39,13 +39,17 @@ import org.apache.hadoop.fs.StorageStatistics;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class GhfsStorageStatistics extends StorageStatistics {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /** {@value} The key that stores all the registered metrics */
   public static final String NAME = "GhfsStorageStatistics";
 
-  public static final int LATENCY_LOGGING_THRESHOLD_MS = 100;
+  public static final int LATENCY_LOGGING_THRESHOLD_MS = 150;
+
+  // Instance to be used if it encounters any error while registering to Global Statistics.
+  // Error can happen for e.g. when different class loaders are used.
+  // If this instance is used, the metrics will not be reported to metrics sinks.
+  static final GhfsStorageStatistics DUMMY_INSTANCE = new GhfsStorageStatistics();
 
   private final Map<String, AtomicLong> opsCount = new HashMap<>();
   private final Map<String, AtomicLong> minimums = new HashMap<>();
@@ -120,34 +124,59 @@ public class GhfsStorageStatistics extends StorageStatistics {
     checkArgument(
         statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
+    updateMinMaxStats(statistic, durationMs, durationMs, context);
+
+    addMeanStatistic(statistic, durationMs, 1);
+  }
+
+  private void addMeanStatistic(GhfsStatistic statistic, long totalDurationMs, int count) {
+    String meanKey = getMeanKey(statistic.getSymbol());
+    if (means.containsKey(meanKey)) {
+      means.get(meanKey).addSample(totalDurationMs, count);
+    }
+  }
+
+  void updateStats(
+      GhfsStatistic statistic,
+      long minLatency,
+      long maxLatency,
+      long totalDuration,
+      int count,
+      Object context) {
+
+    updateMinMaxStats(statistic, minLatency, maxLatency, context);
+    addMeanStatistic(statistic, totalDuration, count);
+
+    if (opsCount.containsKey(statistic)) {
+      opsCount.get(statistic).addAndGet(count);
+    }
+  }
+
+  private void updateMinMaxStats(
+      GhfsStatistic statistic, long minDurationMs, long maxDurationMs, Object context) {
     String minKey = getMinKey(statistic.getSymbol());
 
     AtomicLong minVal = minimums.get(minKey);
     if (minVal == null) {
       // There can be race here. It is ok to have the last write win.
-      minimums.put(minKey, new AtomicLong(durationMs));
-    } else if (durationMs < minVal.get()) {
-      minVal.set(durationMs);
+      minimums.put(minKey, new AtomicLong(minDurationMs));
+    } else if (minDurationMs < minVal.get()) {
+      minVal.set(minDurationMs);
     }
 
     String maxKey = getMaxKey(statistic.getSymbol());
     AtomicLong maxVal = maximums.get(maxKey);
-    if (durationMs > maxVal.get()) {
-      if (durationMs > LATENCY_LOGGING_THRESHOLD_MS) {
+    if (maxDurationMs > maxVal.get()) {
+      if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS) {
         logger.atWarning().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
-            statistic, durationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
+            statistic, maxDurationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
       }
 
       // There can be race here and can have some data points get missed. This is a corner case.
       // Since this function can be called quite frequently, opting for performance over consistency
       // here.
-      maxVal.set(durationMs);
-    }
-
-    String meanKey = getMeanKey(statistic.getSymbol());
-    if (means.containsKey(meanKey)) {
-      means.get(meanKey).addSample(durationMs);
+      maxVal.set(maxDurationMs);
     }
   }
 
@@ -324,7 +353,11 @@ public class GhfsStorageStatistics extends StorageStatistics {
     private long sum;
 
     synchronized void addSample(long val) {
-      sample++;
+      addSample(val, 1);
+    }
+
+    synchronized void addSample(long val, int count) {
+      sample += count;
       sum += val;
     }
 
