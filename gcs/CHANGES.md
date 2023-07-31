@@ -122,6 +122,8 @@
 
 1.  Upgrade java-storage to 2.22.3
 
+1.  Upgrade java-storage to 2.25.0
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
