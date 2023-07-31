@@ -174,7 +174,7 @@ public class HadoopCredentialsConfigurationTest {
   public void wipConfigFileUsedWhenConfigured() throws Exception {
     configuration.setEnum(
         getConfigKey(AUTHENTICATION_TYPE_SUFFIX),
-        AuthenticationType.WORKLOAD_IDENITY_FIDERATION_FILE);
+        AuthenticationType.WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE);
     configuration.set(
         getConfigKey(WORKLOAD_IDENTITY_FILE_SUFFIX), getStringPath("test-wip-config.json"));
 

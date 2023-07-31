@@ -244,7 +244,7 @@ public class HadoopCredentialsConfiguration {
             .setRefreshToken(refreshToken.value())
             .setHttpTransportFactory(transport::get)
             .build();
-      case WORKLOAD_IDENITY_FIDERATION_FILE:
+      case WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE:
         String configFile =
             WORKLOAD_IDENTITY_FILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
         try (FileInputStream fis = new FileInputStream(configFile)) {
@@ -399,7 +399,7 @@ public class HadoopCredentialsConfiguration {
     /** Configures JSON keyfile service account authentication */
     SERVICE_ACCOUNT_JSON_KEYFILE,
     /** Configures workload identity pool key file */
-    WORKLOAD_IDENITY_FIDERATION_FILE,
+    WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE,
     /** Configures unauthenticated access */
     UNAUTHENTICATED,
     /** Configures user credentials authentication */
