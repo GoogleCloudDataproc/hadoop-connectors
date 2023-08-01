@@ -38,11 +38,12 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
@@ -85,7 +86,7 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
-  public static GoogleCloudStorage mockedGcsClientImpl() {
+  public static GoogleCloudStorage createGcsClientImpl() {
     try {
       return GoogleCloudStorageClientImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
@@ -410,20 +411,37 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
+  @FunctionalInterface
+  public interface CheckedFunction2<T, T2, R, E extends Throwable> {
+
+    R apply(T t, T2 t2) throws E;
+  }
+
   public static class TrackingStorageWrapper<T> {
 
+    public final TrackingGrpcRequestInterceptor grpcRequestInterceptor;
     public final TrackingHttpRequestInitializer requestsTracker;
     public final T delegate;
 
     public TrackingStorageWrapper(
         GoogleCloudStorageOptions options,
-        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> delegateStorageFn,
+        CheckedFunction2<TrackingHttpRequestInitializer, ImmutableList, T, IOException>
+            delegateStorageFn,
         Credentials credentials)
         throws IOException {
       this.requestsTracker =
           new TrackingHttpRequestInitializer(
               new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
-      this.delegate = delegateStorageFn.apply(this.requestsTracker);
+      this.grpcRequestInterceptor = new TrackingGrpcRequestInterceptor();
+      this.delegate =
+          delegateStorageFn.apply(this.requestsTracker, ImmutableList.of(grpcRequestInterceptor));
+    }
+
+    public ImmutableList getAllRequestStrings() {
+      return ImmutableList.builder()
+          .addAll(requestsTracker.getAllRequestStrings())
+          .addAll(grpcRequestInterceptor.getAllRequestStrings())
+          .build();
     }
   }
 }

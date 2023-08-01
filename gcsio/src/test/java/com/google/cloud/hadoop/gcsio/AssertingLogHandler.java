@@ -69,6 +69,14 @@ public class AssertingLogHandler extends Handler {
     return logRecords.get(index);
   }
 
+  public List<Map<String, Object>> getSubListOfRecords(int startIndex, int endIndex) {
+    List<Map<String, Object>> recordSubList = new ArrayList<>();
+    for (int i = startIndex; i <= endIndex; i++) {
+      recordSubList.add(logRecords.get(i));
+    }
+    return recordSubList;
+  }
+
   public List<Map<String, Object>> getAllLogRecords() {
     return logRecords;
   }
