@@ -10,5 +10,5 @@ bin/
 # MacOS folder files
 .DS_Store
 
-# Ignore dependency-reduced-pom.xml
-gcs/depedency-reduced-pom.xml
+# Ignore Maven wrapper jar
+.mvn/wrapper/maven-wrapper.jar
