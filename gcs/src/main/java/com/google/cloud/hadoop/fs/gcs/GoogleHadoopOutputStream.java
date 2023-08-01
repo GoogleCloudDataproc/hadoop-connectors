@@ -133,15 +133,16 @@ class GoogleHadoopOutputStream extends OutputStream {
         gcsPath,
         () -> {
           logger.atFiner().log("close(%s)", gcsPath);
-          if (out != null) {
-            try {
+          try {
+            if (out != null) {
               out.close();
-            } finally {
-              out = null;
-              channel = null;
             }
+          } finally {
+            out = null;
+            channel = null;
+            streamStats.close();
           }
-          streamStats.close();
+
           return null;
         });
   }

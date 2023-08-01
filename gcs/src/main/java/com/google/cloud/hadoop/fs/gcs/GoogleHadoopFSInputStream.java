@@ -277,18 +277,21 @@ class GoogleHadoopFSInputStream extends FSInputStream {
         GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS,
         gcsPath,
         () -> {
-          logger.atFiner().log("close(): %s", gcsPath);
-          Stopwatch stopwatch = Stopwatch.createStarted();
-          Map<String, Object> apiTraces = new HashMap<>();
-          if (channel != null) {
-            logger.atFiner().log(
-                "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-            channel.close();
-            closeAPITrace(CLOSE_METHOD, stopwatch);
+          try {
+            logger.atFiner().log("close(): %s", gcsPath);
+            Stopwatch stopwatch = Stopwatch.createStarted();
+            Map<String, Object> apiTraces = new HashMap<>();
+            if (channel != null) {
+              logger.atFiner().log(
+                  "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+              channel.close();
+              closeAPITrace(CLOSE_METHOD, stopwatch);
+            }
+          } finally {
+            streamStats.close();
+            seekStreamStats.close();
           }
 
-          streamStats.close();
-          seekStreamStats.close();
           return null;
         });
   }
