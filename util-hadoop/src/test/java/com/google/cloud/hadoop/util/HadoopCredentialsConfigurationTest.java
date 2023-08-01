@@ -24,7 +24,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_C
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.WORKLOAD_IDENTITY_FILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -75,7 +75,7 @@ public class HadoopCredentialsConfigurationTest {
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.refresh.token", null);
           put(".auth.service.account.json.keyfile", null);
-          put(".auth.workload.identity.pool.json.configfile", null);
+          put(".auth.workload.identity.federation.credential.config.file", null);
           put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
           put(".http.read-timeout", 5_000L);
           put(".proxy.address", null);
@@ -176,7 +176,8 @@ public class HadoopCredentialsConfigurationTest {
         getConfigKey(AUTHENTICATION_TYPE_SUFFIX),
         AuthenticationType.WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE);
     configuration.set(
-        getConfigKey(WORKLOAD_IDENTITY_FILE_SUFFIX), getStringPath("test-wip-config.json"));
+        getConfigKey(WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX),
+        getStringPath("test-wip-config.json"));
 
     ExternalAccountCredentials credentials = (ExternalAccountCredentials) getCredentials();
 

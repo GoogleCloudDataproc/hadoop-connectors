@@ -88,8 +88,10 @@ public class HadoopCredentialsConfiguration {
    * service account impersonation url and credential source. but this setting is only used in the
    * workload identity federation flow and is namespaced as such.
    */
-  public static final HadoopConfigurationProperty<String> WORKLOAD_IDENTITY_FILE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.workload.identity.pool.json.configfile");
+  public static final HadoopConfigurationProperty<String>
+      WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX =
+          new HadoopConfigurationProperty<>(
+              ".auth.workload.identity.federation.credential.config.file");
 
   /**
    * Key suffix used to configure {@link AccessTokenProvider} that will be used to generate {@link
@@ -246,7 +248,9 @@ public class HadoopCredentialsConfiguration {
             .build();
       case WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE:
         String configFile =
-            WORKLOAD_IDENTITY_FILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+            WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX
+                .withPrefixes(keyPrefixes)
+                .get(config, config::get);
         try (FileInputStream fis = new FileInputStream(configFile)) {
           return ExternalAccountCredentials.fromStream(fis, transport::get);
         }
