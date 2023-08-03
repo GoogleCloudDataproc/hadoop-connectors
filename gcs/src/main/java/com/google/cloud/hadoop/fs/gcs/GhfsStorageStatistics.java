@@ -165,7 +165,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
     AtomicLong maxVal = maximums.get(maxKey);
     if (maxDurationMs > maxVal.get()) {
       if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS) {
-        logger.atWarning().log(
+        logger.atInfo().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
             statistic, maxDurationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
       }
