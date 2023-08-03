@@ -327,7 +327,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       Map<String, Object> jsonMap = new HashMap<>();
       addLogProperty(METHOD, method, jsonMap);
       addLogProperty(GCS_PATH, gcsPath, jsonMap);
-      addLogProperty(DURATION_NS, getElapsedMillisFromStartTime(startTimeNs), jsonMap);
+      addLogProperty(DURATION_NS, System.nanoTime() - startTimeNs, jsonMap);
       addLogProperty(POSITION, position, jsonMap);
       addLogProperty(OFFSET, offset, jsonMap);
       addLogProperty(LENGTH, length, jsonMap);
@@ -341,7 +341,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       Map<String, Object> jsonMap = new HashMap<>();
       addLogProperty(METHOD, method, jsonMap);
       addLogProperty(GCS_PATH, gcsPath, jsonMap);
-      addLogProperty(DURATION_NS, getElapsedMillisFromStartTime(startTimeNs), jsonMap);
+      addLogProperty(DURATION_NS, System.nanoTime() - startTimeNs, jsonMap);
       addLogProperty(POSITION, pos, jsonMap);
       captureAPITraces(jsonMap, Level.FINE);
     }
