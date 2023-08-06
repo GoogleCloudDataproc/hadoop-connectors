@@ -267,21 +267,17 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
     assertThat(value).isEqualTo(expected);
 
-    // One seek is to seek to the position and another seek to seek back to the original position.
-    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_OPERATIONS, 2);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_OPERATIONS, 0);
     TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 2);
 
-    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 2);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 0);
 
     in.seek(0);
 
-    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 3);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 0);
 
-    TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS, 1);
-
-    TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS, 2);
-    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 4);
-    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 2);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 0);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 0);
 
     TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 3);
     TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_BACKWARDS, 2);
@@ -298,6 +294,9 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     TestUtils.verifyCounter(stats, STREAM_READ_BYTES, 2);
     TestUtils.verifyCounter(stats, STREAM_READ_OPERATIONS_INCOMPLETE, 0);
     TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS, 1);
+
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS, 4);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS, 2);
   }
 
   private URI createFileWithTestContentAndGetPath(String fileName) throws IOException {

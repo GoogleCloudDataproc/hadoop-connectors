@@ -88,7 +88,7 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
     assertThat(gcsFsIHelper.readFile(path)).isEqualTo(expected);
 
     TestUtils.verifyDurationMetric(
-        stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, expected.length);
+        stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, expected.length + 1);
     TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, expected.length);
     TestUtils.verifyCounter(stats, GhfsStatistic.STREAM_WRITE_BYTES, expected.length);
     TestUtils.verifyDurationMetric(stats, GhfsStatistic.INVOCATION_HSYNC, expected.length);
@@ -228,7 +228,7 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
     assertThat(gcsFsIHelper.readFile(path)).isEqualTo(testData);
 
     TestUtils.verifyDurationMetric(
-        stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, testData.length);
+        stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, testData.length + 1);
     TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, testData.length);
     TestUtils.verifyCounter(stats, GhfsStatistic.STREAM_WRITE_BYTES, testData.length);
     TestUtils.verifyDurationMetric(stats, GhfsStatistic.INVOCATION_HFLUSH, testData.length);

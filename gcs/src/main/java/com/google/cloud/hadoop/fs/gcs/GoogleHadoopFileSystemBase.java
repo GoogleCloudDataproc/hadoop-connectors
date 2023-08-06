@@ -118,6 +118,7 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
@@ -337,10 +338,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public GoogleHadoopFileSystemBase() {
     // Inserts in to GlobalStorageStatistics. Spark Plugin for e.g. can query this and register to
     // Spark metrics system.
-    storageStatistics =
-        (GhfsStorageStatistics)
-            GlobalStorageStatistics.INSTANCE.put(
-                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics());
+    StorageStatistics globalStats =
+        GlobalStorageStatistics.INSTANCE.put(
+            GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics());
+
+    if (GhfsStorageStatistics.class.isAssignableFrom(globalStats.getClass())) {
+      storageStatistics = (GhfsStorageStatistics) globalStats;
+    } else {
+      logger.atWarning().log(
+          "Encountered an error while registering to GlobalStorageStatistics. Some of the GCS connector metrics will not be reported to metrics sinks. globalStatsClassLoader=<%s>; classLoader=<%s>",
+          globalStats.getClass().getClassLoader(), GhfsStorageStatistics.class.getClassLoader());
+      storageStatistics = GhfsStorageStatistics.DUMMY_INSTANCE;
+    }
   }
 
   /**
@@ -1856,7 +1865,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public Map<String, byte[]> getXAttrs(Path path, List<String> names) throws IOException {
     return GhfsStorageStatistics.trackDuration(
         storageStatistics,
-        GhfsStatistic.INVOCATION_XATTR_GET_MAP,
+        GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP,
         path,
         () -> {
           checkNotNull(path, "path should not be null");

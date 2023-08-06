@@ -1267,8 +1267,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @Test
   public void mkdirs_IOstatistics() throws IOException {
-    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     StorageStatistics stats = TestUtils.getStorageStatistics();
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
 
     TestUtils.verifyDurationMetric((GhfsStorageStatistics) stats, INVOCATION_MKDIRS, 1);
   }

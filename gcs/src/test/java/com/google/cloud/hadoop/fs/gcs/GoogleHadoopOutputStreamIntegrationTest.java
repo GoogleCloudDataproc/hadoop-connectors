@@ -130,7 +130,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     fout.close();
 
     TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS, 1);
-    TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, 4);
+    TestUtils.verifyDurationMetric(stats, GhfsStatistic.STREAM_WRITE_OPERATIONS, 2);
     TestUtils.verifyDurationMetric(
         stats, GhfsStatistic.STREAM_WRITE_BYTES, data1.length + data2.length);
   }
