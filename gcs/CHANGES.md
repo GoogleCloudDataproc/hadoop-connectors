@@ -120,7 +120,7 @@
 
 1.  Upgrade Hadoop to 3.3.5.
 
-1.  Upgrade java-storage to 2.22.3
+1.  Upgrade java-storage to 2.25.0
 
 1.  Add support for `WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE` authentication type that retrieves a refresh token using workload identity federation configuraiton defined in: `fs.gs.auth.workload.identity.federation.credential.config.file`
 
