@@ -2,6 +2,8 @@
 
 ## Next
 
+1. Upgrade java-storage to 2.25.0
+
 ## 2.2.16 - 2023-06-30
 
 1. Upgrade java-storage to 2.23.0
