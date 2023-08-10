@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_C
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -35,6 +36,7 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.ExternalAccountCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.auth.oauth2.UserCredentials;
@@ -73,6 +75,7 @@ public class HadoopCredentialsConfigurationTest {
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.refresh.token", null);
           put(".auth.service.account.json.keyfile", null);
+          put(".auth.workload.identity.federation.credential.config.file", null);
           put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
           put(".http.read-timeout", 5_000L);
           put(".proxy.address", null);
@@ -165,6 +168,24 @@ public class HadoopCredentialsConfigurationTest {
 
     assertThat(credentials.getClientEmail()).isEqualTo("test-email@gserviceaccount.com");
     assertThat(credentials.getPrivateKeyId()).isEqualTo("test-key-id");
+  }
+
+  @Test
+  public void wipConfigFileUsedWhenConfigured() throws Exception {
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX),
+        AuthenticationType.WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE);
+    configuration.set(
+        getConfigKey(WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX),
+        getStringPath("test-wip-config.json"));
+
+    ExternalAccountCredentials credentials = (ExternalAccountCredentials) getCredentials();
+
+    assertThat(credentials.getAuthenticationType()).isEqualTo("OAuth2");
+    assertThat(credentials.getAudience())
+        .isEqualTo(
+            "//iam.googleapis.com/projects/test/locations/global/workloadIdentityPools/test-pool/providers/tester");
+    assertThat(credentials.getTokenUrl()).isEqualTo("https://sts.googleapis.com/v1/token");
   }
 
   @Test
