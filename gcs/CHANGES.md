@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.17 - 2023-08-15
 
 1. Upgrade java-storage to 2.25.0
