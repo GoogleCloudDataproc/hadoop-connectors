@@ -145,6 +145,7 @@ public class GoogleCloudStorageImplTest {
     assertThat(trackingGcs.getAllRequestStrings())
         .containsExactly(
             getRequestString(resourceId.getBucketName(), resourceId.getObjectName(), filelds));
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -165,6 +166,7 @@ public class GoogleCloudStorageImplTest {
         .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -192,6 +194,7 @@ public class GoogleCloudStorageImplTest {
             getExpectedRequestsForCreateObject(
                 resourceId, uploadChunkSize, partitionsCount, partition))
         .inOrder();
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -265,6 +268,7 @@ public class GoogleCloudStorageImplTest {
             getExpectedRequestsForCreateObject(
                 resourceId, uploadChunkSize, partitionsCount, partition))
         .inOrder();
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -320,6 +324,8 @@ public class GoogleCloudStorageImplTest {
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, 1, bytesToWrite))
         .inOrder();
+    trackingGcs.delegate.close();
+    trackingGcs2.delegate.close();
   }
 
   @Test
@@ -350,6 +356,7 @@ public class GoogleCloudStorageImplTest {
         .containsExactly(
             uploadRequestString(
                 resourceId.getBucketName(), resourceId.getObjectName(), /* generationId= */ null));
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -440,6 +447,7 @@ public class GoogleCloudStorageImplTest {
                         /* finishWrite */ true))
                 .build()
                 .toArray());
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -503,6 +511,7 @@ public class GoogleCloudStorageImplTest {
                 copiedResourceId.getObjectName(),
                 maxRewriteChunkSize,
                 /* rewriteTokenId= */ 2));
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -555,6 +564,7 @@ public class GoogleCloudStorageImplTest {
                         /* finishWrite= */ true))
                 .build()
                 .toArray());
+    trackingGcs.delegate.close();
   }
 
   @Test
@@ -596,6 +606,7 @@ public class GoogleCloudStorageImplTest {
 
       jsonLogHander.assertLogCount(expectedAfterRead);
       jsonLogHander.verifyJsonLogFields(TEST_BUCKET, name.getMethodName());
+      trackingGcs.delegate.close();
     } finally {
       jsonTracingLogger.removeHandler(jsonLogHander);
     }

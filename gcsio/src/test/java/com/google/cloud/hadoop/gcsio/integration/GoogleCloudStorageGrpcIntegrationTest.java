@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -71,6 +72,16 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private static final String BUCKET_NAME = BUCKET_HELPER.getUniqueBucketName("shared");
 
   private final boolean tdEnabled;
+
+  protected GoogleCloudStorage rawStorage;
+
+  @After
+  public void cleanup() {
+    if (rawStorage != null) {
+      rawStorage.close();
+      rawStorage = null;
+    }
+  }
 
   @Parameters
   // Falling back to gRPC-LB for now as TD has issue with CloudBuild
@@ -127,7 +138,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateObject() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateObject_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
@@ -137,7 +148,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateExistingObject() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateExistingObject_Object");
     writeObject(rawStorage, objectToCreate, /* objectSize= */ 128);
@@ -156,7 +167,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateEmptyObject() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateEmptyObject_Object");
 
@@ -170,7 +181,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateInvalidObject() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateInvalidObject_InvalidObject\n");
 
@@ -180,7 +191,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpen() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
 
@@ -189,7 +200,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenWithMetricsEnabled() throws IOException {
-    GoogleCloudStorage rawStorage =
+    rawStorage =
         GoogleCloudStorageImpl.builder()
             .setOptions(
                 GoogleCloudStorageTestHelper.getStandardOptionBuilder()
@@ -214,7 +225,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         jsonLogHandler.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
 
     try {
-      GoogleCloudStorage rawStorage =
+      rawStorage =
           GoogleCloudStorageImpl.builder()
               .setOptions(configureOptionsWithTD().setTraceLogEnabled(true).build())
               .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
@@ -339,7 +350,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenNonExistentItem() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId =
         new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object");
     IOException exception = assertThrows(IOException.class, () -> rawStorage.open(resourceId));
@@ -348,7 +359,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenEmptyObject() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenEmptyObject_Object");
     rawStorage.createEmptyObject(resourceId);
 
@@ -357,7 +368,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenLargeObject() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
 
     int partitionsCount = 50;
@@ -371,7 +382,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testOpenObjectWithChecksum() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpenObjectWithChecksum_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
@@ -385,7 +396,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testOpenObjectWithSeek() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeek_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
@@ -406,7 +417,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testOpenObjectWithSeekOverBounds() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeekOverBounds_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 4 * 1024 * 1024);
@@ -427,7 +438,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testOpenObjectWithSeekLimits() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeekOverBounds_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 1024);
@@ -451,7 +462,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testReadFooterDataWithGrpcChecksums() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeekToFooter_Object");
     int objectSize = 1024;
@@ -478,7 +489,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadCachedFooterData() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testReadCachedFooterData_Object");
     int objectSize = 10 * 1024 * 1024;
@@ -501,7 +512,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadSeekToFooterData() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testReadSeekToFooterData_Object");
     int objectSize = 1024;
@@ -524,7 +535,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadObjectCachedAsFooter() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testReadSeekToFooterData_Object");
     int objectSize = 1024;
@@ -547,7 +558,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testPartialReadFooterDataWithSingleChunk() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testPartialReadFooterDataWithSingleChunk_Object");
     int objectSize = 2 * 1024 * 1024;
@@ -570,7 +581,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testPartialReadFooterDataWithMultipleChunks() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testPartialReadFooterDataWithMultipleChunks_Object");
     int objectSize = 10 * 1024 * 1024;
@@ -593,7 +604,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testPartialReadFooterDataWithinSegment() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testPartialReadFooterDataWithinSegment_Object");
     int objectSize = 10 * 1024;
@@ -619,7 +630,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testPartialRead() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     int segmentSize = 553;
     int segmentCount = 5;
 
@@ -646,7 +657,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadSeekToOffsetGreaterThanMinRangeRequestSize() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(
             BUCKET_NAME, "testReadSeekToOffsetGreaterThanMinRangeRequestSize_Object");
@@ -683,7 +694,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadBeyondRangeWithFadviseRandom() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testReadBeyondRangeWithFadviseRandom_Object");
     int objectSize = 20 * 1024;
@@ -718,7 +729,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadBeyondRangeWithFadviseAuto() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testReadBeyondRangeWithFadviseAuto_Object");
     int objectSize = 20 * 1024;
@@ -753,7 +764,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testReadBeyondRangeWithFadviseSequential() throws IOException {
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testReadBeyondRangeWithFadviseSequential_Object");
     int objectSize = 20 * 1024;
@@ -786,7 +797,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testChannelClosedException() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    rawStorage = createGoogleCloudStorage();
     int totalBytes = 1200;
 
     StorageResourceId resourceId =
