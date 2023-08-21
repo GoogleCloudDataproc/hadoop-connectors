@@ -123,7 +123,6 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     assertThat(listResult).isEmpty();
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
-    gcs.close();
   }
 
   @Test
@@ -1024,7 +1023,6 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket2, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
-    gcs.close();
   }
 
   @Test
@@ -1193,7 +1191,6 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
               getMediaRequestString(testBucket, testFile.getObjectName(), generationId))
           .inOrder();
     }
-    gcs.close();
   }
 
   @Test
