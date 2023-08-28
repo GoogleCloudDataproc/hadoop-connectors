@@ -158,14 +158,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   public void close() {
     try {
       try {
-        if (storage != null) {
-          storage.close();
-        }
-        super.close();
+        storage.close();
       } catch (Exception e) {
         throw new RuntimeException("Error occurred while closing the storage client", e);
       } finally {
-        backgroundTasksThreadPool.shutdown();
+        try {
+          super.close();
+        } finally {
+          backgroundTasksThreadPool.shutdown();
+        }
       }
     } finally {
       backgroundTasksThreadPool = null;

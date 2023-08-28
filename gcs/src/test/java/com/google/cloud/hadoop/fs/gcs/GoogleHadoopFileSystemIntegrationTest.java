@@ -664,7 +664,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       }
     }
     assertThat(ghfs.getHomeDirectory().toString()).startsWith("gs://" + rootBucketName);
-    myGhfs.close();
   }
 
   /** Validates success path in configureBuckets(). */
