@@ -57,7 +57,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
   private static final Logger LOGGER =
       Logger.getLogger(GoogleCloudStorageClientGrpcTracingInterceptor.class.getName());
 
-  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("grpc-interceptor");
+  private static final TestBucketHelper BUCKET_HELPER =
+      new TestBucketHelper("dataproc-grpc-interceptor");
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
 
   private static GoogleCloudStorage helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
