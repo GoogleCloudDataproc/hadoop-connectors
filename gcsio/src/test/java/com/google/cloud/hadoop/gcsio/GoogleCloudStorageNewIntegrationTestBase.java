@@ -50,6 +50,7 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -76,9 +77,19 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   protected boolean isTracingSupported = false;
 
+  private GoogleCloudStorage gcs;
+
   @Before
   public void before() {
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
+  }
+
+  @After
+  public void after() {
+    if (gcs != null) {
+      gcs.close();
+      gcs = null;
+    }
   }
 
   @Test
@@ -103,7 +114,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = "list-neb-np_" + UUID.randomUUID();
 
@@ -136,7 +147,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = createUniqueBucket("list-eb-np");
 
@@ -169,7 +180,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = createUniqueBucket("list-neb-np-o");
     gcsfsIHelper.createObjects(testBucket, "obj");
@@ -203,7 +214,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = createUniqueBucket("list-neb-np-ed_");
     gcsfsIHelper.createObjects(testBucket, "dir/");
@@ -237,7 +248,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = createUniqueBucket("list-neb-np-sd");
     gcsfsIHelper.createObjects(testBucket, "subdir/", "subdir/obj");
@@ -271,7 +282,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = createUniqueBucket("list-neb-np-isd");
     gcsfsIHelper.createObjects(testBucket, "subdir/obj");
@@ -305,7 +316,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = String.format("list_prefix_doesNotExist_%s/", UUID.randomUUID());
@@ -339,7 +350,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = getTestResource() + "/";
@@ -374,7 +385,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "obj");
@@ -408,7 +419,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "sub/");
@@ -442,7 +453,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "sub/obj");
@@ -477,7 +488,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "obj");
@@ -511,7 +522,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "sub/");
@@ -545,7 +556,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
       BiFunction<String, String, String> requestFn)
       throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "sub/obj");
@@ -559,7 +570,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_withLimit_oneGcsRequest() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -578,7 +589,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
   @Test
   public void listObjectInfo_withLimit_multipleGcsRequests() throws Exception {
     int maxResultsPerRequest = 1;
-    GoogleCloudStorage gcs =
+    gcs =
         createGoogleCloudStorage(
             gcsOptions.toBuilder().setMaxListItemsPerCall(maxResultsPerRequest).build());
 
@@ -604,7 +615,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     GoogleCloudStorageOptions options =
         gcsOptions.toBuilder().setMaxListItemsPerCall(maxResultsPerRequest).build();
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(options);
+    gcs = createGoogleCloudStorage(options);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -624,7 +635,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_emptyBucket() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_empty-bckt");
 
@@ -640,7 +651,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_objectInBucket() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_obj-in-bckt");
     gcsfsIHelper.createObjects(testBucket, "obj");
@@ -657,7 +668,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_implicitDirInBucket() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket =
         gcsfsIHelper.createUniqueBucket(
@@ -676,7 +687,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_onlyPrefixObject() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "dir/") + "dir/";
@@ -692,7 +703,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_object() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "obj");
@@ -708,7 +719,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_subdir() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "dir/");
@@ -724,7 +735,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_implicitPrefixObject() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "obj");
@@ -740,7 +751,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_includePrefix_implicitSubdir() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "dir/obj");
@@ -756,7 +767,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void listObjectInfo_allMetadataFieldsCorrect() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testDirName = name.getMethodName() + "/";
     StorageResourceId objectId =
@@ -787,7 +798,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void getItemInfo_allMetadataFieldsCorrect() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     StorageResourceId objectId =
         new StorageResourceId(gcsfsIHelper.sharedBucketName1, name.getMethodName());
@@ -813,7 +824,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void getItemInfo_oneGcsRequest() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1");
@@ -828,7 +839,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void getItemInfos_withoutLimits() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -853,8 +864,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void getItemInfos_withLimit_zeroBatchGcsRequest() throws Exception {
-    GoogleCloudStorage gcs =
-        createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(1).build());
+    gcs = createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(1).build());
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
 
@@ -877,8 +887,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void getItemInfos_withLimit_multipleBatchGcsRequest() throws Exception {
-    GoogleCloudStorage gcs =
-        createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(2).build());
+    gcs = createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(2).build());
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -904,7 +913,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void updateItems_withoutLimits() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1");
@@ -925,8 +934,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void updateItems_withLimits_MultipleBatchGcsRequests() throws Exception {
-    GoogleCloudStorage gcs =
-        createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(2).build());
+    gcs = createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(2).build());
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -959,7 +967,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void copy_withoutLimits_withDisabledCopyWithRewrites() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket1 = gcsfsIHelper.sharedBucketName1;
     String testBucket2 = gcsfsIHelper.sharedBucketName2;
@@ -985,7 +993,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void copy_withoutLimits_withEnabledCopyWithRewrites() throws Exception {
-    GoogleCloudStorage gcs =
+    gcs =
         createGoogleCloudStorage(
             gcsOptions.toBuilder()
                 .setBatchThreads(0)
@@ -1019,7 +1027,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void deleteObjects_withoutLimit() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -1044,8 +1052,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void deleteObjects_withLimit_zeroBatchGcsRequest() throws Exception {
-    GoogleCloudStorage gcs =
-        createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(1).build());
+    gcs = createGoogleCloudStorage(gcsOptions.toBuilder().setMaxRequestsPerBatch(1).build());
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
@@ -1068,7 +1075,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @Test
   public void composeObject_withoutLimit() throws Exception {
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2");
@@ -1089,7 +1096,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     try (OutputStream os =
         new GZIPOutputStream(Channels.newOutputStream(gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
@@ -1125,7 +1132,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     byte[] readContent = new byte[7];
     GoogleCloudStorageReadOptions readOptions =
@@ -1161,7 +1168,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
     int startIndex = 2; // inclusive
     int endIndex = 4; // exclusive
     byte[] readContent = new byte[endIndex - startIndex];
@@ -1198,7 +1205,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     }
     GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     byte[] readContent = new byte[7];
     GoogleCloudStorageReadOptions readOptions =
@@ -1227,7 +1234,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       os.write("content".getBytes(UTF_8));
     }
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(false).build();
@@ -1256,7 +1263,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
       os.write("content".getBytes(UTF_8));
     }
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
     GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(false).build();
@@ -1274,7 +1281,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
 
-    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+    gcs = createGoogleCloudStorage(gcsOptions);
 
     GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(testFile);
     GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();

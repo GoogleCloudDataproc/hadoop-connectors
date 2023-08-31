@@ -628,6 +628,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     assertThat(thrown).hasMessageThat().startsWith("No enum constant ");
     assertThat(thrown).hasMessageThat().contains("AuthenticationType.INVALID_AUTH_TYPE");
+    ghfs.close();
   }
 
   /** Validates initialize() with configuration key fs.gs.working.dir set. */
@@ -1437,6 +1438,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+    myGhfs.close();
   }
 
   @Test

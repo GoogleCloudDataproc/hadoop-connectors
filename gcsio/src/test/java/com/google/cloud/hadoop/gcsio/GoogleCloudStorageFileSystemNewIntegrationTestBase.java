@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,14 +58,24 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   protected TrackingHttpRequestInitializer gcsRequestsTracker;
 
+  protected GoogleCloudStorageFileSystem gcsFs;
+
   @Before
   public void before() {
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
+  @After
+  public void after() {
+    if (gcsFs != null) {
+      gcsFs.close();
+      gcsFs = null;
+    }
+  }
+
   @Test
   public void mkdir_shouldCreateNewDirectory() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -86,7 +97,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void mkdir_shouldFailSilentlyIfDirectoryExists() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -112,7 +123,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void mkdirs_shouldCreateNewDirectory() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -137,7 +148,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void mkdirs_shouldFailSilentlyIfDirectoryExists() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -166,8 +177,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getFileInfo_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -191,8 +201,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getFileInfo_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -215,8 +224,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getFileInfo_single_file_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource() + "/f1";
@@ -235,8 +243,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_objectName_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -260,8 +267,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_dirName_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -283,8 +289,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_implicit_objectName_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -308,8 +313,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_implicit_dirName_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -331,8 +335,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_objectName_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -355,8 +358,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_dirName_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -378,8 +380,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_implicit_objectName_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -402,8 +403,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getDirInfo_implicit_dirName_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -425,8 +425,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getFileInfos_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -461,8 +460,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void getFileInfos_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -501,7 +499,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_file() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource();
@@ -524,7 +522,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_file_directoryPath() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource();
@@ -542,7 +540,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_directory() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -566,7 +564,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_directory_increased_page_size() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
+    gcsFs =
         newGcsFs(
             newGcsFsOptions()
                 .setCloudStorageOptions(
@@ -590,7 +588,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_directory_directoryPath() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -613,7 +611,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_implicitDirectory() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -635,7 +633,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_emptyDirectoryObject() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -655,7 +653,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_notFound() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -672,7 +670,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_customFields_required() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -715,7 +713,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_customFields_some() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -758,7 +756,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void listFileInfo_customFields_fails() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -785,8 +783,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void delete_file_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -809,8 +806,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void delete_file_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -842,8 +838,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   private void delete_directory(boolean parallelStatus) throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(parallelStatus).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(parallelStatus).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -867,8 +862,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void delete_inferredDirectory() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -900,8 +894,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void rename_file_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -935,8 +928,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void rename_file_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -974,7 +966,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void rename_file_shouldFailIfFileExists() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -1006,8 +998,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void rename_directory_sequential() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -1071,8 +1062,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Test
   public void rename_directory_parallel() throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -1145,7 +1135,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   private void concurrentCreate_oneSucceeds(boolean overwriteExisting) throws Exception {
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build());
+    gcsFs = newGcsFs(newGcsFsOptions().build());
 
     GoogleCloudStorageFileSystemIntegrationHelper testHelper =
         new GoogleCloudStorageFileSystemIntegrationHelper(gcsFs);
