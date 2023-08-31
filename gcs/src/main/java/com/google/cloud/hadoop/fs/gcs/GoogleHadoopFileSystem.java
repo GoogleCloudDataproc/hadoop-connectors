@@ -454,7 +454,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         resourceId.getBucketName(),
         rootBucket);
 
-    Path hadoopPath = new Path(fsRoot, new Path(null, null, resourceId.getObjectName()));
+    Path hadoopPath =
+        new Path(fsRoot, new Path(/*schema*/ null, /*authority*/ null, resourceId.getObjectName()));
     logger.atFiner().log("getHadoopPath(gcsPath: %s): %s", gcsPath, hadoopPath);
     return hadoopPath;
   }

@@ -61,7 +61,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     GoogleHadoopFileSystem eagerFs =
         GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
     String fileNameWithColon = "empty:file";
-    FSDataOutputStream stream = eagerFs.create(new Path(null, null, fileNameWithColon));
+    FSDataOutputStream stream =
+        eagerFs.create(new Path(/*schema*/ null, /*authority*/ null, fileNameWithColon));
     stream.close();
     FileStatus[] fileStatus =
         eagerFs.listStatus(new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET));
