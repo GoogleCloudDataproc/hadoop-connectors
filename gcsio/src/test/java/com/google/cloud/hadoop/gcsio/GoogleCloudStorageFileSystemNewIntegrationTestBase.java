@@ -42,7 +42,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -56,14 +55,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Rule public TestName name = new TestName();
 
-  protected TrackingHttpRequestInitializer gcsRequestsTracker;
-
   protected GoogleCloudStorageFileSystem gcsFs;
-
-  @Before
-  public void before() {
-    gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
-  }
 
   @After
   public void after() {
