@@ -543,13 +543,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       thrown = assertThrows(IllegalArgumentException.class, () -> ghfs.initialize(gsUri, config));
     }
 
-<<<<<<< HEAD
     assertThat(thrown).hasMessageThat().startsWith("No valid credential configuration discovered:");
-=======
-    assertThat(thrown).hasMessageThat().startsWith("No enum constant ");
-    assertThat(thrown).hasMessageThat().contains("AuthenticationType.INVALID_AUTH_TYPE");
-    ghfs.close();
->>>>>>> aa52c345 (java-storage client resource cleanup (#1043))
   }
 
   /** Validates initialize() with configuration key fs.gs.working.dir set. */
