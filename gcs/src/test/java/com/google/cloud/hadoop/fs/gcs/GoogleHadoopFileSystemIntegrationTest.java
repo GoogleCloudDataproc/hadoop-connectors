@@ -985,6 +985,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+    myGhfs.close();
   }
 
   @Test

@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -54,11 +55,21 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   @Rule public TestName name = new TestName();
 
+  protected GoogleCloudStorageFileSystem gcsFs;
+
+  @After
+  public void after() {
+    if (gcsFs != null) {
+      gcsFs.close();
+      gcsFs = null;
+    }
+  }
+
   @Test
   public void mkdir_shouldCreateNewDirectory() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -82,7 +93,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void mkdir_shouldFailSilentlyIfDirectoryExists() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -110,7 +121,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void mkdirs_shouldCreateNewDirectory() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -137,7 +148,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void mkdirs_shouldFailSilentlyIfDirectoryExists() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -168,8 +179,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void getFileInfo_sequential() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -198,7 +208,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -223,8 +233,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void getFileInfo_single_file_sequential() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource() + "/f1";
@@ -245,8 +254,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void getDirInfo_sequential() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -273,7 +281,8 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String dirObject = getTestResource();
@@ -297,8 +306,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void getFileInfos_sequential() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -335,8 +343,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void getFileInfos_parallel() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -377,7 +384,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_file() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource();
@@ -402,7 +409,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_file_directoryPath() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource();
@@ -422,7 +429,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_directory() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -452,7 +459,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
         getStandardOptionBuilder().setMaxListItemsPerCall(5000).build();
     GoogleCloudStorageFileSystemOptions gcsfsOptions =
         newGcsFsOptions().setCloudStorageOptions(gcsOptions).build();
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsfsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsfsOptions, gcsRequestsTracker);
 
     String bucketName = "dataproc-enhanced-list-integ-tests";
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -471,7 +478,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_directory_directoryPath() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -496,7 +503,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_implicitDirectory() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -520,7 +527,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_emptyDirectoryObject() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -542,7 +549,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_notFound() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -561,7 +568,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_customFields_required() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -606,7 +613,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_customFields_some() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -651,7 +658,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   public void listFileInfo_customFields_fails() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+    gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -683,7 +690,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -711,7 +718,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -748,7 +755,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -777,7 +784,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -814,7 +821,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -853,7 +860,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -895,7 +902,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -932,7 +939,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -1001,7 +1008,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+    gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -1074,7 +1081,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   private void concurrentCreate_oneSucceeds(boolean overwriteExisting) throws Exception {
-    GoogleCloudStorageFileSystem gcsFs =
+    gcsFs =
         newGcsFs(
             newGcsFsOptions().build(), new TrackingHttpRequestInitializer(httpRequestsInitializer));
     GoogleCloudStorageFileSystemIntegrationHelper testHelper =
