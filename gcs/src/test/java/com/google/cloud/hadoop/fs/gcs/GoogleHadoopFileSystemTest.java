@@ -31,6 +31,7 @@ import java.net.URISyntaxException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Before;
@@ -52,6 +53,18 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     super.ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
 
     postCreateInit();
+  }
+
+  @Test
+  public void verifyHadoopPath() throws Exception {
+    GoogleHadoopFileSystem eagerFs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
+    String fileNameWithColon = "empty:file";
+    eagerFs.create(new Path(/* schema= */ null, /* authority= */ null, fileNameWithColon)).close();
+    FileStatus[] fileStatus =
+        eagerFs.listStatus(new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET));
+    assertThat(fileStatus).hasLength(1);
+    assertThat(fileStatus[0].getPath().getName()).isEqualTo(fileNameWithColon);
   }
 
   @Test
