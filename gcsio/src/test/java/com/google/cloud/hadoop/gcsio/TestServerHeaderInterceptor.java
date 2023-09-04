@@ -1,7 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static org.junit.Assert.assertEquals;
-
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
@@ -21,14 +19,5 @@ class TestServerHeaderInterceptor implements ServerInterceptor {
     this.allMeta.add(metadata);
 
     return serverCallHandler.startCall(serverCall, metadata);
-  }
-
-  void verifyAllRequestsHasGoogRequestParamsHeader(String bucket, int expectedCallCount) {
-    assertEquals(expectedCallCount, allMeta.size());
-    for (Metadata metadata : allMeta) {
-      assertEquals(
-          String.format("bucket=projects/_/buckets/%s", bucket),
-          metadata.get(StorageStubProvider.GOOG_REQUEST_PARAMS));
-    }
   }
 }
