@@ -214,9 +214,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Factory to create requests that override storage api.
   @VisibleForTesting StorageRequestFactory storageRequestFactory;
 
-  // Utility for building and caching storage channels and stubs.
-  // private StorageStubProvider storageStubProvider;
-
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
       Executors.newCachedThreadPool(
