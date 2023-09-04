@@ -409,9 +409,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .build();
 
-    AbstractGoogleAsyncWriteChannel<?> channel;
-
-    channel =
+    AbstractGoogleAsyncWriteChannel<?> channel =
         new GoogleCloudStorageWriteChannel(
             storage,
             clientRequestHelper,
