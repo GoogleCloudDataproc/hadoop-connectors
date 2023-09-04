@@ -64,8 +64,7 @@ import org.mockito.ArgumentCaptor;
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageClientWriteChannelTest {
 
-  private static final String V1_BUCKET_NAME = "bucket-name";
-  private static final String BUCKET_NAME = GrpcChannelUtils.toV2BucketName(V1_BUCKET_NAME);
+  private static final String BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final String CONTENT_TYPE = "image/jpeg";
   private static final String CONTENT_ENCODING = "content-encoding";

@@ -215,7 +215,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting StorageRequestFactory storageRequestFactory;
 
   // Utility for building and caching storage channels and stubs.
-  private StorageStubProvider storageStubProvider;
+  // private StorageStubProvider storageStubProvider;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -259,9 +259,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
-
-  // Watchdog to monitor gRPC streams
-  private Watchdog watchdog;
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
@@ -341,13 +338,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         MetricsSink.CLOUD_MONITORING == options.getMetricsSink()
             ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), finalCredentials)
             : new NoOpMetricsRecorder();
-
-    // Create the gRPC stub if necessary;
-    if (options.isGrpcEnabled()) {
-      this.watchdog = Watchdog.create(options.getGrpcMessageTimeoutCheckInterval());
-      this.storageStubProvider =
-          StorageStubProvider.newInstance(options, backgroundTasksThreadPool, finalCredentials);
-    }
   }
 
   private ExecutorService createManualBatchingThreadPool() {
@@ -381,11 +371,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   void setBatchFactory(BatchHelper.Factory batchFactory) {
     this.batchFactory = batchFactory;
-  }
-
-  @VisibleForTesting
-  StorageStubProvider getStorageStubProvider() {
-    return storageStubProvider;
   }
 
   @Override
@@ -428,40 +413,22 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .build();
 
     AbstractGoogleAsyncWriteChannel<?> channel;
-    if (storageOptions.isGrpcEnabled()) {
-      String requesterPaysProjectId = null;
-      if (requesterShouldPay(resourceId.getBucketName())) {
-        requesterPaysProjectId = storageOptions.getRequesterPaysOptions().getProjectId();
-      }
-      channel =
-          new GoogleCloudStorageGrpcWriteChannel(
-              storageStubProvider,
-              backgroundTasksThreadPool,
-              storageOptions,
-              resourceId,
-              options,
-              watchdog,
-              writeConditions,
-              requesterPaysProjectId,
-              BackOffFactory.DEFAULT);
-    } else {
-      channel =
-          new GoogleCloudStorageWriteChannel(
-              storage,
-              clientRequestHelper,
-              backgroundTasksThreadPool,
-              storageOptions.getWriteChannelOptions(),
-              resourceId,
-              options,
-              writeConditions) {
-            @Override
-            public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
-                throws IOException {
-              return initializeRequest(
-                  super.createRequest(inputStream), resourceId.getBucketName());
-            }
-          };
-    }
+
+    channel =
+        new GoogleCloudStorageWriteChannel(
+            storage,
+            clientRequestHelper,
+            backgroundTasksThreadPool,
+            storageOptions.getWriteChannelOptions(),
+            resourceId,
+            options,
+            writeConditions) {
+          @Override
+          public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
+              throws IOException {
+            return initializeRequest(super.createRequest(inputStream), resourceId.getBucketName());
+          }
+        };
     channel.initialize();
     return channel;
   }
@@ -677,17 +644,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (itemInfo != null && !itemInfo.exists()) {
       throw createFileNotFoundException(
           resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
-    }
-
-    if (storageOptions.isGrpcEnabled()) {
-      return new GoogleCloudStorageGrpcReadChannel(
-          storageStubProvider,
-          itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-          watchdog,
-          metricsRecorder,
-          storageOptions,
-          readOptions,
-          BackOffFactory.DEFAULT);
     }
 
     return new GoogleCloudStorageReadChannel(
@@ -1950,22 +1906,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       // TODO: add try-catch around each shutdown() call to make sure
       //  that all resources are shut down
-      try {
-        if (storageStubProvider != null) {
-          storageStubProvider.shutdown();
-        }
-        if (watchdog != null) {
-          watchdog.shutdown();
-        }
-      } finally {
-        backgroundTasksThreadPool.shutdown();
-        manualBatchingThreadPool.shutdown();
-      }
+      backgroundTasksThreadPool.shutdown();
+      manualBatchingThreadPool.shutdown();
     } finally {
       backgroundTasksThreadPool = null;
       manualBatchingThreadPool = null;
-      storageStubProvider = null;
-      watchdog = null;
     }
   }
 
