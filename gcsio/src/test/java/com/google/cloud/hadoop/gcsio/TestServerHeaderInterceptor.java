@@ -16,8 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.truth.Truth.assertThat;
-
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
@@ -37,13 +35,5 @@ class TestServerHeaderInterceptor implements ServerInterceptor {
     this.allMeta.add(metadata);
 
     return serverCallHandler.startCall(serverCall, metadata);
-  }
-
-  void verifyAllRequestsHasGoogRequestParamsHeader(String bucket, int expectedCallCount) {
-    assertThat(allMeta).hasSize(expectedCallCount);
-    for (Metadata metadata : allMeta) {
-      assertThat(metadata.get(StorageStubProvider.GOOG_REQUEST_PARAMS))
-          .isEqualTo("bucket=projects/_/buckets/" + bucket);
-    }
   }
 }

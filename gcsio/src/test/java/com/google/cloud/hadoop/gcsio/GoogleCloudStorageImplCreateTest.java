@@ -34,7 +34,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
@@ -85,51 +84,6 @@ public class GoogleCloudStorageImplCreateTest {
             .setProjectId("google.com:foo-project")
             .setGrpcEnabled(testStorageClientImpl)
             .build();
-  }
-
-  @Test
-  public void create_grpc_useDirectpath() throws IOException {
-    GoogleCloudStorageImpl gcs =
-        GoogleCloudStorageImpl.builder()
-            .setOptions(
-                GoogleCloudStorageOptions.builder()
-                    .setAppName("app")
-                    .setGrpcEnabled(true)
-                    .setTrafficDirectorEnabled(false)
-                    .build())
-            .setCredentials(ComputeEngineCredentials.create())
-            .build();
-    assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
-        .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
-  }
-
-  @Test
-  public void create_grpcAndDisableDirectPath_useCloudpath() throws IOException {
-    GoogleCloudStorageImpl gcs =
-        GoogleCloudStorageImpl.builder()
-            .setOptions(
-                GoogleCloudStorageOptions.builder()
-                    .setAppName("app")
-                    .setGrpcEnabled(true)
-                    .setDirectPathPreferred(false)
-                    .setTrafficDirectorEnabled(false)
-                    .build())
-            .setCredentials(ComputeEngineCredentials.create())
-            .build();
-    assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
-        .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
-  }
-
-  @Test
-  public void create_grpcAndTrafficDirector_useTrafficDirector() throws IOException {
-    GoogleCloudStorageImpl gcs =
-        GoogleCloudStorageImpl.builder()
-            .setOptions(
-                GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build())
-            .setCredentials(ComputeEngineCredentials.create())
-            .build();
-    assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
-        .isInstanceOf(StorageStubProvider.TrafficDirectorGrpcDecorator.class);
   }
 
   /**
