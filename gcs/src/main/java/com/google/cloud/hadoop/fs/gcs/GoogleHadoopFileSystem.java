@@ -994,21 +994,24 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         "Path '%s' must be fully qualified.",
         qualifiedPath);
 
+    Path result;
+    String upath = uri.getPath();
+
     // Strip initial '..'s to make root is its own parent.
-    StringBuilder sb = new StringBuilder(uri.getPath());
-    while (sb.indexOf("/../") == 0) {
+    int i = 0;
+    while (upath.startsWith("/../", i)) {
       // Leave a preceding slash, so path is still absolute.
-      sb.delete(0, 3);
+      i += 3;
+    }
+    if (i == upath.length() || upath.substring(i).equals("/..")) {
+      // Allow a Path of gs://someBucket to map to gs://someBucket/
+      result = new Path(uri.getScheme(), uri.getAuthority(), "/");
+    } else if (i == 0) {
+      result = qualifiedPath;
+    } else {
+      result = new Path(uri.getScheme(), uri.getAuthority(), upath.substring(i));
     }
 
-    String strippedPath = sb.toString();
-
-    // Allow a Path of gs://someBucket to map to gs://someBucket/
-    if (strippedPath.equals("/..") || strippedPath.equals("")) {
-      strippedPath = "/";
-    }
-
-    Path result = new Path(uri.getScheme(), uri.getAuthority(), strippedPath);
     logger.atFiner().log("makeQualified(path: %s): %s", path, result);
     return result;
   }
