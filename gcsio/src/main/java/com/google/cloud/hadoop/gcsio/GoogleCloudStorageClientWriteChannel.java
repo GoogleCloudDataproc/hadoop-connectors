@@ -19,11 +19,10 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 
-import com.google.cloud.WriteChannel;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
-import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.BlobWriteSession;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobWriteOption;
 import com.google.common.flogger.GoogleLogger;
@@ -32,6 +31,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -44,7 +44,8 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private final StorageResourceId resourceId;
-  private WriteChannel writeChannel;
+  private WritableByteChannel writableByteChannel;
+  private final BlobWriteSession blobWriteSession;
   private boolean uploadSucceeded = false;
   // TODO: not supported as of now
   // private final String requesterPaysProject;
@@ -54,10 +55,12 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
-      ExecutorService uploadThreadPool) {
+      ExecutorService uploadThreadPool)
+      throws IOException {
     super(uploadThreadPool, storageOptions.getWriteChannelOptions());
     this.resourceId = resourceId;
-    this.writeChannel = getClientWriteChannel(storage, resourceId, createOptions, storageOptions);
+    this.blobWriteSession = getBlobWriteSession(storage, resourceId, createOptions, storageOptions);
+    this.writableByteChannel = blobWriteSession.open();
   }
 
   @Override
@@ -86,19 +89,14 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     return blobInfo;
   }
 
-  private static WriteChannel getClientWriteChannel(
+  private static BlobWriteSession getBlobWriteSession(
       Storage storage,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       GoogleCloudStorageOptions storageOptions) {
-    AsyncWriteChannelOptions channelOptions = storageOptions.getWriteChannelOptions();
-    WriteChannel writeChannel =
-        storage.writer(
-            getBlobInfo(resourceId, createOptions),
-            generateWriteOptions(createOptions, storageOptions));
-    writeChannel.setChunkSize(channelOptions.getUploadChunkSize());
-
-    return writeChannel;
+    return storage.blobWriteSession(
+        getBlobInfo(resourceId, createOptions),
+        generateWriteOptions(createOptions, storageOptions));
   }
 
   private class UploadOperation implements Callable<Boolean> {
@@ -186,11 +184,11 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
       // 2. finalizing gcs-object
       // TODO: what if we want to close the object and free up the resources but not call finalize
       // the gcs-object.
-      writeChannel.close();
+      writableByteChannel.close();
     } catch (Exception e) {
       throw new IOException(String.format("Upload failed for '%s'", resourceId), e);
     } finally {
-      writeChannel = null;
+      writableByteChannel = null;
     }
   }
 
@@ -209,7 +207,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
   }
 
   private int writeInternal(ByteBuffer byteBuffer) throws IOException {
-    int bytesWritten = writeChannel.write(byteBuffer);
+    int bytesWritten = writableByteChannel.write(byteBuffer);
     logger.atFinest().log(
         "%d bytes were written out of provided buffer of capacity %d",
         bytesWritten, byteBuffer.limit());

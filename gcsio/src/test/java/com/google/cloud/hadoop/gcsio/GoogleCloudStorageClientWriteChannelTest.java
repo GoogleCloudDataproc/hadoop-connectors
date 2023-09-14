@@ -40,6 +40,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.BlobWriteSession;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobWriteOption;
 import com.google.protobuf.ByteString;
@@ -80,15 +81,21 @@ public class GoogleCloudStorageClientWriteChannelTest {
   // TODO: Instead of using mock shift to using fakes.
   private Storage mockedStorage = mock(Storage.class);
   private WriteChannel fakeWriteChannel;
-  ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
+
+  private final BlobWriteSession mockBlobWriteSession = mock(BlobWriteSession.class);
+  private ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
   ArgumentCaptor<BlobWriteOption> blobWriteOptionsCapture =
       ArgumentCaptor.forClass(BlobWriteOption.class);
 
   @Before
   public void setUp() throws Exception {
     fakeWriteChannel = spy(new FakeWriteChannel());
-    when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
-        .thenReturn(fakeWriteChannel);
+    // when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
+    //     .thenReturn(fakeWriteChannel);
+    when(mockedStorage.blobWriteSession(
+            blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
+        .thenReturn(mockBlobWriteSession);
+    when(mockBlobWriteSession.open()).thenReturn(fakeWriteChannel);
     writeChannel = getJavaStorageChannel();
   }
 
@@ -142,8 +149,10 @@ public class GoogleCloudStorageClientWriteChannelTest {
     ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
     ArgumentCaptor<BlobWriteOption> blobWriteOptionsCapture =
         ArgumentCaptor.forClass(BlobWriteOption.class);
-    when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
-        .thenReturn(fakeWriteChannel);
+    when(mockedStorage.blobWriteSession(
+            blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
+        .thenReturn(mockBlobWriteSession);
+    when(mockBlobWriteSession.open()).thenReturn(fakeWriteChannel);
     writeChannel = getJavaStorageChannel();
     writeChannel.initialize();
     ByteString data =
@@ -164,14 +173,15 @@ public class GoogleCloudStorageClientWriteChannelTest {
   public void testCreateObjectApiInterruptedException() throws Exception {
 
     Storage mockedJavaClientStorage = mock(Storage.class);
+    BlobWriteSession mockBlobWriteSession = mock(BlobWriteSession.class);
     // Set up the mock Insert to wait forever.
     CountDownLatch waitForEverLatch = new CountDownLatch(1);
     CountDownLatch writeStartedLatch = new CountDownLatch(2);
     CountDownLatch threadsDoneLatch = new CountDownLatch(2);
     // Mock getItemInfo call
     MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
-
-    when(mockedJavaClientStorage.writer(any(), any()))
+    when(mockedJavaClientStorage.blobWriteSession(any(), any())).thenReturn(mockBlobWriteSession);
+    when(mockBlobWriteSession.open())
         .thenReturn(
             new FakeWriteChannel() {
               @Override
@@ -188,6 +198,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
                 return 0;
               }
             });
+
     GoogleCloudStorage gcs = mockGcsJavaStorage(transport, mockedJavaClientStorage);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
@@ -217,7 +228,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
         .isTrue();
   }
 
-  private GoogleCloudStorageClientWriteChannel getJavaStorageChannel() {
+  private GoogleCloudStorageClientWriteChannel getJavaStorageChannel() throws IOException {
     return new GoogleCloudStorageClientWriteChannel(
         mockedStorage,
         GoogleCloudStorageOptions.DEFAULT.toBuilder()

@@ -28,6 +28,7 @@ import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
@@ -217,6 +218,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               return ImmutableList.copyOf(list);
             })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
+        .setBlobWriteSessionConfig(
+            BlobWriteSessionConfigs.getDefault()
+                .withChunkSize(storageOptions.getWriteChannelOptions().getUploadChunkSize()))
         .build()
         .getService();
   }
