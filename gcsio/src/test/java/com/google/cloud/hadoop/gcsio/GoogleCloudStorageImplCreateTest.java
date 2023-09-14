@@ -224,7 +224,7 @@ public class GoogleCloudStorageImplCreateTest {
                   return null;
                 }));
 
-    // Below mocsk will be used only when JavaClientStorage is enabled
+    // Below mocks will be used only when JavaClientStorage is enabled
     when(mockedJavaClientStorage.blobWriteSession(any(), any())).thenReturn(mockBlobWriteSession);
     when(mockBlobWriteSession.open())
         .thenReturn(

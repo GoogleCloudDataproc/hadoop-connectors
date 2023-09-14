@@ -199,23 +199,6 @@ public class GoogleCloudStorageClientWriteChannelTest {
               }
             });
 
-    // when(mockedJavaClientStorage.writer(any(), any()))
-    //     .thenReturn(
-    //         new FakeWriteChannel() {
-    //           @Override
-    //           public int write(ByteBuffer src) {
-    //             try {
-    //               writeStartedLatch.countDown();
-    //               waitForEverLatch.await();
-    //             } catch (InterruptedException e) {
-    //               // Expected test behavior. Do nothing.
-    //             } finally {
-    //               threadsDoneLatch.countDown();
-    //             }
-    //             fail("Unexpected to get here.");
-    //             return 0;
-    //           }
-    //         });
     GoogleCloudStorage gcs = mockGcsJavaStorage(transport, mockedJavaClientStorage);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
