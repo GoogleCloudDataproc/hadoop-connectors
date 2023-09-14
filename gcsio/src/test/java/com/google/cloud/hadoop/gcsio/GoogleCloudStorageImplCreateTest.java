@@ -38,6 +38,7 @@ import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.cloud.storage.BlobWriteSession;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -71,6 +72,7 @@ public class GoogleCloudStorageImplCreateTest {
   private static final String OBJECT_NAME = "bar-object";
   private static final com.google.cloud.storage.Storage mockedJavaClientStorage =
       mock(com.google.cloud.storage.Storage.class);
+  private final BlobWriteSession mockBlobWriteSession = mock(BlobWriteSession.class);
 
   private final boolean testStorageClientImpl;
 
@@ -112,8 +114,9 @@ public class GoogleCloudStorageImplCreateTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeError)));
-    // This mock will be used only when JavaClientStorage is enabled
-    when(mockedJavaClientStorage.writer(any(), any()))
+    // Below mocks will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.blobWriteSession(any(), any())).thenReturn(mockBlobWriteSession);
+    when(mockBlobWriteSession.open())
         .thenReturn(
             new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
@@ -121,6 +124,7 @@ public class GoogleCloudStorageImplCreateTest {
                 throw fakeError;
               }
             });
+
     GoogleCloudStorage gcs = getCloudStorageImpl(transport, gcsOptions);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
@@ -185,8 +189,9 @@ public class GoogleCloudStorageImplCreateTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeException)));
-    // This mock will be used only when JavaClientStorage is enabled
-    when(mockedJavaClientStorage.writer(any(), any()))
+    // Below mocks will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.blobWriteSession(any(), any())).thenReturn(mockBlobWriteSession);
+    when(mockBlobWriteSession.open())
         .thenReturn(
             new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
@@ -230,8 +235,9 @@ public class GoogleCloudStorageImplCreateTest {
                   return null;
                 }));
 
-    // This mock will be used only when JavaClientStorage is enabled
-    when(mockedJavaClientStorage.writer(any(), any()))
+    // Below mocks will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.blobWriteSession(any(), any())).thenReturn(mockBlobWriteSession);
+    when(mockBlobWriteSession.open())
         .thenReturn(
             new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
