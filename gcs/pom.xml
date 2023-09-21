@@ -228,6 +228,7 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
+                  <include>org.apache.httpcomponents</include>
                   <include>org.threeten:threetenbp</include>
                 </includes>
               </artifactSet>
@@ -240,11 +241,14 @@
                     <include>com.google.api.**</include>
                     <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>
+                    <include>com.google.cloud.*</include>
                     <include>com.google.cloud.audit.**</include>
                     <include>com.google.cloud.grpc.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>
                     <include>com.google.cloud.hadoop.util.**</include>
                     <include>com.google.cloud.http.**</include>
+                    <include>com.google.cloud.monitoring.**</include>
+                    <include>com.google.cloud.spi.**</include>
                     <include>com.google.cloud.storage.**</include>
                     <include>com.google.common.**</include>
                     <include>com.google.geo.**</include>
@@ -253,6 +257,7 @@
                     <include>com.google.iam.**</include>
                     <include>com.google.logging.**</include>
                     <include>com.google.longrunning.**</include>
+                    <include>com.google.monitoring.**</include>
                     <include>com.google.protobuf.**</include>
                     <include>com.google.re2j.**</include>
                     <include>com.google.rpc.**</include>
@@ -269,6 +274,14 @@
                     <exclude>com.google.cloud.hadoop.util.AccessBoundary$Action</exclude>
                     <exclude>com.google.cloud.hadoop.util.AutoValue_AccessBoundary</exclude>
                   </excludes>
+                </relocation>
+                <relocation>
+                  <pattern>org</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.org</shadedPattern>
+                  <includes>
+                    <include>org.apache.http.**</include>
+                    <include>org.threeten.**</include>
+                  </includes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package
                      io.grpc.netty.shaded.io.grpc.netty, which will cause the
