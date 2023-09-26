@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -111,6 +112,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
+          put("fs.gs.write.to.disk.then.upload.enabled", false);
+          put("fs.gs.write.temporary.dirs", ImmutableSet.of());
         }
       };
 
