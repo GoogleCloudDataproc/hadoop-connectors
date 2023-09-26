@@ -472,7 +472,7 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.write.to.disk.then.upload.enabled", false);
 
   /**
-   * Configuration key to configure the Paths where uploads will b parked on disk. If not set then
+   * Configuration key to configure the Paths where uploads will be parked on disk. If not set then
    * uploads will be parked at default location pointed by java-storage client. This will only be
    * effective if fs.gs.write.to.disk.then.upload.enabled is set.
    */
