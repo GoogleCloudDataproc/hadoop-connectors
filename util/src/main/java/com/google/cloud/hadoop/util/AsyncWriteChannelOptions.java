@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.time.Duration;
 
@@ -57,7 +58,9 @@ public abstract class AsyncWriteChannelOptions {
         .setPipeBufferSize(1024 * 1024)
         .setPipeType(PipeType.IO_STREAM_PIPE)
         .setUploadCacheSize(0)
-        .setUploadChunkSize(DEFAULT_UPLOAD_CHUNK_SIZE);
+        .setUploadChunkSize(DEFAULT_UPLOAD_CHUNK_SIZE)
+        .setDiskThenUploadEnabled(false)
+        .setTemporaryPaths(ImmutableSet.of());
   }
 
   public abstract Builder toBuilder();
@@ -81,6 +84,10 @@ public abstract class AsyncWriteChannelOptions {
   public abstract int getNumberOfBufferedRequests();
 
   public abstract Duration getGrpcWriteMessageTimeout();
+
+  public abstract boolean isDiskThenUploadEnabled();
+
+  public abstract ImmutableSet<String> getTemporaryPaths();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -109,6 +116,10 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
     public abstract Builder setGrpcWriteMessageTimeout(Duration grpcWriteMessageTimeout);
+
+    public abstract Builder setDiskThenUploadEnabled(boolean diskThenUploadEnabled);
+
+    public abstract Builder setTemporaryPaths(ImmutableSet<String> temporaryPaths);
 
     abstract AsyncWriteChannelOptions autoBuild();
 

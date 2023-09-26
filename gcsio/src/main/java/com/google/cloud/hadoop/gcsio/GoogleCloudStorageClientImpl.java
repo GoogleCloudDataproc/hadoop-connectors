@@ -26,13 +26,16 @@ import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
@@ -40,6 +43,7 @@ import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -201,7 +205,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors) {
+      List<ClientInterceptor> interceptors)
+      throws IOException {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
@@ -218,11 +223,27 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               return ImmutableList.copyOf(list);
             })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
-        .setBlobWriteSessionConfig(
-            BlobWriteSessionConfigs.getDefault()
-                .withChunkSize(storageOptions.getWriteChannelOptions().getUploadChunkSize()))
+        .setBlobWriteSessionConfig(getSessionConfig(storageOptions.getWriteChannelOptions()))
         .build()
         .getService();
+  }
+
+  private static BlobWriteSessionConfig getSessionConfig(AsyncWriteChannelOptions writeOptions)
+      throws IOException {
+    if (writeOptions.isDiskThenUploadEnabled()) {
+      BlobWriteSessionConfig bufferConfig;
+      if (writeOptions.getTemporaryPaths() != null && !writeOptions.getTemporaryPaths().isEmpty()) {
+        bufferConfig =
+            BlobWriteSessionConfigs.bufferToDiskThenUpload(
+                writeOptions.getTemporaryPaths().stream()
+                    .map(x -> Paths.get(x))
+                    .collect(ImmutableSet.toImmutableSet()));
+      } else {
+        bufferConfig = BlobWriteSessionConfigs.bufferToTempDirThenUpload();
+      }
+      return bufferConfig;
+    }
+    return BlobWriteSessionConfigs.getDefault().withChunkSize(writeOptions.getUploadChunkSize());
   }
 
   public static Builder builder() {

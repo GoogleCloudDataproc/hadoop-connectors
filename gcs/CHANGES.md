@@ -122,9 +122,18 @@
 
 1.  Upgrade Hadoop to 3.3.5.
 
-1.  Upgrade java-storage to 2.25.0
+1.  Upgrade java-storage to 2.26.1
 
 1.  Add support for `WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE` authentication type that retrieves a refresh token using workload identity federation configuraiton defined in: `fs.gs.auth.workload.identity.federation.credential.config.file`
+
+1. Added support to use the optimized write api via google-cloud-storage.
+
+1. Added configs to configure the disk path where uploads will be parked temporarily.
+
+    ```
+    fs.gs.write.to.disk.then.upload.enabled (default: false)
+    fs.gs.write.temporary.dirs (default: empty set)
+    ```
 
 ### 2.2.2 - 2021-06-25
 
