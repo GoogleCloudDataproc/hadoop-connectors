@@ -57,12 +57,12 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.GcsClientMetrics;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.util.StatusMetrics;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -240,7 +240,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Request initializer to use for batch and non-batch requests.
   private final HttpRequestInitializer httpRequestInitializer;
 
-  private final StatusMetrics statusMetrics;
+  private final GcsClientMetrics gcsClientMetrics;
 
   private final StatisticsTrackingHttpRequestInitializer httpStatistics =
       new StatisticsTrackingHttpRequestInitializer();
@@ -276,14 +276,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable StatusMetrics statusMetrics)
+      @Nullable GcsClientMetrics gcsClientMetrics)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
     checkNotNull(options, "options must not be null").throwIfNotValid();
     this.storageOptions = options;
 
-    this.statusMetrics = statusMetrics;
+    this.gcsClientMetrics = gcsClientMetrics;
 
     Credentials finalCredentials;
     // If credentials is null then use httpRequestInitializer to initialize finalCredentials
@@ -304,7 +304,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (httpRequestInitializer == null) {
       finalHttpRequestInitializer =
           new RetryHttpInitializer(
-              finalCredentials, options.toRetryHttpInitializerOptions(), statusMetrics);
+              finalCredentials, options.toRetryHttpInitializerOptions(), gcsClientMetrics);
     } else {
       logger.atWarning().log(
           "ALERT: Overriding httpRequestInitializer - this should not be done in production!");
@@ -2250,7 +2250,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     public abstract Builder setHttpTransport(@Nullable HttpTransport httpTransport);
 
-    public abstract Builder setStatusMetrics(@Nullable StatusMetrics statusMetrics);
+    public abstract Builder setGcsClientMetrics(@Nullable GcsClientMetrics gcsClientMetrics);
 
     @VisibleForTesting
     public abstract Builder setHttpRequestInitializer(

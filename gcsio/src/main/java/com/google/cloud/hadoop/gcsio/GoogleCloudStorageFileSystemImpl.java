@@ -32,8 +32,8 @@ import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
+import com.google.cloud.hadoop.util.GcsClientMetrics;
 import com.google.cloud.hadoop.util.LazyExecutorService;
-import com.google.cloud.hadoop.util.StatusMetrics;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -120,7 +120,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       GoogleCloudStorageFileSystemOptions options,
       Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      StatusMetrics statusMetrics)
+      GcsClientMetrics gcsClientMetrics)
       throws IOException {
     checkNotNull(options, "options must not be null");
 
@@ -130,14 +130,14 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .setStatusMetrics(statusMetrics)
+            .setGcsClientMetrics(gcsClientMetrics)
             .build();
       default:
         return GoogleCloudStorageImpl.builder()
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .setStatusMetrics(statusMetrics)
+            .setGcsClientMetrics(gcsClientMetrics)
             .build();
     }
   }
@@ -169,9 +169,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
       GoogleCloudStorageFileSystemOptions options,
-      StatusMetrics statusMetrics)
+      GcsClientMetrics gcsClientMetrics)
       throws IOException {
-    this(createCloudStorage(options, credentials, downscopedAccessTokenFn, statusMetrics), options);
+    this(
+        createCloudStorage(options, credentials, downscopedAccessTokenFn, gcsClientMetrics),
+        options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 

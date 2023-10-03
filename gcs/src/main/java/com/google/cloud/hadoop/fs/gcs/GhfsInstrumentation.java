@@ -32,7 +32,7 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStat
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
-import com.google.cloud.hadoop.util.StatusMetrics;
+import com.google.cloud.hadoop.util.GcsClientMetrics;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -69,7 +69,11 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
 public class GhfsInstrumentation
-    implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory, StatusMetrics {
+    implements Closeable,
+        MetricsSource,
+        IOStatisticsSource,
+        DurationTrackerFactory,
+        GcsClientMetrics {
 
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 

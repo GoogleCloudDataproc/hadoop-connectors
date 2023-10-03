@@ -62,7 +62,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
-  private StatusMetrics statusMetrics;
+  private final GcsClientMetrics gcsClientMetrics;
 
   /**
    * @param credentials A credentials which will be used to initialize on HttpRequests and as the
@@ -72,14 +72,16 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
-    this.statusMetrics = null;
+    this.gcsClientMetrics = null;
   }
 
   public RetryHttpInitializer(
-      Credentials credentials, RetryHttpInitializerOptions options, StatusMetrics statusMetrics) {
+      Credentials credentials,
+      RetryHttpInitializerOptions options,
+      GcsClientMetrics gcsClientMetrics) {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
-    this.statusMetrics = statusMetrics;
+    this.gcsClientMetrics = gcsClientMetrics;
   }
 
   @Override
@@ -96,7 +98,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         // Set the timeout configurations.
         .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
         .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
-        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials, statusMetrics))
+        .setUnsuccessfulResponseHandler(
+            new UnsuccessfulResponseHandler(credentials, gcsClientMetrics))
         .setIOExceptionHandler(new IoExceptionHandler());
 
     HttpHeaders headers = request.getHeaders();
@@ -162,16 +165,16 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     private final HttpCredentialsAdapter credentials;
     private final HttpBackOffUnsuccessfulResponseHandler delegate;
 
-    private final StatusMetrics statusMetrics;
+    private final GcsClientMetrics gcsClientMetrics;
 
     public UnsuccessfulResponseHandler(
-        HttpCredentialsAdapter credentials, StatusMetrics statusMetrics) {
+        HttpCredentialsAdapter credentials, GcsClientMetrics gcsClientMetrics) {
       this.credentials = credentials;
       this.delegate =
           new HttpBackOffUnsuccessfulResponseHandler(BACKOFF_BUILDER.build())
               .setBackOffRequired(BACK_OFF_REQUIRED);
 
-      this.statusMetrics = statusMetrics;
+      this.gcsClientMetrics = gcsClientMetrics;
     }
 
     @Override
@@ -198,9 +201,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
     private void logResponseCode(HttpRequest request, HttpResponse response) {
 
-      if (statusMetrics != null) {
-        statusMetrics.statusMetricsUpdation(response.getStatusCode());
-      } else logger.atInfo().log("Encountered statusMetrics as null");
+      if (gcsClientMetrics != null) {
+        gcsClientMetrics.statusMetricsUpdation(response.getStatusCode());
+      }
 
       if (RESPONSE_CODES_TO_LOG.contains(response.getStatusCode())) {
         logger

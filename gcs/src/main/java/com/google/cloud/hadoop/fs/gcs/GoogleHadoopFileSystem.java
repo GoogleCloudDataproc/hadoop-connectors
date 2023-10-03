@@ -339,8 +339,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     GoogleCredentials credentials = getCredentials(config);
 
-    logger.atInfo().log();
-
     AccessTokenProvider accessTokenProvider =
         credentials instanceof AccessTokenProviderCredentials
             ? ((AccessTokenProviderCredentials) credentials).getAccessTokenProvider()

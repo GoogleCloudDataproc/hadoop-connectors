@@ -16,6 +16,6 @@
 
 package com.google.cloud.hadoop.util;
 
-public interface StatusMetrics {
+public interface GcsClientMetrics {
   public void statusMetricsUpdation(int statusCode);
 }
