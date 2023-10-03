@@ -175,7 +175,9 @@ public enum GhfsStatistic {
   DELEGATION_TOKENS_ISSUED(
       StoreStatisticNames.DELEGATION_TOKENS_ISSUED,
       "Count of delegation tokens issued",
-      TYPE_DURATION);
+      TYPE_DURATION),
+
+  STORE_IO_RATE_LIMITED(StoreStatisticNames.STORE_IO_RATE_LIMITED, "429 Error", TYPE_COUNTER);
 
   public static final ImmutableSet<GhfsStatistic> VALUES =
       ImmutableSet.copyOf(EnumSet.allOf(GhfsStatistic.class));

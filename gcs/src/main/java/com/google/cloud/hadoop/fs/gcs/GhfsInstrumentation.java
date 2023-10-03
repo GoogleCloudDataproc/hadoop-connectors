@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STORE_IO_RATE_LIMITED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
@@ -31,6 +32,7 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStat
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
+import com.google.cloud.hadoop.util.StatusMetrics;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -67,7 +69,7 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
 public class GhfsInstrumentation
-    implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
+    implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory, StatusMetrics {
 
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
@@ -171,6 +173,16 @@ public class GhfsInstrumentation
         metricsSystem.shutdown();
         metricsSystem = null;
       }
+    }
+  }
+
+  @Override
+  public void statusMetricsUpdation(int statusCode) {
+
+    switch (statusCode) {
+      case 429:
+        incrementCounter(STORE_IO_RATE_LIMITED, 1);
+        break;
     }
   }
 

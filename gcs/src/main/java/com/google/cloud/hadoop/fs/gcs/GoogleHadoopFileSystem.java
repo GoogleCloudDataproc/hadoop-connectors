@@ -254,14 +254,13 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     initializeFsRoot();
     initializeWorkingDirectory(config);
     initializeDelegationTokenSupport(config);
-    initializeGcsFs(config);
-
     instrumentation = new GhfsInstrumentation(initUri);
     storageStatistics =
         (GhfsStorageStatistics)
             GlobalStorageStatistics.INSTANCE.put(
                 GhfsStorageStatistics.NAME,
                 () -> new GhfsStorageStatistics(instrumentation.getIOStatistics()));
+    initializeGcsFs(config);
   }
 
   private void initializeFsRoot() {
@@ -340,6 +339,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     GoogleCredentials credentials = getCredentials(config);
 
+    logger.atInfo().log();
+
     AccessTokenProvider accessTokenProvider =
         credentials instanceof AccessTokenProviderCredentials
             ? ((AccessTokenProviderCredentials) credentials).getAccessTokenProvider()
@@ -349,9 +350,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         ? new GoogleCloudStorageFileSystemImpl(
             /* credentials= */ null,
             accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken(),
-            gcsFsOptions)
+            gcsFsOptions,
+            getInstrumentation())
         : new GoogleCloudStorageFileSystemImpl(
-            credentials, /* downscopedAccessTokenFn= */ null, gcsFsOptions);
+            credentials, /* downscopedAccessTokenFn= */ null, gcsFsOptions, getInstrumentation());
   }
 
   private GoogleCredentials getCredentials(Configuration config) throws IOException {

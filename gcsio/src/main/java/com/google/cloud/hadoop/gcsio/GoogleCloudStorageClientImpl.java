@@ -28,6 +28,7 @@ import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.hadoop.util.StatusMetrics;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
@@ -63,6 +64,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
+  // gul jain changes
+  // private final StatusMetrics statusMetrics;
+
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
       Executors.newCachedThreadPool(
@@ -81,7 +85,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
-      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      @Nullable StatusMetrics statusMetrics)
       throws IOException {
     super(
         GoogleCloudStorageImpl.builder()
@@ -90,7 +95,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpTransport(httpTransport)
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .setStatusMetrics(statusMetrics)
             .build());
+
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
@@ -247,6 +254,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setGRPCInterceptors(
         @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
+
+    public abstract Builder setStatusMetrics(@Nullable StatusMetrics statusMetrics);
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
