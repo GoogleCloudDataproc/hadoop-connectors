@@ -62,6 +62,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
+  private StatusMetrics statusMetrics;
+
   /**
    * @param credentials A credentials which will be used to initialize on HttpRequests and as the
    *     delegate for a {@link UnsuccessfulResponseHandler}.
@@ -70,6 +72,14 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
+    this.statusMetrics = null;
+  }
+
+  public RetryHttpInitializer(
+      Credentials credentials, RetryHttpInitializerOptions options, StatusMetrics statusMetrics) {
+    this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
+    this.options = options;
+    this.statusMetrics = statusMetrics;
   }
 
   @Override
@@ -86,7 +96,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         // Set the timeout configurations.
         .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
         .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
-        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials))
+        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials, statusMetrics))
         .setIOExceptionHandler(new IoExceptionHandler());
 
     HttpHeaders headers = request.getHeaders();
@@ -152,16 +162,22 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     private final HttpCredentialsAdapter credentials;
     private final HttpBackOffUnsuccessfulResponseHandler delegate;
 
-    public UnsuccessfulResponseHandler(HttpCredentialsAdapter credentials) {
+    private final StatusMetrics statusMetrics;
+
+    public UnsuccessfulResponseHandler(
+        HttpCredentialsAdapter credentials, StatusMetrics statusMetrics) {
       this.credentials = credentials;
       this.delegate =
           new HttpBackOffUnsuccessfulResponseHandler(BACKOFF_BUILDER.build())
               .setBackOffRequired(BACK_OFF_REQUIRED);
+
+      this.statusMetrics = statusMetrics;
     }
 
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
+
       logResponseCode(request, response);
 
       if (credentials != null && credentials.handleResponse(request, response, supportsRetry)) {
@@ -181,6 +197,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     private void logResponseCode(HttpRequest request, HttpResponse response) {
+
+      if (statusMetrics != null) {
+        statusMetrics.statusMetricsUpdation(response.getStatusCode());
+      } else logger.atInfo().log("Encountered statusMetrics as null");
+
       if (RESPONSE_CODES_TO_LOG.contains(response.getStatusCode())) {
         logger
             .atInfo()
