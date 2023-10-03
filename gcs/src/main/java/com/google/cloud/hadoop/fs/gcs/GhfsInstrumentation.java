@@ -21,9 +21,9 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STORE_IO_RATE_LIMITED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
@@ -185,7 +185,7 @@ public class GhfsInstrumentation
 
     switch (statusCode) {
       case 429:
-        incrementCounter(STORE_IO_RATE_LIMITED, 1);
+        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
         break;
     }
   }

@@ -69,12 +69,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    *     delegate for a {@link UnsuccessfulResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
-  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
-    this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
-    this.options = options;
-    this.gcsClientMetrics = null;
-  }
-
   public RetryHttpInitializer(
       Credentials credentials,
       RetryHttpInitializerOptions options,
@@ -82,6 +76,13 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
     this.gcsClientMetrics = gcsClientMetrics;
+  }
+
+  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
+    this(credentials, options, null);
+    // this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
+    // this.options = options;
+    // this.gcsClientMetrics = null;
   }
 
   @Override
