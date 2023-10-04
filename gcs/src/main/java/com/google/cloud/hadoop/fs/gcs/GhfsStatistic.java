@@ -177,7 +177,7 @@ public enum GhfsStatistic {
       "Count of delegation tokens issued",
       TYPE_DURATION),
 
-  /* Client-side Status Code statistics */
+  /** Client-side Status Code statistics */
   GCS_CLIENT_RATE_LIMIT_COUNT(StoreStatisticNames.STORE_IO_RATE_LIMITED, "429 Error", TYPE_COUNTER);
 
   public static final ImmutableSet<GhfsStatistic> VALUES =

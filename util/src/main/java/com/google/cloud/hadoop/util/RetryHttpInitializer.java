@@ -80,9 +80,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
     this(credentials, options, null);
-    // this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
-    // this.options = options;
-    // this.gcsClientMetrics = null;
   }
 
   @Override

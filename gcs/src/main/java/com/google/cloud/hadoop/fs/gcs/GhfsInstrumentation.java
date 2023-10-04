@@ -180,16 +180,6 @@ public class GhfsInstrumentation
     }
   }
 
-  @Override
-  public void statusMetricsUpdation(int statusCode) {
-
-    switch (statusCode) {
-      case 429:
-        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
-        break;
-    }
-  }
-
   /**
    * Get the instance IO Statistics.
    *
@@ -335,6 +325,19 @@ public class GhfsInstrumentation
       if (counter != null) {
         counter.incr(count);
       }
+    }
+  }
+
+  /**
+   * Metrics based on the Http reponse
+   */
+  @Override
+  public void statusMetricsUpdation(int statusCode) {
+
+    switch (statusCode) {
+      case 429:
+        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
+        break;
     }
   }
 
