@@ -16,11 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
-
-/**
- * Base Interface for Status metrics
- */
-
+/** Base Interface for Status metrics */
 public interface GcsClientMetrics {
   public void statusMetricsUpdation(int statusCode);
 }

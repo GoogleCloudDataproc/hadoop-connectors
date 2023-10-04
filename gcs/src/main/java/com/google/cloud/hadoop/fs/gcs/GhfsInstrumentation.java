@@ -328,9 +328,7 @@ public class GhfsInstrumentation
     }
   }
 
-  /**
-   * Metrics based on the Http reponse
-   */
+  /** Metrics based on the Http response */
   @Override
   public void statusMetricsUpdation(int statusCode) {
 
