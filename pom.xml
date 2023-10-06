@@ -110,6 +110,8 @@
     <system-lambda.version>1.2.1</system-lambda.version>
     <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
     <assertj.version>3.14.0</assertj.version>
+    <deploy.skip>true</deploy.skip>
+    <nexus.remote.skip>false</nexus.remote.skip>
   </properties>
 
   <modules>
@@ -175,6 +177,18 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.7</version>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+              <autoReleaseAfterClose>false</autoReleaseAfterClose>
+              <skipRemoteStaging>${nexus.remote.skip}</skipRemoteStaging>
+            </configuration>
+          </plugin>
+          <plugin>
             <artifactId>maven-gpg-plugin</artifactId>
             <executions>
               <execution>
@@ -185,6 +199,10 @@
                 </goals>
               </execution>
             </executions>
+            <configuration>
+              <!-- Expect the password to be passed as the gpg.passphrase property instead of provided over a tty by the gpg-agent process. -->
+              <useAgent>false</useAgent>
+            </configuration>
           </plugin>
           <plugin>
             <artifactId>maven-source-plugin</artifactId>
@@ -542,6 +560,13 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <configuration>
+            <skip>${deploy.skip}</skip>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
