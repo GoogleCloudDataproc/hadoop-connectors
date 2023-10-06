@@ -21,17 +21,20 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CLIENT_RATE_LIMIT_COUNT;
+// import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
+import static com.google.cloud.hadoop.gcsio.GcsStatusMetrics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
+import com.google.cloud.hadoop.gcsio.GcsStatusMetrics;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.util.GcsClientMetrics;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
@@ -207,6 +210,22 @@ public class GhfsInstrumentation
   }
 
   /**
+   * Increments a mutable counter and the matching instance IOStatistics counter. No-op if the
+   * counter is not defined, or the count == 0.
+   *
+   * @param op operation
+   * @param count increment value
+   */
+  public void incrementCounter(GcsStatusMetrics op, long count) {
+    if (count == 0) {
+      return;
+    }
+    String name = op.getSymbol();
+    incrementMutableCounter(name, count);
+    instanceIOStatistics.incrementCounter(name, count);
+  }
+
+  /**
    * Get the metrics system.
    *
    * @return metricsSystem
@@ -239,6 +258,16 @@ public class GhfsInstrumentation
    * @return a new counter
    */
   protected final MutableCounterLong counter(GhfsStatistic op) {
+    return counter(op.getSymbol(), op.getDescription());
+  }
+
+  /**
+   * Create a counter in the registry.
+   *
+   * @param op statistic to count
+   * @return a new counter
+   */
+  protected final MutableCounterLong counter(GcsStatusMetrics op) {
     return counter(op.getSymbol(), op.getDescription());
   }
 
@@ -331,7 +360,6 @@ public class GhfsInstrumentation
   /** Metrics based on the Http response */
   @Override
   public void statusMetricsUpdation(int statusCode) {
-
     switch (statusCode) {
       case 429:
         incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
@@ -964,17 +992,27 @@ public class GhfsInstrumentation
         .forEach(
             stat -> {
               // declare all counter statistics
-              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+              if (stat.getType() == StatisticTypeEnum.TYPE_COUNTER) {
                 counter(stat);
                 storeBuilder.withCounters(stat.getSymbol());
                 // declare all gauge statistics
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_GAUGE) {
                 gauge(stat);
                 storeBuilder.withGauges(stat.getSymbol());
                 // and durations
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
+              }
+            });
+
+    EnumSet.allOf(GcsStatusMetrics.class)
+        .forEach(
+            stat -> {
+              // declare all counter statistics
+              if (stat.getType() == StatisticTypeEnum.TYPE_COUNTER) {
+                counter(stat);
+                storeBuilder.withCounters(stat.getSymbol());
               }
             });
 
