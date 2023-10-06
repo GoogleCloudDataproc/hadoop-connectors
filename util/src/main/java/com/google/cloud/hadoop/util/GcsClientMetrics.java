@@ -16,10 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-
 /** Base Interface for Status metrics */
-@InterfaceAudience.Private
 public interface GcsClientMetrics {
   public void statusMetricsUpdation(int statusCode);
 }
