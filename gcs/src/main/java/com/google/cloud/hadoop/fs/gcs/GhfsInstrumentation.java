@@ -209,19 +209,15 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Increments a mutable counter and the matching instance IOStatistics counter. No-op if the
-   * counter is not defined, or the count == 0.
+   * Increments a mutable counter and the matching instance IOStatistics counter.
    *
    * @param op operation
-   * @param count increment value
    */
-  public void incrementCounter(GcsStatusMetrics op, long count) {
-    if (count == 0) {
-      return;
-    }
+  private void incrementCounter(GcsStatusMetrics op) {
+
     String name = op.getSymbol();
-    incrementMutableCounter(name, count);
-    instanceIOStatistics.incrementCounter(name, count);
+    incrementMutableCounter(name, 1);
+    instanceIOStatistics.incrementCounter(name, 1);
   }
 
   /**
@@ -266,7 +262,7 @@ public class GhfsInstrumentation
    * @param op statistic to count
    * @return a new counter
    */
-  protected final MutableCounterLong counter(GcsStatusMetrics op) {
+  private final MutableCounterLong counter(GcsStatusMetrics op) {
     return counter(op.getSymbol(), op.getDescription());
   }
 
@@ -361,7 +357,7 @@ public class GhfsInstrumentation
   public void statusMetricsUpdation(int statusCode) {
     switch (statusCode) {
       case 429:
-        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
+        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT);
         break;
     }
   }
@@ -1008,11 +1004,8 @@ public class GhfsInstrumentation
     EnumSet.allOf(GcsStatusMetrics.class)
         .forEach(
             stat -> {
-              // declare all counter statistics
-              if (stat.getType() == StatisticTypeEnum.TYPE_COUNTER) {
-                counter(stat);
-                storeBuilder.withCounters(stat.getSymbol());
-              }
+              counter(stat);
+              storeBuilder.withCounters(stat.getSymbol());
             });
 
     return storeBuilder;
