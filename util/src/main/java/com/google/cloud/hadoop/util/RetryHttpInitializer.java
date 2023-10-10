@@ -62,7 +62,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
-  private final GcsClientMetrics gcsClientMetrics;
+  public final GcsClientMetrics gcsClientMetrics;
+
+  public static HttpRequest gcsClientRequest;
 
   /**
    * @param credentials A credentials which will be used to initialize on HttpRequests and as the
@@ -90,15 +92,16 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       credentials.initialize(request);
     }
 
-    request
-        // Request will be retried if server errors (5XX) or I/O errors are encountered.
-        .setNumberOfRetries(options.getMaxRequestRetries())
-        // Set the timeout configurations.
-        .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
-        .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
-        .setUnsuccessfulResponseHandler(
-            new UnsuccessfulResponseHandler(credentials, gcsClientMetrics))
-        .setIOExceptionHandler(new IoExceptionHandler());
+    gcsClientRequest =
+        request
+            // Request will be retried if server errors (5XX) or I/O errors are encountered.
+            .setNumberOfRetries(options.getMaxRequestRetries())
+            // Set the timeout configurations.
+            .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
+            .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
+            .setUnsuccessfulResponseHandler(
+                new UnsuccessfulResponseHandler(credentials, gcsClientMetrics))
+            .setIOExceptionHandler(new IoExceptionHandler());
 
     HttpHeaders headers = request.getHeaders();
     if (isNullOrEmpty(headers.getUserAgent()) && !isNullOrEmpty(options.getDefaultUserAgent())) {
@@ -109,6 +112,12 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
     headers.putAll(options.getHttpHeaders());
     request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor()));
+  }
+
+  public void runLogResponseCode(HttpRequest request, HttpResponse response) {
+    UnsuccessfulResponseHandler unsuccessfulResponseHandler =
+        new UnsuccessfulResponseHandler(this.credentials, this.gcsClientMetrics);
+    unsuccessfulResponseHandler.logResponseCode(request, response);
   }
 
   public Credentials getCredentials() {
