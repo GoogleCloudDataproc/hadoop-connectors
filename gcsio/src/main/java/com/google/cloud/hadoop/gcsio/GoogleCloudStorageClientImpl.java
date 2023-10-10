@@ -230,20 +230,39 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private static BlobWriteSessionConfig getSessionConfig(AsyncWriteChannelOptions writeOptions)
       throws IOException {
-    if (writeOptions.isDiskThenUploadEnabled()) {
-      BlobWriteSessionConfig bufferConfig;
-      if (writeOptions.getTemporaryPaths() != null && !writeOptions.getTemporaryPaths().isEmpty()) {
+    BlobWriteSessionConfig bufferConfig;
+    logger.atFiner().log("Upload strategy in use: %s", writeOptions.getUploadType());
+    switch (writeOptions.getUploadType()) {
+      case WRITE_TO_DISK_THEN_UPLOAD:
+        if (writeOptions.getTemporaryPaths() == null
+            || writeOptions.getTemporaryPaths().isEmpty()) {
+          bufferConfig = BlobWriteSessionConfigs.bufferToTempDirThenUpload();
+
+        } else {
+          bufferConfig =
+              BlobWriteSessionConfigs.bufferToDiskThenUpload(
+                  writeOptions.getTemporaryPaths().stream()
+                      .map(x -> Paths.get(x))
+                      .collect(ImmutableSet.toImmutableSet()));
+        }
+        break;
+      case JOURNALING:
+        if (writeOptions.getTemporaryPaths() == null
+            || writeOptions.getTemporaryPaths().isEmpty()) {
+          throw new IllegalArgumentException(
+              "Upload using `Journaling` requires the property:fs.gs.write.temporary.dirs to be set.");
+        }
         bufferConfig =
-            BlobWriteSessionConfigs.bufferToDiskThenUpload(
+            BlobWriteSessionConfigs.journaling(
                 writeOptions.getTemporaryPaths().stream()
                     .map(x -> Paths.get(x))
                     .collect(ImmutableSet.toImmutableSet()));
-      } else {
-        bufferConfig = BlobWriteSessionConfigs.bufferToTempDirThenUpload();
-      }
-      return bufferConfig;
+        break;
+      default:
+        bufferConfig =
+            BlobWriteSessionConfigs.getDefault().withChunkSize(writeOptions.getUploadChunkSize());
     }
-    return BlobWriteSessionConfigs.getDefault().withChunkSize(writeOptions.getUploadChunkSize());
+    return bufferConfig;
   }
 
   public static Builder builder() {

@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.gcsio.integration;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -23,15 +24,16 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Iterator;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -62,6 +64,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static final String DEFAULT_TEMP_SUB_DIR = "google-cloud-storage";
 
   private static GoogleCloudStorage helperGcs;
+
+  private static ImmutableSet<String> tempDirs =
+      ImmutableSet.of(GCS_WRITE_TMP_DIR_1, GCS_WRITE_TMP_DIR);
+  private static ImmutableSet<Path> tempDirsPath =
+      tempDirs.stream().map(x -> Paths.get(x)).collect(ImmutableSet.toImmutableSet());
 
   @Rule
   public TestName name =
@@ -100,10 +107,42 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     Iterator<String> iterator = tempDirs.stream().iterator();
     while (iterator.hasNext()) {
       String filePath = iterator.next();
-      for (File file : new File(filePath).listFiles()) {
-        file.delete();
+      File directory = new File(filePath);
+      if (directory.listFiles() != null) {
+        for (File file : new File(filePath).listFiles()) {
+          file.delete();
+        }
       }
     }
+  }
+
+  @Test
+  public void writeToDiskDisabled() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder().setUploadType(UploadType.DEFAULT).build())
+            .build();
+
+    GoogleCloudStorage gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    byte[] bytesToWrite = new byte[1024];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+    Path temporaryPath = Paths.get(GCS_WRITE_TMP_DIR, DEFAULT_TEMP_SUB_DIR);
+    // validate that there were no files
+    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
+
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+    // temporary files created in disk.
+    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
+
+    writeChannel.close();
+    // temporary files will be deleted from disk once upload is finished.
+    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
+
+    gcs.close();
   }
 
   @Test
@@ -111,7 +150,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setWriteChannelOptions(
-                AsyncWriteChannelOptions.builder().setDiskThenUploadEnabled(true).build())
+                AsyncWriteChannelOptions.builder()
+                    .setUploadType(UploadType.WRITE_TO_DISK_THEN_UPLOAD)
+                    .build())
             .build();
 
     GoogleCloudStorage gcs = getGCSImpl(storageOptions);
@@ -137,16 +178,13 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void writeToPathThenUploadEnabled() throws IOException {
-    ImmutableSet<String> tempDirs = ImmutableSet.of(GCS_WRITE_TMP_DIR_1, GCS_WRITE_TMP_DIR);
-    ImmutableSet<Path> tempDirsPath =
-        tempDirs.stream().map(x -> Paths.get(x)).collect(ImmutableSet.toImmutableSet());
 
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setWriteChannelOptions(
                 AsyncWriteChannelOptions.builder()
-                    .setDiskThenUploadEnabled(true)
-                    .setTemporaryPaths(ImmutableSet.of(GCS_WRITE_TMP_DIR_1, GCS_WRITE_TMP_DIR))
+                    .setUploadType(UploadType.WRITE_TO_DISK_THEN_UPLOAD)
+                    .setTemporaryPaths(tempDirs)
                     .build())
             .build();
 
@@ -154,6 +192,49 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     byte[] bytesToWrite = new byte[1024];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+    // validate that there were no files
+    verifyTemporaryFileCount(tempDirsPath, 0);
+
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+    // temporary files created in disk.
+    verifyTemporaryFileCount(tempDirsPath, 1);
+
+    writeChannel.close();
+    // temporary files will be deleted from disk once upload is finished.
+    verifyTemporaryFileCount(tempDirsPath, 0);
+    gcs.close();
+  }
+
+  @Test
+  public void uploadViaJournalingThrows() {
+
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder().setUploadType(UploadType.JOURNALING).build())
+            .build();
+
+    assertThrows(IllegalArgumentException.class, () -> getGCSImpl(storageOptions));
+  }
+
+  @Test
+  public void uploadViaJournaling() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder()
+                    .setTemporaryPaths(tempDirs)
+                    .setUploadType(UploadType.JOURNALING)
+                    .build())
+            .build();
+
+    GoogleCloudStorage gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    // in Journaling it will write to disk iff file size > 2MiB
+    byte[] bytesToWrite = new byte[1024 * 1024 * 3];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
     // validate that there were no files
     verifyTemporaryFileCount(tempDirsPath, 0);
@@ -178,13 +259,15 @@ public class GoogleCloudStorageClientImplIntegrationTest {
         .build();
   }
 
-  private void verifyTemporaryFileCount(ImmutableSet<Path> paths, int expectedCount)
-      throws IOException {
+  private void verifyTemporaryFileCount(ImmutableSet<Path> paths, int expectedCount) {
     Iterator<Path> iterator = paths.stream().iterator();
     int fileCount = 0;
     while (iterator.hasNext()) {
       Path path = iterator.next();
-      fileCount += Files.list(path).count();
+      File directory = path.toFile();
+      if (directory.listFiles() != null) {
+        fileCount += Arrays.stream(directory.listFiles()).count();
+      }
     }
     assertThat(fileCount).isEqualTo(expectedCount);
   }

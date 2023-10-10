@@ -36,6 +36,19 @@ public abstract class AsyncWriteChannelOptions {
     NIO_CHANNEL_PIPE,
   }
 
+  /**
+   * UploadType are in parity with various upload configuration offers by google-java-storage client
+   * ref: https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.BlobWriteSessionConfigs
+   */
+  public enum UploadType {
+    /* Upload chunks to gcs and waits for acknowledgement before uploading another chunk*/
+    DEFAULT,
+    /* Write whole file to disk and then upload.*/
+    WRITE_TO_DISK_THEN_UPLOAD,
+    /* Write chunks to file along with uploading to gcs, and failure will be retried from data on disk.*/
+    JOURNALING
+  }
+
   /** Upload chunk size granularity */
   private static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
 
@@ -59,7 +72,7 @@ public abstract class AsyncWriteChannelOptions {
         .setPipeType(PipeType.IO_STREAM_PIPE)
         .setUploadCacheSize(0)
         .setUploadChunkSize(DEFAULT_UPLOAD_CHUNK_SIZE)
-        .setDiskThenUploadEnabled(false)
+        .setUploadType(UploadType.DEFAULT)
         .setTemporaryPaths(ImmutableSet.of());
   }
 
@@ -85,7 +98,7 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract Duration getGrpcWriteMessageTimeout();
 
-  public abstract boolean isDiskThenUploadEnabled();
+  public abstract UploadType getUploadType();
 
   public abstract ImmutableSet<String> getTemporaryPaths();
 
@@ -117,7 +130,7 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setGrpcWriteMessageTimeout(Duration grpcWriteMessageTimeout);
 
-    public abstract Builder setDiskThenUploadEnabled(boolean diskThenUploadEnabled);
+    public abstract Builder setUploadType(UploadType uploadType);
 
     public abstract Builder setTemporaryPaths(ImmutableSet<String> temporaryPaths);
 
