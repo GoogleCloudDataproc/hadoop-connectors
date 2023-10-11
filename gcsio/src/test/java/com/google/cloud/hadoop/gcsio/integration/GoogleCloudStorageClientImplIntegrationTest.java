@@ -135,7 +135,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
     WritableByteChannel writeChannel = gcs.create(resourceId);
     writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-    // temporary files created in disk.
+    // no temporary files in
     verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
 
     writeChannel.close();
