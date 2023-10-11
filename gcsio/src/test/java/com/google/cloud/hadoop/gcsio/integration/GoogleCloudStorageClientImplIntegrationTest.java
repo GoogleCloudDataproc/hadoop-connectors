@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -52,10 +53,13 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static final TestBucketHelper BUCKET_HELPER =
       new TestBucketHelper("dataproc-gcs-client-impl");
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
+  private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
 
   // Do cleanup the path after every test.
-  private static final String GCS_WRITE_TMP_DIR = "/tmp/gcs-write-dir";
-  private static final String GCS_WRITE_TMP_DIR_1 = "/tmp/gcs-write-dir-1";
+  private static final String GCS_WRITE_TMP_DIR =
+      String.format("%s/%s", TEMP_DIR_PATH, "gcs-write-dir");
+  private static final String GCS_WRITE_TMP_DIR_1 =
+      String.format("%s/%s", TEMP_DIR_PATH, "gcs-write-dir-1");
   /**
    * Deafult value is picked from java-storage API.
    *
@@ -70,19 +74,10 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static ImmutableSet<Path> tempDirsPath =
       tempDirs.stream().map(x -> Paths.get(x)).collect(ImmutableSet.toImmutableSet());
 
-  @Rule
-  public TestName name =
-      new TestName() {
-        // With parametrization method name will get [index] appended in their name.
-        @Override
-        public String getMethodName() {
-          return super.getMethodName().replaceAll("[\\[,\\]]", "");
-        }
-      };
+  @Rule public TestName name = new TestName();
 
   @BeforeClass
   public static void before() throws IOException {
-
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
     helperGcs.createBucket(TEST_BUCKET);
   }
@@ -208,7 +203,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   }
 
   @Test
-  public void uploadViaJournalingThrows() {
+  public void uploadViaJournalingThrowsIfTempDirNotProvided() {
 
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
@@ -233,7 +228,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     GoogleCloudStorage gcs = getGCSImpl(storageOptions);
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    // in Journaling it will write to disk iff file size > 2MiB
+    // will not flush unless data is > 2MiB
     byte[] bytesToWrite = new byte[1024 * 1024 * 3];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
     // validate that there were no files

@@ -37,8 +37,8 @@ public abstract class AsyncWriteChannelOptions {
   }
 
   /**
-   * UploadType are in parity with various upload configuration offers by google-java-storage client
-   * ref:
+   * UploadType are in parity with various upload configuration offered by google-java-storage
+   * client ref:
    * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.BlobWriteSessionConfigs
    */
   public enum UploadType {
