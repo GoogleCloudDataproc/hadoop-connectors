@@ -25,16 +25,13 @@ import com.google.common.collect.Maps;
 import java.util.EnumSet;
 
 /**
- * Statistics which are collected in GCS. Counter and duration statistics are published in {@link
- * GoogleHadoopFileSystem} and as metrics in {@link GhfsInstrumentation}.
- *
- * <p>Where possible, stream names come from {@link StreamStatisticNames} and {@link
- * StoreStatisticNames}
+ * Statistics which are collected in GCS Client Side. Counter statistics are published in {@link
+ * GoogleHadoopFileSystem} and as metrics in {@link GcsStatusMetrics}.
  */
 public enum GcsStatusMetrics {
 
   /** Client-side Status Code statistics */
-  GCS_CLIENT_RATE_LIMIT_COUNT("gcs_client_rate_limit_count", "429 Error", TYPE_COUNTER);
+  GCS_CLIENT_RATE_LIMIT_COUNT("gcs_client_rate_limit_count", "Detects 429 Error", TYPE_COUNTER);
 
   public static final ImmutableSet<GcsStatusMetrics> VALUES =
       ImmutableSet.copyOf(EnumSet.allOf(GcsStatusMetrics.class));

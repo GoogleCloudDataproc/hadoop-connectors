@@ -47,7 +47,6 @@ public class GoogleHadoopStatusMetricsTest {
 
     URI initUri = new Path("gs://test/").toUri();
     ghfsInstrumentation = new GhfsInstrumentation(initUri);
-    assertThat(ghfsInstrumentation).isNotNull();
 
     String authHeaderValue = "Bearer: y2.WAKiHahzxGS_a1bd40RjNUF";
 
@@ -62,8 +61,6 @@ public class GoogleHadoopStatusMetricsTest {
                 .setReadTimeout(Duration.ofSeconds(5))
                 .build(),
             ghfsInstrumentation);
-
-    assertThat(retryHttpInitializer.gcsClientMetrics).isNotNull();
 
     HttpRequestFactory requestFactory =
         mockTransport(emptyResponse(429), emptyResponse(429), emptyResponse(200))
