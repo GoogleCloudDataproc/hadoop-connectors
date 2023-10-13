@@ -25,13 +25,16 @@ import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
@@ -39,6 +42,7 @@ import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -207,7 +211,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors) {
+      List<ClientInterceptor> interceptors)
+      throws IOException {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
@@ -224,11 +229,38 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               return ImmutableList.copyOf(list);
             })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
-        .setBlobWriteSessionConfig(
-            BlobWriteSessionConfigs.getDefault()
-                .withChunkSize(storageOptions.getWriteChannelOptions().getUploadChunkSize()))
+        .setBlobWriteSessionConfig(getSessionConfig(storageOptions.getWriteChannelOptions()))
         .build()
         .getService();
+  }
+
+  private static BlobWriteSessionConfig getSessionConfig(AsyncWriteChannelOptions writeOptions)
+      throws IOException {
+    logger.atFiner().log("Upload strategy in use: %s", writeOptions.getUploadType());
+    switch (writeOptions.getUploadType()) {
+      case WRITE_TO_DISK_THEN_UPLOAD:
+        if (writeOptions.getTemporaryPaths() == null
+            || writeOptions.getTemporaryPaths().isEmpty()) {
+          return BlobWriteSessionConfigs.bufferToTempDirThenUpload();
+        }
+        return BlobWriteSessionConfigs.bufferToDiskThenUpload(
+            writeOptions.getTemporaryPaths().stream()
+                .map(x -> Paths.get(x))
+                .collect(ImmutableSet.toImmutableSet()));
+      case JOURNALING:
+        if (writeOptions.getTemporaryPaths() == null
+            || writeOptions.getTemporaryPaths().isEmpty()) {
+          throw new IllegalArgumentException(
+              "Upload using `Journaling` requires the property:fs.gs.write.temporary.dirs to be set.");
+        }
+        return BlobWriteSessionConfigs.journaling(
+            writeOptions.getTemporaryPaths().stream()
+                .map(x -> Paths.get(x))
+                .collect(ImmutableSet.toImmutableSet()));
+      default:
+        return BlobWriteSessionConfigs.getDefault()
+            .withChunkSize(writeOptions.getUploadChunkSize());
+    }
   }
 
   public static Builder builder() {
