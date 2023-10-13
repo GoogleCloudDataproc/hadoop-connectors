@@ -25,7 +25,6 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
-import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import java.io.File;
@@ -34,7 +33,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Iterator;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -60,14 +58,10 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       String.format("%s/%s", TEMP_DIR_PATH, "gcs-write-dir");
   private static final String GCS_WRITE_TMP_DIR_1 =
       String.format("%s/%s", TEMP_DIR_PATH, "gcs-write-dir-1");
-  /**
-   * Deafult value is picked from java-storage API.
-   *
-   * @see BlobWriteSessionConfigs#bufferToTempDirThenUpload()
-   */
-  private static final String DEFAULT_TEMP_SUB_DIR = "google-cloud-storage";
 
   private static GoogleCloudStorage helperGcs;
+
+  private GoogleCloudStorage gcs;
 
   private static ImmutableSet<String> tempDirs =
       ImmutableSet.of(GCS_WRITE_TMP_DIR_1, GCS_WRITE_TMP_DIR);
@@ -98,6 +92,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @After
   public void cleanUp() {
+    // cleanup any leaked files
     ImmutableSet<String> tempDirs = ImmutableSet.of(GCS_WRITE_TMP_DIR_1, GCS_WRITE_TMP_DIR);
     Iterator<String> iterator = tempDirs.stream().iterator();
     while (iterator.hasNext()) {
@@ -109,6 +104,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
         }
       }
     }
+
+    // close cloudStorage to free up resources
+    if (gcs != null) {
+      gcs.close();
+    }
   }
 
   @Test
@@ -119,25 +119,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
                 AsyncWriteChannelOptions.builder().setUploadType(UploadType.DEFAULT).build())
             .build();
 
-    GoogleCloudStorage gcs = getGCSImpl(storageOptions);
+    gcs = getGCSImpl(storageOptions);
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    byte[] bytesToWrite = new byte[1024];
-    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-    Path temporaryPath = Paths.get(GCS_WRITE_TMP_DIR, DEFAULT_TEMP_SUB_DIR);
-    // validate that there were no files
-    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
-
-    WritableByteChannel writeChannel = gcs.create(resourceId);
-    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-    // no temporary files in
-    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
-
-    writeChannel.close();
-    // temporary files will be deleted from disk once upload is finished.
-    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
-
-    gcs.close();
+    // validate that there were no temporaryFiles created files
+    writeAndVerifyTemporaryFiles(resourceId, 0);
   }
 
   @Test
@@ -150,25 +136,10 @@ public class GoogleCloudStorageClientImplIntegrationTest {
                     .build())
             .build();
 
-    GoogleCloudStorage gcs = getGCSImpl(storageOptions);
+    gcs = getGCSImpl(storageOptions);
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    byte[] bytesToWrite = new byte[1024];
-    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-    Path temporaryPath = Paths.get(GCS_WRITE_TMP_DIR, DEFAULT_TEMP_SUB_DIR);
-    // validate that there were no files
-    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
-
-    WritableByteChannel writeChannel = gcs.create(resourceId);
-    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-    // temporary files created in disk.
-    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 1);
-
-    writeChannel.close();
-    // temporary files will be deleted from disk once upload is finished.
-    verifyTemporaryFileCount(ImmutableSet.of(temporaryPath), 0);
-
-    gcs.close();
+    writeAndVerifyTemporaryFiles(resourceId, 1);
   }
 
   @Test
@@ -183,23 +154,10 @@ public class GoogleCloudStorageClientImplIntegrationTest {
                     .build())
             .build();
 
-    GoogleCloudStorage gcs = getGCSImpl(storageOptions);
+    gcs = getGCSImpl(storageOptions);
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    byte[] bytesToWrite = new byte[1024];
-    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-    // validate that there were no files
-    verifyTemporaryFileCount(tempDirsPath, 0);
-
-    WritableByteChannel writeChannel = gcs.create(resourceId);
-    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-    // temporary files created in disk.
-    verifyTemporaryFileCount(tempDirsPath, 1);
-
-    writeChannel.close();
-    // temporary files will be deleted from disk once upload is finished.
-    verifyTemporaryFileCount(tempDirsPath, 0);
-    gcs.close();
+    writeAndVerifyTemporaryFiles(resourceId, 1);
   }
 
   @Test
@@ -225,24 +183,27 @@ public class GoogleCloudStorageClientImplIntegrationTest {
                     .build())
             .build();
 
-    GoogleCloudStorage gcs = getGCSImpl(storageOptions);
+    gcs = getGCSImpl(storageOptions);
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    // will not flush unless data is > 2MiB
+    writeAndVerifyTemporaryFiles(resourceId, 1);
+  }
+
+  private void writeAndVerifyTemporaryFiles(
+      StorageResourceId resourceId, int expectedTemporaryFileCount) throws IOException {
     byte[] bytesToWrite = new byte[1024 * 1024 * 3];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-    // validate that there were no files
+
     verifyTemporaryFileCount(tempDirsPath, 0);
 
     WritableByteChannel writeChannel = gcs.create(resourceId);
     writeChannel.write(ByteBuffer.wrap(bytesToWrite));
     // temporary files created in disk.
-    verifyTemporaryFileCount(tempDirsPath, 1);
+    verifyTemporaryFileCount(tempDirsPath, expectedTemporaryFileCount);
 
     writeChannel.close();
     // temporary files will be deleted from disk once upload is finished.
     verifyTemporaryFileCount(tempDirsPath, 0);
-    gcs.close();
   }
 
   private GoogleCloudStorage getGCSImpl(GoogleCloudStorageOptions storageOptions)
@@ -260,10 +221,24 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     while (iterator.hasNext()) {
       Path path = iterator.next();
       File directory = path.toFile();
-      if (directory.listFiles() != null) {
-        fileCount += Arrays.stream(directory.listFiles()).count();
-      }
+      fileCount += getFileCount(directory);
     }
     assertThat(fileCount).isEqualTo(expectedCount);
+  }
+
+  private int getFileCount(File file) {
+    File[] files = file.listFiles();
+    if (files == null) {
+      return 0;
+    }
+    int count = 0;
+    for (File f : files) {
+      if (f.isDirectory()) {
+        count += getFileCount(f);
+      } else {
+        count = count + 1;
+      }
+    }
+    return count;
   }
 }
