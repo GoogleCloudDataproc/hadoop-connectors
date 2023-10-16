@@ -2,6 +2,10 @@
 
 ## Next
 
+1. Upgrade java-storage to 2.27.1
+
+1. Integrate `journaling` and `bufferToDIskThenUpload` APIs.
+
 ## 2.2.17 - 2023-08-15
 
 1. Upgrade java-storage to 2.25.0
