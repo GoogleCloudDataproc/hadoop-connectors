@@ -16,7 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.gcsio.GcsStatusMetrics.GCS_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
@@ -43,7 +43,7 @@ public class GoogleHadoopStatusMetricsTest {
   private static GhfsInstrumentation ghfsInstrumentation;
 
   @Test
-  public void gcs_client_429_status_metrics() throws Exception {
+  public void gcs_client_429_status_metrics_STORAGE_CLIENT() throws Exception {
 
     URI initUri = new Path("gs://test/").toUri();
     ghfsInstrumentation = new GhfsInstrumentation(initUri);

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_COUNTER;
@@ -25,20 +24,19 @@ import com.google.common.collect.Maps;
 import java.util.EnumSet;
 
 /**
- * Statistics which are collected in GCS Client Side. Counter statistics are published in {@link
- * GoogleHadoopFileSystem} and as metrics in {@link GcsStatusMetrics}.
+ * Statistics which are collected in GCS Client Side.
  */
-public enum GcsStatusMetrics {
+public enum GoogleCloudStorageStatusStatistics {
 
   /** Client-side Status Code statistics */
   GCS_CLIENT_RATE_LIMIT_COUNT("gcs_client_rate_limit_count", "Detects 429 Error", TYPE_COUNTER);
 
-  public static final ImmutableSet<GcsStatusMetrics> VALUES =
-      ImmutableSet.copyOf(EnumSet.allOf(GcsStatusMetrics.class));
+  public static final ImmutableSet<GoogleCloudStorageStatusStatistics> VALUES =
+      ImmutableSet.copyOf(EnumSet.allOf(GoogleCloudStorageStatusStatistics.class));
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
-  private static final ImmutableMap<String, GcsStatusMetrics> SYMBOL_MAP =
-      Maps.uniqueIndex(Iterators.forArray(values()), GcsStatusMetrics::getSymbol);
+  private static final ImmutableMap<String, GoogleCloudStorageStatusStatistics> SYMBOL_MAP =
+      Maps.uniqueIndex(Iterators.forArray(values()), GoogleCloudStorageStatusStatistics::getSymbol);
 
   /**
    * Statistic definition.
@@ -47,7 +45,7 @@ public enum GcsStatusMetrics {
    * @param description description.
    * @param type type
    */
-  GcsStatusMetrics(String symbol, String description, StatisticTypeEnum type) {
+  GoogleCloudStorageStatusStatistics(String symbol, String description, StatisticTypeEnum type) {
     this.symbol = symbol;
     this.description = description;
     this.type = type;
@@ -73,7 +71,7 @@ public enum GcsStatusMetrics {
    * @param symbol statistic to look up
    * @return the value or null.
    */
-  public static GcsStatusMetrics fromSymbol(String symbol) {
+  public static GoogleCloudStorageStatusStatistics fromSymbol(String symbol) {
     return SYMBOL_MAP.get(symbol);
   }
 

@@ -57,7 +57,7 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
-import com.google.cloud.hadoop.util.GcsClientMetrics;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
@@ -240,7 +240,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Request initializer to use for batch and non-batch requests.
   private final HttpRequestInitializer httpRequestInitializer;
 
-  private final GcsClientMetrics gcsClientMetrics;
+  // Backporting GhfsInstrumentation
+  private final GcsClientStatisticInterface gcsClientStatisticInterface;
 
   private final StatisticsTrackingHttpRequestInitializer httpStatistics =
       new StatisticsTrackingHttpRequestInitializer();
@@ -268,6 +269,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param httpTransport transport used for HTTP requests
    * @param httpRequestInitializer request initializer used to initialize all HTTP requests
    * @param downscopedAccessTokenFn Function that generates downscoped access token
+   * @param gcsClientStatisticInterface used for backporting ghfsInstrumentation instances
    * @throws IOException on IO error
    */
   GoogleCloudStorageImpl(
@@ -276,14 +278,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable GcsClientMetrics gcsClientMetrics)
+      @Nullable GcsClientStatisticInterface gcsClientStatisticInterface)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
     checkNotNull(options, "options must not be null").throwIfNotValid();
+
     this.storageOptions = options;
 
-    this.gcsClientMetrics = gcsClientMetrics;
+    this.gcsClientStatisticInterface = gcsClientStatisticInterface;
 
     Credentials finalCredentials;
     // If credentials is null then use httpRequestInitializer to initialize finalCredentials
@@ -304,7 +307,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (httpRequestInitializer == null) {
       finalHttpRequestInitializer =
           new RetryHttpInitializer(
-              finalCredentials, options.toRetryHttpInitializerOptions(), gcsClientMetrics);
+              finalCredentials,
+              options.toRetryHttpInitializerOptions(),
+              gcsClientStatisticInterface);
     } else {
       logger.atWarning().log(
           "ALERT: Overriding httpRequestInitializer - this should not be done in production!");
@@ -2250,7 +2255,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     public abstract Builder setHttpTransport(@Nullable HttpTransport httpTransport);
 
-    public abstract Builder setGcsClientMetrics(@Nullable GcsClientMetrics gcsClientMetrics);
+    public abstract Builder setGcsClientStatisticInterface(
+        @Nullable GcsClientStatisticInterface gcsClientStatisticInterface);
 
     @VisibleForTesting
     public abstract Builder setHttpRequestInitializer(

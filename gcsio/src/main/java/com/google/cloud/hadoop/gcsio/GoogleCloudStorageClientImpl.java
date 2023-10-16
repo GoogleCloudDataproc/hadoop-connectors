@@ -27,7 +27,7 @@ import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
-import com.google.cloud.hadoop.util.GcsClientMetrics;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
@@ -83,7 +83,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable GcsClientMetrics gcsClientMetrics)
+      @Nullable GcsClientStatisticInterface gcsClientStatisticInterface)
       throws IOException {
     super(
         GoogleCloudStorageImpl.builder()
@@ -92,7 +92,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpTransport(httpTransport)
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .setGcsClientMetrics(gcsClientMetrics)
+            .setGcsClientStatisticInterface(gcsClientStatisticInterface)
             .build());
 
     this.storageOptions = options;
@@ -252,7 +252,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     public abstract Builder setGRPCInterceptors(
         @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
 
-    public abstract Builder setGcsClientMetrics(@Nullable GcsClientMetrics gcsClientMetrics);
+    public abstract Builder setGcsClientStatisticInterface(
+        @Nullable GcsClientStatisticInterface gcsClientStatisticInterface);
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);

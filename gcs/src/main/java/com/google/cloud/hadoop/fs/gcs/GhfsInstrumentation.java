@@ -27,14 +27,14 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
-import static com.google.cloud.hadoop.gcsio.GcsStatusMetrics.GCS_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
-import com.google.cloud.hadoop.gcsio.GcsStatusMetrics;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
-import com.google.cloud.hadoop.util.GcsClientMetrics;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -63,7 +63,7 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
 /**
  * Instrumentation of GCS.
  *
- * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic}
+ * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic} and {@link GoogleCloudStorageStatusStatistics}
  * key. There <i>may</i> be some Statistics which do not have an entry here. To avoid attempts to
  * access such counters failing, the operations to increment/query metric values are designed to
  * handle lookup failures.
@@ -75,7 +75,7 @@ public class GhfsInstrumentation
         MetricsSource,
         IOStatisticsSource,
         DurationTrackerFactory,
-        GcsClientMetrics {
+        GcsClientStatisticInterface {
 
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
@@ -209,11 +209,11 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Increments a mutable counter and the matching instance IOStatistics counter.
+   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in GoogleCloudStorageStatusStatistics.
    *
    * @param op operation
    */
-  private void incrementCounter(GcsStatusMetrics op) {
+  private void incrementCounter(GoogleCloudStorageStatusStatistics op) {
 
     String name = op.getSymbol();
     incrementMutableCounter(name, 1);
@@ -247,7 +247,7 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Create a counter in the registry.
+   * Create a counter in the registry for metrics in GhfsStatistic.
    *
    * @param op statistic to count
    * @return a new counter
@@ -257,12 +257,12 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Create a counter in the registry.
+   * Create a counter in the registry for metrics in GoogleCloudStorageStatusStatistics.
    *
    * @param op statistic to count
    * @return a new counter
    */
-  private final MutableCounterLong counter(GcsStatusMetrics op) {
+  private final MutableCounterLong counter(GoogleCloudStorageStatusStatistics op) {
     return counter(op.getSymbol(), op.getDescription());
   }
 
@@ -352,7 +352,10 @@ public class GhfsInstrumentation
     }
   }
 
-  /** Metrics based on the Http response */
+  /** Counter Metrics updation based on the Http response
+   *
+   * @param statusCode of ther Http response
+   * */
   @Override
   public void statusMetricsUpdation(int statusCode) {
     switch (statusCode) {
@@ -1001,7 +1004,8 @@ public class GhfsInstrumentation
               }
             });
 
-    EnumSet.allOf(GcsStatusMetrics.class)
+    // registering metrics of GoogleCloudStorageStatusStatistics which are all counters
+    EnumSet.allOf(GoogleCloudStorageStatusStatistics.class)
         .forEach(
             stat -> {
               counter(stat);
