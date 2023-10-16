@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.gcsio.integration;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.auth.oauth2.Credential;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
@@ -209,9 +210,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private GoogleCloudStorage getGCSImpl(GoogleCloudStorageOptions storageOptions)
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+    Credential credential = GoogleCloudStorageTestHelper.getCredential();
     return GoogleCloudStorageClientImpl.builder()
         .setOptions(storageOptions)
         .setCredentials(credentials)
+        .setCredential(credential)
         .build();
   }
 
