@@ -68,6 +68,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    * @param credentials A credentials which will be used to initialize on HttpRequests and as the
    *     delegate for a {@link UnsuccessfulResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
+   * @param gcsClientStatisticInterface To backport ghfsInstrumentation instances.
    */
   public RetryHttpInitializer(
       Credentials credentials,
@@ -79,7 +80,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   }
 
   public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
-    this(credentials, options, null);
+    this(credentials, options, /* gcsClientStatisticInterface */null);
   }
 
   @Override

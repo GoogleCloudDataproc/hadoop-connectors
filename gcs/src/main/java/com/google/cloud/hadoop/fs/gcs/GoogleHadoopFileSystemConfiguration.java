@@ -36,11 +36,13 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.util.Collection;
 import java.util.List;
@@ -463,6 +465,22 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.client.type", GoogleCloudStorageFileSystemOptions.DEFAULT.getClientType());
 
+  /**
+   * Configuration key to configure the properties to optimize gcs-write. This config will be
+   * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
+   */
+  public static final HadoopConfigurationProperty<UploadType> GCS_CLIENT_UPLOAD_TYPE =
+      new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.DEFAULT);
+
+  /**
+   * Configuration key to configure the Path where uploads will be parked on disk. If not set then
+   * uploads will be parked at default location pointed by java-storage client. This will only be
+   * effective if fs.gs.client.upload.type is set to non-default value.
+   */
+  public static final HadoopConfigurationProperty<Collection<String>>
+      GCS_WRITE_TEMPORARY_FILES_PATH =
+          new HadoopConfigurationProperty<>("fs.gs.write.temporary.dirs", ImmutableSet.of());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -567,6 +585,9 @@ public class GoogleHadoopFileSystemConfiguration {
             toIntExact(GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE.get(config, config::getLongBytes)))
         .setUploadChunkSize(
             toIntExact(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.get(config, config::getLongBytes)))
+        .setUploadType(GCS_CLIENT_UPLOAD_TYPE.get(config, config::getEnum))
+        .setTemporaryPaths(
+            ImmutableSet.copyOf(GCS_WRITE_TEMPORARY_FILES_PATH.getStringCollection(config)))
         .build();
   }
 
