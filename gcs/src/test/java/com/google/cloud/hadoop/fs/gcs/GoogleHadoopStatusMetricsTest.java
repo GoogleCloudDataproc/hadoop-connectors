@@ -37,16 +37,15 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+/** Unit tests for {@link GoogleCloudStorageStatusStatistics} class. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopStatusMetricsTest {
-
-  private static GhfsInstrumentation ghfsInstrumentation;
 
   @Test
   public void gcs_client_429_status_metrics_STORAGE_CLIENT() throws Exception {
 
     URI initUri = new Path("gs://test/").toUri();
-    ghfsInstrumentation = new GhfsInstrumentation(initUri);
+    GhfsInstrumentation ghfsInstrumentation = new GhfsInstrumentation(initUri);
 
     String authHeaderValue = "Bearer: y2.WAKiHahzxGS_a1bd40RjNUF";
 
