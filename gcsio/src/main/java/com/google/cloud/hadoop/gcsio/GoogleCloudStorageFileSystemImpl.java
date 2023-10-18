@@ -169,7 +169,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @param gcsClientStatisticInterface for allowing ghfsIntrumentation to backport.
+   * @param gcsClientStatisticInterface for backporting ghfsInstrumentation
    */
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials,
