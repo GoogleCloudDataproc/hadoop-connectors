@@ -80,7 +80,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   }
 
   public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
-    this(credentials, options, /* gcsClientStatisticInterface */null);
+    this(credentials, options, /* gcsClientStatisticInterface */ null);
   }
 
   @Override

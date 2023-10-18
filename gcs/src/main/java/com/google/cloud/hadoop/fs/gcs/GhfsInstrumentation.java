@@ -63,10 +63,10 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
 /**
  * Instrumentation of GCS.
  *
- * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic} and {@link GoogleCloudStorageStatusStatistics}
- * key. There <i>may</i> be some Statistics which do not have an entry here. To avoid attempts to
- * access such counters failing, the operations to increment/query metric values are designed to
- * handle lookup failures.
+ * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic}
+ * and {@link GoogleCloudStorageStatusStatistics} key. There <i>may</i> be some Statistics which do
+ * not have an entry here. To avoid attempts to access such counters failing, the operations to
+ * increment/query metric values are designed to handle lookup failures.
  *
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
@@ -209,7 +209,8 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in GoogleCloudStorageStatusStatistics.
+   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in
+   * GoogleCloudStorageStatusStatistics.
    *
    * @param op operation
    */
@@ -352,10 +353,11 @@ public class GhfsInstrumentation
     }
   }
 
-  /** Counter Metrics updation based on the Http response
+  /**
+   * Counter Metrics updation based on the Http response
    *
    * @param statusCode of ther Http response
-   * */
+   */
   @Override
   public void statusMetricsUpdation(int statusCode) {
     switch (statusCode) {

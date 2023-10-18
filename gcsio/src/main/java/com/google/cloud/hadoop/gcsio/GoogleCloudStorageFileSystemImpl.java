@@ -120,9 +120,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       GoogleCloudStorageFileSystemOptions options,
       Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
+      GcsClientStatisticInterface gcsClientStatisticInterface,
+      String See)
       throws IOException {
     checkNotNull(options, "options must not be null");
+
+    logger.atInfo().log("client :  %s", options.getClientType());
 
     switch (options.getClientType()) {
       case STORAGE_CLIENT:
@@ -152,7 +155,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
-        createCloudStorage(options, credentials, /* downscopedAccessTokenFn= */ null, /* gcsClientStatisticInterface */null),
+        createCloudStorage(
+            options,
+            credentials,
+            /* downscopedAccessTokenFn= */ null, /* gcsClientStatisticInterface */
+            null,
+            "Not needed "),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -164,7 +172,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @param gcsOptions Options for allowing ghfsIntrumentation to backport.
+   * @param gcsClientStatisticInterface for allowing ghfsIntrumentation to backport.
    */
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials,
@@ -174,7 +182,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       throws IOException {
     this(
         createCloudStorage(
-            options, credentials, downscopedAccessTokenFn, gcsClientStatisticInterface),
+            options, credentials, downscopedAccessTokenFn, gcsClientStatisticInterface, "needed"),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
