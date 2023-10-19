@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 
 /** Options for the {@link AbstractGoogleAsyncWriteChannel}. */
@@ -37,6 +38,20 @@ public abstract class AsyncWriteChannelOptions {
 
   /** Default pipe buffer size. */
   public static final int PIPE_BUFFER_SIZE_DEFAULT = 1024 * 1024;
+
+  /**
+   * UploadType are in parity with various upload configuration offered by google-java-storage
+   * client ref:
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.BlobWriteSessionConfigs
+   */
+  public enum UploadType {
+    /* Upload chunks to gcs and waits for acknowledgement before uploading another chunk*/
+    DEFAULT,
+    /* Write whole file to disk and then upload.*/
+    WRITE_TO_DISK_THEN_UPLOAD,
+    /* Write chunks to file along with uploading to gcs, and failure will be retried from data on disk.*/
+    JOURNALING
+  }
 
   /** Upload chunk size granularity */
   public static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
@@ -79,7 +94,9 @@ public abstract class AsyncWriteChannelOptions {
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
         .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT)
         .setNumberOfBufferedRequests(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC)
-        .setGrpcWriteMessageTimeoutMillis(DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS);
+        .setGrpcWriteMessageTimeoutMillis(DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS)
+        .setUploadType(UploadType.DEFAULT)
+        .setTemporaryPaths(ImmutableSet.of());
   }
 
   public abstract Builder toBuilder();
@@ -103,6 +120,10 @@ public abstract class AsyncWriteChannelOptions {
   public abstract long getNumberOfBufferedRequests();
 
   public abstract long getGrpcWriteMessageTimeoutMillis();
+
+  public abstract UploadType getUploadType();
+
+  public abstract ImmutableSet<String> getTemporaryPaths();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -131,6 +152,10 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
     public abstract Builder setGrpcWriteMessageTimeoutMillis(long grpcWriteMessageTimeoutMillis);
+
+    public abstract Builder setUploadType(UploadType uploadType);
+
+    public abstract Builder setTemporaryPaths(ImmutableSet<String> temporaryPaths);
 
     abstract AsyncWriteChannelOptions autoBuild();
 
