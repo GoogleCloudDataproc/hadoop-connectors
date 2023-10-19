@@ -46,6 +46,7 @@ import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistic;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
@@ -1425,6 +1426,15 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
           checkMetric(metricName + suffix, statistics, metricNames, statsString);
         }
       }
+    }
+
+    for (GoogleCloudStorageStatusStatistic googleCloudStorageStatusStatistic :
+        GoogleCloudStorageStatusStatistic.values()) {
+      expected++;
+
+      String metricName = googleCloudStorageStatusStatistic.getSymbol();
+
+      checkMetric(metricName, statistics, metricNames, statsString);
     }
 
     assertEquals(expected, metricNames.size());

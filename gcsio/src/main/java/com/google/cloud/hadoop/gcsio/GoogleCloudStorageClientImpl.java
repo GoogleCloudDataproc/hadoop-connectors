@@ -26,6 +26,7 @@ import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
@@ -81,7 +82,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable com.google.api.services.storage.Storage apiaryClientStorage,
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
-      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      @Nullable GcsClientStatisticInterface gcsClientStatistics)
       throws IOException {
     super(
         getDelegate(
@@ -90,7 +92,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             options,
             credentials,
             credential,
-            downscopedAccessTokenFn));
+            downscopedAccessTokenFn,
+            gcsClientStatistics));
+
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
@@ -190,18 +194,21 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageOptions storageOptions,
       Credentials credentials,
       Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      GcsClientStatisticInterface gcsClientStatistics)
       throws IOException {
+
     if (httpRequestInitializer != null) {
       logger.atWarning().log("Overriding httpRequestInitializer. ALERT: Use this only for testing");
       return new GoogleCloudStorageImpl(
-          storageOptions, httpRequestInitializer, downscopedAccessTokenFn);
+          storageOptions, httpRequestInitializer, downscopedAccessTokenFn, gcsClientStatistics);
     } else if (storage != null) {
       logger.atWarning().log("Overriding storage. ALERT: Use this only for testing");
       return new GoogleCloudStorageImpl(
-          storageOptions, storage, credentials, downscopedAccessTokenFn);
+          storageOptions, storage, credentials, downscopedAccessTokenFn, gcsClientStatistics);
     }
-    return new GoogleCloudStorageImpl(storageOptions, credential);
+
+    return new GoogleCloudStorageImpl(storageOptions, credential, gcsClientStatistics);
   }
 
   private static Storage createStorage(
@@ -259,6 +266,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
+
+    public abstract Builder setGcsClientStatistics(
+        @Nullable GcsClientStatisticInterface gcsClientStatistics);
 
     public abstract GoogleCloudStorageClientImpl build() throws IOException;
   }

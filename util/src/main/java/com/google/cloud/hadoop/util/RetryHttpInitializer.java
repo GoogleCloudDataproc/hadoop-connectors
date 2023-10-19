@@ -108,6 +108,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     public boolean handleResponse(
         HttpRequest httpRequest, HttpResponse httpResponse, boolean supportsRetry)
         throws IOException {
+
       if (responseCodesToLogWithRateLimit.contains(httpResponse.getStatusCode())) {
         switch (httpResponse.getStatusCode()) {
           case HTTP_SC_TOO_MANY_REQUESTS:
@@ -153,8 +154,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // The backoff-handler instance to use whenever the outer-class's Credential does not handle
     // the error.
     private final HttpUnsuccessfulResponseHandler delegateHandler;
+    private final GcsClientStatisticInterface gcsClientStatistics;
 
-    public CredentialOrBackoffResponseHandler() {
+    public CredentialOrBackoffResponseHandler(GcsClientStatisticInterface gcsClientStatistics) {
+
       HttpBackOffUnsuccessfulResponseHandler errorCodeHandler =
           new HttpBackOffUnsuccessfulResponseHandler(getDefaultBackOff());
       errorCodeHandler.setBackOffRequired(
@@ -165,11 +168,20 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         errorCodeHandler.setSleeper(sleeperOverride);
       }
       this.delegateHandler = errorCodeHandler;
+      this.gcsClientStatistics = gcsClientStatistics;
+    }
+
+    public CredentialOrBackoffResponseHandler() {
+      this(/* gcsClientStatistics */ null);
     }
 
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
+
+      if (gcsClientStatistics != null)
+        gcsClientStatistics.statusMetricsUpdation(response.getStatusCode());
+
       if (credential != null && credential.handleResponse(request, response, supportsRetry)) {
         // If credential decides it can handle it, the return code or message indicated something
         // specific to authentication, and no backoff is desired.
@@ -204,6 +216,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
   }
 
+  public final GcsClientStatisticInterface gcsClientStatistics;
+
   /**
    * @param credential A credential which will be set as an interceptor on HttpRequests and as the
    *     delegate for a CredentialOrBackoffResponseHandler.
@@ -223,11 +237,20 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    * @param credential A credential which will be set as an interceptor on HttpRequests and as the
    *     delegate for a CredentialOrBackoffResponseHandler.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
+   * @param gcsClientStatistics used for backporting GhfsStorageStatistics
    */
-  public RetryHttpInitializer(Credential credential, RetryHttpInitializerOptions options) {
+  public RetryHttpInitializer(
+      Credential credential,
+      RetryHttpInitializerOptions options,
+      GcsClientStatisticInterface gcsClientStatistics) {
     this.credential = credential;
     this.options = options;
     this.sleeperOverride = null;
+    this.gcsClientStatistics = gcsClientStatistics;
+  }
+
+  public RetryHttpInitializer(Credential credential, RetryHttpInitializerOptions options) {
+    this(credential, options, /* gcsClientStatistics */ null);
   }
 
   @Override
@@ -255,7 +278,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // handler.
     LoggingResponseHandler loggingResponseHandler =
         new LoggingResponseHandler(
-            new CredentialOrBackoffResponseHandler(),
+            new CredentialOrBackoffResponseHandler(gcsClientStatistics),
             exceptionHandler,
             ImmutableSet.of(HttpStatus.SC_GONE, HttpStatus.SC_SERVICE_UNAVAILABLE),
             ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS));

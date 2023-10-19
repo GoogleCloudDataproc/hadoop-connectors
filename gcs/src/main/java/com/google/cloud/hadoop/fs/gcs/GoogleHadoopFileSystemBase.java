@@ -1599,7 +1599,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
             ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
             : null,
-        gcsFsOptions);
+        gcsFsOptions,
+        storageStatistics);
   }
 
   /**
