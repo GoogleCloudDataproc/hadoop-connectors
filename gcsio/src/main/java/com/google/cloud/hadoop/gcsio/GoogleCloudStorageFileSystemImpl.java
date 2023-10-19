@@ -124,7 +124,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       throws IOException {
     checkNotNull(options, "options must not be null");
 
-
     switch (options.getClientType()) {
       case STORAGE_CLIENT:
         return GoogleCloudStorageClientImpl.builder()
