@@ -5,6 +5,7 @@ import com.google.api.client.googleapis.testing.auth.oauth2.MockGoogleCredential
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -39,7 +40,7 @@ public class MockGoogleCloudStorageImplFactory {
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
-    return new GoogleCloudStorageImpl(options, storage, null);
+    return new GoogleCloudStorageImpl(options, storage, (Credentials) null);
   }
 
   public static GoogleCloudStorageClientImpl mockedGcsClientImpl(

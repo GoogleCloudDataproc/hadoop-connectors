@@ -35,6 +35,7 @@ import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.CredentialAdapter;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -139,9 +140,11 @@ public class GoogleCloudStorageFileSystem {
   private static GoogleCloudStorage createCloudStorage(
       GoogleCloudStorageFileSystemOptions options,
       Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      GcsClientStatisticInterface gcsClientStatistics)
       throws IOException {
     checkNotNull(options, "options must not be null");
+
     switch (options.getClientType()) {
       case STORAGE_CLIENT:
         return GoogleCloudStorageClientImpl.builder()
@@ -149,10 +152,14 @@ public class GoogleCloudStorageFileSystem {
             .setCredentials(new CredentialAdapter(credential))
             .setCredential(credential)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .setGcsClientStatistics(gcsClientStatistics)
             .build();
       default:
         return new GoogleCloudStorageImpl(
-            options.getCloudStorageOptions(), credential, downscopedAccessTokenFn);
+            options.getCloudStorageOptions(),
+            credential,
+            downscopedAccessTokenFn,
+            gcsClientStatistics);
     }
   }
 
@@ -166,7 +173,25 @@ public class GoogleCloudStorageFileSystem {
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
-    this(createCloudStorage(options, credential, /* downscopedAccessTokenFn= */ null), options);
+    this(
+        createCloudStorage(
+            options,
+            credential,
+            /* downscopedAccessTokenFn= */ null, /* gcsClientStatistics */
+            null),
+        options);
+    logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
+  }
+
+  public GoogleCloudStorageFileSystem(
+      Credential credential,
+      GoogleCloudStorageFileSystemOptions options,
+      GcsClientStatisticInterface gcsClientStatistics)
+      throws IOException {
+    this(
+        createCloudStorage(
+            options, credential, /* downscopedAccessTokenFn= */ null, gcsClientStatistics),
+        options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 
@@ -184,7 +209,23 @@ public class GoogleCloudStorageFileSystem {
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
-    this(createCloudStorage(options, credential, downscopedAccessTokenFn), options);
+    this(
+        createCloudStorage(
+            options, credential, downscopedAccessTokenFn, /* gcsClientStatistics */ null),
+        options);
+    logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
+  }
+
+  public GoogleCloudStorageFileSystem(
+      Credential credential,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      GoogleCloudStorageFileSystemOptions options,
+      GcsClientStatisticInterface gcsClientStatistics)
+      throws IOException {
+    this(
+        createCloudStorage(options, credential, downscopedAccessTokenFn, gcsClientStatistics),
+        options);
+
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 
