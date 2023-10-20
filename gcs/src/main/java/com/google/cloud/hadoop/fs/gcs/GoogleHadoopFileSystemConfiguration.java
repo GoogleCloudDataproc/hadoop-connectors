@@ -482,16 +482,32 @@ public class GoogleHadoopFileSystemConfiguration {
       GCS_WRITE_TEMPORARY_FILES_PATH =
           new HadoopConfigurationProperty<>("fs.gs.write.temporary.dirs", ImmutableSet.of());
 
+  /**
+   * Configuration key to configure the Buffers for UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in
+   * alignment with configuration of java-storage client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_PCU_BUFFER_COUNT =
       new HadoopConfigurationProperty<>(
           "fs.gs.write.parallel.composite.upload.buffer.count",
           AsyncWriteChannelOptions.DEFAULT.getPCUBufferCount());
 
+  /**
+   * Configuration key to configure the buffer capacity for UploadType.PARALLEL_COMPOSITE_UPLOAD. It
+   * is in alignment with configuration of java-storage client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+   */
   public static final HadoopConfigurationProperty<Long> GCS_PCU_BUFFER_CAPACITY =
       new HadoopConfigurationProperty<>(
           "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
           (long) AsyncWriteChannelOptions.DEFAULT.getPCUBufferCapacity());
 
+  /**
+   * Configuration key to clean up strategy of part files created via
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
+   * client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy
+   */
   public static final HadoopConfigurationProperty<PartFileCleanupType>
       GCS_PCU_PART_FILE_CLEANUP_TYPE =
           new HadoopConfigurationProperty<>(

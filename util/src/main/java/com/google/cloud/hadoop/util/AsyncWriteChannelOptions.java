@@ -55,6 +55,7 @@ public abstract class AsyncWriteChannelOptions {
     WRITE_TO_DISK_THEN_UPLOAD,
     /* Write chunks to file along with uploading to gcs, and failure will be retried from data on disk.*/
     JOURNALING,
+    /* Write are performed using parallel composite upload strategy.  */
     PARALLEL_COMPOSITE_UPLOAD
   }
 
