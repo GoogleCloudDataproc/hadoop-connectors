@@ -35,6 +35,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -481,6 +482,22 @@ public class GoogleHadoopFileSystemConfiguration {
       GCS_WRITE_TEMPORARY_FILES_PATH =
           new HadoopConfigurationProperty<>("fs.gs.write.temporary.dirs", ImmutableSet.of());
 
+  public static final HadoopConfigurationProperty<Integer> GCS_PCU_BUFFER_COUNT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.buffer.count",
+          AsyncWriteChannelOptions.DEFAULT.getPCUBufferCount());
+
+  public static final HadoopConfigurationProperty<Long> GCS_PCU_BUFFER_CAPACITY =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
+          (long) AsyncWriteChannelOptions.DEFAULT.getPCUBufferCapacity());
+
+  public static final HadoopConfigurationProperty<PartFileCleanupType>
+      GCS_PCU_PART_FILE_CLEANUP_TYPE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
+              AsyncWriteChannelOptions.DEFAULT.getPartFileCleanupType());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -588,6 +605,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setUploadType(GCS_CLIENT_UPLOAD_TYPE.get(config, config::getEnum))
         .setTemporaryPaths(
             ImmutableSet.copyOf(GCS_WRITE_TEMPORARY_FILES_PATH.getStringCollection(config)))
+        .setPCUBufferCapacity(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
+        .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
+        .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
         .build();
   }
 

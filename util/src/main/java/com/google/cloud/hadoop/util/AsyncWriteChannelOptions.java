@@ -36,6 +36,13 @@ public abstract class AsyncWriteChannelOptions {
     NIO_CHANNEL_PIPE,
   }
 
+  /** Part file cleanup strategy for parallel composite upload. */
+  public enum PartFileCleanupType {
+    ALWAYS,
+    NEVER,
+    ON_SUCCESS
+  }
+
   /**
    * UploadType are in parity with various upload configuration offered by google-java-storage
    * client ref:
@@ -47,8 +54,12 @@ public abstract class AsyncWriteChannelOptions {
     /* Write whole file to disk and then upload.*/
     WRITE_TO_DISK_THEN_UPLOAD,
     /* Write chunks to file along with uploading to gcs, and failure will be retried from data on disk.*/
-    JOURNALING
+    JOURNALING,
+    PARALLEL_COMPOSITE_UPLOAD
   }
+
+  private static final int PARALLEL_COMPOSITE_UPLOAD_BUFFER_COUNT = 1;
+  private static final int PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY = 32 * 1024 * 1024;
 
   /** Upload chunk size granularity */
   private static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
@@ -74,7 +85,10 @@ public abstract class AsyncWriteChannelOptions {
         .setUploadCacheSize(0)
         .setUploadChunkSize(DEFAULT_UPLOAD_CHUNK_SIZE)
         .setUploadType(UploadType.DEFAULT)
-        .setTemporaryPaths(ImmutableSet.of());
+        .setTemporaryPaths(ImmutableSet.of())
+        .setPCUBufferCount(PARALLEL_COMPOSITE_UPLOAD_BUFFER_COUNT)
+        .setPCUBufferCapacity(PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY)
+        .setPartFileCleanupType(PartFileCleanupType.ALWAYS);
   }
 
   public abstract Builder toBuilder();
@@ -101,7 +115,13 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract UploadType getUploadType();
 
+  public abstract PartFileCleanupType getPartFileCleanupType();
+
   public abstract ImmutableSet<String> getTemporaryPaths();
+
+  public abstract int getPCUBufferCount();
+
+  public abstract int getPCUBufferCapacity();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -133,7 +153,13 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setUploadType(UploadType uploadType);
 
+    public abstract Builder setPartFileCleanupType(PartFileCleanupType partFileCleanupType);
+
     public abstract Builder setTemporaryPaths(ImmutableSet<String> temporaryPaths);
+
+    public abstract Builder setPCUBufferCount(int bufferCount);
+
+    public abstract Builder setPCUBufferCapacity(int bufferCapacity);
 
     abstract AsyncWriteChannelOptions autoBuild();
 

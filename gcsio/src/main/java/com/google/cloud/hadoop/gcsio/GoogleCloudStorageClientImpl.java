@@ -27,10 +27,14 @@ import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
+import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy;
+import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.ExecutorSupplier;
+import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
@@ -66,6 +70,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
+
+  //
+  private static ExecutorService pcuThreadPool =
+      Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder().setNameFormat("gcsio-storage-client-pcu-pool-%d").build());
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -168,6 +177,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         logger.atWarning().withCause(e).log("Error occurred while closing the storage client");
       }
       try {
+        if (pcuThreadPool != null && !pcuThreadPool.isShutdown()) {
+          pcuThreadPool.shutdown();
+        }
+      } finally {
+        pcuThreadPool = null;
+      }
+      try {
         super.close();
       } finally {
         backgroundTasksThreadPool.shutdown();
@@ -251,9 +267,27 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             writeOptions.getTemporaryPaths().stream()
                 .map(x -> Paths.get(x))
                 .collect(ImmutableSet.toImmutableSet()));
+      case PARALLEL_COMPOSITE_UPLOAD:
+        return BlobWriteSessionConfigs.parallelCompositeUpload()
+            .withBufferAllocationStrategy(
+                BufferAllocationStrategy.fixedPool(
+                    writeOptions.getPCUBufferCount(), writeOptions.getPCUBufferCapacity()))
+            .withPartCleanupStrategy(getPartCleanupStrategy(writeOptions.getPartFileCleanupType()))
+            .withExecutorSupplier(ExecutorSupplier.useExecutor(pcuThreadPool));
       default:
         return BlobWriteSessionConfigs.getDefault()
             .withChunkSize(writeOptions.getUploadChunkSize());
+    }
+  }
+
+  private static PartCleanupStrategy getPartCleanupStrategy(PartFileCleanupType cleanupType) {
+    switch (cleanupType) {
+      case NEVER:
+        return PartCleanupStrategy.never();
+      case ON_SUCCESS:
+        return PartCleanupStrategy.onlyOnSuccess();
+      default:
+        return PartCleanupStrategy.always();
     }
   }
 
