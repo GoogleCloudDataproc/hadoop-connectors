@@ -71,7 +71,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
-  //
+  // Thread-pool used by java-storage client during parallel composite uploads
   private static ExecutorService pcuThreadPool =
       Executors.newCachedThreadPool(
           new ThreadFactoryBuilder().setNameFormat("gcsio-storage-client-pcu-pool-%d").build());

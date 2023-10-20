@@ -63,12 +63,6 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
   private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
 
-  private static final AsyncWriteChannelOptions PCU_DEFAULT_OPTION =
-      AsyncWriteChannelOptions.builder()
-          .setUploadType(UploadType.PARALLEL_COMPOSITE_UPLOAD)
-          .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
-          .build();
-
   // Do cleanup the path after every test.
   private static final String GCS_WRITE_TMP_DIR =
       String.format("%s/%s", TEMP_DIR_PATH, "gcs-write-dir");
@@ -80,6 +74,15 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static GoogleCloudStorage helperGcs;
 
   private GoogleCloudStorage gcs;
+
+  private int partFileCount = 2;
+  private int bufferCapacity = partFileCount * ONE_MiB;
+
+  private final AsyncWriteChannelOptions pcuDefaultOptions =
+      AsyncWriteChannelOptions.builder()
+          .setUploadType(UploadType.PARALLEL_COMPOSITE_UPLOAD)
+          .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
+          .build();
 
   private static ImmutableSet<String> tempDirs =
       ImmutableSet.of(GCS_WRITE_TMP_DIR_1, GCS_WRITE_TMP_DIR);
@@ -209,16 +212,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void uploadViaPCUVerifyPartFileCleanup() throws IOException, InterruptedException {
-    int partFileCount = 2;
-    int bufferCapacity = partFileCount * ONE_MiB;
-
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(
-                PCU_DEFAULT_OPTION.toBuilder()
-                    .setPCUBufferCapacity(bufferCapacity)
-                    .setPCUBufferCount(partFileCount)
-                    .build())
+            .setWriteChannelOptions(pcuDefaultOptions)
             .build();
 
     gcs = getGCSImpl(storageOptions);
@@ -229,15 +225,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void uploadViaPCUVerifyPartFileNotCleanedUp() throws IOException, InterruptedException {
-    int partFileCount = 2;
-    int bufferCapacity = partFileCount * ONE_MiB;
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setWriteChannelOptions(
-                PCU_DEFAULT_OPTION.toBuilder()
+                pcuDefaultOptions.toBuilder()
                     .setPartFileCleanupType(PartFileCleanupType.NEVER)
-                    .setPCUBufferCapacity(bufferCapacity)
-                    .setPCUBufferCount(partFileCount)
                     .build())
             .build();
 
@@ -249,15 +241,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void uploadViaPCUComposeFileMissingFailure() throws IOException, InterruptedException {
-    int partFileCount = 2;
-    int bufferCapacity = partFileCount * ONE_MiB;
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(
-                PCU_DEFAULT_OPTION.toBuilder()
-                    .setPCUBufferCapacity(bufferCapacity)
-                    .setPCUBufferCount(partFileCount)
-                    .build())
+            .setWriteChannelOptions(pcuDefaultOptions)
             .build();
 
     gcs = getGCSImpl(storageOptions);
@@ -283,15 +269,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void uploadViaPCUComposeMissingObjectVersion() throws IOException, InterruptedException {
-    int partFileCount = 2;
-    int bufferCapacity = partFileCount * ONE_MiB;
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(
-                PCU_DEFAULT_OPTION.toBuilder()
-                    .setPCUBufferCapacity(bufferCapacity)
-                    .setPCUBufferCount(partFileCount)
-                    .build())
+            .setWriteChannelOptions(pcuDefaultOptions)
             .build();
 
     gcs = getGCSImpl(storageOptions);
