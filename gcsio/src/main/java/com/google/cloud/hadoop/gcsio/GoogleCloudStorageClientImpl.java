@@ -71,11 +71,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
-  // Thread-pool used by java-storage client during parallel composite uploads
-  private static ExecutorService pcuThreadPool =
-      Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder().setNameFormat("gcsio-storage-client-pcu-pool-%d").build());
-
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
       Executors.newCachedThreadPool(
@@ -177,13 +172,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         logger.atWarning().withCause(e).log("Error occurred while closing the storage client");
       }
       try {
-        if (pcuThreadPool != null && !pcuThreadPool.isShutdown()) {
-          pcuThreadPool.shutdown();
-        }
-      } finally {
-        pcuThreadPool = null;
-      }
-      try {
         super.close();
       } finally {
         backgroundTasksThreadPool.shutdown();
@@ -268,6 +256,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 .map(x -> Paths.get(x))
                 .collect(ImmutableSet.toImmutableSet()));
       case PARALLEL_COMPOSITE_UPLOAD:
+        ExecutorService pcuThreadPool =
+            Executors.newCachedThreadPool(
+                new ThreadFactoryBuilder()
+                    .setNameFormat("gcsio-storage-client-pcu-pool-%d")
+                    .build());
         return BlobWriteSessionConfigs.parallelCompositeUpload()
             .withBufferAllocationStrategy(
                 BufferAllocationStrategy.fixedPool(
