@@ -80,6 +80,8 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       AsyncWriteChannelOptions.builder()
           .setUploadType(UploadType.PARALLEL_COMPOSITE_UPLOAD)
           .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
+          .setPCUBufferCount(partFileCount)
+          .setPCUBufferCapacity(bufferCapacity)
           .build();
 
   private static ImmutableSet<String> tempDirs =
