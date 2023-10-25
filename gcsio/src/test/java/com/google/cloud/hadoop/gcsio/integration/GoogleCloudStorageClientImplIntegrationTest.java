@@ -32,7 +32,6 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
@@ -57,7 +56,6 @@ import org.junit.rules.TestName;
  */
 public class GoogleCloudStorageClientImplIntegrationTest {
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final TestBucketHelper BUCKET_HELPER =
       new TestBucketHelper("dataproc-gcs-client-impl");
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
@@ -255,7 +253,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     writeChannel.write(ByteBuffer.wrap(bytesToWrite));
     // part files are getting uploaded in async thread
     // wait for it to complete before listing files
-    Thread.sleep(10000);
+    Thread.sleep(5000);
 
     List<GoogleCloudStorageItemInfo> partFiles = getPartFiles();
 
@@ -283,7 +281,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     writeChannel.write(ByteBuffer.wrap(bytesToWrite));
     // part files are getting uploaded in async thread
     // wait for it to complete before listing files
-    Thread.sleep(10000);
+    Thread.sleep(5000);
 
     List<GoogleCloudStorageItemInfo> partFiles = getPartFiles();
     // get one part file and override its content
@@ -344,7 +342,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     writeChannel.write(ByteBuffer.wrap(bytesToWrite));
     // part files are getting uploaded in async thread
     // wait for it to complete before listing files
-    Thread.sleep(10000);
+    Thread.sleep(5000);
 
     List<GoogleCloudStorageItemInfo> partFiles = getPartFiles();
 

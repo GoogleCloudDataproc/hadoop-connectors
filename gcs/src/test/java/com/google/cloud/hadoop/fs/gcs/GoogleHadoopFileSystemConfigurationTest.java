@@ -114,12 +114,12 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
+          put("fs.gs.client.upload.type", UploadType.DEFAULT);
+          put("fs.gs.write.temporary.dirs", ImmutableSet.of());
           put("fs.gs.write.parallel.composite.upload.buffer.count", 1);
           put(
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               PartFileCleanupType.ALWAYS);
-          put("fs.gs.client.upload.type", UploadType.DEFAULT);
-          put("fs.gs.write.temporary.dirs", ImmutableSet.of());
         }
       };
 
