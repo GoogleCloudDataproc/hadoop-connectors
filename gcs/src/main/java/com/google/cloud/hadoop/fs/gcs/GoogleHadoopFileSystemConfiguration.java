@@ -635,7 +635,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
-        // .setPartFilePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setPartFilePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
         .build();
   }
 
