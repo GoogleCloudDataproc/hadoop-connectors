@@ -35,9 +35,11 @@ import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.ExecutorSupplier;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
+import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
@@ -266,7 +268,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 BufferAllocationStrategy.fixedPool(
                     writeOptions.getPCUBufferCount(), writeOptions.getPCUBufferCapacity()))
             .withPartCleanupStrategy(getPartCleanupStrategy(writeOptions.getPartFileCleanupType()))
-            .withExecutorSupplier(ExecutorSupplier.useExecutor(pcuThreadPool));
+            .withExecutorSupplier(ExecutorSupplier.useExecutor(pcuThreadPool))
+            .withPartNamingStrategy(getPartNamingStrategy(writeOptions.getPartFilePrefix()));
       default:
         return BlobWriteSessionConfigs.getDefault()
             .withChunkSize(writeOptions.getUploadChunkSize());
@@ -282,6 +285,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       default:
         return PartCleanupStrategy.always();
     }
+  }
+
+  private static PartNamingStrategy getPartNamingStrategy(String partFilePrefix) {
+    if (Strings.isNullOrEmpty(partFilePrefix)) {
+      return PartNamingStrategy.noPrefix();
+    }
+    return PartNamingStrategy.prefix(partFilePrefix);
   }
 
   public static Builder builder() {

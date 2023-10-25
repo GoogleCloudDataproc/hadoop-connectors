@@ -514,6 +514,17 @@ public class GoogleHadoopFileSystemConfiguration {
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               AsyncWriteChannelOptions.DEFAULT.getPartFileCleanupType());
 
+  /**
+   * Configuration key to set up the naming strategy of part files created via
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
+   * client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy
+   */
+  public static final HadoopConfigurationProperty<String> GCS_PCU_PART_FILE_NAME_PREFIX =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
+          AsyncWriteChannelOptions.DEFAULT.getPartFilePrefix());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -624,6 +635,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
+        // .setPartFilePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
         .build();
   }
 

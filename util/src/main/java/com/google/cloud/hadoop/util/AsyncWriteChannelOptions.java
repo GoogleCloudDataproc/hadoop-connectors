@@ -65,6 +65,8 @@ public abstract class AsyncWriteChannelOptions {
   /** Upload chunk size granularity */
   private static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
 
+  private static final String PART_FILE_PREFIX = "";
+
   /** Default upload chunk size. */
   private static final int DEFAULT_UPLOAD_CHUNK_SIZE =
       Runtime.getRuntime().maxMemory() < 512 * 1024 * 1024
@@ -89,7 +91,8 @@ public abstract class AsyncWriteChannelOptions {
         .setTemporaryPaths(ImmutableSet.of())
         .setPCUBufferCount(PARALLEL_COMPOSITE_UPLOAD_BUFFER_COUNT)
         .setPCUBufferCapacity(PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY)
-        .setPartFileCleanupType(PartFileCleanupType.ALWAYS);
+        .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
+        .setPartFilePrefix(PART_FILE_PREFIX);
   }
 
   public abstract Builder toBuilder();
@@ -123,6 +126,8 @@ public abstract class AsyncWriteChannelOptions {
   public abstract int getPCUBufferCount();
 
   public abstract int getPCUBufferCapacity();
+
+  public abstract String getPartFilePrefix();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -161,6 +166,8 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setPCUBufferCount(int bufferCount);
 
     public abstract Builder setPCUBufferCapacity(int bufferCapacity);
+
+    public abstract Builder setPartFilePrefix(String prefix);
 
     abstract AsyncWriteChannelOptions autoBuild();
 
