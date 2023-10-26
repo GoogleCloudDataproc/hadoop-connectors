@@ -16,9 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_COUNTER;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_COUNTER;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
@@ -191,7 +192,7 @@ public enum GhfsStatistic {
    * @param description description.
    * @param type type
    */
-  GhfsStatistic(String symbol, String description, GhfsStatisticTypeEnum type) {
+  GhfsStatistic(String symbol, String description, StatisticTypeEnum type) {
     this.symbol = symbol;
     this.description = description;
     this.type = type;
@@ -204,7 +205,7 @@ public enum GhfsStatistic {
   private final String description;
 
   /** Statistic type. */
-  private final GhfsStatisticTypeEnum type;
+  private final StatisticTypeEnum type;
 
   /** the name of the statistic */
   public String getSymbol() {
@@ -241,7 +242,7 @@ public enum GhfsStatistic {
    *
    * @return the type.
    */
-  public GhfsStatisticTypeEnum getType() {
+  public StatisticTypeEnum getType() {
     return type;
   }
 }

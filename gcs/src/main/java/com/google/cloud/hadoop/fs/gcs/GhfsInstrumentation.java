@@ -27,10 +27,14 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -60,14 +64,18 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  * Instrumentation of GCS.
  *
  * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic}
- * key. There <i>may</i> be some Statistics which do not have an entry here. To avoid attempts to
- * access such counters failing, the operations to increment/query metric values are designed to
- * handle lookup failures.
+ * and {@link GoogleCloudStorageStatusStatistics} key. There <i>may</i> be some Statistics which do
+ * not have an entry here. To avoid attempts to access such counters failing, the operations to
+ * increment/query metric values are designed to handle lookup failures.
  *
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
 public class GhfsInstrumentation
-    implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
+    implements Closeable,
+        MetricsSource,
+        IOStatisticsSource,
+        DurationTrackerFactory,
+        GcsClientStatisticInterface {
 
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
@@ -201,6 +209,19 @@ public class GhfsInstrumentation
   }
 
   /**
+   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in
+   * GoogleCloudStorageStatusStatistics.
+   *
+   * @param op operation
+   */
+  private void incrementCounter(GoogleCloudStorageStatusStatistics op) {
+
+    String name = op.getSymbol();
+    incrementMutableCounter(name, 1);
+    instanceIOStatistics.incrementCounter(name, 1);
+  }
+
+  /**
    * Get the metrics system.
    *
    * @return metricsSystem
@@ -227,12 +248,22 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Create a counter in the registry.
+   * Create a counter in the registry for metrics in GhfsStatistic.
    *
    * @param op statistic to count
    * @return a new counter
    */
   protected final MutableCounterLong counter(GhfsStatistic op) {
+    return counter(op.getSymbol(), op.getDescription());
+  }
+
+  /**
+   * Create a counter in the registry for metrics in GoogleCloudStorageStatusStatistics.
+   *
+   * @param op statistic to count
+   * @return a new counter
+   */
+  private final MutableCounterLong counter(GoogleCloudStorageStatusStatistics op) {
     return counter(op.getSymbol(), op.getDescription());
   }
 
@@ -319,6 +350,20 @@ public class GhfsInstrumentation
       if (counter != null) {
         counter.incr(count);
       }
+    }
+  }
+
+  /**
+   * Counter Metrics updation based on the Http response
+   *
+   * @param statusCode of ther Http response
+   */
+  @Override
+  public void statusMetricsUpdation(int statusCode) {
+    switch (statusCode) {
+      case 429:
+        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT);
+        break;
     }
   }
 
@@ -947,18 +992,26 @@ public class GhfsInstrumentation
         .forEach(
             stat -> {
               // declare all counter statistics
-              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+              if (stat.getType() == StatisticTypeEnum.TYPE_COUNTER) {
                 counter(stat);
                 storeBuilder.withCounters(stat.getSymbol());
                 // declare all gauge statistics
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_GAUGE) {
                 gauge(stat);
                 storeBuilder.withGauges(stat.getSymbol());
                 // and durations
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }
+            });
+
+    // registering metrics of GoogleCloudStorageStatusStatistics which are all counters
+    EnumSet.allOf(GoogleCloudStorageStatusStatistics.class)
+        .forEach(
+            stat -> {
+              counter(stat);
+              storeBuilder.withCounters(stat.getSymbol());
             });
 
     return storeBuilder;
