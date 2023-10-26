@@ -499,7 +499,7 @@ public class GoogleHadoopFileSystemConfiguration {
    */
   public static final HadoopConfigurationProperty<Long> GCS_PCU_BUFFER_CAPACITY =
       new HadoopConfigurationProperty<>(
-          "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
+          "fs.gs.write.parallel.composite.upload.buffer.capacity",
           (long) AsyncWriteChannelOptions.DEFAULT.getPCUBufferCapacity());
 
   /**
@@ -523,7 +523,7 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_PCU_PART_FILE_NAME_PREFIX =
       new HadoopConfigurationProperty<>(
           "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
-          AsyncWriteChannelOptions.DEFAULT.getPartFilePrefix());
+          AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
@@ -632,10 +632,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setUploadType(GCS_CLIENT_UPLOAD_TYPE.get(config, config::getEnum))
         .setTemporaryPaths(
             ImmutableSet.copyOf(GCS_WRITE_TEMPORARY_FILES_PATH.getStringCollection(config)))
-        .setPCUBufferCapacity(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
+        .setPCUBufferCount(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
-        .setPartFilePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
         .build();
   }
 

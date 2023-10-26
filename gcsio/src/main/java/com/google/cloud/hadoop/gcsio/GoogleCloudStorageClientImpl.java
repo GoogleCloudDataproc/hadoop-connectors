@@ -91,7 +91,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
-      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      @Nullable ExecutorService pCUExecutorService)
       throws IOException {
     super(
         GoogleCloudStorageImpl.builder()
@@ -104,7 +105,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
-            ? createStorage(credentials, options, gRPCInterceptors)
+            ? createStorage(credentials, options, gRPCInterceptors, pCUExecutorService)
             : clientLibraryStorage;
   }
 
@@ -211,7 +212,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors)
+      List<ClientInterceptor> interceptors,
+      ExecutorService pCUExecutorService)
       throws IOException {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
@@ -229,12 +231,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               return ImmutableList.copyOf(list);
             })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
-        .setBlobWriteSessionConfig(getSessionConfig(storageOptions.getWriteChannelOptions()))
+        .setBlobWriteSessionConfig(
+            getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
         .build()
         .getService();
   }
 
-  private static BlobWriteSessionConfig getSessionConfig(AsyncWriteChannelOptions writeOptions)
+  private static BlobWriteSessionConfig getSessionConfig(
+      AsyncWriteChannelOptions writeOptions, ExecutorService pCUExecutorService)
       throws IOException {
     logger.atFiner().log("Upload strategy in use: %s", writeOptions.getUploadType());
     switch (writeOptions.getUploadType()) {
@@ -258,18 +262,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 .map(x -> Paths.get(x))
                 .collect(ImmutableSet.toImmutableSet()));
       case PARALLEL_COMPOSITE_UPLOAD:
-        ExecutorService pcuThreadPool =
-            Executors.newCachedThreadPool(
-                new ThreadFactoryBuilder()
-                    .setNameFormat("gcsio-storage-client-pcu-pool-%d")
-                    .build());
         return BlobWriteSessionConfigs.parallelCompositeUpload()
             .withBufferAllocationStrategy(
                 BufferAllocationStrategy.fixedPool(
                     writeOptions.getPCUBufferCount(), writeOptions.getPCUBufferCapacity()))
             .withPartCleanupStrategy(getPartCleanupStrategy(writeOptions.getPartFileCleanupType()))
-            .withExecutorSupplier(ExecutorSupplier.useExecutor(pcuThreadPool))
-            .withPartNamingStrategy(getPartNamingStrategy(writeOptions.getPartFilePrefix()));
+            .withExecutorSupplier(getPCUExecutorSupplier(pCUExecutorService))
+            .withPartNamingStrategy(getPartNamingStrategy(writeOptions.getPartFileNamePrefix()));
       default:
         return BlobWriteSessionConfigs.getDefault()
             .withChunkSize(writeOptions.getUploadChunkSize());
@@ -292,6 +291,16 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       return PartNamingStrategy.noPrefix();
     }
     return PartNamingStrategy.prefix(partFilePrefix);
+  }
+
+  private static ExecutorSupplier getPCUExecutorSupplier(ExecutorService pCUExecutorService) {
+    if (pCUExecutorService == null) {
+      ExecutorService pcuThreadPool =
+          Executors.newCachedThreadPool(
+              new ThreadFactoryBuilder().setNameFormat("gcsio-storage-client-pcu-pool-%d").build());
+      return ExecutorSupplier.useExecutor(pcuThreadPool);
+    }
+    return ExecutorSupplier.useExecutor(pCUExecutorService);
   }
 
   public static Builder builder() {
@@ -319,6 +328,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
+
+    @VisibleForTesting
+    public abstract Builder setPCUExecutorService(@Nullable ExecutorService pCUExecutorService);
 
     public abstract GoogleCloudStorageClientImpl build() throws IOException;
   }

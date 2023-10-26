@@ -92,7 +92,7 @@ public abstract class AsyncWriteChannelOptions {
         .setPCUBufferCount(PARALLEL_COMPOSITE_UPLOAD_BUFFER_COUNT)
         .setPCUBufferCapacity(PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY)
         .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
-        .setPartFilePrefix(PART_FILE_PREFIX);
+        .setPartFileNamePrefix(PART_FILE_PREFIX);
   }
 
   public abstract Builder toBuilder();
@@ -127,7 +127,7 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract int getPCUBufferCapacity();
 
-  public abstract String getPartFilePrefix();
+  public abstract String getPartFileNamePrefix();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -167,7 +167,7 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setPCUBufferCapacity(int bufferCapacity);
 
-    public abstract Builder setPartFilePrefix(String prefix);
+    public abstract Builder setPartFileNamePrefix(String prefix);
 
     abstract AsyncWriteChannelOptions autoBuild();
 
