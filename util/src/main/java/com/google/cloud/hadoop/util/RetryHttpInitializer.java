@@ -68,6 +68,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
+  private final GcsClientStatisticInterface gcsClientStatisticInterface;
+
   // If non-null, the backoff handlers will be set to use this sleeper instead of their defaults.
   // Only used for testing.
   private Sleeper sleeperOverride;
@@ -84,6 +86,29 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     private final HttpIOExceptionHandler delegateIOExceptionHandler;
     private final ImmutableSet<Integer> responseCodesToLog;
     private final ImmutableSet<Integer> responseCodesToLogWithRateLimit;
+    private final GcsClientStatisticInterface gcsClientStatisticInterface;
+
+    /**
+     * @param delegateResponseHandler The HttpUnsuccessfulResponseHandler to invoke to really handle
+     *     errors.
+     * @param delegateIOExceptionHandler The HttpIOExceptionResponseHandler to delegate to.
+     * @param responseCodesToLog The set of response codes to log URLs for.
+     * @param responseCodesToLogWithRateLimit The set of response codes to log URLs for with reate
+     *     limit.
+     * @param gcsClientStatisticInterface for backporting statistics
+     */
+    public LoggingResponseHandler(
+        HttpUnsuccessfulResponseHandler delegateResponseHandler,
+        HttpIOExceptionHandler delegateIOExceptionHandler,
+        Set<Integer> responseCodesToLog,
+        Set<Integer> responseCodesToLogWithRateLimit,
+        GcsClientStatisticInterface gcsClientStatisticInterface) {
+      this.delegateResponseHandler = delegateResponseHandler;
+      this.delegateIOExceptionHandler = delegateIOExceptionHandler;
+      this.responseCodesToLog = ImmutableSet.copyOf(responseCodesToLog);
+      this.responseCodesToLogWithRateLimit = ImmutableSet.copyOf(responseCodesToLogWithRateLimit);
+      this.gcsClientStatisticInterface = gcsClientStatisticInterface;
+    }
 
     /**
      * @param delegateResponseHandler The HttpUnsuccessfulResponseHandler to invoke to really handle
@@ -98,16 +123,23 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         HttpIOExceptionHandler delegateIOExceptionHandler,
         Set<Integer> responseCodesToLog,
         Set<Integer> responseCodesToLogWithRateLimit) {
-      this.delegateResponseHandler = delegateResponseHandler;
-      this.delegateIOExceptionHandler = delegateIOExceptionHandler;
-      this.responseCodesToLog = ImmutableSet.copyOf(responseCodesToLog);
-      this.responseCodesToLogWithRateLimit = ImmutableSet.copyOf(responseCodesToLogWithRateLimit);
+      this(
+          delegateResponseHandler,
+          delegateIOExceptionHandler,
+          responseCodesToLog,
+          responseCodesToLogWithRateLimit,
+          null);
     }
 
     @Override
     public boolean handleResponse(
         HttpRequest httpRequest, HttpResponse httpResponse, boolean supportsRetry)
         throws IOException {
+
+      if (gcsClientStatisticInterface != null) {
+        gcsClientStatisticInterface.statusMetricsUpdation(httpResponse.getStatusCode());
+      }
+
       if (responseCodesToLogWithRateLimit.contains(httpResponse.getStatusCode())) {
         switch (httpResponse.getStatusCode()) {
           case HTTP_SC_TOO_MANY_REQUESTS:
@@ -153,6 +185,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // The backoff-handler instance to use whenever the outer-class's Credential does not handle
     // the error.
     private final HttpUnsuccessfulResponseHandler delegateHandler;
+    private final GcsClientStatisticInterface gcsClientStatisticInterface;
 
     public CredentialOrBackoffResponseHandler() {
       HttpBackOffUnsuccessfulResponseHandler errorCodeHandler =
@@ -165,11 +198,22 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         errorCodeHandler.setSleeper(sleeperOverride);
       }
       this.delegateHandler = errorCodeHandler;
+      this.gcsClientStatisticInterface = null;
+    }
+
+    public CredentialOrBackoffResponseHandler(
+        GcsClientStatisticInterface gcsClientStatisticInterface) {
+      this();
     }
 
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
+
+      if (gcsClientStatisticInterface != null) {
+        gcsClientStatisticInterface.statusMetricsUpdation(response.getStatusCode());
+      }
+
       if (credential != null && credential.handleResponse(request, response, supportsRetry)) {
         // If credential decides it can handle it, the return code or message indicated something
         // specific to authentication, and no backoff is desired.
@@ -225,9 +269,23 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
   public RetryHttpInitializer(Credential credential, RetryHttpInitializerOptions options) {
+    this(credential, options, null);
+  }
+
+  /**
+   * @param credential A credential which will be set as an interceptor on HttpRequests and as the
+   *     delegate for a CredentialOrBackoffResponseHandler.
+   * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
+   * @param gcsClientStatisticInterface for backporting statistics
+   */
+  public RetryHttpInitializer(
+      Credential credential,
+      RetryHttpInitializerOptions options,
+      GcsClientStatisticInterface gcsClientStatisticInterface) {
     this.credential = credential;
     this.options = options;
     this.sleeperOverride = null;
+    this.gcsClientStatisticInterface = gcsClientStatisticInterface;
   }
 
   @Override
@@ -255,10 +313,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // handler.
     LoggingResponseHandler loggingResponseHandler =
         new LoggingResponseHandler(
-            new CredentialOrBackoffResponseHandler(),
+            new CredentialOrBackoffResponseHandler(gcsClientStatisticInterface),
             exceptionHandler,
             ImmutableSet.of(HttpStatus.SC_GONE, HttpStatus.SC_SERVICE_UNAVAILABLE),
-            ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS));
+            ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS),
+            gcsClientStatisticInterface);
     request.setUnsuccessfulResponseHandler(loggingResponseHandler);
     request.setIOExceptionHandler(loggingResponseHandler);
 

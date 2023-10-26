@@ -18,9 +18,13 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistic.GCS_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistic;
+import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -38,7 +42,8 @@ import org.apache.hadoop.fs.StorageStatistics;
 /** Storage statistics for GCS */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class GhfsStorageStatistics extends StorageStatistics {
+public class GhfsStorageStatistics extends StorageStatistics
+    implements GcsClientStatisticInterface {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /** {@value} The key that stores all the registered metrics */
@@ -62,11 +67,16 @@ public class GhfsStorageStatistics extends StorageStatistics {
       String symbol = opType.getSymbol();
       opsCount.put(symbol, new AtomicLong(0));
 
-      if (opType.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+      if (opType.getType() == TYPE_DURATION) {
         minimums.put(getMinKey(symbol), null);
         maximums.put(getMaxKey(symbol), new AtomicLong(0));
         means.put(getMeanKey(symbol), new MeanStatistic());
       }
+    }
+
+    for (GoogleCloudStorageStatusStatistic opType : GoogleCloudStorageStatusStatistic.values()) {
+      String symbol = opType.getSymbol();
+      opsCount.put(symbol, new AtomicLong(0));
     }
   }
 
@@ -89,6 +99,19 @@ public class GhfsStorageStatistics extends StorageStatistics {
     return incrementCounter(statistic, 1);
   }
 
+  private long increment(GoogleCloudStorageStatusStatistic statistic) {
+    return incrementCounter(statistic, 1);
+  }
+
+  @Override
+  public void statusMetricsUpdation(int statusCode) {
+    switch (statusCode) {
+      case 429:
+        increment(GCS_CLIENT_RATE_LIMIT_COUNT);
+        break;
+    }
+  }
+
   /**
    * Increment a specific counter.
    *
@@ -97,6 +120,17 @@ public class GhfsStorageStatistics extends StorageStatistics {
    * @return the new value
    */
   long incrementCounter(GhfsStatistic op, long count) {
+    return opsCount.get(op.getSymbol()).addAndGet(count);
+  }
+
+  /**
+   * Increment a specific counter.
+   *
+   * @param op operation
+   * @param count increment value
+   * @return the new value
+   */
+  long incrementCounter(GoogleCloudStorageStatusStatistic op, long count) {
     return opsCount.get(op.getSymbol()).addAndGet(count);
   }
 
@@ -122,7 +156,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
   void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
     checkArgument(
-        statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
+        statistic.getType() == TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
     updateMinMaxStats(statistic, durationMs, durationMs, context);
 

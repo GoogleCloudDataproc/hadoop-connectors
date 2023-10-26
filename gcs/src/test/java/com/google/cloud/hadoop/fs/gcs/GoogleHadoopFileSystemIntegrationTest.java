@@ -28,6 +28,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
@@ -46,6 +47,7 @@ import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistic;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
@@ -1418,13 +1420,22 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       String metricName = ghfsStatistic.getSymbol();
 
       checkMetric(metricName, statistics, metricNames, statsString);
-      if (ghfsStatistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+      if (ghfsStatistic.getType() == TYPE_DURATION) {
         expected += 3;
 
         for (String suffix : ImmutableList.of("_min", "_max", "_mean")) {
           checkMetric(metricName + suffix, statistics, metricNames, statsString);
         }
       }
+    }
+
+    for (GoogleCloudStorageStatusStatistic googleCloudStorageStatusStatistic :
+        GoogleCloudStorageStatusStatistic.values()) {
+      expected++;
+
+      String metricName = googleCloudStorageStatusStatistic.getSymbol();
+
+      checkMetric(metricName, statistics, metricNames, statsString);
     }
 
     assertEquals(expected, metricNames.size());
