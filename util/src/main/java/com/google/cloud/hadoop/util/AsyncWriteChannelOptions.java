@@ -38,6 +38,12 @@ public abstract class AsyncWriteChannelOptions {
 
   /** Default pipe buffer size. */
   public static final int PIPE_BUFFER_SIZE_DEFAULT = 1024 * 1024;
+  /** Part file cleanup strategy for parallel composite upload. */
+  public enum PartFileCleanupType {
+    ALWAYS,
+    NEVER,
+    ON_SUCCESS
+  }
 
   /**
    * UploadType are in parity with various upload configuration offered by google-java-storage
@@ -46,15 +52,23 @@ public abstract class AsyncWriteChannelOptions {
    */
   public enum UploadType {
     /* Upload chunks to gcs and waits for acknowledgement before uploading another chunk*/
-    DEFAULT,
+    CHUNK_UPLOAD,
     /* Write whole file to disk and then upload.*/
     WRITE_TO_DISK_THEN_UPLOAD,
     /* Write chunks to file along with uploading to gcs, and failure will be retried from data on disk.*/
-    JOURNALING
+    JOURNALING,
+    /* Write are performed using parallel composite upload strategy.  */
+    PARALLEL_COMPOSITE_UPLOAD
   }
+
+  // TODO: update these config with better default values.
+  private static final int PARALLEL_COMPOSITE_UPLOAD_BUFFER_COUNT = 1;
+  private static final int PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY = 32 * 1024 * 1024;
 
   /** Upload chunk size granularity */
   public static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
+
+  private static final String PART_FILE_PREFIX = "";
 
   /** Default upload chunk size. */
   public static final int UPLOAD_CHUNK_SIZE_DEFAULT =
@@ -95,8 +109,12 @@ public abstract class AsyncWriteChannelOptions {
         .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT)
         .setNumberOfBufferedRequests(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC)
         .setGrpcWriteMessageTimeoutMillis(DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS)
-        .setUploadType(UploadType.DEFAULT)
-        .setTemporaryPaths(ImmutableSet.of());
+        .setUploadType(UploadType.CHUNK_UPLOAD)
+        .setTemporaryPaths(ImmutableSet.of())
+        .setPCUBufferCount(PARALLEL_COMPOSITE_UPLOAD_BUFFER_COUNT)
+        .setPCUBufferCapacity(PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY)
+        .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
+        .setPartFileNamePrefix(PART_FILE_PREFIX);
   }
 
   public abstract Builder toBuilder();
@@ -123,7 +141,15 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract UploadType getUploadType();
 
+  public abstract PartFileCleanupType getPartFileCleanupType();
+
   public abstract ImmutableSet<String> getTemporaryPaths();
+
+  public abstract int getPCUBufferCount();
+
+  public abstract int getPCUBufferCapacity();
+
+  public abstract String getPartFileNamePrefix();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -155,7 +181,15 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setUploadType(UploadType uploadType);
 
+    public abstract Builder setPartFileCleanupType(PartFileCleanupType partFileCleanupType);
+
     public abstract Builder setTemporaryPaths(ImmutableSet<String> temporaryPaths);
+
+    public abstract Builder setPCUBufferCount(int bufferCount);
+
+    public abstract Builder setPCUBufferCapacity(int bufferCapacity);
+
+    public abstract Builder setPartFileNamePrefix(String prefix);
 
     abstract AsyncWriteChannelOptions autoBuild();
 
