@@ -74,12 +74,10 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   private static GoogleCloudStorage helperGcs;
 
-  private GoogleCloudStorage gcs;
+  private static final int partFileCount = 2;
+  private static final int bufferCapacity = partFileCount * ONE_MiB;
 
-  private int partFileCount = 2;
-  private int bufferCapacity = partFileCount * ONE_MiB;
-
-  private final AsyncWriteChannelOptions pcuDefaultOptions =
+  private static final AsyncWriteChannelOptions pcuDefaultOptions =
       AsyncWriteChannelOptions.builder()
           .setUploadType(UploadType.PARALLEL_COMPOSITE_UPLOAD)
           .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
@@ -93,6 +91,8 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       tempDirs.stream().map(x -> Paths.get(x)).collect(ImmutableSet.toImmutableSet());
 
   @Rule public TestName name = new TestName();
+
+  private GoogleCloudStorage gcs;
 
   @BeforeClass
   public static void before() throws IOException {
@@ -140,7 +140,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setWriteChannelOptions(
-                AsyncWriteChannelOptions.builder().setUploadType(UploadType.DEFAULT).build())
+                AsyncWriteChannelOptions.builder().setUploadType(UploadType.CHUNK_UPLOAD).build())
             .build();
 
     gcs = getGCSImpl(storageOptions);

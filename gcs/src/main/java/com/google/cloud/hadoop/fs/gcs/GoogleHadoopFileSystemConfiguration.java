@@ -471,7 +471,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
    */
   public static final HadoopConfigurationProperty<UploadType> GCS_CLIENT_UPLOAD_TYPE =
-      new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.DEFAULT);
+      new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
 
   /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then

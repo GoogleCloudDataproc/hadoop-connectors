@@ -246,6 +246,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       throws IOException {
     logger.atFiner().log("Upload strategy in use: %s", writeOptions.getUploadType());
     switch (writeOptions.getUploadType()) {
+      case CHUNK_UPLOAD:
+        return BlobWriteSessionConfigs.getDefault()
+            .withChunkSize(writeOptions.getUploadChunkSize());
       case WRITE_TO_DISK_THEN_UPLOAD:
         if (writeOptions.getTemporaryPaths() == null
             || writeOptions.getTemporaryPaths().isEmpty()) {
@@ -274,8 +277,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .withExecutorSupplier(getPCUExecutorSupplier(pCUExecutorService))
             .withPartNamingStrategy(getPartNamingStrategy(writeOptions.getPartFileNamePrefix()));
       default:
-        return BlobWriteSessionConfigs.getDefault()
-            .withChunkSize(writeOptions.getUploadChunkSize());
+        throw new IllegalArgumentException(
+            String.format("Upload type:%s is not supported.", writeOptions.getUploadType()));
     }
   }
 
@@ -285,8 +288,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         return PartCleanupStrategy.never();
       case ON_SUCCESS:
         return PartCleanupStrategy.onlyOnSuccess();
-      default:
+      case ALWAYS:
         return PartCleanupStrategy.always();
+      default:
+        throw new IllegalArgumentException(
+            String.format("Cleanup type:%s is not handled.", cleanupType));
     }
   }
 
@@ -298,13 +304,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private static ExecutorSupplier getPCUExecutorSupplier(ExecutorService pCUExecutorService) {
-    if (pCUExecutorService == null) {
-      ExecutorService pcuThreadPool =
-          Executors.newCachedThreadPool(
-              new ThreadFactoryBuilder().setNameFormat("gcsio-storage-client-pcu-pool-%d").build());
-      return ExecutorSupplier.useExecutor(pcuThreadPool);
-    }
-    return ExecutorSupplier.useExecutor(pCUExecutorService);
+    return pCUExecutorService == null
+        ? ExecutorSupplier.cachedPool()
+        : ExecutorSupplier.useExecutor(pCUExecutorService);
   }
 
   public static Builder builder() {
