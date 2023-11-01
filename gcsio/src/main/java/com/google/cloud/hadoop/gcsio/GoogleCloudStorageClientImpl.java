@@ -28,7 +28,6 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
-import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
@@ -65,7 +64,6 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private final GoogleCloudStorageOptions storageOptions;
@@ -81,7 +79,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
-
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
@@ -95,8 +92,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable ExecutorService pCUExecutorService,
-      @Nullable GcsClientStatisticInterface gcsClientStatisticInterface)
+      @Nullable ExecutorService pCUExecutorService)
       throws IOException {
     super(
         getDelegate(
@@ -105,8 +101,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             options,
             credentials,
             credential,
-            downscopedAccessTokenFn,
-            gcsClientStatisticInterface));
+            downscopedAccessTokenFn));
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
@@ -206,26 +201,18 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageOptions storageOptions,
       Credentials credentials,
       Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     if (httpRequestInitializer != null) {
       logger.atWarning().log("Overriding httpRequestInitializer. ALERT: Use this only for testing");
       return new GoogleCloudStorageImpl(
-          storageOptions,
-          httpRequestInitializer,
-          downscopedAccessTokenFn,
-          gcsClientStatisticInterface);
+          storageOptions, httpRequestInitializer, downscopedAccessTokenFn);
     } else if (storage != null) {
       logger.atWarning().log("Overriding storage. ALERT: Use this only for testing");
       return new GoogleCloudStorageImpl(
-          storageOptions,
-          storage,
-          credentials,
-          downscopedAccessTokenFn,
-          gcsClientStatisticInterface);
+          storageOptions, storage, credentials, downscopedAccessTokenFn);
     }
-    return new GoogleCloudStorageImpl(storageOptions, credential, gcsClientStatisticInterface);
+    return new GoogleCloudStorageImpl(storageOptions, credential);
   }
 
   private static Storage createStorage(
@@ -349,9 +336,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setGRPCInterceptors(
         @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
-
-    public abstract Builder setGcsClientStatisticInterface(
-        @Nullable GcsClientStatisticInterface gcsClientStatisticInterface);
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);

@@ -65,7 +65,6 @@ import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
-import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
@@ -1600,8 +1599,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
             ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
             : null,
-        gcsFsOptions,
-        (GcsClientStatisticInterface) storageStatistics);
+        gcsFsOptions);
   }
 
   /**

@@ -64,7 +64,6 @@ import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.CredentialAdapter;
-import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
@@ -255,9 +254,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Request initializer to use for batch and non-batch requests.
   private final HttpRequestInitializer httpRequestInitializer;
 
-  // Backporting GhfsInstrumentation
-  private final GcsClientStatisticInterface gcsClientStatisticInterface;
-
   // Configuration values for this instance
   private final GoogleCloudStorageOptions storageOptions;
 
@@ -285,27 +281,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(
-        options,
-        credential, /* downscopedAccessTokenFn */
-        null, /* gcsClientStatisticInterface */
-        null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options options to customize behavior
-   * @param credential OAuth2 credential that allows access to GCS
-   * @param gcsClientStatisticInterface for backporting statistics
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Credential credential,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
-      throws IOException {
-    this(options, credential, /* downscopedAccessTokenFn */ null, gcsClientStatisticInterface);
+    this(options, credential, /* downscopedAccessTokenFn= */ null);
   }
 
   /**
@@ -327,65 +303,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions())),
         /* credentials= */ null,
         credential,
-        downscopedAccessTokenFn,
-        /* gcsClientStatisticInterface */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options options to customize behavior
-   * @param credential OAuth2 credential that allows access to GCS
-   * @param downscopedAccessTokenFn Function that generates downscoped access token.
-   * @throws IOException on IO error
-   */
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options options to customize behavior
-   * @param credential OAuth2 credential that allows access to GCS
-   * @param downscopedAccessTokenFn Function that generates downscoped access token.
-   * @param gcsClientStatisticInterface for backporting statistics
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
-      throws IOException {
-    this(
-        options,
-        createStorage(
-            options,
-            new RetryHttpInitializer(
-                credential, options.toRetryHttpInitializerOptions(), gcsClientStatisticInterface)),
-        /* credentials= */ null,
-        credential,
-        downscopedAccessTokenFn,
-        gcsClientStatisticInterface);
+        downscopedAccessTokenFn);
   }
 
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(
-        options,
-        httpRequestInitializer,
-        /* accessTokenProvider= */ null, /* gcsClientStatisticInterface */
-        null);
-  }
-
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      HttpRequestInitializer httpRequestInitializer,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
-      throws IOException {
-    this(
-        options,
-        httpRequestInitializer,
-        /* accessTokenProvider= */ null,
-        gcsClientStatisticInterface);
+    this(options, httpRequestInitializer, /* accessTokenProvider= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -398,23 +322,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createStorage(options, httpRequestInitializer),
         /* credentials= */ null,
         tryGetCredentialsFromRequestInitializer(httpRequestInitializer),
-        downscopedAccessTokenFn, /* gcsClientStatisticInterface */
-        null);
-  }
-
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      HttpRequestInitializer httpRequestInitializer,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
-      throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        tryGetCredentialsFromRequestInitializer(httpRequestInitializer),
-        downscopedAccessTokenFn,
-        gcsClientStatisticInterface);
+        downscopedAccessTokenFn);
   }
 
   /**
@@ -423,7 +331,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, (Credentials) null, (Function<List<AccessBoundary>, String>) null);
+    this(options, storage, /* credentials= */ null, /* downscopedAccessTokenFn= */ null);
     warnIfTracingEnabled(options.isTraceLogEnabled());
   }
 
@@ -436,52 +344,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
-    this(options, storage, credentials, (Function<List<AccessBoundary>, String>) null);
-    warnIfTracingEnabled(options.isTraceLogEnabled());
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
-   * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
-   * @param gcsClientStatisticInterface for back porting statistics
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Storage storage,
-      Credentials credentials,
-      GcsClientStatisticInterface gcsClientStatisticInterface) {
-    this(
-        options,
-        storage,
-        credentials, /* downscopedAccessTokenFn */
-        null,
-        gcsClientStatisticInterface);
-    warnIfTracingEnabled(options.isTraceLogEnabled());
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
-   * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
-   * @param downscopedAccessTokenFn Function that generates down scoped access token.
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Storage storage,
-      Credentials credentials,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    this(
-        options,
-        storage,
-        credentials, /* credential */
-        null,
-        downscopedAccessTokenFn, /* gcsClientStatisticInterface */
-        null);
+    this(options, storage, credentials, /* downscopedAccessTokenFn= */ null);
     warnIfTracingEnabled(options.isTraceLogEnabled());
   }
 
@@ -493,28 +356,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param credentials OAuth2 credentials that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    */
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
-   * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
-   * @param downscopedAccessTokenFn Function that generates down scoped access token.
-   * @param gcsClientStatisticInterface for back porting statistics
-   */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
       Storage storage,
       Credentials credentials,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface) {
-    this(
-        options,
-        storage,
-        credentials, /* credential */
-        null,
-        downscopedAccessTokenFn,
-        gcsClientStatisticInterface);
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+    this(options, storage, credentials, /* credential */ null, downscopedAccessTokenFn);
     warnIfTracingEnabled(options.isTraceLogEnabled());
   }
 
@@ -524,25 +371,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Credentials credentials,
       Credential credential,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    this(
-        options,
-        storage,
-        credentials,
-        credential,
-        downscopedAccessTokenFn, /* gcsClientStatisticInterface */
-        null);
-  }
-
-  private GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Storage storage,
-      Credentials credentials,
-      Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface) {
     logger.atFiner().log("GCS(options: %s)", options);
 
-    this.gcsClientStatisticInterface = gcsClientStatisticInterface;
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
 
