@@ -2,6 +2,8 @@
 
 ## Next
 
+## 2.2.18 - 2023-11-03
+
 1. Upgrade java-storage to 2.28.0
 
 1. Integrate `journaling` , `bufferToDIskThenUpload` and `ParallelCompositeUpload` APIs.
