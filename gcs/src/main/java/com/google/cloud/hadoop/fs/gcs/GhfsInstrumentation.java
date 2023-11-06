@@ -27,6 +27,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_API_TOTAL;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
@@ -365,6 +366,11 @@ public class GhfsInstrumentation
         incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT);
         break;
     }
+  }
+
+  @Override
+  public void incrementGcsRequestCount() {
+    incrementCounter(GCS_API_TOTAL);
   }
 
   /**

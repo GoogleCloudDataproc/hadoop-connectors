@@ -27,6 +27,8 @@ import java.util.EnumSet;
 public enum GoogleCloudStorageStatusStatistics {
 
   /** Client-side Status Code statistics */
+  GCS_API_TOTAL(
+      "gcs_api_total", "Calculcated the total number of requests made to GCS", TYPE_COUNTER),
   GCS_CLIENT_RATE_LIMIT_COUNT("gcs_client_rate_limit_count", "Detects 429 Error", TYPE_COUNTER);
 
   public static final ImmutableSet<GoogleCloudStorageStatusStatistics> VALUES =

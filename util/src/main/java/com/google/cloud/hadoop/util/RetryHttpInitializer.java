@@ -85,6 +85,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
+
+    if (gcsClientStatisticInterface != null) {
+      gcsClientStatisticInterface.incrementGcsRequestCount();
+    }
     // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
     // to refresh credentials later if necessary
     if (credentials != null) {
@@ -181,6 +185,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
 
+      // logger.atInfo().log("StatusCode : " + response.getStatusCode());
+
       logResponseCode(request, response);
 
       if (credentials != null && credentials.handleResponse(request, response, supportsRetry)) {
@@ -254,8 +260,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     @Override
     public boolean handleIOException(HttpRequest httpRequest, boolean supportsRetry)
         throws IOException {
+
       // We sadly don't get anything helpful to see if this is something we want to log.
       // As a result we'll turn down the logging level to debug.
+
       logger.atFine().log("Encountered an IOException when accessing URL %s", httpRequest.getUrl());
       return delegate.handleIOException(httpRequest, supportsRetry);
     }

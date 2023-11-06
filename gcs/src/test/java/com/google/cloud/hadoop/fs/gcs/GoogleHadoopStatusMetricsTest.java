@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_API_TOTAL;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -26,6 +27,7 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpStatusCodes;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
@@ -33,6 +35,7 @@ import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.time.Duration;
 import org.apache.hadoop.fs.Path;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -41,28 +44,34 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleHadoopStatusMetricsTest {
 
-  @Test
-  public void gcs_client_429_status_metrics_STORAGE_CLIENT() throws Exception {
+  private GhfsInstrumentation ghfsInstrumentation;
 
+  @Before
+  public void Before() {
     URI initUri = new Path("gs://test/").toUri();
-    GhfsInstrumentation ghfsInstrumentation = new GhfsInstrumentation(initUri);
+    this.ghfsInstrumentation = new GhfsInstrumentation(initUri);
+  }
 
-    String authHeaderValue = "Bearer: y2.WAKiHahzxGS_a1bd40RjNUF";
+  private RetryHttpInitializer createRetryHttpInitializer(Credentials credentials) {
+    return new RetryHttpInitializer(
+        null,
+        RetryHttpInitializerOptions.builder()
+            .setDefaultUserAgent("foo-user-agent")
+            .setHttpHeaders(ImmutableMap.of("header-key", "header-value"))
+            .setMaxRequestRetries(5)
+            .setConnectTimeout(Duration.ofSeconds(5))
+            .setReadTimeout(Duration.ofSeconds(5))
+            .build(),
+        ghfsInstrumentation);
+  }
 
-    RetryHttpInitializer retryHttpInitializer =
-        new RetryHttpInitializer(
-            null,
-            RetryHttpInitializerOptions.builder()
-                .setDefaultUserAgent("foo-user-agent")
-                .setHttpHeaders(ImmutableMap.of("header-key", "header-value"))
-                .setMaxRequestRetries(5)
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(5))
-                .build(),
-            ghfsInstrumentation);
+  @Test
+  public void test_gcsClientRateLimitCount() throws Exception {
+
+    RetryHttpInitializer retryHttpInitializer = createRetryHttpInitializer(null);
 
     HttpRequestFactory requestFactory =
-        mockTransport(emptyResponse(429), emptyResponse(429), emptyResponse(200))
+        mockTransport(emptyResponse(429), emptyResponse(200))
             .createRequestFactory(retryHttpInitializer);
 
     HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
@@ -74,10 +83,25 @@ public class GoogleHadoopStatusMetricsTest {
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
     assertThat(
-            ((GhfsInstrumentation) ghfsInstrumentation)
+            (ghfsInstrumentation)
                 .getIOStatistics()
                 .counters()
                 .get(GCS_CLIENT_RATE_LIMIT_COUNT.getSymbol()))
-        .isNotEqualTo(0);
+        .isEqualTo(1);
+  }
+
+  @Test
+  public void test_gcsRequestCount() throws Exception {
+    RetryHttpInitializer retryHttpInitializer = createRetryHttpInitializer(null);
+    HttpRequestFactory requestFactory =
+        mockTransport(emptyResponse(429)).createRequestFactory(retryHttpInitializer);
+
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    assertThat(
+            ((GhfsInstrumentation) ghfsInstrumentation)
+                .getIOStatistics()
+                .counters()
+                .get(GCS_API_TOTAL.getSymbol()))
+        .isEqualTo(1);
   }
 }
