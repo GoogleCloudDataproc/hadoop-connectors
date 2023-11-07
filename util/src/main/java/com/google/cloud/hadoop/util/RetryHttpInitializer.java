@@ -62,14 +62,25 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
+  private final GcsClientStatisticInterface gcsClientStatisticInterface;
+
   /**
    * @param credentials A credentials which will be used to initialize on HttpRequests and as the
    *     delegate for a {@link UnsuccessfulResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
+   * @param gcsClientStatisticInterface To backport ghfsInstrumentation instances.
    */
-  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
+  public RetryHttpInitializer(
+      Credentials credentials,
+      RetryHttpInitializerOptions options,
+      GcsClientStatisticInterface gcsClientStatisticInterface) {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
+    this.gcsClientStatisticInterface = gcsClientStatisticInterface;
+  }
+
+  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
+    this(credentials, options, /* gcsClientStatisticInterface */ null);
   }
 
   @Override
@@ -86,7 +97,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         // Set the timeout configurations.
         .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
         .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
-        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials))
+        .setUnsuccessfulResponseHandler(
+            new UnsuccessfulResponseHandler(credentials, gcsClientStatisticInterface))
         .setIOExceptionHandler(new IoExceptionHandler());
 
     HttpHeaders headers = request.getHeaders();
@@ -152,16 +164,23 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     private final HttpCredentialsAdapter credentials;
     private final HttpBackOffUnsuccessfulResponseHandler delegate;
 
-    public UnsuccessfulResponseHandler(HttpCredentialsAdapter credentials) {
+    private final GcsClientStatisticInterface gcsClientStatisticInterface;
+
+    public UnsuccessfulResponseHandler(
+        HttpCredentialsAdapter credentials,
+        GcsClientStatisticInterface gcsClientStatisticInterface) {
       this.credentials = credentials;
       this.delegate =
           new HttpBackOffUnsuccessfulResponseHandler(BACKOFF_BUILDER.build())
               .setBackOffRequired(BACK_OFF_REQUIRED);
+
+      this.gcsClientStatisticInterface = gcsClientStatisticInterface;
     }
 
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
+
       logResponseCode(request, response);
 
       if (credentials != null && credentials.handleResponse(request, response, supportsRetry)) {
@@ -181,6 +200,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     private void logResponseCode(HttpRequest request, HttpResponse response) {
+
+      if (gcsClientStatisticInterface != null) {
+        gcsClientStatisticInterface.statusMetricsUpdation(response.getStatusCode());
+      }
+
       if (RESPONSE_CODES_TO_LOG.contains(response.getStatusCode())) {
         logger
             .atInfo()

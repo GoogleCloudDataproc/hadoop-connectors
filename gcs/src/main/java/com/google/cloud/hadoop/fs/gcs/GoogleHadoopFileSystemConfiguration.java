@@ -35,6 +35,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -470,7 +471,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
    */
   public static final HadoopConfigurationProperty<UploadType> GCS_CLIENT_UPLOAD_TYPE =
-      new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.DEFAULT);
+      new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
 
   /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
@@ -480,6 +481,49 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Collection<String>>
       GCS_WRITE_TEMPORARY_FILES_PATH =
           new HadoopConfigurationProperty<>("fs.gs.write.temporary.dirs", ImmutableSet.of());
+
+  /**
+   * Configuration key to configure the Buffers for UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in
+   * alignment with configuration of java-storage client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_PCU_BUFFER_COUNT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.buffer.count",
+          AsyncWriteChannelOptions.DEFAULT.getPCUBufferCount());
+
+  /**
+   * Configuration key to configure the buffer capacity for UploadType.PARALLEL_COMPOSITE_UPLOAD. It
+   * is in alignment with configuration of java-storage client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+   */
+  public static final HadoopConfigurationProperty<Long> GCS_PCU_BUFFER_CAPACITY =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.buffer.capacity",
+          (long) AsyncWriteChannelOptions.DEFAULT.getPCUBufferCapacity());
+
+  /**
+   * Configuration key to clean up strategy of part files created via
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
+   * client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy
+   */
+  public static final HadoopConfigurationProperty<PartFileCleanupType>
+      GCS_PCU_PART_FILE_CLEANUP_TYPE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
+              AsyncWriteChannelOptions.DEFAULT.getPartFileCleanupType());
+
+  /**
+   * Configuration key to set up the naming strategy of part files created via
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
+   * client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy
+   */
+  public static final HadoopConfigurationProperty<String> GCS_PCU_PART_FILE_NAME_PREFIX =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
+          AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
@@ -588,6 +632,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setUploadType(GCS_CLIENT_UPLOAD_TYPE.get(config, config::getEnum))
         .setTemporaryPaths(
             ImmutableSet.copyOf(GCS_WRITE_TEMPORARY_FILES_PATH.getStringCollection(config)))
+        .setPCUBufferCount(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
+        .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
+        .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
+        .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
         .build();
   }
 
