@@ -33,9 +33,12 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.List;
+import java.util.function.IntFunction;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
@@ -75,6 +78,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
+  private final VectoredIOImpl vectoredIO;
 
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
@@ -115,6 +119,20 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
 
     this.traceFactory = ghfs.getTraceFactory();
+    this.vectoredIO = VectoredIOImpl.create(ghfs, gcsPath, statistics);
+  }
+
+  /**
+   * {@inheritDoc} Vectored read implementation for GoogleHadoopFSInputStream.
+   *
+   * @param ranges the byte ranges to read.
+   * @param allocate the function to allocate ByteBuffer.
+   * @throws IOException IOE if any.
+   */
+  @Override
+  public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    vectoredIO.readVectored(ranges, allocate);
   }
 
   @Override
@@ -228,6 +246,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
     if (!isClosed) {
       streamStatistics.close();
+      vectoredIO.close();
     }
   }
 
