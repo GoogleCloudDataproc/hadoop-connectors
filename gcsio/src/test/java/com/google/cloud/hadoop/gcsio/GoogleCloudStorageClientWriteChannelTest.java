@@ -274,7 +274,7 @@ public class GoogleCloudStorageClientWriteChannelTest {
             .setAppName("gcsio-unit-test")
             .setGrpcEnabled(true)
             .build();
-    return GoogleCloudStorageClientImpl.builder()
+    return GoogleCloudStorageGrpcClientImpl.builder()
         .setOptions(options)
         .setCredentials(fakeCredentials)
         .setHttpTransport(transport)

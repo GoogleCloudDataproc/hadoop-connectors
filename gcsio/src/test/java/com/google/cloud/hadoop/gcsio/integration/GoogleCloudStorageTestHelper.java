@@ -31,7 +31,7 @@ import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -88,7 +88,7 @@ public class GoogleCloudStorageTestHelper {
 
   public static GoogleCloudStorage createGcsClientImpl() {
     try {
-      return GoogleCloudStorageClientImpl.builder()
+      return GoogleCloudStorageGrpcClientImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
           .setCredentials(getCredentials())
           .build();

@@ -74,7 +74,7 @@ public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
       throws IOException {
     return new GoogleCloudStorageFileSystemImpl(
         options ->
-            GoogleCloudStorageClientImpl.builder()
+            GoogleCloudStorageGrpcClientImpl.builder()
                 .setOptions(options)
                 .setCredentials(httpRequestsInitializer.getCredentials())
                 .setHttpRequestInitializer(gcsRequestsTracker)

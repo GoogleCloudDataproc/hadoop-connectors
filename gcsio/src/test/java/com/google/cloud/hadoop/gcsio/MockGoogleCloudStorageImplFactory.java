@@ -57,7 +57,7 @@ public class MockGoogleCloudStorageImplFactory {
       GoogleCloudStorageOptions options, HttpTransport transport, Storage storage)
       throws IOException {
     FakeCredentials fakeCredentials = new FakeCredentials();
-    return GoogleCloudStorageClientImpl.builder()
+    return GoogleCloudStorageGrpcClientImpl.builder()
         .setOptions(options)
         .setHttpTransport(transport)
         .setHttpRequestInitializer(

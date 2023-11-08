@@ -126,7 +126,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     switch (options.getClientType()) {
       case STORAGE_CLIENT:
-        return GoogleCloudStorageClientImpl.builder()
+        return GoogleCloudStorageGrpcClientImpl.builder()
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)

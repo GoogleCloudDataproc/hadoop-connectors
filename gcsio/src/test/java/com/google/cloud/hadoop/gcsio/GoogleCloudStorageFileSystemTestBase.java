@@ -86,7 +86,7 @@ public abstract class GoogleCloudStorageFileSystemTestBase
   private Class getGoogleCloudStorageImplClass() {
     switch (storageClientType) {
       case STORAGE_CLIENT:
-        return GoogleCloudStorageClientImpl.class;
+        return GoogleCloudStorageGrpcClientImpl.class;
       default:
         return GoogleCloudStorageImpl.class;
     }

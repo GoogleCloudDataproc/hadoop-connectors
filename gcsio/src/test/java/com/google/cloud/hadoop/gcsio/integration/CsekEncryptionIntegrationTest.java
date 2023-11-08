@@ -23,7 +23,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -138,7 +138,7 @@ public class CsekEncryptionIntegrationTest {
 
   private GoogleCloudStorage makeStorage(GoogleCloudStorageOptions options) throws IOException {
     if (testStorageClientImpl) {
-      return GoogleCloudStorageClientImpl.builder()
+      return GoogleCloudStorageGrpcClientImpl.builder()
           .setOptions(options)
           .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
           .build();

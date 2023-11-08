@@ -22,7 +22,7 @@ import com.google.api.client.http.HttpStatusCodes;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
@@ -437,7 +437,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private GoogleCloudStorage getGCSImpl(GoogleCloudStorageOptions storageOptions)
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    return GoogleCloudStorageClientImpl.builder()
+    return GoogleCloudStorageGrpcClientImpl.builder()
         .setOptions(storageOptions)
         .setCredentials(credentials)
         .setPCUExecutorService(MoreExecutors.newDirectExecutorService())

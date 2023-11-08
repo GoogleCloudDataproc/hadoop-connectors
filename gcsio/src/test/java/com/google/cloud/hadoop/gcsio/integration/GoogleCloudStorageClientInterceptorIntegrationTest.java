@@ -25,7 +25,7 @@ import static com.google.common.truth.Truth.assertThat;
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientGrpcTracingInterceptor;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTracingFields;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -202,7 +202,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
   public static GoogleCloudStorage getGCSClientImpl(GoogleCloudStorageOptions options) {
     try {
-      return GoogleCloudStorageClientImpl.builder()
+      return GoogleCloudStorageGrpcClientImpl.builder()
           .setOptions(options)
           .setCredentials(getCredentials())
           .build();

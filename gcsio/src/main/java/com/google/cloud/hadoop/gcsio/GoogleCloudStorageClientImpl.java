@@ -23,8 +23,6 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.auth.Credentials;
-import com.google.auto.value.AutoBuilder;
-import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
@@ -38,7 +36,6 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -51,21 +48,19 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
  * Provides read/write access to Google Cloud Storage (GCS), using Java nio channel semantics. This
- * is a basic implementation of the GoogleCloudStorage interface that mostly delegates through to
- * the appropriate API call(s) google-cloud-storage client.
+ * is a basic transport agnostic implementation of the GoogleCloudStorage interface that mostly
+ * delegates through to the appropriate API call(s) google-cloud-storage client.
  */
 @VisibleForTesting
-public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
+public abstract class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private final GoogleCloudStorageOptions storageOptions;
@@ -82,8 +77,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setDaemon(true)
               .build());
   /**
-   * Having an instance of gscImpl to redirect calls to Json client while new client implementation
-   * is in WIP.
+   * Having an instance of gscImpl to redirect calls to google-cloud-storage Json client while new
+   * client implementation is in WIP.
    */
   GoogleCloudStorageClientImpl(
       GoogleCloudStorageOptions options,
@@ -188,6 +183,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
+  abstract Storage createStorage(
+      Credentials credentials,
+      GoogleCloudStorageOptions storageOptions,
+      List<ClientInterceptor> interceptors,
+      ExecutorService pCUExecutorService)
+      throws IOException;
+
   /**
    * Gets the object generation for a write operation
    *
@@ -213,35 +215,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
-  private static Storage createStorage(
-      Credentials credentials,
-      GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors,
-      ExecutorService pCUExecutorService)
-      throws IOException {
-    return StorageOptions.grpc()
-        .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
-        .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
-        .setGrpcInterceptorProvider(
-            () -> {
-              List<ClientInterceptor> list = new ArrayList<>();
-              if (interceptors != null && !interceptors.isEmpty()) {
-                list.addAll(
-                    interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
-              }
-              if (storageOptions.isTraceLogEnabled()) {
-                list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
-              }
-              return ImmutableList.copyOf(list);
-            })
-        .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
-        .setBlobWriteSessionConfig(
-            getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
-        .build()
-        .getService();
-  }
-
-  private static BlobWriteSessionConfig getSessionConfig(
+  static BlobWriteSessionConfig getSessionConfig(
       AsyncWriteChannelOptions writeOptions, ExecutorService pCUExecutorService)
       throws IOException {
     logger.atFiner().log("Upload strategy in use: %s", writeOptions.getUploadType());
@@ -307,40 +281,5 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return pCUExecutorService == null
         ? ExecutorSupplier.cachedPool()
         : ExecutorSupplier.useExecutor(pCUExecutorService);
-  }
-
-  public static Builder builder() {
-    return new AutoBuilder_GoogleCloudStorageClientImpl_Builder();
-  }
-
-  @AutoBuilder(ofClass = GoogleCloudStorageClientImpl.class)
-  public abstract static class Builder {
-
-    public abstract Builder setOptions(GoogleCloudStorageOptions options);
-
-    public abstract Builder setHttpTransport(@Nullable HttpTransport httpTransport);
-
-    public abstract Builder setCredentials(@Nullable Credentials credentials);
-
-    @VisibleForTesting
-    public abstract Builder setHttpRequestInitializer(
-        @Nullable HttpRequestInitializer httpRequestInitializer);
-
-    public abstract Builder setDownscopedAccessTokenFn(
-        @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
-
-    public abstract Builder setGRPCInterceptors(
-        @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
-
-    public abstract Builder setGcsClientStatisticInterface(
-        @Nullable GcsClientStatisticInterface gcsClientStatisticInterface);
-
-    @VisibleForTesting
-    public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
-
-    @VisibleForTesting
-    public abstract Builder setPCUExecutorService(@Nullable ExecutorService pCUExecutorService);
-
-    public abstract GoogleCloudStorageClientImpl build() throws IOException;
   }
 }

@@ -67,7 +67,7 @@ public class GoogleCloudStorageJavaStorageNewIntegrationTest
 
   protected GoogleCloudStorage createGoogleCloudStorage(GoogleCloudStorageOptions options)
       throws IOException {
-    return GoogleCloudStorageClientImpl.builder()
+    return GoogleCloudStorageGrpcClientImpl.builder()
         .setOptions(options)
         .setCredentials(httpRequestsInitializer.getCredentials())
         .setHttpRequestInitializer(gcsRequestsTracker)

@@ -34,7 +34,7 @@ import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -619,7 +619,7 @@ public class GoogleCloudStorageImplTest {
         options,
         (httpRequestInitializer, grpcRequestInterceptors) ->
             testStorageClientImpl
-                ? GoogleCloudStorageClientImpl.builder()
+                ? GoogleCloudStorageGrpcClientImpl.builder()
                     .setOptions(options)
                     .setCredentials(credentials)
                     .setHttpRequestInitializer(httpRequestInitializer)
@@ -637,7 +637,7 @@ public class GoogleCloudStorageImplTest {
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     return testStorageClientImpl
-        ? GoogleCloudStorageClientImpl.builder()
+        ? GoogleCloudStorageGrpcClientImpl.builder()
             .setOptions(options)
             .setCredentials(credentials)
             .build()
