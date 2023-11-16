@@ -34,6 +34,8 @@ public class GrpcErrorTypeExtractor implements ErrorTypeExtractor {
         return ErrorType.NOT_FOUND;
       case OUT_OF_RANGE:
         return ErrorType.OUT_OF_RANGE;
+      case ALREADY_EXISTS:
+        return ErrorType.ALREADY_EXISTS;
       default:
         return ErrorType.UNKNOWN;
     }

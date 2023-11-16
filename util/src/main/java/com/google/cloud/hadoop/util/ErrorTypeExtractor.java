@@ -22,6 +22,7 @@ public interface ErrorTypeExtractor {
   enum ErrorType {
     NOT_FOUND,
     OUT_OF_RANGE,
+    ALREADY_EXISTS,
     UNKNOWN
   }
 
