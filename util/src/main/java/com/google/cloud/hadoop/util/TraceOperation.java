@@ -26,12 +26,12 @@ import java.util.Deque;
 /**
  * Helps trace a block of code.
  *
- * Use {@code TraceOperation.createRootWithLogging} to setup tracing on a thread.
- * Use {@code TraceOperation.addToExistingTrace to add to the existing tracer}.
- * Use {@code TraceOperation.getChildTrace to track operation which runs in another thread}
+ * <p>Use {@code TraceOperation.createRootWithLogging} to setup tracing on a thread. Use {@code
+ * TraceOperation.addToExistingTrace to add to the existing tracer}. Use {@code
+ * TraceOperation.getChildTrace to track operation which runs in another thread}
  *
- * NOTE: Ensure that close() is called on each of the operation.
- * NOTE: This class is for internal use and can change without notice.
+ * <p>NOTE: Ensure that close() is called on each of the operation. NOTE: This class is for internal
+ * use and can change without notice.
  */
 public class TraceOperation implements ITraceOperation {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();

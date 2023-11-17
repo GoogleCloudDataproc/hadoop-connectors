@@ -26,11 +26,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Helps track a request. For eg. this can be used to track a HCFS API call (e.g. rename). This can help pinpoint the operation (e.g. a GCS API call) which is causing request to be slow.
+ * Helps track a request. For eg. this can be used to track a HCFS API call (e.g. rename). This can
+ * help pinpoint the operation (e.g. a GCS API call) which is causing request to be slow.
  *
- * This also tracks operations which runs in the same thread or another thread, up to one level. Mmeaning if an main thread uses threadA, that is tracked. But if threadA uses threadB, it is not tracked. This case can be added if required.
+ * <p>This also tracks operations which runs in the same thread or another thread, up to one level.
+ * Mmeaning if an main thread uses threadA, that is tracked. But if threadA uses threadB, it is not
+ * tracked. This case can be added if required.
  *
- * NOTE: Do not directly use this class. Use the factory methods in {@code ThreadOperation}. This class is for internal use and the API signatures can change.
+ * <p>NOTE: Do not directly use this class. Use the factory methods in {@code ThreadOperation}. This
+ * class is for internal use and the API signatures can change.
  */
 public class ThreadTrace {
 

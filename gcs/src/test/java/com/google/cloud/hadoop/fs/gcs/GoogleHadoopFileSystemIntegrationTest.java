@@ -1843,11 +1843,11 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     ghfs.mkdirs(testRoot);
     assertThat(ghfs.exists(testRoot)).isTrue();
 
-    Path source = new Path(sharedBucketName1,"/directory1/file1");
+    Path source = new Path(sharedBucketName1, "/directory1/file1");
     ghfs.mkdirs(source);
     assertThat(ghfs.exists(source)).isTrue();
 
-    Path dest = new Path(sharedBucketName1,"/directory2/");
+    Path dest = new Path(sharedBucketName1, "/directory2/");
     assertThat(ghfs.exists(dest)).isFalse();
     ghfs.rename(testRoot, dest);
     assertThat(ghfs.exists(dest)).isTrue();
