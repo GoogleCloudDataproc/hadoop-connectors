@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_TRACE_LOG_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
@@ -53,7 +54,10 @@ import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
+import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.PropertyUtil;
+import com.google.cloud.hadoop.util.TraceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
@@ -110,6 +114,7 @@ import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.io.Text;
@@ -118,6 +123,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.functional.CallableRaisingIOE;
 
 /**
  * GoogleHadoopFileSystem is rooted in a single bucket at initialization time; in this case, Hadoop
@@ -210,6 +216,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
+  private ITraceFactory traceFactory = TraceFactory.get(/* isEnabled */ false);
+
   /**
    * Constructs an instance of GoogleHadoopFileSystem; the internal GoogleCloudStorageFileSystem
    * will be set up with config settings when initialize() is called.
@@ -261,6 +269,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 GhfsStorageStatistics.NAME,
                 () -> new GhfsStorageStatistics(instrumentation.getIOStatistics()));
     initializeGcsFs(config);
+
+    // this.traceFactory = TraceFactory.get(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+    this.traceFactory = TraceFactory.get(true);
   }
 
   private void initializeFsRoot() {
@@ -495,9 +506,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_OPEN.getSymbol(),
+        hadoopPath,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
           checkOpen();
@@ -518,9 +530,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       long blockSize,
       Progressable progress)
       throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_CREATE.getSymbol(),
+        hadoopPath,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
           checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
@@ -562,9 +575,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       long blockSize,
       Progressable progress)
       throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE.getSymbol(),
+        hadoopPath,
         () -> {
 
           // incrementStatistic(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
@@ -590,9 +604,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_RENAME.getSymbol(),
+        String.format("%s->%s", src, dst),
         () -> {
           checkArgument(src != null, "src must not be null");
           checkArgument(dst != null, "dst must not be null");
@@ -619,11 +634,27 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         });
   }
 
+  /**
+   * Tracks the duration of the operation {@code operation}. Also setup operation tracking using
+   * {@code ThreadTrace}.
+   */
+  private <B> B trackDurationWithTracing(
+      DurationTrackerFactory factory,
+      String statistic,
+      Object context,
+      CallableRaisingIOE<B> operation)
+      throws IOException {
+    try (ITraceOperation op = traceFactory.createRootWithLogging(statistic, context)) {
+      return trackDuration(factory, statistic, operation);
+    }
+  }
+
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_DELETE.getSymbol(),
+        hadoopPath,
         () -> {
           boolean response;
           try {
@@ -825,9 +856,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public byte[] getXAttr(Path path, String name) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED.getSymbol(),
+        String.format("%s:%s", path, name),
         () -> {
           checkNotNull(path, "path should not be null");
           checkNotNull(name, "name should not be null");
@@ -847,9 +879,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public Map<String, byte[]> getXAttrs(Path path) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_XATTR_GET_MAP.getSymbol(),
+        path,
         () -> {
           checkNotNull(path, "path should not be null");
 
@@ -869,9 +902,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public Map<String, byte[]> getXAttrs(Path path, List<String> names) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP.getSymbol(),
+        String.format("%s:%s", path, names == null ? -1 : names.size()),
         () -> {
           checkNotNull(path, "path should not be null");
           checkNotNull(names, "names should not be null");
@@ -895,9 +929,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public List<String> listXAttrs(Path path) throws IOException {
-    return trackDuration(
+    return trackDurationWithTracing(
         instrumentation,
         GhfsStatistic.INVOCATION_OP_XATTR_LIST.getSymbol(),
+        path,
         () -> {
           checkNotNull(path, "path should not be null");
 
