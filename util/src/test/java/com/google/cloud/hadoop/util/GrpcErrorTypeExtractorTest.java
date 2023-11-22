@@ -38,4 +38,26 @@ public class GrpcErrorTypeExtractorTest {
     Exception ex = new StatusRuntimeException(Status.OUT_OF_RANGE);
     assertThat(typeExtractor.getErrorType(ex)).isEqualTo(ErrorType.OUT_OF_RANGE);
   }
+
+  @Test
+  public void testBucketAlreadyExistsFailedPreconditionException() {
+    Exception ex =
+        new Exception(
+            new StatusRuntimeException(
+                Status.FAILED_PRECONDITION.withDescription(
+                    "Your previous request to create the named bucket succeeded and you already own it.")));
+    assertThat(typeExtractor.bucketAlreadyExists(ex)).isEqualTo(true);
+  }
+
+  @Test
+  public void testBucketAlreadyExists() {
+    Exception ex = new Exception(new StatusRuntimeException(Status.ALREADY_EXISTS));
+    assertThat(typeExtractor.bucketAlreadyExists(ex)).isEqualTo(true);
+  }
+
+  @Test
+  public void testBucketAlreadyExistsInvalidException() {
+    Exception ex = new StatusRuntimeException(Status.ABORTED);
+    assertThat(typeExtractor.bucketAlreadyExists(ex)).isEqualTo(false);
+  }
 }

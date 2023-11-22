@@ -31,7 +31,6 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
-import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfig;
@@ -176,7 +175,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     try {
       storage.create(bucketInfoBuilder.build());
     } catch (StorageException e) {
-      if (errorExtractor.getErrorType(e) == ErrorType.ALREADY_EXISTS) {
+      if (errorExtractor.bucketAlreadyExists(e)) {
         throw (FileAlreadyExistsException)
             new FileAlreadyExistsException(String.format("Bucket '%s' already exists.", bucketName))
                 .initCause(e);
