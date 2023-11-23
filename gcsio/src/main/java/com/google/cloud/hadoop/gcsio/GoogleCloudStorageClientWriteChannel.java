@@ -25,6 +25,7 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSession;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobWriteOption;
+import com.google.cloud.storage.StorageException;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
@@ -60,7 +61,11 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     super(uploadThreadPool, storageOptions.getWriteChannelOptions());
     this.resourceId = resourceId;
     this.blobWriteSession = getBlobWriteSession(storage, resourceId, createOptions, storageOptions);
-    this.writableByteChannel = blobWriteSession.open();
+    try {
+      this.writableByteChannel = blobWriteSession.open();
+    } catch (StorageException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override

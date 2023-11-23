@@ -34,6 +34,7 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
   public static Collection<Object[]> getConstructorArguments() throws IOException {
     return Arrays.asList(
         new Object[] {getGoogleCloudStorage()},
+        new Object[] {GoogleCloudStorageTestHelper.createGcsClientImpl()},
         new Object[] {getPerformanceCachingGoogleCloudStorage()});
   }
 

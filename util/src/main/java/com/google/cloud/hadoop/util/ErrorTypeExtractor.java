@@ -22,8 +22,13 @@ public interface ErrorTypeExtractor {
   enum ErrorType {
     NOT_FOUND,
     OUT_OF_RANGE,
+    ALREADY_EXISTS,
+    FAILED_PRECONDITION,
     UNKNOWN
   }
 
   ErrorType getErrorType(Exception exception);
+
+  /** Determines if the given exception indicates that bucket already exists. */
+  boolean bucketAlreadyExists(Exception e);
 }

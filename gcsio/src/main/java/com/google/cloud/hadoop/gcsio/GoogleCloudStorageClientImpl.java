@@ -19,6 +19,8 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
@@ -33,11 +35,16 @@ import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
+import com.google.cloud.storage.BucketInfo;
+import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
+import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.ExecutorSupplier;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageClass;
+import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -52,6 +59,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -81,6 +89,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
+
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
@@ -134,6 +143,45 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
     channel.initialize();
     return channel;
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#createBucket(String, CreateBucketOptions)} for details about
+   * expected behavior.
+   */
+  @Override
+  public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
+    logger.atFiner().log("createBucket(%s)", bucketName);
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkNotNull(options, "options must not be null");
+    checkNotNull(storageOptions.getProjectId(), "projectId must not be null");
+
+    BucketInfo.Builder bucketInfoBuilder =
+        BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
+
+    if (options.getStorageClass() != null) {
+      bucketInfoBuilder.setStorageClass(
+          StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
+    }
+    if (options.getTtl() != null) {
+      bucketInfoBuilder.setLifecycleRules(
+          Collections.singletonList(
+              new BucketInfo.LifecycleRule(
+                  LifecycleAction.newDeleteAction(),
+                  LifecycleCondition.newBuilder()
+                      .setAge(toIntExact(options.getTtl().toDays()))
+                      .build())));
+    }
+    try {
+      storage.create(bucketInfoBuilder.build());
+    } catch (StorageException e) {
+      if (errorExtractor.bucketAlreadyExists(e)) {
+        throw (FileAlreadyExistsException)
+            new FileAlreadyExistsException(String.format("Bucket '%s' already exists.", bucketName))
+                .initCause(e);
+      }
+      throw new IOException(e);
+    }
   }
 
   @Override
@@ -237,6 +285,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
         .setBlobWriteSessionConfig(
             getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
+        .setProjectId(storageOptions.getProjectId())
         .build()
         .getService();
   }
