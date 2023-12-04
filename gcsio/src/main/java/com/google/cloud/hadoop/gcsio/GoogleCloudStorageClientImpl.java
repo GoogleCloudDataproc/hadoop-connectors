@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl.getFromFuture;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -49,12 +48,13 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobField;
+import com.google.cloud.storage.Storage.BlobGetOption;
+import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
-import com.google.cloud.storage.Storage.BlobField;
-import com.google.cloud.storage.Storage.BlobGetOption;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -62,10 +62,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
@@ -76,15 +72,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -281,6 +272,140 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         bucket.asBucketInfo().getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
         bucket.getLocation(),
         bucket.getStorageClass().name());
+  }
+
+  /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about the expected behavior. */
+  @Override
+  public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
+    logger.atFiner().log("deleteObjects(%s)", fullObjectNames);
+
+    if (fullObjectNames.isEmpty()) {
+      return;
+    }
+
+    // Validate that all the elements represent StorageObjects.
+    for (StorageResourceId fullObjectName : fullObjectNames) {
+      checkArgument(
+          fullObjectName.isStorageObject(),
+          "Expected full StorageObject names only, got: %s",
+          fullObjectName);
+    }
+
+    // Gather exceptions to wrap in a composite exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    GrpcManualBatchExecutor executor =
+        new GrpcManualBatchExecutor(storageOptions.getBatchThreads());
+
+    for (StorageResourceId object : fullObjectNames) {
+      queueSingleObjectDelete(object, innerExceptions, executor, 0);
+    }
+    executor.shutdown();
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void queueSingleObjectDelete(
+      StorageResourceId resourceId,
+      KeySetView<IOException, Boolean> innerExceptions,
+      GrpcManualBatchExecutor grpcManualBatchExecutor,
+      int attempt) {
+    String bucketName = resourceId.getBucketName();
+    String objectName = resourceId.getObjectName();
+    if (resourceId.hasGenerationId()) {
+      grpcManualBatchExecutor.queue(
+          () ->
+              storage.delete(
+                  BlobId.of(bucketName, objectName),
+                  BlobSourceOption.generationMatch(resourceId.getGenerationId())),
+          getObjectDeletionCallback(
+              resourceId,
+              innerExceptions,
+              grpcManualBatchExecutor,
+              attempt,
+              resourceId.getGenerationId()));
+
+    } else {
+      // We first need to get the current object version to issue a safe delete for only the latest
+      // version of the object.
+      grpcManualBatchExecutor.queue(
+          () ->
+              storage.get(
+                  BlobId.of(bucketName, objectName), BlobGetOption.fields(BlobField.GENERATION)),
+          new FutureCallback<>() {
+            @Override
+            public void onSuccess(Blob blob) {
+              Long generation = checkNotNull(blob.getGeneration(), "generation can not be null");
+              grpcManualBatchExecutor.queue(
+                  () ->
+                      storage.delete(
+                          BlobId.of(bucketName, objectName),
+                          BlobSourceOption.generationMatch(generation)),
+                  getObjectDeletionCallback(
+                      resourceId, innerExceptions, grpcManualBatchExecutor, attempt, generation));
+            }
+
+            @Override
+            public void onFailure(Throwable throwable) {
+              if (throwable instanceof Exception
+                  && errorExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
+                // If the item isn't found, treat it the same as if it's not found
+                // in the delete case: assume the user wanted the object gone, and now it is.
+                logger.atFiner().log(
+                    "deleteObjects(%s): get not found:%n%s", resourceId, throwable);
+              } else {
+                innerExceptions.add(
+                    new IOException(
+                        String.format("Error deleting %s, stage 1", resourceId), throwable));
+              }
+            }
+          });
+    }
+  }
+
+  private FutureCallback<Boolean> getObjectDeletionCallback(
+      StorageResourceId resourceId,
+      ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
+      GrpcManualBatchExecutor grpcManualBatchExecutor,
+      int attempt,
+      long generation) {
+    return new FutureCallback<>() {
+      @Override
+      public void onSuccess(Boolean result) {
+        if (!result) {
+          // Ignore item-not-found scenario. We do not have to delete what we cannot find.
+          // This situation typically shows up when we make a request to delete something and the
+          // server receives the request, but we get a retry-able error before we get a response.
+          // During a retry, we no longer find the item because the server had deleted it already.
+          logger.atFiner().log("Delete object %s not found:%n", resourceId);
+        } else {
+          logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
+        }
+      }
+
+      @Override
+      public void onFailure(Throwable throwable) {
+        if (throwable instanceof Exception
+            && errorExtractor.getErrorType((Exception) throwable) == ErrorType.FAILED_PRECONDITION
+            && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
+          logger.atInfo().log(
+              "Precondition not met while deleting '%s' at generation %s. Attempt %s."
+                  + " Retrying:%n%s",
+              resourceId, generation, attempt, throwable);
+          queueSingleObjectDelete(
+              resourceId, innerExceptions, grpcManualBatchExecutor, attempt + 1);
+        } else {
+          innerExceptions.add(
+              new IOException(
+                  String.format(
+                      "Error deleting '%s', stage 2 with generation %s", resourceId, generation),
+                  throwable));
+        }
+      }
+    };
   }
 
   @Override
