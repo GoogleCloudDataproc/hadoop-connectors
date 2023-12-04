@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl.getFromFuture;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -32,8 +33,11 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Bucket;
@@ -49,12 +53,19 @@ import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.Storage.BlobField;
+import com.google.cloud.storage.Storage.BlobGetOption;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
@@ -65,8 +76,15 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap.KeySetView;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -78,7 +96,11 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  // Maximum number of times to retry deletes in the case of precondition failures.
+  private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
