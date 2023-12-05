@@ -1037,14 +1037,16 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
             new StorageResourceId(testBucket, testDir + "f1"),
             new StorageResourceId(testBucket, testDir + "f2")));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            batchRequestString(),
-            getRequestString(testBucket, testDir + "f1", /* fields= */ "generation"),
-            getRequestString(testBucket, testDir + "f2", /* fields= */ "generation"),
-            batchRequestString(),
-            deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
-            deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              batchRequestString(),
+              getRequestString(testBucket, testDir + "f1", /* fields= */ "generation"),
+              getRequestString(testBucket, testDir + "f2", /* fields= */ "generation"),
+              batchRequestString(),
+              deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
+              deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
+    }
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f3");
@@ -1062,12 +1064,14 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
             new StorageResourceId(testBucket, testDir + "f1"),
             new StorageResourceId(testBucket, testDir + "f2")));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testDir + "f1", /* fields= */ "generation"),
-            deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
-            getRequestString(testBucket, testDir + "f2", /* fields= */ "generation"),
-            deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(testBucket, testDir + "f1", /* fields= */ "generation"),
+              deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
+              getRequestString(testBucket, testDir + "f2", /* fields= */ "generation"),
+              deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
+    }
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f3");
@@ -1361,6 +1365,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
   @FunctionalInterface
   private interface TriFunction<A, B, C, R> {
+
     R apply(A a, B b, C c) throws IOException;
 
     default <V> TriFunction<A, B, C, V> andThen(Function<? super R, ? extends V> after) {

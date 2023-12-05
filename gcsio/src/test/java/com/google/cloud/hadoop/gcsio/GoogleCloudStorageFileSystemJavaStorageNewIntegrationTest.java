@@ -35,6 +35,8 @@ import org.junit.runners.JUnit4;
  * Test suites of integration tests for {@link GoogleCloudStorageFileSystemImpl} class configured to
  * use java-storage client to connect to gcs server.
  */
+// TODO : Wire out these tests from GoogleCloudStorageFileSystemNewIntegrationTestBase. Tests in
+//  the base class are tightly coupled with the HTTP client.
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
     extends GoogleCloudStorageFileSystemNewIntegrationTestBase {
@@ -60,6 +62,7 @@ public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
 
     gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
     gcsfsIHelper.beforeAllTests();
+    isTracingSupported = false;
   }
 
   @AfterClass

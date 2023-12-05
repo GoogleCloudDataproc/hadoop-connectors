@@ -295,13 +295,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
         ConcurrentHashMap.newKeySet();
 
-    GrpcManualBatchExecutor executor =
-        new GrpcManualBatchExecutor(storageOptions.getBatchThreads());
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
 
-    for (StorageResourceId object : fullObjectNames) {
-      queueSingleObjectDelete(object, innerExceptions, executor, 0);
+    try {
+      for (StorageResourceId object : fullObjectNames) {
+        queueSingleObjectDelete(object, innerExceptions, executor, 0);
+      }
+    } finally {
+      executor.shutdown();
     }
-    executor.shutdown();
 
     if (!innerExceptions.isEmpty()) {
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
@@ -311,56 +313,51 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private void queueSingleObjectDelete(
       StorageResourceId resourceId,
       KeySetView<IOException, Boolean> innerExceptions,
-      GrpcManualBatchExecutor grpcManualBatchExecutor,
+      BatchExecutor batchExecutor,
       int attempt) {
     String bucketName = resourceId.getBucketName();
     String objectName = resourceId.getObjectName();
     if (resourceId.hasGenerationId()) {
-      grpcManualBatchExecutor.queue(
+      batchExecutor.queue(
           () ->
               storage.delete(
                   BlobId.of(bucketName, objectName),
                   BlobSourceOption.generationMatch(resourceId.getGenerationId())),
           getObjectDeletionCallback(
-              resourceId,
-              innerExceptions,
-              grpcManualBatchExecutor,
-              attempt,
-              resourceId.getGenerationId()));
+              resourceId, innerExceptions, batchExecutor, attempt, resourceId.getGenerationId()));
 
     } else {
       // We first need to get the current object version to issue a safe delete for only the latest
       // version of the object.
-      grpcManualBatchExecutor.queue(
+      batchExecutor.queue(
           () ->
               storage.get(
                   BlobId.of(bucketName, objectName), BlobGetOption.fields(BlobField.GENERATION)),
           new FutureCallback<>() {
             @Override
             public void onSuccess(Blob blob) {
-              Long generation = checkNotNull(blob.getGeneration(), "generation can not be null");
-              grpcManualBatchExecutor.queue(
+              if (blob == null) {
+                // Denotes that the item cannot be found.
+                // If the item isn't found, treat it the same as if it's not found
+                // in the delete case: assume the user wanted the object gone, and now it is.
+                logger.atFiner().log("deleteObjects(%s): get not found.", resourceId);
+                return;
+              }
+              long generation = checkNotNull(blob.getGeneration(), "generation can not be null");
+              batchExecutor.queue(
                   () ->
                       storage.delete(
                           BlobId.of(bucketName, objectName),
                           BlobSourceOption.generationMatch(generation)),
                   getObjectDeletionCallback(
-                      resourceId, innerExceptions, grpcManualBatchExecutor, attempt, generation));
+                      resourceId, innerExceptions, batchExecutor, attempt, generation));
             }
 
             @Override
             public void onFailure(Throwable throwable) {
-              if (throwable instanceof Exception
-                  && errorExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
-                // If the item isn't found, treat it the same as if it's not found
-                // in the delete case: assume the user wanted the object gone, and now it is.
-                logger.atFiner().log(
-                    "deleteObjects(%s): get not found:%n%s", resourceId, throwable);
-              } else {
-                innerExceptions.add(
-                    new IOException(
-                        String.format("Error deleting %s, stage 1", resourceId), throwable));
-              }
+              innerExceptions.add(
+                  new IOException(
+                      String.format("Error deleting %s, stage 1", resourceId), throwable));
             }
           });
     }
@@ -369,7 +366,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private FutureCallback<Boolean> getObjectDeletionCallback(
       StorageResourceId resourceId,
       ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
-      GrpcManualBatchExecutor grpcManualBatchExecutor,
+      BatchExecutor batchExecutor,
       int attempt,
       long generation) {
     return new FutureCallback<>() {
@@ -380,7 +377,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           // This situation typically shows up when we make a request to delete something and the
           // server receives the request, but we get a retry-able error before we get a response.
           // During a retry, we no longer find the item because the server had deleted it already.
-          logger.atFiner().log("Delete object %s not found:%n", resourceId);
+          logger.atFiner().log("Delete object %s not found.", resourceId);
         } else {
           logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
         }
@@ -393,10 +390,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
           logger.atInfo().log(
               "Precondition not met while deleting '%s' at generation %s. Attempt %s."
-                  + " Retrying:%n%s",
+                  + " Retrying:%s",
               resourceId, generation, attempt, throwable);
-          queueSingleObjectDelete(
-              resourceId, innerExceptions, grpcManualBatchExecutor, attempt + 1);
+          queueSingleObjectDelete(resourceId, innerExceptions, batchExecutor, attempt + 1);
         } else {
           innerExceptions.add(
               new IOException(

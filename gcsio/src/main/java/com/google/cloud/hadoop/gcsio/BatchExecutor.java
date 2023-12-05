@@ -1,7 +1,24 @@
+/*
+ * Copyright 2023 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl.getFromFuture;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.FutureCallback;
@@ -17,15 +34,15 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * GrpcManualBatchExecutor provides a means to manually batch gRPC requests using a thread pool.
- * Execution is performed by the requestsExecutor ExecutorService.
+ * BatchExecutor provides a means to manually batch requests using a thread pool. Execution is
+ * performed by the underlying {@link #requestsExecutor} ExecutorService.
  *
- * <p>Expected usage is to create a new GrpcManualBatchExecutor instance per client operation that
- * represents logical grouping of requests(delete, copy, get).
+ * <p>Expected usage is to create a new BatchExecutor instance per client operation that represents
+ * logical grouping of requests(delete, copy, get).
  *
  * <p>Instance of this class can not be used again after {@link #shutdown()} method has been called.
  */
-public class GrpcManualBatchExecutor {
+class BatchExecutor {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -33,7 +50,12 @@ public class GrpcManualBatchExecutor {
 
   private final Queue<Future<Void>> responseFutures = new ConcurrentLinkedQueue<>();
 
-  GrpcManualBatchExecutor(int numThreads) {
+  public BatchExecutor(int numThreads) {
+    this.requestsExecutor =
+        numThreads == 0 ? newDirectExecutorService() : newRequestExecutor(numThreads);
+  }
+
+  private static ExecutorService newRequestExecutor(int numThreads) {
     ThreadPoolExecutor executor =
         new ThreadPoolExecutor(
             /* corePoolSize= */ numThreads,
@@ -47,7 +69,7 @@ public class GrpcManualBatchExecutor {
                 .build());
     executor.allowCoreThreadTimeOut(true);
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-    this.requestsExecutor = executor;
+    return executor;
   }
 
   /** Adds a task to the execution queue. */
