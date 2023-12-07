@@ -242,8 +242,8 @@ public class BatchHelper {
     responseFutures.add(
         requestsExecutor.submit(
             () -> {
-              String tc = String.format("%s(batchSize=%s)", this.traceContext, batch.size());
-              try (ITraceOperation to = TraceOperation.getChildTrace(this.rootTrace, tc)) {
+              String traceName = String.format("%s(batchSize=%s)", this.traceContext, batch.size());
+              try (ITraceOperation to = TraceOperation.getChildTrace(this.rootTrace, traceName)) {
                 batch.execute();
               }
               return null;

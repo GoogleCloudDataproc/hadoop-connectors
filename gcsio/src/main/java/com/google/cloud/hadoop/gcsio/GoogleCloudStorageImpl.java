@@ -1695,7 +1695,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               storageOptions.getMaxRequestsPerBatch(),
               resourceIds.size(),
               storageOptions.getBatchThreads(),
-              "batchGetItemInfo");
+              traceContext);
 
       // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request,
       // or enqueue a StorageObject fetch request.
