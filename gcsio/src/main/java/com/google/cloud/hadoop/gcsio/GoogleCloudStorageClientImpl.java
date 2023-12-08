@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -402,6 +403,36 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         }
       }
     };
+  }
+
+  /** See {@link GoogleCloudStorage#deleteBuckets(List)} for details about expected behavior. */
+  @Override
+  public void deleteBuckets(List<String> bucketNames) throws IOException {
+    logger.atFiner().log("deleteBuckets(%s)", bucketNames);
+
+    // Validate all the inputs first.
+    for (String bucketName : bucketNames) {
+      checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    }
+
+    // Gather exceptions to wrap in a composite exception at the end.
+    List<IOException> innerExceptions = new ArrayList<>();
+
+    for (String bucketName : bucketNames) {
+      try {
+        boolean isDeleted = storage.delete(bucketName);
+        if (!isDeleted) {
+          innerExceptions.add(createFileNotFoundException(bucketName, null, null));
+        }
+      } catch (StorageException e) {
+        innerExceptions.add(
+            new IOException(String.format("Error deleting '%s' bucket", bucketName), e));
+      }
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
   }
 
   @Override
