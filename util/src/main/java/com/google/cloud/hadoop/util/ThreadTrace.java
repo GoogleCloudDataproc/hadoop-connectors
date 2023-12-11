@@ -126,6 +126,8 @@ public class ThreadTrace {
     private enum EventType {
       START,
       END,
+      // This indicates that two consecutive start-end event pairs are "merged" to one event. This
+      // is done to reduce the number of events in the trace.
       MERGED,
     }
 
@@ -161,7 +163,7 @@ public class ThreadTrace {
 
     ThreadTraceEvent endEvent() {
       ThreadTraceEvent result = new ThreadTraceEvent(EventType.END, name);
-      result.setTimeTaken(result.timeStamp - timeStamp);
+      result.setTimeTaken(result.timeStamp - this.timeStamp);
       return result;
     }
 

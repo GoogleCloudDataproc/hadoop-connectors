@@ -191,7 +191,7 @@ public class BatchHelper {
 
   private <T> void execute(StorageRequest<T> req, JsonBatchCallback<T> callback)
       throws IOException {
-    String traceName = this.traceContext + "(size=1)";
+    String traceName = this.traceContext + "(batchSize=1)";
     try (ITraceOperation to = TraceOperation.getChildTrace(this.rootTrace, traceName)) {
       T result = req.execute();
       callback.onSuccess(result, req.getLastResponseHeaders());
