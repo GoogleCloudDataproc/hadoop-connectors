@@ -24,6 +24,7 @@ import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.gax.paging.Page;
 import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
@@ -35,6 +36,7 @@ import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
+import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
@@ -43,6 +45,8 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BucketField;
+import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
@@ -182,6 +186,79 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  /** See {@link GoogleCloudStorage#listBucketNames()} for details about expected behavior. */
+  @Override
+  public List<String> listBucketNames() throws IOException {
+    logger.atFiner().log("listBucketNames()");
+    List<Bucket> allBuckets = listBucketsInternal();
+    List<String> bucketNames = new ArrayList<>(allBuckets.size());
+    for (Bucket bucket : allBuckets) {
+      bucketNames.add(bucket.getName());
+    }
+    return bucketNames;
+  }
+
+  /** See {@link GoogleCloudStorage#listBucketInfo()} for details about expected behavior. */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
+    logger.atFiner().log("listBucketInfo()");
+    List<Bucket> allBuckets = listBucketsInternal();
+    List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>(allBuckets.size());
+    for (Bucket bucket : allBuckets) {
+      bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
+    }
+    return bucketInfos;
+  }
+
+  /**
+   * Shared helper for actually dispatching buckets list API calls and accumulating paginated
+   * results; these can then be used to either extract just their names, or to parse into full
+   * GoogleCloudStorageItemInfos.
+   */
+  private List<Bucket> listBucketsInternal() throws IOException {
+    logger.atFiner().log("listBucketsInternal()");
+    checkNotNull(storageOptions.getProjectId(), "projectId must not be null");
+    List<Bucket> allBuckets = new ArrayList<>();
+    try {
+      Page<Bucket> buckets =
+          storage.list(
+              BucketListOption.pageSize(storageOptions.getMaxListItemsPerCall()),
+              BucketListOption.fields(
+                  BucketField.LOCATION,
+                  BucketField.STORAGE_CLASS,
+                  BucketField.TIME_CREATED,
+                  BucketField.UPDATED));
+
+      // Loop to fetch all the items.
+      for (Bucket bucket : buckets.iterateAll()) {
+        allBuckets.add(bucket);
+      }
+    } catch (StorageException e) {
+      throw new IOException(e);
+    }
+    return allBuckets;
+  }
+
+  /** Helper for converting a StorageResourceId + Bucket into a GoogleCloudStorageItemInfo. */
+  private static GoogleCloudStorageItemInfo createItemInfoForBucket(
+      StorageResourceId resourceId, Bucket bucket) {
+    checkArgument(resourceId != null, "resourceId must not be null");
+    checkArgument(bucket != null, "bucket must not be null");
+    checkArgument(resourceId.isBucket(), "resourceId must be a Bucket. resourceId: %s", resourceId);
+    checkArgument(
+        resourceId.getBucketName().equals(bucket.getName()),
+        "resourceId.getBucketName() must equal bucket.getName(): '%s' vs '%s'",
+        resourceId.getBucketName(),
+        bucket.getName());
+
+    return GoogleCloudStorageItemInfo.createBucket(
+        resourceId,
+        bucket.asBucketInfo().getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        bucket.asBucketInfo().getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        bucket.getLocation(),
+        bucket.getStorageClass().name());
   }
 
   @Override
