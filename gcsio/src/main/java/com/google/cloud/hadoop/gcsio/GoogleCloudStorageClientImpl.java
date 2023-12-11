@@ -32,8 +32,11 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Bucket;
@@ -45,6 +48,9 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobField;
+import com.google.cloud.storage.Storage.BlobGetOption;
+import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.StorageClass;
@@ -55,6 +61,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
@@ -65,6 +72,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -78,7 +87,11 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  // Maximum number of times to retry deletes in the case of precondition failures.
+  private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
@@ -259,6 +272,136 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         bucket.asBucketInfo().getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
         bucket.getLocation(),
         bucket.getStorageClass().name());
+  }
+
+  /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about the expected behavior. */
+  @Override
+  public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
+    logger.atFiner().log("deleteObjects(%s)", fullObjectNames);
+
+    if (fullObjectNames.isEmpty()) {
+      return;
+    }
+
+    // Validate that all the elements represent StorageObjects.
+    for (StorageResourceId fullObjectName : fullObjectNames) {
+      checkArgument(
+          fullObjectName.isStorageObject(),
+          "Expected full StorageObject names only, got: %s",
+          fullObjectName);
+    }
+
+    // Gather exceptions to wrap in a composite exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
+
+    try {
+      for (StorageResourceId object : fullObjectNames) {
+        queueSingleObjectDelete(object, innerExceptions, executor, 0);
+      }
+    } finally {
+      executor.shutdown();
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void queueSingleObjectDelete(
+      StorageResourceId resourceId,
+      KeySetView<IOException, Boolean> innerExceptions,
+      BatchExecutor batchExecutor,
+      int attempt) {
+    String bucketName = resourceId.getBucketName();
+    String objectName = resourceId.getObjectName();
+    if (resourceId.hasGenerationId()) {
+      batchExecutor.queue(
+          () ->
+              storage.delete(
+                  BlobId.of(bucketName, objectName),
+                  BlobSourceOption.generationMatch(resourceId.getGenerationId())),
+          getObjectDeletionCallback(
+              resourceId, innerExceptions, batchExecutor, attempt, resourceId.getGenerationId()));
+
+    } else {
+      // We first need to get the current object version to issue a safe delete for only the latest
+      // version of the object.
+      batchExecutor.queue(
+          () ->
+              storage.get(
+                  BlobId.of(bucketName, objectName), BlobGetOption.fields(BlobField.GENERATION)),
+          new FutureCallback<>() {
+            @Override
+            public void onSuccess(Blob blob) {
+              if (blob == null) {
+                // Denotes that the item cannot be found.
+                // If the item isn't found, treat it the same as if it's not found
+                // in the delete case: assume the user wanted the object gone, and now it is.
+                logger.atFiner().log("deleteObjects(%s): get not found.", resourceId);
+                return;
+              }
+              long generation = checkNotNull(blob.getGeneration(), "generation can not be null");
+              batchExecutor.queue(
+                  () ->
+                      storage.delete(
+                          BlobId.of(bucketName, objectName),
+                          BlobSourceOption.generationMatch(generation)),
+                  getObjectDeletionCallback(
+                      resourceId, innerExceptions, batchExecutor, attempt, generation));
+            }
+
+            @Override
+            public void onFailure(Throwable throwable) {
+              innerExceptions.add(
+                  new IOException(
+                      String.format("Error deleting %s, stage 1", resourceId), throwable));
+            }
+          });
+    }
+  }
+
+  private FutureCallback<Boolean> getObjectDeletionCallback(
+      StorageResourceId resourceId,
+      ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
+      BatchExecutor batchExecutor,
+      int attempt,
+      long generation) {
+    return new FutureCallback<>() {
+      @Override
+      public void onSuccess(Boolean result) {
+        if (!result) {
+          // Ignore item-not-found scenario. We do not have to delete what we cannot find.
+          // This situation typically shows up when we make a request to delete something and the
+          // server receives the request, but we get a retry-able error before we get a response.
+          // During a retry, we no longer find the item because the server had deleted it already.
+          logger.atFiner().log("Delete object %s not found.", resourceId);
+        } else {
+          logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
+        }
+      }
+
+      @Override
+      public void onFailure(Throwable throwable) {
+        if (throwable instanceof Exception
+            && errorExtractor.getErrorType((Exception) throwable) == ErrorType.FAILED_PRECONDITION
+            && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
+          logger.atInfo().log(
+              "Precondition not met while deleting '%s' at generation %s. Attempt %s."
+                  + " Retrying:%s",
+              resourceId, generation, attempt, throwable);
+          queueSingleObjectDelete(resourceId, innerExceptions, batchExecutor, attempt + 1);
+        } else {
+          innerExceptions.add(
+              new IOException(
+                  String.format(
+                      "Error deleting '%s', stage 2 with generation %s", resourceId, generation),
+                  throwable));
+        }
+      }
+    };
   }
 
   @Override
