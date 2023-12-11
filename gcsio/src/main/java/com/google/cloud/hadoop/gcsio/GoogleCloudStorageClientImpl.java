@@ -16,21 +16,19 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Strings.emptyToNull;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.util.Data;
-import com.google.api.gax.paging.Page;
 import com.google.api.gax.paging.Page;
 import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
@@ -42,7 +40,6 @@ import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
-import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
@@ -58,9 +55,8 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Pa
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobField;
-import com.google.cloud.storage.Storage.BlobListOption;
-import com.google.cloud.storage.Storage.BlobField;
 import com.google.cloud.storage.Storage.BlobGetOption;
+import com.google.cloud.storage.Storage.BlobListOption;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.Storage.BucketField;
@@ -73,9 +69,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.io.BaseEncoding;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -88,11 +82,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -108,7 +102,6 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -127,17 +120,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
-
-  @Nullable
-  private static byte[] decodeMetadataValues(String value) {
-    try {
-      return BaseEncoding.base64().decode(value);
-    } catch (IllegalArgumentException iae) {
-      logger.atSevere().withCause(iae).log(
-          "Failed to parse base64 encoded attribute value %s - %s", value, iae);
-      return null;
-    }
-  }
 
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
@@ -478,10 +460,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     String pageToken = null;
     do {
-      pageToken = listObjectInfoPageInternal(bucketName, objectNamePrefix, objectInfos, listOptions,
-          pageToken);
+      pageToken =
+          listObjectInfoPageInternal(
+              bucketName, objectNamePrefix, objectInfos, listOptions, pageToken);
     } while (pageToken != null
         && getMaxRemainingResults(listOptions.getMaxResults(), objectInfos) > 0);
+
+    objectInfos.sort(Comparator.comparing(GoogleCloudStorageItemInfo::getObjectName));
 
     return objectInfos;
   }
@@ -503,17 +488,19 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     List<GoogleCloudStorageItemInfo> objectInfos = new ArrayList<>();
 
-    String nextPageToken = listObjectInfoPageInternal(bucketName, objectNamePrefix, objectInfos,
-        listOptions, pageToken);
+    String nextPageToken =
+        listObjectInfoPageInternal(
+            bucketName, objectNamePrefix, objectInfos, listOptions, pageToken);
     return new ListPage<>(objectInfos, nextPageToken);
-
   }
 
-  private String listObjectInfoPageInternal(String bucketName,
+  private String listObjectInfoPageInternal(
+      String bucketName,
       String objectNamePrefix,
       List<GoogleCloudStorageItemInfo> objectInfos,
       ListObjectOptions listOptions,
-      String pageToken) throws IOException {
+      String pageToken)
+      throws IOException {
     // TODO: Check if we need to set maxResults + 1 in case of listing prefixes.
     logger.atFiner().log("listObjectInfoPage(%s, %s)", objectInfos, listOptions);
 
@@ -536,9 +523,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     Iterator<Blob> blobIterator;
     String nextPageToken = null;
     try {
-      Page<Blob> blobListPage = storage.list(bucketName,
-          prepareBlobListOptions(listOptions, objectNamePrefix, pageToken).toArray(
-              new BlobListOption[0]));
+      Page<Blob> blobListPage =
+          storage.list(
+              bucketName,
+              prepareBlobListOptions(listOptions, objectNamePrefix, pageToken)
+                  .toArray(new BlobListOption[0]));
       nextPageToken = emptyToNull(blobListPage.getNextPageToken());
       blobIterator = blobListPage.getValues().iterator();
     } catch (StorageException e) {
@@ -556,15 +545,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       Blob blob = blobIterator.next();
       if (blob.isDirectory() && listOptions.isIncludePrefix()) {
         // Handle prefixes.
-        objectInfos.add(
-            createInferredDirectory(new StorageResourceId(bucketName, blob.getName())));
+        objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, blob.getName())));
       } else if (!objectPrefixEndsWithDelimiter || !blob.getName().equals(objectNamePrefix)) {
         // Handle objects.
         objectInfos.add(createItemInfoForBlob(blob));
       } else if (blob.getName().equals(objectNamePrefix) && listOptions.isIncludePrefix()) {
         // Handle object prefixes. Object prefixes show up as non-directory.
-        objectInfos.add(
-            createInferredDirectory(new StorageResourceId(bucketName, blob.getName())));
+        objectInfos.add(createItemInfoForBlob(blob));
         objectPrefixIncluded = true;
       }
     }
@@ -578,16 +565,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         // Only add an inferred directory if listed any prefixes or objects, i.e. prefix "exists"
         && !objectInfos.isEmpty()
         // Only add an inferred directory if prefix object is not listed already
-        && !objectPrefixIncluded
-    ) {
-      objectInfos.add(
-          createInferredDirectory(new StorageResourceId(bucketName, objectNamePrefix)));
+        && !objectPrefixIncluded) {
+      objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, objectNamePrefix)));
     }
     return nextPageToken;
   }
 
-  private static long getMaxRemainingResults(long maxResults,
-      List<GoogleCloudStorageItemInfo> blobs) {
+  private static long getMaxRemainingResults(
+      long maxResults, List<GoogleCloudStorageItemInfo> blobs) {
     if (maxResults <= 0) {
       return Long.MAX_VALUE;
     }
@@ -595,20 +580,26 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private static BlobField getBlobField(String field) {
-    Optional<BlobField> resultField = Arrays.stream(BlobField.values())
-        .filter(blobField -> blobField.getApiaryName().equals(field)).findFirst();
+    Optional<BlobField> resultField =
+        Arrays.stream(BlobField.values())
+            .filter(blobField -> blobField.getApiaryName().equals(field))
+            .findFirst();
     return resultField.orElse(null);
   }
 
-  private List<BlobListOption> prepareBlobListOptions(ListObjectOptions listOptions,
-      @Nullable String objectNamePrefix, @Nullable String pageToken) {
+  private List<BlobListOption> prepareBlobListOptions(
+      ListObjectOptions listOptions,
+      @Nullable String objectNamePrefix,
+      @Nullable String pageToken) {
     long maxResults = listOptions.getMaxResults();
 
     List<BlobListOption> blobListOptions = new ArrayList<>();
 
-    blobListOptions.add(BlobListOption.pageSize(
-        maxResults <= 0 || maxResults >= storageOptions.getMaxListItemsPerCall()
-            ? storageOptions.getMaxListItemsPerCall() : maxResults));
+    blobListOptions.add(
+        BlobListOption.pageSize(
+            maxResults <= 0 || maxResults >= storageOptions.getMaxListItemsPerCall()
+                ? storageOptions.getMaxListItemsPerCall()
+                : maxResults));
 
     if (listOptions.getDelimiter() != null) {
       blobListOptions.add(BlobListOption.delimiter(listOptions.getDelimiter()));
@@ -617,8 +608,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       blobListOptions.add(BlobListOption.prefix(objectNamePrefix));
     }
     if (listOptions.getFields() != null) {
-      blobListOptions.add(BlobListOption.fields(Arrays.stream(listOptions.getFields().split(","))
-          .map(GoogleCloudStorageClientImpl::getBlobField).toArray(BlobField[]::new)));
+      blobListOptions.add(
+          BlobListOption.fields(
+              Arrays.stream(listOptions.getFields().split(","))
+                  .map(GoogleCloudStorageClientImpl::getBlobField)
+                  .toArray(BlobField[]::new)));
     }
     if (pageToken != null) {
       blobListOptions.add(BlobListOption.pageToken(pageToken));
@@ -630,11 +624,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     checkNotNull(blob, "object must not be null");
     checkArgument(!isNullOrEmpty(blob.getBucket()), "object must have a bucket: %s", blob);
     checkArgument(!isNullOrEmpty(blob.getName()), "object must have a name: %s", blob);
-    return createItemInfoForStorageBlob(new StorageResourceId(blob.getBucket(), blob.getName()),
-        blob);
+    return createItemInfoForBlob(new StorageResourceId(blob.getBucket(), blob.getName()), blob);
   }
 
-  private static GoogleCloudStorageItemInfo createItemInfoForStorageBlob(
+  private static GoogleCloudStorageItemInfo createItemInfoForBlob(
       StorageResourceId resourceId, Blob blob) {
     checkArgument(resourceId != null, "resourceId must not be null");
     checkArgument(blob != null, "object must not be null");
@@ -667,23 +660,21 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       md5Hash = BaseEncoding.base64().decode(blob.getMd5());
     }
 
-    // TODO : Replace the deprecated time fields.
     return GoogleCloudStorageItemInfo.createObject(
         resourceId,
-        blob.getCreateTime() == null ? 0 : blob.getCreateTime(),
-        blob.getUpdateTime() == null ? 0 : blob.getUpdateTime(),
-        blob.getSize() == null ? 0 : blob.getSize().longValue(),
+        blob.getCreateTimeOffsetDateTime() == null
+            ? 0
+            : blob.getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        blob.getUpdateTimeOffsetDateTime() == null
+            ? 0
+            : blob.getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        blob.getSize() == null ? 0 : blob.getSize(),
         blob.getContentType(),
         blob.getContentEncoding(),
         decodedMetadata,
         blob.getGeneration() == null ? 0 : blob.getGeneration(),
         blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
         new VerificationAttributes(md5Hash, crc32c));
-  }
-
-  @VisibleForTesting
-  static Map<String, byte[]> decodeMetadata(Map<String, String> metadata) {
-    return Maps.transformValues(metadata, GoogleCloudStorageClientImpl::decodeMetadataValues);
   }
 
   @Override
@@ -786,8 +777,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   /**
    * Gets the object generation for a write operation
    *
-   * <p>making getItemInfo call even if overwrite is disabled to fail fast in case file is
-   * existing.
+   * <p>making getItemInfo call even if overwrite is disabled to fail fast in case file is existing.
    *
    * @param resourceId object for which generation info is requested
    * @param overwrite whether existing object should be overwritten
@@ -904,57 +894,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return pCUExecutorService == null
         ? ExecutorSupplier.cachedPool()
         : ExecutorSupplier.useExecutor(pCUExecutorService);
-  }
-
-  /** Helper for converting a StorageResourceId + Blob into a GoogleCloudStorageItemInfo. */
-  private static GoogleCloudStorageItemInfo createItemInfoForBlob(
-      StorageResourceId resourceId, Blob blob) {
-    checkArgument(resourceId != null, "resourceId must not be null");
-    checkArgument(blob != null, "object must not be null");
-    checkArgument(
-        resourceId.isStorageObject(),
-        "resourceId must be a StorageObject. resourceId: %s",
-        resourceId);
-    checkArgument(
-        resourceId.getBucketName().equals(blob.getBucket()),
-        "resourceId.getBucketName() must equal object.getBucket(): '%s' vs '%s'",
-        resourceId.getBucketName(),
-        blob.getBucket());
-    checkArgument(
-        resourceId.getObjectName().equals(blob.getName()),
-        "resourceId.getObjectName() must equal object.getName(): '%s' vs '%s'",
-        resourceId.getObjectName(),
-        blob.getName());
-
-    Map<String, byte[]> decodedMetadata =
-        blob.getMetadata() == null ? null : decodeMetadata(blob.getMetadata());
-
-    byte[] md5Hash = null;
-    byte[] crc32c = null;
-
-    if (!isNullOrEmpty(blob.getCrc32c())) {
-      crc32c = BaseEncoding.base64().decode(blob.getCrc32c());
-    }
-
-    if (!isNullOrEmpty(blob.getMd5())) {
-      md5Hash = BaseEncoding.base64().decode(blob.getMd5());
-    }
-
-    return GoogleCloudStorageItemInfo.createObject(
-        resourceId,
-        blob.getCreateTimeOffsetDateTime() == null
-            ? 0
-            : blob.getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
-        blob.getUpdateTimeOffsetDateTime() == null
-            ? 0
-            : blob.getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
-        blob.getSize() == null ? 0 : blob.getSize(),
-        blob.getContentType(),
-        blob.getContentEncoding(),
-        decodedMetadata,
-        blob.getGeneration() == null ? 0 : blob.getGeneration(),
-        blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
-        new VerificationAttributes(md5Hash, crc32c));
   }
 
   public static Builder builder() {
