@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -24,6 +25,7 @@ import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.gax.paging.Page;
 import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
@@ -31,10 +33,14 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
+import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
@@ -43,6 +49,11 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobField;
+import com.google.cloud.storage.Storage.BlobGetOption;
+import com.google.cloud.storage.Storage.BlobSourceOption;
+import com.google.cloud.storage.Storage.BucketField;
+import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
@@ -51,6 +62,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
@@ -61,6 +73,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -74,7 +88,11 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  // Maximum number of times to retry deletes in the case of precondition failures.
+  private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
@@ -181,6 +199,239 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 .initCause(e);
       }
       throw new IOException(e);
+    }
+  }
+
+  /** See {@link GoogleCloudStorage#listBucketNames()} for details about expected behavior. */
+  @Override
+  public List<String> listBucketNames() throws IOException {
+    logger.atFiner().log("listBucketNames()");
+    List<Bucket> allBuckets = listBucketsInternal();
+    List<String> bucketNames = new ArrayList<>(allBuckets.size());
+    for (Bucket bucket : allBuckets) {
+      bucketNames.add(bucket.getName());
+    }
+    return bucketNames;
+  }
+
+  /** See {@link GoogleCloudStorage#listBucketInfo()} for details about expected behavior. */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
+    logger.atFiner().log("listBucketInfo()");
+    List<Bucket> allBuckets = listBucketsInternal();
+    List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>(allBuckets.size());
+    for (Bucket bucket : allBuckets) {
+      bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
+    }
+    return bucketInfos;
+  }
+
+  /**
+   * Shared helper for actually dispatching buckets list API calls and accumulating paginated
+   * results; these can then be used to either extract just their names, or to parse into full
+   * GoogleCloudStorageItemInfos.
+   */
+  private List<Bucket> listBucketsInternal() throws IOException {
+    logger.atFiner().log("listBucketsInternal()");
+    checkNotNull(storageOptions.getProjectId(), "projectId must not be null");
+    List<Bucket> allBuckets = new ArrayList<>();
+    try {
+      Page<Bucket> buckets =
+          storage.list(
+              BucketListOption.pageSize(storageOptions.getMaxListItemsPerCall()),
+              BucketListOption.fields(
+                  BucketField.LOCATION,
+                  BucketField.STORAGE_CLASS,
+                  BucketField.TIME_CREATED,
+                  BucketField.UPDATED));
+
+      // Loop to fetch all the items.
+      for (Bucket bucket : buckets.iterateAll()) {
+        allBuckets.add(bucket);
+      }
+    } catch (StorageException e) {
+      throw new IOException(e);
+    }
+    return allBuckets;
+  }
+
+  /** Helper for converting a StorageResourceId + Bucket into a GoogleCloudStorageItemInfo. */
+  private static GoogleCloudStorageItemInfo createItemInfoForBucket(
+      StorageResourceId resourceId, Bucket bucket) {
+    checkArgument(resourceId != null, "resourceId must not be null");
+    checkArgument(bucket != null, "bucket must not be null");
+    checkArgument(resourceId.isBucket(), "resourceId must be a Bucket. resourceId: %s", resourceId);
+    checkArgument(
+        resourceId.getBucketName().equals(bucket.getName()),
+        "resourceId.getBucketName() must equal bucket.getName(): '%s' vs '%s'",
+        resourceId.getBucketName(),
+        bucket.getName());
+
+    return GoogleCloudStorageItemInfo.createBucket(
+        resourceId,
+        bucket.asBucketInfo().getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        bucket.asBucketInfo().getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        bucket.getLocation(),
+        bucket.getStorageClass().name());
+  }
+
+  /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about the expected behavior. */
+  @Override
+  public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
+    logger.atFiner().log("deleteObjects(%s)", fullObjectNames);
+
+    if (fullObjectNames.isEmpty()) {
+      return;
+    }
+
+    // Validate that all the elements represent StorageObjects.
+    for (StorageResourceId fullObjectName : fullObjectNames) {
+      checkArgument(
+          fullObjectName.isStorageObject(),
+          "Expected full StorageObject names only, got: %s",
+          fullObjectName);
+    }
+
+    // Gather exceptions to wrap in a composite exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
+
+    try {
+      for (StorageResourceId object : fullObjectNames) {
+        queueSingleObjectDelete(object, innerExceptions, executor, 0);
+      }
+    } finally {
+      executor.shutdown();
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void queueSingleObjectDelete(
+      StorageResourceId resourceId,
+      KeySetView<IOException, Boolean> innerExceptions,
+      BatchExecutor batchExecutor,
+      int attempt) {
+    String bucketName = resourceId.getBucketName();
+    String objectName = resourceId.getObjectName();
+    if (resourceId.hasGenerationId()) {
+      batchExecutor.queue(
+          () ->
+              storage.delete(
+                  BlobId.of(bucketName, objectName),
+                  BlobSourceOption.generationMatch(resourceId.getGenerationId())),
+          getObjectDeletionCallback(
+              resourceId, innerExceptions, batchExecutor, attempt, resourceId.getGenerationId()));
+
+    } else {
+      // We first need to get the current object version to issue a safe delete for only the latest
+      // version of the object.
+      batchExecutor.queue(
+          () ->
+              storage.get(
+                  BlobId.of(bucketName, objectName), BlobGetOption.fields(BlobField.GENERATION)),
+          new FutureCallback<>() {
+            @Override
+            public void onSuccess(Blob blob) {
+              if (blob == null) {
+                // Denotes that the item cannot be found.
+                // If the item isn't found, treat it the same as if it's not found
+                // in the delete case: assume the user wanted the object gone, and now it is.
+                logger.atFiner().log("deleteObjects(%s): get not found.", resourceId);
+                return;
+              }
+              long generation = checkNotNull(blob.getGeneration(), "generation can not be null");
+              batchExecutor.queue(
+                  () ->
+                      storage.delete(
+                          BlobId.of(bucketName, objectName),
+                          BlobSourceOption.generationMatch(generation)),
+                  getObjectDeletionCallback(
+                      resourceId, innerExceptions, batchExecutor, attempt, generation));
+            }
+
+            @Override
+            public void onFailure(Throwable throwable) {
+              innerExceptions.add(
+                  new IOException(
+                      String.format("Error deleting %s, stage 1", resourceId), throwable));
+            }
+          });
+    }
+  }
+
+  private FutureCallback<Boolean> getObjectDeletionCallback(
+      StorageResourceId resourceId,
+      ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
+      BatchExecutor batchExecutor,
+      int attempt,
+      long generation) {
+    return new FutureCallback<>() {
+      @Override
+      public void onSuccess(Boolean result) {
+        if (!result) {
+          // Ignore item-not-found scenario. We do not have to delete what we cannot find.
+          // This situation typically shows up when we make a request to delete something and the
+          // server receives the request, but we get a retry-able error before we get a response.
+          // During a retry, we no longer find the item because the server had deleted it already.
+          logger.atFiner().log("Delete object %s not found.", resourceId);
+        } else {
+          logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
+        }
+      }
+
+      @Override
+      public void onFailure(Throwable throwable) {
+        if (throwable instanceof Exception
+            && errorExtractor.getErrorType((Exception) throwable) == ErrorType.FAILED_PRECONDITION
+            && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
+          logger.atInfo().log(
+              "Precondition not met while deleting '%s' at generation %s. Attempt %s."
+                  + " Retrying:%s",
+              resourceId, generation, attempt, throwable);
+          queueSingleObjectDelete(resourceId, innerExceptions, batchExecutor, attempt + 1);
+        } else {
+          innerExceptions.add(
+              new IOException(
+                  String.format(
+                      "Error deleting '%s', stage 2 with generation %s", resourceId, generation),
+                  throwable));
+        }
+      }
+    };
+  }
+
+  /** See {@link GoogleCloudStorage#deleteBuckets(List)} for details about expected behavior. */
+  @Override
+  public void deleteBuckets(List<String> bucketNames) throws IOException {
+    logger.atFiner().log("deleteBuckets(%s)", bucketNames);
+
+    // Validate all the inputs first.
+    for (String bucketName : bucketNames) {
+      checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    }
+
+    // Gather exceptions to wrap in a composite exception at the end.
+    List<IOException> innerExceptions = new ArrayList<>();
+
+    for (String bucketName : bucketNames) {
+      try {
+        boolean isDeleted = storage.delete(bucketName);
+        if (!isDeleted) {
+          innerExceptions.add(createFileNotFoundException(bucketName, null, null));
+        }
+      } catch (StorageException e) {
+        innerExceptions.add(
+            new IOException(String.format("Error deleting '%s' bucket", bucketName), e));
+      }
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
   }
 
