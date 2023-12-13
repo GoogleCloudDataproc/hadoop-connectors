@@ -17,6 +17,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -38,6 +40,7 @@ import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Bucket;
@@ -52,8 +55,10 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobField;
 import com.google.cloud.storage.Storage.BlobGetOption;
 import com.google.cloud.storage.Storage.BlobSourceOption;
+import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
+import com.google.cloud.storage.Storage.ComposeRequest;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
@@ -62,6 +67,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
@@ -73,6 +79,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -487,6 +494,65 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
+  @Override
+  public void compose(
+      String bucketName, List<String> sources, String destination, String contentType)
+      throws IOException {
+    logger.atFiner().log("compose(%s, %s, %s, %s)", bucketName, sources, destination, contentType);
+    List<StorageResourceId> sourceIds =
+        sources.stream()
+            .map(objectName -> new StorageResourceId(bucketName, objectName))
+            .collect(Collectors.toList());
+    StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setContentType(contentType)
+            .setEnsureEmptyObjectsMetadataMatch(false)
+            .build();
+    composeObjects(sourceIds, destinationId, options);
+  }
+
+  @Override
+  public GoogleCloudStorageItemInfo composeObjects(
+      List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
+      throws IOException {
+    logger.atFiner().log("composeObjects(%s, %s, %s)", sources, destination, options);
+    for (StorageResourceId inputId : sources) {
+      if (!destination.getBucketName().equals(inputId.getBucketName())) {
+        throw new IOException(
+            String.format(
+                "Bucket doesn't match for source '%s' and destination '%s'!",
+                inputId, destination));
+      }
+    }
+    ComposeRequest request =
+        ComposeRequest.newBuilder()
+            .addSource(
+                sources.stream().map(StorageResourceId::getObjectName).collect(Collectors.toList()))
+            .setTarget(
+                BlobInfo.newBuilder(destination.getBucketName(), destination.getObjectName())
+                    .setContentType(options.getContentType())
+                    .setContentEncoding(options.getContentEncoding())
+                    .setMetadata(encodeMetadata(options.getMetadata()))
+                    .build())
+            .setTargetOptions(
+                BlobTargetOption.generationMatch(
+                    destination.hasGenerationId()
+                        ? destination.getGenerationId()
+                        : getWriteGeneration(destination, true)))
+            .build();
+
+    Blob composedBlob;
+    try {
+      composedBlob = storage.compose(request);
+    } catch (StorageException e) {
+      throw new IOException(e);
+    }
+    GoogleCloudStorageItemInfo compositeInfo = createItemInfoForBlob(destination, composedBlob);
+    logger.atFiner().log("composeObjects() done, returning: %s", compositeInfo);
+    return compositeInfo;
+  }
+
   /**
    * Gets the object generation for a write operation
    *
@@ -607,6 +673,57 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return pCUExecutorService == null
         ? ExecutorSupplier.cachedPool()
         : ExecutorSupplier.useExecutor(pCUExecutorService);
+  }
+
+  /** Helper for converting a StorageResourceId + Blob into a GoogleCloudStorageItemInfo. */
+  private static GoogleCloudStorageItemInfo createItemInfoForBlob(
+      StorageResourceId resourceId, Blob blob) {
+    checkArgument(resourceId != null, "resourceId must not be null");
+    checkArgument(blob != null, "object must not be null");
+    checkArgument(
+        resourceId.isStorageObject(),
+        "resourceId must be a StorageObject. resourceId: %s",
+        resourceId);
+    checkArgument(
+        resourceId.getBucketName().equals(blob.getBucket()),
+        "resourceId.getBucketName() must equal object.getBucket(): '%s' vs '%s'",
+        resourceId.getBucketName(),
+        blob.getBucket());
+    checkArgument(
+        resourceId.getObjectName().equals(blob.getName()),
+        "resourceId.getObjectName() must equal object.getName(): '%s' vs '%s'",
+        resourceId.getObjectName(),
+        blob.getName());
+
+    Map<String, byte[]> decodedMetadata =
+        blob.getMetadata() == null ? null : decodeMetadata(blob.getMetadata());
+
+    byte[] md5Hash = null;
+    byte[] crc32c = null;
+
+    if (!isNullOrEmpty(blob.getCrc32c())) {
+      crc32c = BaseEncoding.base64().decode(blob.getCrc32c());
+    }
+
+    if (!isNullOrEmpty(blob.getMd5())) {
+      md5Hash = BaseEncoding.base64().decode(blob.getMd5());
+    }
+
+    return GoogleCloudStorageItemInfo.createObject(
+        resourceId,
+        blob.getCreateTimeOffsetDateTime() == null
+            ? 0
+            : blob.getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        blob.getUpdateTimeOffsetDateTime() == null
+            ? 0
+            : blob.getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        blob.getSize() == null ? 0 : blob.getSize(),
+        blob.getContentType(),
+        blob.getContentEncoding(),
+        decodedMetadata,
+        blob.getGeneration() == null ? 0 : blob.getGeneration(),
+        blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
+        new VerificationAttributes(md5Hash, crc32c));
   }
 
   public static Builder builder() {
