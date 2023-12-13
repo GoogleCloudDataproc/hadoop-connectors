@@ -2,6 +2,10 @@
 
 ## Next
 
+1. Upgrade java-storage to 2.29.0
+
+1. Upgrade guava to 32.1.2-jre
+
 ## 2.2.18 - 2023-11-03
 
 1. Upgrade java-storage to 2.28.0
