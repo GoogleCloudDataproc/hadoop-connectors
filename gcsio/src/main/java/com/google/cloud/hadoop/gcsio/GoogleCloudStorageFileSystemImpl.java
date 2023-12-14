@@ -32,7 +32,10 @@ import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
+import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.LazyExecutorService;
+import com.google.cloud.hadoop.util.ThreadTrace;
+import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -53,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -479,8 +483,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           StorageResourceId.fromUriPath(
               UriPaths.getParentPath(src), /* allowEmptyObjectName= */ true);
       srcParentInfoFuture =
-          cachedExecutor.submit(
-              () -> getFileInfoInternal(srcParentId, /* inferImplicitDirectories= */ false));
+          runFuture(
+              cachedExecutor,
+              () -> getFileInfoInternal(srcParentId, /* inferImplicitDirectories= */ false),
+              "getParentFileInfo");
     }
 
     if (srcInfo.isDirectory()) {
@@ -902,7 +908,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     try {
       List<Future<FileInfo>> infoFutures = new ArrayList<>(paths.size());
       for (URI path : paths) {
-        infoFutures.add(fileInfoExecutor.submit(() -> getFileInfo(path)));
+        infoFutures.add(runFuture(fileInfoExecutor, () -> getFileInfo(path), "getFileInfo"));
       }
       fileInfoExecutor.shutdown();
 
@@ -978,6 +984,16 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             "Cannot create directories because of existing file: " + fileInfo.getResourceId());
       }
     }
+  }
+
+  private <T> Future<T> runFuture(ExecutorService service, Callable<T> task, String name) {
+    ThreadTrace trace = TraceOperation.current();
+    return service.submit(
+        () -> {
+          try (ITraceOperation traceOperation = TraceOperation.getChildTrace(trace, name)) {
+            return task.call();
+          }
+        });
   }
 
   /**
