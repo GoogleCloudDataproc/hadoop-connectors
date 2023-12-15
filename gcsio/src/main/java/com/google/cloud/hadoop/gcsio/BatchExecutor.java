@@ -86,12 +86,19 @@ class BatchExecutor {
             }));
   }
 
-  private static <T> void execute(Callable<T> task, FutureCallback<T> callback) {
+  private static <T> void execute(Callable<T> task, FutureCallback<T> callback) throws Exception {
     try {
       T result = task.call();
-      callback.onSuccess(result);
+      if (callback != null) {
+        callback.onSuccess(result);
+      }
     } catch (Throwable throwable) {
-      callback.onFailure(throwable);
+      if (callback != null) {
+        callback.onFailure(throwable);
+      } else {
+        // Re-throw the exception.
+        throw throwable;
+      }
     }
   }
 
