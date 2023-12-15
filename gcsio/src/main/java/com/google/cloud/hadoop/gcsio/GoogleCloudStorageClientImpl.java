@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateCopyArguments;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -44,6 +45,7 @@ import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
+import com.google.cloud.storage.CopyWriter;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.ExecutorSupplier;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
@@ -52,8 +54,10 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobField;
 import com.google.cloud.storage.Storage.BlobGetOption;
 import com.google.cloud.storage.Storage.BlobSourceOption;
+import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
+import com.google.cloud.storage.Storage.CopyRequest;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
@@ -73,6 +77,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -200,6 +205,104 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+
+    validateCopyArguments(sourceToDestinationObjectsMap, this);
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    // Gather FileNotFoundExceptions for individual objects,
+    // but only throw a single combined exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
+
+    try {
+      for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+          sourceToDestinationObjectsMap.entrySet()) {
+        StorageResourceId srcObject = entry.getKey();
+        StorageResourceId dstObject = entry.getValue();
+        copyInternal(
+            executor,
+            innerExceptions,
+            srcObject.getBucketName(),
+            srcObject.getObjectName(),
+            dstObject.getGenerationId(),
+            dstObject.getBucketName(),
+            dstObject.getObjectName());
+      }
+    } finally {
+      executor.shutdown();
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void copyInternal(
+      BatchExecutor executor,
+      ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
+      String srcBucketName,
+      String srcObjectName,
+      long dstContentGeneration,
+      String dstBucketName,
+      String dstObjectName)
+      throws IOException {
+    CopyRequest.Builder copyRequestBuilder =
+        CopyRequest.newBuilder().setSource(BlobId.of(srcBucketName, srcObjectName));
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      copyRequestBuilder.setTarget(
+          BlobId.of(dstBucketName, dstObjectName),
+          BlobTargetOption.generationMatch(dstContentGeneration));
+    } else {
+      copyRequestBuilder.setTarget(BlobId.of(dstBucketName, dstObjectName));
+    }
+
+    if (storageOptions.getMaxRewriteChunkSize() > 0) {
+      // TODO : Should convert the chunk size to MB?
+      copyRequestBuilder.setMegabytesCopiedPerChunk(storageOptions.getMaxRewriteChunkSize());
+    }
+    executor.queue(
+        () -> {
+          try {
+            String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(dstBucketName, dstObjectName);
+
+            CopyWriter copyWriter = storage.copy(copyRequestBuilder.build());
+            while (!copyWriter.isDone()) {
+              copyWriter.copyChunk();
+              logger.atFiner().log(
+                  "Copy (%s to %s) did not complete. Resuming...", srcString, dstString);
+            }
+            logger.atFiner().log("Successfully copied %s to %s", srcString, dstString);
+          } catch (StorageException e) {
+            if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
+              innerExceptions.add(
+                  createFileNotFoundException(srcBucketName, srcObjectName, new IOException(e)));
+            } else {
+              innerExceptions.add(
+                  new IOException(
+                      String.format(
+                          "Error copying '%s'",
+                          StringPaths.fromComponents(srcBucketName, srcObjectName)),
+                      e));
+            }
+          }
+          return null;
+        },
+        null);
   }
 
   /** See {@link GoogleCloudStorage#listBucketNames()} for details about expected behavior. */
