@@ -46,7 +46,7 @@ steps:
       - 'TRAFFIC_DIRECTOR_ENABLED=false'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
-  # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
+  # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests1
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests-hadoop3'
     waitFor: ['unit-tests-hadoop2', 'unit-tests-hadoop3']
