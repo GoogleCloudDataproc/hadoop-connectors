@@ -16,7 +16,6 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'CLOUDSDK_API_ENDPOINT_OVERRIDES_CLOUDBUILD=https://staging-cloudbuild.sandbox.googleapis.com/'
 
   # 3. Run Hadoop 3 unit tests concurrently
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -30,7 +29,6 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'CLOUDSDK_API_ENDPOINT_OVERRIDES_CLOUDBUILD=https://staging-cloudbuild.sandbox.googleapis.com/'
 
   # 4. Run Hadoop 2 integration tests concurrently with Hadoop 2 and Hadoop 3 unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -45,8 +43,8 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'TRAFFIC_DIRECTOR_ENABLED=true'
-      - 'GCS_TEST_DIRECT_PATH_PREFERRED=true'
+      - 'TRAFFIC_DIRECTOR_ENABLED=false'
+      - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
   # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -61,8 +59,8 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'TRAFFIC_DIRECTOR_ENABLED=true'
-      - 'GCS_TEST_DIRECT_PATH_PREFERRED=true'
+      - 'TRAFFIC_DIRECTOR_ENABLED=false'
+      - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
 # Tests take on average 40 minutes to run
 timeout: 3000s
