@@ -494,24 +494,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
-  @Override
-  public void compose(
-      String bucketName, List<String> sources, String destination, String contentType)
-      throws IOException {
-    logger.atFiner().log("compose(%s, %s, %s, %s)", bucketName, sources, destination, contentType);
-    List<StorageResourceId> sourceIds =
-        sources.stream()
-            .map(objectName -> new StorageResourceId(bucketName, objectName))
-            .collect(Collectors.toList());
-    StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
-    CreateObjectOptions options =
-        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
-            .setContentType(contentType)
-            .setEnsureEmptyObjectsMetadataMatch(false)
-            .build();
-    composeObjects(sourceIds, destinationId, options);
-  }
-
+  /**
+   * See {@link GoogleCloudStorage#composeObjects(List, StorageResourceId, CreateObjectOptions)}}
+   * for details about expected behavior.
+   */
   @Override
   public GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
