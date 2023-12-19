@@ -72,7 +72,8 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
   protected static RetryHttpInitializer httpRequestsInitializer;
   protected static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
 
-  @Rule public TestName name = new TestName();
+  @Rule
+  public TestName name = new TestName();
   protected TrackingHttpRequestInitializer gcsRequestsTracker;
 
   protected boolean isTracingSupported = false;
@@ -121,8 +122,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, null);
 
     assertThat(listResult).isEmpty();
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    }
   }
 
   @Test
@@ -154,8 +157,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, null);
 
     assertThat(listResult).isEmpty();
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    }
   }
 
   @Test
@@ -188,8 +193,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, null);
 
     assertThat(listResult).containsExactly("obj");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    }
   }
 
   @Test
@@ -222,8 +229,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, null);
 
     assertThat(listResult).containsExactly("dir/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    }
   }
 
   @Test
@@ -256,8 +265,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, null);
 
     assertThat(listResult).containsExactly("subdir/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    }
   }
 
   @Test
@@ -290,8 +301,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, null);
 
     assertThat(listResult).containsExactly("subdir/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+    }
   }
 
   @Test
@@ -324,8 +337,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).isEmpty();
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -359,8 +374,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).isEmpty();
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -393,8 +410,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "obj");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -427,8 +446,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -462,8 +483,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -496,8 +519,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "obj");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -530,8 +555,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -564,8 +591,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(requestFn.apply(testBucket, testDir));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(requestFn.apply(testBucket, testDir));
+    }
   }
 
   @Test
@@ -580,10 +609,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
             testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build());
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir + "f1");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(
-                testBucket, true, testDir, /* maxResults= */ 2, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestString(
+                  testBucket, true, testDir, /* maxResults= */ 2, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -601,12 +632,14 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
             testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir + "f1", testDir + "f2");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(
-                testBucket, true, testDir, maxResultsPerRequest, /* pageToken= */ null),
-            listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_1"),
-            listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_2"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestString(
+                  testBucket, true, testDir, maxResultsPerRequest, /* pageToken= */ null),
+              listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_1"),
+              listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_2"));
+    }
   }
 
   @Test
@@ -624,13 +657,16 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(getObjectNames(listedObjects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(
-                testBucket, true, testDir, maxResultsPerRequest, /* pageToken= */ null),
-            listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_1"),
-            listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_2"),
-            listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_3"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestString(
+                  testBucket, true, testDir, maxResultsPerRequest, /* pageToken= */ null),
+              listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_1"),
+              listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_2"),
+              listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_3"));
+
+    }
   }
 
   @Test
@@ -643,10 +679,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).isEmpty();
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, /* prefix= */ null, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(
+                  testBucket, /* prefix= */ null, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -660,10 +698,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly("obj");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, /* prefix= */ null, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(
+                  testBucket, /* prefix= */ null, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -679,10 +719,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly("implDir/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, /* prefix= */ null, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(
+                  testBucket, /* prefix= */ null, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -696,9 +738,11 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir);
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -712,9 +756,11 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -728,9 +774,11 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -744,9 +792,11 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -760,9 +810,11 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -790,10 +842,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(getObjectNames(listedObjects)).containsExactly(objectId.getObjectName());
     assertObjectFields(objectId, listedObjects.get(0));
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                objectId.getBucketName(), testDirName, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(
+                  objectId.getBucketName(), testDirName, /* pageToken= */ null));
+    }
   }
 
   @Test
