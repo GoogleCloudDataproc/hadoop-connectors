@@ -1086,10 +1086,12 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     gcs.compose(testBucket, ImmutableList.of(testDir + "f1", testDir + "f2"), testDir + "f3", null);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testDir + "f3"),
-            composeRequestString(testBucket, testDir + "f3", /* generationId= */ 1));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(testBucket, testDir + "f3"),
+              composeRequestString(testBucket, testDir + "f3", /* generationId= */ 1));
+    }
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
