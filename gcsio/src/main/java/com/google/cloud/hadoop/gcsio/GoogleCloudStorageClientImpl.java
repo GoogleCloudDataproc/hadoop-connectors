@@ -18,11 +18,11 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpRequestInitializer;
@@ -66,6 +66,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
@@ -80,6 +81,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -114,6 +116,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
+
+  private static String encodeMetadataValues(byte[] bytes) {
+    return bytes == null ? null : BaseEncoding.base64().encode(bytes);
+  }
 
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
@@ -492,6 +498,98 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     } finally {
       backgroundTasksThreadPool = null;
     }
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
+      throws IOException {
+    logger.atFiner().log("updateItems(%s)", itemInfoList);
+
+    if (itemInfoList.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    for (UpdatableItemInfo itemInfo : itemInfoList) {
+      checkArgument(
+          !itemInfo.getStorageResourceId().isBucket() && !itemInfo.getStorageResourceId().isRoot(),
+          "Buckets and GCS Root resources are not supported for updateItems");
+    }
+
+    Map<StorageResourceId, GoogleCloudStorageItemInfo> resultItemInfos = new ConcurrentHashMap<>();
+    Set<IOException> innerExceptions = newConcurrentHashSet();
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
+
+    try {
+      for (UpdatableItemInfo itemInfo : itemInfoList) {
+        StorageResourceId resourceId = itemInfo.getStorageResourceId();
+        String bucketName = resourceId.getBucketName();
+        String blobName = resourceId.getObjectName();
+
+        Map<String, byte[]> originalMetadata = itemInfo.getMetadata();
+        Map<String, String> rewrittenMetadata = encodeMetadata(originalMetadata);
+
+        BlobInfo blobUpdate =
+            BlobInfo.newBuilder(bucketName, blobName).setMetadata(rewrittenMetadata).build();
+
+        executor.queue(
+            () -> storage.update(blobUpdate),
+            new FutureCallback<>() {
+              @Override
+              public void onSuccess(Blob blob) {
+                logger.atFiner().log(
+                    "updateItems: Successfully updated object '%s' for resourceId '%s'",
+                    blob, resourceId);
+                resultItemInfos.put(resourceId, createItemInfoForBlob(resourceId, blob));
+              }
+
+              @Override
+              public void onFailure(Throwable throwable) {
+                if (throwable instanceof Exception
+                    && errorExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
+                  logger.atFiner().log(
+                      "updateItems: object not found %s: %s", resourceId, throwable);
+                  resultItemInfos.put(
+                      resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
+                } else {
+                  innerExceptions.add(
+                      new IOException(
+                          String.format("Error updating '%s' object", resourceId), throwable));
+                }
+              }
+            });
+      }
+    } finally {
+      executor.shutdown();
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+
+    // Assemble the return list in the same order as the input arguments.
+    List<GoogleCloudStorageItemInfo> sortedItemInfos = new ArrayList<>();
+    for (UpdatableItemInfo itemInfo : itemInfoList) {
+      checkState(
+          resultItemInfos.containsKey(itemInfo.getStorageResourceId()),
+          "Missing resourceId '%s' from map: %s",
+          itemInfo.getStorageResourceId(),
+          resultItemInfos);
+      sortedItemInfos.add(resultItemInfos.get(itemInfo.getStorageResourceId()));
+    }
+
+    // We expect the return list to be the same size, even if some entries were "not found".
+    checkState(
+        sortedItemInfos.size() == itemInfoList.size(),
+        "sortedItemInfos.size() (%s) != resourceIds.size() (%s). infos: %s, updateItemInfos: %s",
+        sortedItemInfos.size(),
+        itemInfoList.size(),
+        sortedItemInfos,
+        itemInfoList);
+    return sortedItemInfos;
+  }
+
+  private static Map<String, String> encodeMetadata(Map<String, byte[]> metadata) {
+    return Maps.transformValues(metadata, GoogleCloudStorageClientImpl::encodeMetadataValues);
   }
 
   /**
