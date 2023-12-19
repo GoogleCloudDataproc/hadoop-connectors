@@ -467,8 +467,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // At non-existent path.
     validateListFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
     validateListFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
+
     validateListFileInfo(
-        "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, /* expectedToExist= */ false);
+        "dataproc-gcsio-test-bucket-" + objDoesNotExist,
+        objDoesNotExist,
+        /* expectedToExist= */ false);
 
     validateListFileInfo(
         null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);

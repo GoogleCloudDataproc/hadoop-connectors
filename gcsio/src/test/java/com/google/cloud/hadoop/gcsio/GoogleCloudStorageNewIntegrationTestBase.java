@@ -818,8 +818,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     GoogleCloudStorageItemInfo object = gcs.getItemInfo(objectId);
 
     assertObjectFields(objectId, object);
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(objectId.getBucketName(), objectId.getObjectName()));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(getRequestString(objectId.getBucketName(), objectId.getObjectName()));
+    }
   }
 
   @Test
@@ -833,8 +835,10 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
 
     assertThat(object.getObjectName()).isEqualTo(testDir + "f1");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(testBucket, testDir + "f1"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(getRequestString(testBucket, testDir + "f1"));
+    }
   }
 
   @Test
@@ -854,12 +858,14 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            batchRequestString(),
-            getRequestString(testBucket, testDir + "f1"),
-            getRequestString(testBucket, testDir + "f2"),
-            getRequestString(testBucket, testDir + "f3"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              batchRequestString(),
+              getRequestString(testBucket, testDir + "f1"),
+              getRequestString(testBucket, testDir + "f2"),
+              getRequestString(testBucket, testDir + "f3"));
+    }
   }
 
   @Test
@@ -878,11 +884,13 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testDir + "f1"),
-            getRequestString(testBucket, testDir + "f2"),
-            getRequestString(testBucket, testDir + "f3"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(testBucket, testDir + "f1"),
+              getRequestString(testBucket, testDir + "f2"),
+              getRequestString(testBucket, testDir + "f3"));
+    }
   }
 
   @Test
@@ -902,13 +910,15 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
 
     assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            batchRequestString(),
-            getRequestString(testBucket, testDir + "f1"),
-            getRequestString(testBucket, testDir + "f2"),
-            batchRequestString(),
-            getRequestString(testBucket, testDir + "f3"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              batchRequestString(),
+              getRequestString(testBucket, testDir + "f1"),
+              getRequestString(testBucket, testDir + "f2"),
+              batchRequestString(),
+              getRequestString(testBucket, testDir + "f3"));
+    }
   }
 
   @Test

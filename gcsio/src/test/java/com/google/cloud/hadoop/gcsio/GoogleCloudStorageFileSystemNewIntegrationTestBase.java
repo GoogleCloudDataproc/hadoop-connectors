@@ -136,16 +136,18 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.mkdirs(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
-        .containsExactly(
-            batchRequestString(),
-            getRequestString(bucketName, dirObject),
-            getRequestString(bucketName, dirObject + "/d1"),
-            uploadRequestString(
-                bucketName,
-                dirObject + "/d1/",
-                /* generationId= */ 0,
-                /* replaceGenerationId= */ false));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+          .containsExactly(
+              batchRequestString(),
+              getRequestString(bucketName, dirObject),
+              getRequestString(bucketName, dirObject + "/d1"),
+              uploadRequestString(
+                  bucketName,
+                  dirObject + "/d1/",
+                  /* generationId= */ 0,
+                  /* replaceGenerationId= */ false));
+    }
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -163,18 +165,20 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     gcsfsIHelper.mkdirs(dirObjectUri);
     gcsFs.mkdirs(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
-        .containsExactly(
-            batchRequestString(),
-            getRequestString(bucketName, dirObject),
-            getRequestString(bucketName, dirObject + "/d1"),
-            uploadRequestString(
-                bucketName,
-                dirObject + "/d1/",
-                /* generationId= */ 0,
-                /* replaceGenerationId= */ false),
-            // verifies directory exists
-            getRequestString(bucketName, dirObject + "/d1/"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+          .containsExactly(
+              batchRequestString(),
+              getRequestString(bucketName, dirObject),
+              getRequestString(bucketName, dirObject + "/d1"),
+              uploadRequestString(
+                  bucketName,
+                  dirObject + "/d1/",
+                  /* generationId= */ 0,
+                  /* replaceGenerationId= */ false),
+              // verifies directory exists
+              getRequestString(bucketName, dirObject + "/d1/"));
+    }
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -193,12 +197,14 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
-        .inOrder();
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
+          .inOrder();
+    }
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -217,11 +223,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    }
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -239,8 +247,10 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo fileInfo = gcsFs.getFileInfo(fileObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(bucketName, fileObject));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(getRequestString(bucketName, fileObject));
+    }
 
     assertThat(fileInfo.exists()).isTrue();
     assertThat(fileInfo.getPath()).isEqualTo(fileObjectUri);
@@ -259,12 +269,14 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
-        .inOrder();
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
+          .inOrder();
+    }
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -305,12 +317,14 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
-        .inOrder();
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
+          .inOrder();
+    }
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -351,12 +365,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
-
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    }
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
   }
@@ -396,11 +411,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    }
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -455,12 +472,14 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             bucketUri.resolve(dirObject + "/subdir/f3"))
         .inOrder();
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "/f1"),
-            getRequestString(bucketName, dirObject + "/f2"),
-            getRequestString(bucketName, dirObject + "/subdir/f3"))
-        .inOrder();
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              getRequestString(bucketName, dirObject + "/f2"),
+              getRequestString(bucketName, dirObject + "/subdir/f3"))
+          .inOrder();
+    }
   }
 
   @Test
@@ -489,17 +508,22 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             bucketUri.resolve(dirObject + "/f2"),
             bucketUri.resolve(dirObject + "/subdir/f3"));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/f1"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/f2"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/subdir/f3/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/subdir/f3"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/f1"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/subdir/f3/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/subdir/f3"));
+    }
   }
 
   @Test
@@ -514,10 +538,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(fileObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, fileObject),
-            listRequestWithTrailingDelimiter(bucketName, fileObject + "/", /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, fileObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, fileObject + "/", /* pageToken= */ null));
+    }
 
     assertThat(fileInfos).hasSize(1);
     FileInfo fileInfo = fileInfos.get(0);
@@ -555,10 +582,12 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    }
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
         .containsExactly(true, true);
@@ -584,11 +613,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(fileInfos).hasSize(5000);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 5000, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 5000, /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -626,10 +657,12 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    }
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList())).containsExactly(true);
     assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
@@ -648,10 +681,12 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    }
 
     assertThat(fileInfos).isEmpty();
   }
@@ -667,10 +702,12 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     assertThrows(
         FileNotFoundException.class, () -> gcsFs.listFileInfo(bucketUri.resolve(dirObject)));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -705,15 +742,17 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(fileInfos).containsExactly(expectedFileInfo);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/",
-                /* objectFields= */ "bucket,name",
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/",
+                  /* objectFields= */ "bucket,name",
 
-                /* pageToken= */ null));
+                  /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -748,15 +787,16 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(fileInfos).containsExactly(expectedFileInfo);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/",
-                /* objectFields= */ "bucket,name,contentType",
-
-                /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/",
+                  /* objectFields= */ "bucket,name,contentType",
+                  /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -779,11 +819,16 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(thrown).hasCauseThat().hasCauseThat().isInstanceOf(NullPointerException.class);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* objectFields= */ "bucket", /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/",
+                  /* objectFields= */ "bucket",
+                  /* pageToken= */ null));
+    }
   }
 
   @Test
@@ -998,16 +1043,18 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             gcsFs.rename(
                 bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2")));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "/f1"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/f2"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+    }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isTrue();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
