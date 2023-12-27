@@ -983,13 +983,16 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         testBucket2,
         ImmutableList.of(testDir + "f4", testDir + "f5"));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getBucketRequestString(testBucket1),
-            getBucketRequestString(testBucket2),
-            batchRequestString(),
-            copyRequestString(testBucket1, testDir + "f1", testBucket2, testDir + "f4", "copyTo"),
-            copyRequestString(testBucket1, testDir + "f2", testBucket2, testDir + "f5", "copyTo"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getBucketRequestString(testBucket1),
+              getBucketRequestString(testBucket2),
+              batchRequestString(),
+              copyRequestString(testBucket1, testDir + "f1", testBucket2, testDir + "f4", "copyTo"),
+              copyRequestString(
+                  testBucket1, testDir + "f2", testBucket2, testDir + "f5", "copyTo"));
+    }
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket2, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
@@ -1015,15 +1018,17 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
         testBucket2,
         ImmutableList.of(testDir + "f4", testDir + "f5"));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getBucketRequestString(testBucket1),
-            getBucketRequestString(testBucket2),
-            batchRequestString(),
-            copyRequestString(
-                testBucket1, testDir + "f1", testBucket2, testDir + "f4", "rewriteTo"),
-            copyRequestString(
-                testBucket1, testDir + "f2", testBucket2, testDir + "f5", "rewriteTo"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getBucketRequestString(testBucket1),
+              getBucketRequestString(testBucket2),
+              batchRequestString(),
+              copyRequestString(
+                  testBucket1, testDir + "f1", testBucket2, testDir + "f4", "rewriteTo"),
+              copyRequestString(
+                  testBucket1, testDir + "f2", testBucket2, testDir + "f5", "rewriteTo"));
+    }
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket2, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");

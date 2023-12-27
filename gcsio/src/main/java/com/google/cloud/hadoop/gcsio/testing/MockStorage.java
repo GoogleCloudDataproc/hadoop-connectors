@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio.testing;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
 import com.google.storage.v2.Bucket;
+import com.google.storage.v2.ComposeObjectRequest;
 import com.google.storage.v2.CreateBucketRequest;
 import com.google.storage.v2.DeleteBucketRequest;
 import com.google.storage.v2.DeleteObjectRequest;
@@ -26,6 +27,8 @@ import com.google.storage.v2.GetObjectRequest;
 import com.google.storage.v2.ListBucketsRequest;
 import com.google.storage.v2.ListBucketsResponse;
 import com.google.storage.v2.Object;
+import com.google.storage.v2.RewriteObjectRequest;
+import com.google.storage.v2.RewriteResponse;
 import com.google.storage.v2.StorageGrpc.StorageImplBase;
 import com.google.storage.v2.UpdateObjectRequest;
 import io.grpc.stub.StreamObserver;
@@ -77,6 +80,26 @@ public final class MockStorage extends StorageImplBase {
                   "Unrecognized response type %s for method CreateBucket, expected %s or %s",
                   response == null ? "null" : response.getClass().getName(),
                   Bucket.class.getName(),
+                  Exception.class.getName())));
+    }
+  }
+
+  @Override
+  public void composeObject(ComposeObjectRequest request, StreamObserver<Object> responseObserver) {
+    java.lang.Object response = responses.poll();
+    if (response instanceof Object) {
+      requests.add(request);
+      responseObserver.onNext(((Object) response));
+      responseObserver.onCompleted();
+    } else if (response instanceof Exception) {
+      responseObserver.onError(((Exception) response));
+    } else {
+      responseObserver.onError(
+          new IllegalArgumentException(
+              String.format(
+                  "Unrecognized response type %s for method ComposeObject, expected %s or %s",
+                  response == null ? "null" : response.getClass().getName(),
+                  Object.class.getName(),
                   Exception.class.getName())));
     }
   }
@@ -178,6 +201,27 @@ public final class MockStorage extends StorageImplBase {
                   "Unrecognized response type %s for method UpdateObject, expected %s or %s",
                   response == null ? "null" : response.getClass().getName(),
                   Object.class.getName(),
+                  Exception.class.getName())));
+    }
+  }
+
+  @Override
+  public void rewriteObject(
+      RewriteObjectRequest request, StreamObserver<RewriteResponse> responseObserver) {
+    java.lang.Object response = responses.poll();
+    if (response instanceof RewriteResponse) {
+      requests.add(request);
+      responseObserver.onNext(((RewriteResponse) response));
+      responseObserver.onCompleted();
+    } else if (response instanceof Exception) {
+      responseObserver.onError(((Exception) response));
+    } else {
+      responseObserver.onError(
+          new IllegalArgumentException(
+              String.format(
+                  "Unrecognized response type %s for method RewriteObject, expected %s or %s",
+                  response == null ? "null" : response.getClass().getName(),
+                  RewriteResponse.class.getName(),
                   Exception.class.getName())));
     }
   }

@@ -82,6 +82,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -216,6 +217,33 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void copy(
+      String srcBucketName,
+      List<String> srcObjectNames,
+      String dstBucketName,
+      List<String> dstObjectNames)
+      throws IOException {
+    checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
+    checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+    checkArgument(
+        srcObjectNames.size() == dstObjectNames.size(),
+        "Must supply same number of elements in srcObjects and dstObjects");
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
+        new HashMap<>(srcObjectNames.size());
+    for (int i = 0; i < srcObjectNames.size(); i++) {
+      sourceToDestinationObjectsMap.put(
+          new StorageResourceId(srcBucketName, srcObjectNames.get(i)),
+          new StorageResourceId(dstBucketName, dstObjectNames.get(i)));
+    }
+    copy(sourceToDestinationObjectsMap);
   }
 
   /**
@@ -690,6 +718,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private static Map<String, String> encodeMetadata(Map<String, byte[]> metadata) {
     return Maps.transformValues(metadata, GoogleCloudStorageClientImpl::encodeMetadataValues);
+  }
+
+  @Override
+  public void compose(
+      String bucketName, List<String> sources, String destination, String contentType)
+      throws IOException {
+    logger.atFiner().log("compose(%s, %s, %s, %s)", bucketName, sources, destination, contentType);
+    List<StorageResourceId> sourceIds =
+        sources.stream()
+            .map(objectName -> new StorageResourceId(bucketName, objectName))
+            .collect(Collectors.toList());
+    StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setContentType(contentType)
+            .setEnsureEmptyObjectsMetadataMatch(false)
+            .build();
+    composeObjects(sourceIds, destinationId, options);
   }
 
   /**

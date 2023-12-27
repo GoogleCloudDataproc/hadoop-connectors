@@ -17,15 +17,19 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newBucket;
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsClientImpl;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTest.BYTE_ARRAY_EQUIVALENCE;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTest.assertMapsEqual;
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.newStorageObject;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.testing.FakeServer;
 import com.google.cloud.hadoop.gcsio.testing.MockStorage;
 import com.google.cloud.storage.StorageException;
@@ -40,11 +44,14 @@ import com.google.storage.v2.Bucket.Lifecycle.Rule;
 import com.google.storage.v2.Bucket.Lifecycle.Rule.Action;
 import com.google.storage.v2.Bucket.Lifecycle.Rule.Condition;
 import com.google.storage.v2.BucketName;
+import com.google.storage.v2.ComposeObjectRequest;
 import com.google.storage.v2.CreateBucketRequest;
 import com.google.storage.v2.DeleteBucketRequest;
 import com.google.storage.v2.DeleteObjectRequest;
 import com.google.storage.v2.ListBucketsResponse;
 import com.google.storage.v2.Object;
+import com.google.storage.v2.RewriteObjectRequest;
+import com.google.storage.v2.RewriteResponse;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
@@ -115,7 +122,7 @@ public class GoogleCloudStorageClientTest {
           .setSize(1234)
           .build();
 
-  private static final MockHttpTransport transport = mockTransport();
+  private static MockHttpTransport transport = mockTransport();
 
   private static final MockStorage mockStorage = new MockStorage();
 
@@ -204,6 +211,123 @@ public class GoogleCloudStorageClientTest {
   }
 
   @Test
+  public void compose_succeeds() throws Exception {
+    mockStorage.addResponse(TEST_OBJECT);
+    List<String> sources = ImmutableList.of("object1", "object2");
+
+    // TODO : Remove these mocks once java-storage implementation for getItemInfo is added.
+    StorageObject storageObject = newStorageObject(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
+    MockHttpTransport transport = mockTransport(jsonDataResponse(storageObject));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.compose(TEST_BUCKET_NAME, sources, TEST_OBJECT_NAME, "application/octet-stream");
+    }
+
+    assertEquals(mockStorage.getRequests().size(), 1);
+
+    ComposeObjectRequest actualRequest = (ComposeObjectRequest) mockStorage.getRequests().get(0);
+    assertThat(actualRequest.getDestination().getName()).contains(TEST_OBJECT_NAME);
+    assertThat(actualRequest.getSourceObjects(0).getName()).isEqualTo("object1");
+    assertThat(actualRequest.getSourceObjects(1).getName()).isEqualTo("object2");
+  }
+
+  @Test
+  public void compose_throwsException() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.INVALID_ARGUMENT));
+    List<String> sources = ImmutableList.of("object1", "object2");
+
+    // TODO : Remove these mocks once java-storage implementation for getItemInfo is added.
+    StorageObject storageObject = newStorageObject(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
+    transport = mockTransport(jsonDataResponse(storageObject));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      assertThrows(
+          IOException.class,
+          () ->
+              gcs.compose(TEST_BUCKET_NAME, sources, TEST_OBJECT_NAME, "application/octet-stream"));
+    }
+  }
+
+  @Test
+  public void copyObjects_sameBucket_succeeds() throws Exception {
+    RewriteResponse expectedResponse =
+        RewriteResponse.newBuilder()
+            .setTotalBytesRewritten(-1109205579)
+            .setObjectSize(-1277221631)
+            .setDone(true)
+            .setRewriteToken("rewriteToken80654285")
+            .setResource(Object.newBuilder().build())
+            .build();
+    mockStorage.addResponse(expectedResponse);
+
+    String destinationObject = TEST_OBJECT_NAME + "-copy";
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.copy(
+          TEST_BUCKET_NAME,
+          ImmutableList.of(TEST_OBJECT_NAME),
+          TEST_BUCKET_NAME,
+          ImmutableList.of(destinationObject));
+    }
+    assertEquals(mockStorage.getRequests().size(), 1);
+    RewriteObjectRequest actualResponse = (RewriteObjectRequest) mockStorage.getRequests().get(0);
+
+    assertThat(actualResponse.getDestinationName()).isEqualTo(destinationObject);
+    assertThat(actualResponse.getDestinationBucket()).contains(TEST_BUCKET_NAME);
+    assertThat(actualResponse.getSourceBucket()).contains(TEST_BUCKET_NAME);
+    assertThat(actualResponse.getSourceObject()).isEqualTo(TEST_OBJECT_NAME);
+  }
+
+  @Test
+  public void copyObjects_differentBuckets_succeeds() throws Exception {
+    RewriteResponse expectedResponse =
+        RewriteResponse.newBuilder()
+            .setTotalBytesRewritten(-1109205579)
+            .setObjectSize(-1277221631)
+            .setDone(true)
+            .setRewriteToken("rewriteToken80654285")
+            .setResource(Object.newBuilder().build())
+            .build();
+    mockStorage.addResponse(expectedResponse);
+
+    String destinationBucket = TEST_BUCKET_NAME + "-copy";
+    String destinationObject = TEST_OBJECT_NAME + "-copy";
+
+    // TODO : Remove these mocks once java-storage implementation for getItemInfo is added.
+    transport =
+        mockTransport(
+            jsonDataResponse(newBucket(TEST_BUCKET_NAME)),
+            jsonDataResponse(newBucket(destinationBucket)));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.copy(
+          TEST_BUCKET_NAME,
+          ImmutableList.of(TEST_OBJECT_NAME),
+          destinationBucket,
+          ImmutableList.of(destinationObject));
+    }
+    assertEquals(mockStorage.getRequests().size(), 1);
+    RewriteObjectRequest actualResponse = (RewriteObjectRequest) mockStorage.getRequests().get(0);
+
+    assertThat(actualResponse.getDestinationName()).isEqualTo(destinationObject);
+    assertThat(actualResponse.getDestinationBucket()).contains(destinationBucket);
+    assertThat(actualResponse.getSourceBucket()).contains(TEST_BUCKET_NAME);
+    assertThat(actualResponse.getSourceObject()).isEqualTo(TEST_OBJECT_NAME);
+  }
+
+  @Test
   public void deleteBuckets_illegalArguments() throws Exception {
     try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
       GoogleCloudStorage gcs =
@@ -225,12 +349,13 @@ public class GoogleCloudStorageClientTest {
           mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
 
       gcs.deleteBuckets(ImmutableList.of(TEST_BUCKET_NAME));
-      assertEquals(mockStorage.getRequests().size(), 1);
-
-      DeleteBucketRequest deleteBucketRequest =
-          (DeleteBucketRequest) mockStorage.getRequests().get(0);
-      assertThat(deleteBucketRequest.getName()).contains(TEST_BUCKET_NAME);
     }
+
+    assertEquals(mockStorage.getRequests().size(), 1);
+
+    DeleteBucketRequest deleteBucketRequest =
+        (DeleteBucketRequest) mockStorage.getRequests().get(0);
+    assertThat(deleteBucketRequest.getName()).contains(TEST_BUCKET_NAME);
   }
 
   @Test
@@ -285,12 +410,12 @@ public class GoogleCloudStorageClientTest {
 
       gcs.deleteObjects(
           ImmutableList.of(new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME)));
-
-      assertEquals(mockStorage.getRequests().size(), 2);
-      DeleteObjectRequest actualRequest = (DeleteObjectRequest) mockStorage.getRequests().get(1);
-      assertThat(actualRequest.getBucket()).contains(TEST_BUCKET_NAME);
-      assertEquals(actualRequest.getObject(), TEST_OBJECT_NAME);
     }
+
+    assertEquals(mockStorage.getRequests().size(), 2);
+    DeleteObjectRequest actualRequest = (DeleteObjectRequest) mockStorage.getRequests().get(1);
+    assertThat(actualRequest.getBucket()).contains(TEST_BUCKET_NAME);
+    assertEquals(actualRequest.getObject(), TEST_OBJECT_NAME);
   }
 
   @Test
