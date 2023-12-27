@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateCopyArguments;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -387,7 +386,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         bucket.asBucketInfo().getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
         bucket.asBucketInfo().getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
         bucket.getLocation(),
-        bucket.getStorageClass().name());
+        bucket.getStorageClass() == null ? null : bucket.getStorageClass().name());
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about the expected behavior. */
@@ -638,25 +637,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             new FutureCallback<>() {
               @Override
               public void onSuccess(Blob blob) {
-                logger.atFiner().log(
-                    "updateItems: Successfully updated object '%s' for resourceId '%s'",
-                    blob, resourceId);
-                resultItemInfos.put(resourceId, createItemInfoForBlob(resourceId, blob));
+                if (blob == null) {
+                  // Indicated that the blob was not found.
+                  logger.atFiner().log("updateItems: object not found %s", resourceId);
+                  resultItemInfos.put(
+                      resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
+                } else {
+                  logger.atFiner().log(
+                      "updateItems: Successfully updated object '%s' for resourceId '%s'",
+                      blob, resourceId);
+                  resultItemInfos.put(resourceId, createItemInfoForBlob(resourceId, blob));
+                }
               }
 
               @Override
               public void onFailure(Throwable throwable) {
-                if (throwable instanceof Exception
-                    && errorExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
-                  logger.atFiner().log(
-                      "updateItems: object not found %s: %s", resourceId, throwable);
-                  resultItemInfos.put(
-                      resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
-                } else {
-                  innerExceptions.add(
-                      new IOException(
-                          String.format("Error updating '%s' object", resourceId), throwable));
-                }
+                innerExceptions.add(
+                    new IOException(
+                        String.format("Error updating '%s' object", resourceId), throwable));
               }
             });
       }
