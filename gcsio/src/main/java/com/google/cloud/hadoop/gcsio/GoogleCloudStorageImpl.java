@@ -252,7 +252,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final GoogleCloudStorageOptions storageOptions;
 
   // Object to use to perform sleep operations
-  private final Sleeper sleeper = Sleeper.DEFAULT;
+  static final Sleeper sleeper = Sleeper.DEFAULT;
 
   // BackOff objects are per-request, use this to make new ones.
   private final BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
