@@ -308,6 +308,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       copyRequestBuilder.setTarget(BlobId.of(dstBucketName, dstObjectName));
     }
 
+    if (storageOptions.getEncryptionKey() != null) {
+      copyRequestBuilder.setSourceOptions(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      copyRequestBuilder.setTarget(
+          copyRequestBuilder.build().getTarget().getBlobId(),
+          BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+
     if (storageOptions.getMaxRewriteChunkSize() > 0) {
       copyRequestBuilder.setMegabytesCopiedPerChunk(
           // Convert raw byte size into Mib.
