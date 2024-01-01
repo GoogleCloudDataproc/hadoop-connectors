@@ -88,7 +88,8 @@ public class GoogleCloudStorageMockitoTest {
     gcs.setBatchFactory(mockBatchFactory);
     gcs.setErrorExtractor(mockErrorExtractor);
 
-    when(mockBatchFactory.newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt()))
+    when(mockBatchFactory.newBatchHelper(
+            any(), any(Storage.class), anyInt(), anyInt(), anyInt(), any()))
         .thenReturn(mockBatchHelper);
   }
 
@@ -178,7 +179,7 @@ public class GoogleCloudStorageMockitoTest {
             gcs.deleteObjects(Lists.newArrayList(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))));
 
     verify(mockBatchFactory, times(2))
-        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt());
+        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt(), any());
     verify(mockBatchHelper, times(4)).queue(any(), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockErrorExtractor).preconditionNotMet(any(IOException.class));
@@ -242,7 +243,7 @@ public class GoogleCloudStorageMockitoTest {
                 BUCKET_NAME, ImmutableList.of(dstObjectName)));
 
     verify(mockBatchFactory, times(2))
-        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt());
+        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt(), any());
     verify(mockBatchHelper, times(2)).queue(any(Storage.Objects.Copy.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockBatchHelper, times(2)).flush();
@@ -304,7 +305,7 @@ public class GoogleCloudStorageMockitoTest {
     // All invocations still should have been attempted; the exception should have been thrown
     // at the very end.
     verify(mockBatchFactory)
-        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt());
+        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt(), any());
     verify(mockBatchHelper).queue(any(Storage.Buckets.Get.class), any());
     verify(mockBatchHelper).queue(any(Storage.Objects.Get.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
