@@ -281,9 +281,10 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                       GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name);
           assertThat(invocationId).matches("[a-z,0-9,-]+");
         } else {
-          partFileChunkUploadRecord
-              .get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)
-              .equals(invocationId);
+          assertThat(
+                  partFileChunkUploadRecord.get(
+                      GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name))
+              .isEqualTo(invocationId);
         }
 
         assertThat(partFileChunkUploadRecord.get(GoogleCloudStorageTracingFields.RPC_METHOD.name))
