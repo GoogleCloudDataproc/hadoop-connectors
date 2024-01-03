@@ -29,8 +29,10 @@ import com.google.storage.v2.ReadObjectResponse;
 import com.google.storage.v2.StartResumableWriteRequest;
 import com.google.storage.v2.StartResumableWriteResponse;
 import com.google.storage.v2.WriteObjectRequest;
+import com.google.storage.v2.WriteObjectRequest.FirstMessageCase;
 import com.google.storage.v2.WriteObjectResponse;
-import io.grpc.Attributes;
+import com.google.storage.v2.WriteObjectResponse.WriteStatusCase;
+import com.google.storage.v2.WriteObjectSpec;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
@@ -81,6 +83,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
       @Override
       public void start(Listener<RespT> responseListener, Metadata headers) {
+        streamTracer.updatedStreamHeaders(headers);
         super.start(
             new SimpleForwardingClientCallListener<RespT>(responseListener) {
               @Override
@@ -194,11 +197,8 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
                   .build()));
     }
 
-    /** The stream is being created on a ready transport. */
-    @Override
-    public void streamCreated(Attributes transportAttrs, Metadata headers) {
+    protected void updatedStreamHeaders(Metadata headers) {
       this.headers = headers;
-      super.streamCreated(transportAttrs, headers);
     }
 
     protected ImmutableMap.Builder<String, Object> getRequestTrackingInfo() {
@@ -247,7 +247,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, this.resourceId)
                   .build()));
     }
 
@@ -258,7 +258,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
+                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, this.resourceId)
                   .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, response.getUploadId())
                   .build()));
     }
@@ -266,7 +266,9 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
   private class WriteObjectStreamTracer extends TrackingStreamTracer {
 
-    private String streamUploadId = null;
+    private String streamUploadId = "";
+
+    private StorageResourceId resourceId = StorageResourceId.ROOT;
 
     WriteObjectStreamTracer(String rpcMethod) {
       super(rpcMethod);
@@ -275,41 +277,61 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     @Override
     public void logRequestMessage(MessageLite message) {
       WriteObjectRequest request = (WriteObjectRequest) message;
-      String uploadId = request.getUploadId();
-      if (!Strings.isNullOrEmpty(uploadId)) {
-        updateUploadId(request.getUploadId());
+
+      FirstMessageCase messageCase = request.getFirstMessageCase();
+      ImmutableMap.Builder<String, Object> logRecords = getRequestTrackingInfo();
+
+      if (messageCase.equals(FirstMessageCase.UPLOAD_ID)) { // For Resumable Upload
+        // UploadId will only be present in the first message of stream
+        // set the uploadId globally for a stream to make it available across other req/messages in
+        // stream.
+        updateStreamUploadId(request.getUploadId());
+        logRecords.put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, this.streamUploadId);
+      } else if (messageCase.equals(
+          FirstMessageCase.WRITE_OBJECT_SPEC)) { // For direct upload which is used in PCUs
+        WriteObjectSpec objectSpec = request.getWriteObjectSpec();
+        if (objectSpec.hasResource()) {
+          // Resource will only be present in the first message of stream
+          // set the uploadId globally for a stream to make it available across other req/messages
+          // in
+          // stream.
+          updateResourceId(objectSpec.getResource());
+          logRecords.put(GoogleCloudStorageTracingFields.RESOURCE.name, this.resourceId);
+        }
       }
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, request.getUploadId())
-                  .put(GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
-                  .put(
-                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name, request.getFinishWrite())
-                  .put(
-                      GoogleCloudStorageTracingFields.CONTENT_LENGTH.name,
-                      request.getChecksummedData().getContent().size())
-                  .build()));
+
+      logRecords
+          .put(GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
+          .put(GoogleCloudStorageTracingFields.FINALIZE_WRITE.name, request.getFinishWrite())
+          .put(
+              GoogleCloudStorageTracingFields.CONTENT_LENGTH.name,
+              request.getChecksummedData().getContent().size());
+
+      logger.atInfo().log("%s", toJson(logRecords.build()));
     }
 
     @Override
     public void logResponseMessage(MessageLite message) {
 
       WriteObjectResponse response = (WriteObjectResponse) message;
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, streamUploadId)
-                  .put(
-                      GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
-                      response.getPersistedSize())
-                  .build()));
+      WriteStatusCase writeStatusCase = response.getWriteStatusCase();
+      ImmutableMap.Builder<String, Object> logRecords = getResponseTrackingInfo();
+      if (writeStatusCase.equals(WriteStatusCase.PERSISTED_SIZE)) { // For resumable upload
+        logRecords.put(
+            GoogleCloudStorageTracingFields.PERSISTED_SIZE.name, response.getPersistedSize());
+      } else if (writeStatusCase.equals(
+          WriteStatusCase.RESOURCE)) { // For direct upload which is used PCU
+        logRecords.put(
+            GoogleCloudStorageTracingFields.RESOURCE_SIZE.name, response.getResource().getSize());
+      }
+      logRecords
+          .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, this.streamUploadId)
+          .put(GoogleCloudStorageTracingFields.RESOURCE.name, this.resourceId);
+      logger.atInfo().log("%s", toJson(logRecords.build()));
     }
 
-    private void updateUploadId(@Nonnull String uploadId) {
-      if (streamUploadId == null) {
+    private void updateStreamUploadId(@Nonnull String uploadId) {
+      if (Strings.isNullOrEmpty(streamUploadId) && !Strings.isNullOrEmpty(uploadId)) {
         this.streamUploadId = uploadId;
       }
       checkState(
@@ -317,6 +339,12 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           String.format(
               "Write stream should have unique uploadId associated with each chunk request. Expected was %s got %s",
               streamUploadId, uploadId));
+    }
+
+    private void updateResourceId(@Nonnull com.google.storage.v2.Object resourceObject) {
+      this.resourceId =
+          new StorageResourceId(
+              resourceObject.getBucket(), resourceObject.getName(), resourceObject.getGeneration());
     }
   }
 
