@@ -31,7 +31,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTracingFields;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.gson.Gson;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
+import com.google.common.base.Strings;
 import com.google.storage.v2.BucketName;
 import io.grpc.Status;
 import java.io.IOException;
@@ -64,8 +65,6 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
   private static GoogleCloudStorage helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
 
   private AssertingLogHandler assertingHandler;
-
-  private final Gson gson = new Gson();
 
   @Rule
   public TestName name =
@@ -108,7 +107,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
   public void testWriteLogs() throws IOException {
 
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-    int uploadChunkSize = 2 * 1024 * 1024;
+    int uploadChunkSize = 3 * 1024 * 1024;
     GoogleCloudStorageOptions storageOption =
         GCS_TRACE_OPTIONS.toBuilder()
             .setWriteChannelOptions(
@@ -116,7 +115,9 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
             .build();
 
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
-    gcsImpl.create(resourceId).close();
+    byte[] partition =
+        writeObject(
+            gcsImpl, resourceId, /* partitionSize= */ 5 * 1024 * 1024, /* partitionCount= */ 1);
 
     assertingHandler.assertLogCount(2 * 3);
 
@@ -200,6 +201,39 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
   }
 
+  @Test
+  public void testPCUWrites() throws IOException {
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    int partFileSize = 2 * 1024 * 1024;
+    int partFileCount = 2;
+    GoogleCloudStorageOptions storageOption =
+        GCS_TRACE_OPTIONS.toBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder()
+                    .setUploadType(UploadType.PARALLEL_COMPOSITE_UPLOAD)
+                    .setPCUBufferCapacity(partFileSize)
+                    .build())
+            .build();
+
+    GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
+    byte[] partition =
+        writeObject(
+            gcsImpl,
+            resourceId,
+            /* partitionSize= */ partFileSize * partFileCount,
+            /* partitionCount= */ 1);
+    // 1. 4 for a single part file writing
+    //    1.1 2 for chunk write
+    //        1.1.1 2MiB chunk write
+    //        1.1.2 chunk with length 0 and finalize bit set
+    //    1.2 for write response
+    //    1.3 for stream onClose
+    // 2. 1 for compose operation
+    // 3. 2 for deleting 2 part files
+    assertingHandler.assertLogCount(partFileCount * 4 + 1 + partFileCount);
+    verifyPartFileWrites(partFileCount, partFileSize);
+  }
+
   public static GoogleCloudStorage getGCSClientImpl(GoogleCloudStorageOptions options) {
     try {
       return GoogleCloudStorageClientImpl.builder()
@@ -211,8 +245,106 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     }
   }
 
+  private void verifyPartFileWrites(int partFileCount, int partFileSize) {
+    int partFileCounter = partFileCount;
+    int index = 0;
+    int chunkSize = 2 * 1024 * 1024;
+    // There are 3 things to a PCU upload
+    // 1. PartFileUpload
+    // 2. ComposeOperation
+    // 3. Deletion of part file
+
+    // Verify part file uploads
+    while (partFileCounter > 0) {
+      // A partFile upload will have 3 set of message exchanges
+      // 1. Chunks uploaded in stream
+      // 2. Response received on stream
+      // 3. Stream getting closed via onCLose
+      String invocationId = null;
+      int chunkCount =
+          (partFileSize % chunkSize == 0 ? partFileSize / chunkSize : partFileSize / chunkSize + 1)
+              + 1;
+      int chunkIndex = 0;
+      Map<String, Object> partFileChunkUploadRecord;
+      // verify chunks upload in stream
+      while (chunkIndex < chunkCount) {
+        partFileChunkUploadRecord = assertingHandler.getLogRecordAtIndex(index++);
+        verifyCommonFields(partFileChunkUploadRecord, "WriteObject");
+        assertThat(
+                partFileChunkUploadRecord.get(
+                    GoogleCloudStorageTracingFields.STREAM_OPERATION.name))
+            .isEqualTo("request");
+        if (Strings.isNullOrEmpty(invocationId)) {
+          invocationId =
+              (String)
+                  partFileChunkUploadRecord.get(
+                      GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name);
+          assertThat(invocationId).matches("[a-z,0-9,-]+");
+        } else {
+          partFileChunkUploadRecord
+              .get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)
+              .equals(invocationId);
+        }
+
+        assertThat(partFileChunkUploadRecord.get(GoogleCloudStorageTracingFields.RPC_METHOD.name))
+            .isEqualTo("WriteObject");
+        assertThat(
+                partFileChunkUploadRecord.get(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name))
+            .isEqualTo(chunkIndex);
+        // part files are not uploaded via resumable upload hence no uploadId
+        assertThat(partFileChunkUploadRecord.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
+            .isNull();
+        // if last chunk then finalizeWrite would be true
+        if (chunkIndex == chunkCount - 1) {
+          assertThat(
+                  partFileChunkUploadRecord.get(
+                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name))
+              .isEqualTo(true);
+        } else {
+          assertThat(
+                  partFileChunkUploadRecord.get(
+                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name))
+              .isEqualTo(false);
+        }
+        chunkIndex++;
+      }
+
+      // verify response received on stream
+      Map<String, Object> partFileResponseRecord = assertingHandler.getLogRecordAtIndex(index++);
+      assertThat(partFileResponseRecord.get(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name))
+          .isEqualTo(0);
+      assertThat(partFileResponseRecord.get(GoogleCloudStorageTracingFields.STREAM_OPERATION.name))
+          .isEqualTo("response");
+      // not a resumable upload hence no intermittent persistence
+      assertThat(partFileResponseRecord.get(GoogleCloudStorageTracingFields.PERSISTED_SIZE.name))
+          .isNull();
+      assertThat(partFileResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE_SIZE.name))
+          .isEqualTo(partFileSize);
+
+      // verify onClose on Stream
+      verifyCloseStatus(assertingHandler.getLogRecordAtIndex(index++), "WriteObject", Status.OK);
+      partFileCounter--;
+    }
+
+    // verify compose operation
+    Map<String, Object> composeOperationRecord = assertingHandler.getLogRecordAtIndex(index++);
+    verifyCommonFields(composeOperationRecord, "ComposeObject");
+    verifyCloseStatus(composeOperationRecord, "ComposeObject", Status.OK);
+
+    // verify delete operation
+    partFileCounter = partFileCount;
+    Map<String, Object> deleteOperationRecord;
+    while (partFileCounter > 0) {
+      deleteOperationRecord = assertingHandler.getLogRecordAtIndex(index++);
+      verifyCommonFields(deleteOperationRecord, "DeleteObject");
+      verifyCloseStatus(deleteOperationRecord, "DeleteObject", Status.OK);
+      partFileCounter--;
+    }
+  }
+
   private void verifyCommonFields(Map<String, Object> logRecord, String rpcMethod) {
-    assertThat(logRecord.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)).isNotNull();
+    assertThat(logRecord.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name))
+        .isNotEqualTo("");
     assertThat(logRecord.get(GoogleCloudStorageTracingFields.RPC_METHOD.name)).isEqualTo(rpcMethod);
   }
 
