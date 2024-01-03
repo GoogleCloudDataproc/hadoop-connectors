@@ -27,6 +27,9 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.ITraceOperation;
+import com.google.cloud.hadoop.util.ThreadTrace;
+import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
@@ -61,6 +64,8 @@ public class BatchHelper {
 
   private static final ThreadFactory THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("gcsfs-batch-helper-%d").setDaemon(true).build();
+  private final String traceContext;
+  private final ThreadTrace rootTrace;
 
   /**
    * Since each BatchHelper instance should be tied to a particular related set of requests, use
@@ -69,7 +74,7 @@ public class BatchHelper {
   public static class Factory {
     public BatchHelper newBatchHelper(
         HttpRequestInitializer requestInitializer, Storage gcs, long maxRequestsPerBatch) {
-      return new BatchHelper(requestInitializer, gcs, maxRequestsPerBatch, /* numThreads= */ 0);
+      return new BatchHelper(requestInitializer, gcs, maxRequestsPerBatch, /* numThreads= */ 0, "");
     }
 
     BatchHelper newBatchHelper(
@@ -77,17 +82,23 @@ public class BatchHelper {
         Storage gcs,
         long maxRequestsPerBatch,
         long totalRequests,
-        int maxThreads) {
+        int maxThreads,
+        String traceContext) {
       checkArgument(maxRequestsPerBatch > 0, "maxRequestsPerBatch should be greater than 0");
       checkArgument(totalRequests > 0, "totalRequests should be greater than 0");
       checkArgument(maxThreads >= 0, "maxThreads should be greater or equal to 0");
       // Do not send batch request when performing operations on 1 object.
       if (totalRequests == 1) {
         return new BatchHelper(
-            requestInitializer, gcs, /* maxRequestsPerBatch= */ 1, /* numThreads= */ 0);
+            requestInitializer,
+            gcs,
+            /* maxRequestsPerBatch= */ 1,
+            /* numThreads= */ 0,
+            traceContext);
       }
       if (maxThreads == 0) {
-        return new BatchHelper(requestInitializer, gcs, maxRequestsPerBatch, maxThreads);
+        return new BatchHelper(
+            requestInitializer, gcs, maxRequestsPerBatch, maxThreads, traceContext);
       }
       // If maxRequestsPerBatch is too high to fill up all parallel batches (maxThreads)
       // then reduce it to evenly distribute requests across the batches
@@ -97,7 +108,7 @@ public class BatchHelper {
       // in batches (requestsPerBatch) then reduce it to minimum required number of threads
       int numThreads = Math.toIntExact((long) Math.ceil((double) totalRequests / requestsPerBatch));
       numThreads = Math.min(numThreads, maxThreads);
-      return new BatchHelper(requestInitializer, gcs, requestsPerBatch, numThreads);
+      return new BatchHelper(requestInitializer, gcs, requestsPerBatch, numThreads, traceContext);
     }
   }
 
@@ -126,12 +137,15 @@ public class BatchHelper {
       HttpRequestInitializer requestInitializer,
       Storage gcs,
       long maxRequestsPerBatch,
-      int numThreads) {
+      int numThreads,
+      String traceContext) {
     this.requestInitializer = requestInitializer;
     this.gcs = gcs;
     this.requestsExecutor =
         numThreads == 0 ? newDirectExecutorService() : newRequestsExecutor(numThreads);
     this.maxRequestsPerBatch = maxRequestsPerBatch;
+    this.traceContext = traceContext;
+    this.rootTrace = TraceOperation.current();
   }
 
   private static ExecutorService newRequestsExecutor(int numThreads) {
@@ -171,9 +185,10 @@ public class BatchHelper {
     }
   }
 
-  private static <T> void execute(StorageRequest<T> req, JsonBatchCallback<T> callback)
+  private <T> void execute(StorageRequest<T> req, JsonBatchCallback<T> callback)
       throws IOException {
-    try {
+    String traceName = this.traceContext + "(batchSize=1)";
+    try (ITraceOperation to = TraceOperation.getChildTrace(this.rootTrace, traceName)) {
       T result = req.execute();
       callback.onSuccess(result, req.getLastResponseHeaders());
     } catch (IOException e) {
@@ -223,7 +238,10 @@ public class BatchHelper {
     responseFutures.add(
         requestsExecutor.submit(
             () -> {
-              batch.execute();
+              String traceName = String.format("%s(batchSize=%s)", this.traceContext, batch.size());
+              try (ITraceOperation to = TraceOperation.getChildTrace(this.rootTrace, traceName)) {
+                batch.execute();
+              }
               return null;
             }));
   }

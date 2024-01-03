@@ -65,10 +65,12 @@ import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -611,7 +613,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
     Storage.Objects.Insert insertObject = prepareEmptyInsert(resourceId, options);
-    try {
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.objects.insert")) {
       insertObject.execute();
     } catch (IOException e) {
       if (canIgnoreExceptionForEmptyObject(e, resourceId, options)) {
@@ -659,7 +661,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 resourceId.getBucketName())
             .setIfMetagenerationMatch(itemInfo.getMetaGeneration());
 
-    patchObject.execute();
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.objects.patch")) {
+      patchObject.execute();
+    }
   }
 
   @Override
@@ -841,7 +845,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         initializeRequest(
                 storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
             .setIfMetagenerationMatch(metaGeneration);
-    deleteObject.execute();
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.objects.delete")) {
+      deleteObject.execute();
+    }
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about expected behavior. */
@@ -863,20 +869,23 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Gather exceptions to wrap in a composite exception at the end.
     final KeySetView<IOException, Boolean> innerExceptions = ConcurrentHashMap.newKeySet();
-    BatchHelper batchHelper =
-        batchFactory.newBatchHelper(
-            httpRequestInitializer,
-            storage,
-            storageOptions.getMaxRequestsPerBatch(),
-            fullObjectNames.size(),
-            storageOptions.getBatchThreads());
+    String traceContext = String.format("batchDelete(size=%s)", fullObjectNames.size());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      BatchHelper batchHelper =
+          batchFactory.newBatchHelper(
+              httpRequestInitializer,
+              storage,
+              storageOptions.getMaxRequestsPerBatch(),
+              fullObjectNames.size(),
+              storageOptions.getBatchThreads(),
+              "batchDelete");
 
-    for (StorageResourceId fullObjectName : fullObjectNames) {
-      queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
+      for (StorageResourceId fullObjectName : fullObjectNames) {
+        queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
+      }
+
+      batchHelper.flush();
     }
-
-    batchHelper.flush();
-
     if (!innerExceptions.isEmpty()) {
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
@@ -1122,46 +1131,50 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // but only throw a single combined exception at the end.
     KeySetView<IOException, Boolean> innerExceptions = ConcurrentHashMap.newKeySet();
 
-    // Perform the copy operations.
-    BatchHelper batchHelper =
-        batchFactory.newBatchHelper(
-            httpRequestInitializer,
-            storage,
-            storageOptions.getMaxRequestsPerBatch(),
-            sourceToDestinationObjectsMap.size(),
-            storageOptions.getBatchThreads());
+    String traceContext = String.format("batchcopy(size=%s)", sourceToDestinationObjectsMap.size());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      // Perform the copy operations.
+      BatchHelper batchHelper =
+          batchFactory.newBatchHelper(
+              httpRequestInitializer,
+              storage,
+              storageOptions.getMaxRequestsPerBatch(),
+              sourceToDestinationObjectsMap.size(),
+              storageOptions.getBatchThreads(),
+              traceContext);
 
-    for (Entry<StorageResourceId, StorageResourceId> entry :
-        sourceToDestinationObjectsMap.entrySet()) {
-      StorageResourceId srcObject = entry.getKey();
-      StorageResourceId dstObject = entry.getValue();
-      if (storageOptions.isCopyWithRewriteEnabled()) {
-        // Rewrite request has the same effect as Copy, but it can handle moving
-        // large objects that may potentially timeout a Copy request.
-        rewriteInternal(
-            batchHelper,
-            innerExceptions,
-            srcObject.getBucketName(),
-            srcObject.getObjectName(),
-            dstObject.getBucketName(),
-            dstObject.getObjectName());
-      } else {
-        copyInternal(
-            batchHelper,
-            innerExceptions,
-            srcObject.getBucketName(),
-            srcObject.getObjectName(),
-            dstObject.getGenerationId(),
-            dstObject.getBucketName(),
-            dstObject.getObjectName());
+      for (Entry<StorageResourceId, StorageResourceId> entry :
+          sourceToDestinationObjectsMap.entrySet()) {
+        StorageResourceId srcObject = entry.getKey();
+        StorageResourceId dstObject = entry.getValue();
+        if (storageOptions.isCopyWithRewriteEnabled()) {
+          // Rewrite request has the same effect as Copy, but it can handle moving
+          // large objects that may potentially timeout a Copy request.
+          rewriteInternal(
+              batchHelper,
+              innerExceptions,
+              srcObject.getBucketName(),
+              srcObject.getObjectName(),
+              dstObject.getBucketName(),
+              dstObject.getObjectName());
+        } else {
+          copyInternal(
+              batchHelper,
+              innerExceptions,
+              srcObject.getBucketName(),
+              srcObject.getObjectName(),
+              dstObject.getGenerationId(),
+              dstObject.getBucketName(),
+              dstObject.getObjectName());
+        }
       }
-    }
 
-    // Execute any remaining requests not divisible by the max batch size.
-    batchHelper.flush();
+      // Execute any remaining requests not divisible by the max batch size.
+      batchHelper.flush();
 
-    if (!innerExceptions.isEmpty()) {
-      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+      if (!innerExceptions.isEmpty()) {
+        throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+      }
     }
   }
 
@@ -1307,22 +1320,28 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Loop till we fetch all items.
     String pageToken = null;
+    int page = 0;
     do {
       if (pageToken != null) {
         logger.atFiner().log("listBucketsInternal: next page %s", pageToken);
         listBucket.setPageToken(pageToken);
       }
 
-      Buckets items = listBucket.execute();
+      try (ITraceOperation op =
+          TraceOperation.addToExistingTrace(String.format("gcs.buckets.list(page=%d)", page))) {
+        Buckets items = listBucket.execute();
 
-      // Accumulate buckets (if any).
-      List<Bucket> buckets = items.getItems();
-      if (buckets != null) {
-        logger.atFiner().log("listed %s items", buckets.size());
-        allBuckets.addAll(buckets);
+        // Accumulate buckets (if any).
+        List<Bucket> buckets = items.getItems();
+        if (buckets != null) {
+          logger.atFiner().log("listed %s items", buckets.size());
+          allBuckets.addAll(buckets);
+        }
+
+        pageToken = items.getNextPageToken();
       }
 
-      pageToken = items.getNextPageToken();
+      page += 1;
     } while (pageToken != null);
 
     return allBuckets;
@@ -1477,8 +1496,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Set<String> prefixes = new LinkedHashSet<>(listedPrefixes);
 
     Objects items;
-    try {
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.objects.list")) {
       items = listObject.execute();
+      op.annotate("resultSize", items == null ? 0 : items.size());
     } catch (IOException e) {
       String resource = StringPaths.fromComponents(listObject.getBucket(), listObject.getPrefix());
       if (errorExtractor.itemNotFound(e)) {
@@ -1811,87 +1831,94 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     final Map<StorageResourceId, GoogleCloudStorageItemInfo> itemInfos = new ConcurrentHashMap<>();
     final Set<IOException> innerExceptions = newConcurrentHashSet();
-    BatchHelper batchHelper =
-        batchFactory.newBatchHelper(
-            httpRequestInitializer,
-            storage,
-            storageOptions.getMaxRequestsPerBatch(),
-            resourceIds.size(),
-            storageOptions.getBatchThreads());
 
-    // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request,
-    // or
-    // enqueue a StorageObject fetch request.
-    for (final StorageResourceId resourceId : resourceIds) {
-      if (resourceId.isRoot()) {
-        itemInfos.put(resourceId, GoogleCloudStorageItemInfo.ROOT_INFO);
-      } else if (resourceId.isBucket()) {
-        batchHelper.queue(
-            initializeRequest(
-                storage.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
-            new JsonBatchCallback<Bucket>() {
-              @Override
-              public void onSuccess(Bucket bucket, HttpHeaders responseHeaders) {
-                logger.atFiner().log(
-                    "getItemInfos: Successfully fetched bucket: %s for resourceId: %s",
-                    bucket, resourceId);
-                itemInfos.put(resourceId, createItemInfoForBucket(resourceId, bucket));
-              }
+    String traceContext = String.format("batchGetItemInfos(size=%s)", resourceIds.size());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      BatchHelper batchHelper =
+          batchFactory.newBatchHelper(
+              httpRequestInitializer,
+              storage,
+              storageOptions.getMaxRequestsPerBatch(),
+              resourceIds.size(),
+              storageOptions.getBatchThreads(),
+              traceContext);
 
-              @Override
-              public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
-                GoogleJsonResponseException cause =
-                    createJsonResponseException(jsonError, responseHeaders);
-                if (errorExtractor.itemNotFound(cause)) {
+      // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request,
+      // or
+      // enqueue a StorageObject fetch request.
+      for (final StorageResourceId resourceId : resourceIds) {
+        if (resourceId.isRoot()) {
+          itemInfos.put(resourceId, GoogleCloudStorageItemInfo.ROOT_INFO);
+        } else if (resourceId.isBucket()) {
+          batchHelper.queue(
+              initializeRequest(
+                  storage.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
+              new JsonBatchCallback<Bucket>() {
+                @Override
+                public void onSuccess(Bucket bucket, HttpHeaders responseHeaders) {
                   logger.atFiner().log(
-                      "getItemInfos: bucket '%s' not found:%n%s",
-                      resourceId.getBucketName(), jsonError);
-                  itemInfos.put(resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
-                } else {
-                  innerExceptions.add(
-                      new IOException(
-                          String.format("Error getting '%s' bucket", resourceId.getBucketName()),
-                          cause));
+                      "getItemInfos: Successfully fetched bucket: %s for resourceId: %s",
+                      bucket, resourceId);
+                  itemInfos.put(resourceId, createItemInfoForBucket(resourceId, bucket));
                 }
-              }
-            });
-      } else {
-        final String bucketName = resourceId.getBucketName();
-        final String objectName = resourceId.getObjectName();
-        batchHelper.queue(
-            initializeRequest(
-                    storageRequestFactory.objectsGetMetadata(bucketName, objectName), bucketName)
-                // Request only fields used in GoogleCloudStorageItemInfo:
-                // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
-                .setFields(OBJECT_FIELDS),
-            new JsonBatchCallback<StorageObject>() {
-              @Override
-              public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
-                logger.atFiner().log(
-                    "getItemInfos: Successfully fetched object '%s' for resourceId '%s'",
-                    obj, resourceId);
-                itemInfos.put(resourceId, createItemInfoForStorageObject(resourceId, obj));
-              }
 
-              @Override
-              public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
-                GoogleJsonResponseException cause =
-                    createJsonResponseException(jsonError, responseHeaders);
-                if (errorExtractor.itemNotFound(cause)) {
-                  logger.atFiner().log(
-                      "getItemInfos: object '%s' not found:%n%s", resourceId, jsonError);
-                  itemInfos.put(resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
-                } else {
-                  innerExceptions.add(
-                      new IOException(
-                          String.format("Error getting '%s' object", resourceId), cause));
+                @Override
+                public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
+                  GoogleJsonResponseException cause =
+                      createJsonResponseException(jsonError, responseHeaders);
+                  if (errorExtractor.itemNotFound(cause)) {
+                    logger.atFiner().log(
+                        "getItemInfos: bucket '%s' not found:%n%s",
+                        resourceId.getBucketName(), jsonError);
+                    itemInfos.put(
+                        resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
+                  } else {
+                    innerExceptions.add(
+                        new IOException(
+                            String.format("Error getting '%s' bucket", resourceId.getBucketName()),
+                            cause));
+                  }
                 }
-              }
-            });
+              });
+        } else {
+          final String bucketName = resourceId.getBucketName();
+          final String objectName = resourceId.getObjectName();
+          batchHelper.queue(
+              initializeRequest(
+                      storageRequestFactory.objectsGetMetadata(bucketName, objectName), bucketName)
+                  // Request only fields used in GoogleCloudStorageItemInfo:
+                  // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
+                  .setFields(OBJECT_FIELDS),
+              new JsonBatchCallback<StorageObject>() {
+                @Override
+                public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
+                  logger.atFiner().log(
+                      "getItemInfos: Successfully fetched object '%s' for resourceId '%s'",
+                      obj, resourceId);
+                  itemInfos.put(resourceId, createItemInfoForStorageObject(resourceId, obj));
+                }
+
+                @Override
+                public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
+                  GoogleJsonResponseException cause =
+                      createJsonResponseException(jsonError, responseHeaders);
+                  if (errorExtractor.itemNotFound(cause)) {
+                    logger.atFiner().log(
+                        "getItemInfos: object '%s' not found:%n%s", resourceId, jsonError);
+                    itemInfos.put(
+                        resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
+                  } else {
+                    innerExceptions.add(
+                        new IOException(
+                            String.format("Error getting '%s' object", resourceId), cause));
+                  }
+                }
+              });
+        }
       }
-    }
 
-    batchHelper.flush();
+      batchHelper.flush();
+    }
 
     if (!innerExceptions.isEmpty()) {
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
@@ -1931,68 +1958,74 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     final Map<StorageResourceId, GoogleCloudStorageItemInfo> resultItemInfos =
         new ConcurrentHashMap<>();
     final Set<IOException> innerExceptions = newConcurrentHashSet();
-    BatchHelper batchHelper =
-        batchFactory.newBatchHelper(
-            httpRequestInitializer,
-            storage,
-            storageOptions.getMaxRequestsPerBatch(),
-            itemInfoList.size(),
-            storageOptions.getBatchThreads());
 
-    for (UpdatableItemInfo itemInfo : itemInfoList) {
-      Preconditions.checkArgument(
-          !itemInfo.getStorageResourceId().isBucket() && !itemInfo.getStorageResourceId().isRoot(),
-          "Buckets and GCS Root resources are not supported for updateItems");
-    }
+    String traceContext = String.format("batchUpdateItems(size=%s)", itemInfoList.size());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      BatchHelper batchHelper =
+          batchFactory.newBatchHelper(
+              httpRequestInitializer,
+              storage,
+              storageOptions.getMaxRequestsPerBatch(),
+              itemInfoList.size(),
+              storageOptions.getBatchThreads(),
+              traceContext);
 
-    for (final UpdatableItemInfo itemInfo : itemInfoList) {
-      final StorageResourceId resourceId = itemInfo.getStorageResourceId();
-      final String bucketName = resourceId.getBucketName();
-      final String objectName = resourceId.getObjectName();
+      for (UpdatableItemInfo itemInfo : itemInfoList) {
+        Preconditions.checkArgument(
+            !itemInfo.getStorageResourceId().isBucket()
+                && !itemInfo.getStorageResourceId().isRoot(),
+            "Buckets and GCS Root resources are not supported for updateItems");
+      }
 
-      Map<String, byte[]> originalMetadata = itemInfo.getMetadata();
-      Map<String, String> rewrittenMetadata = encodeMetadata(originalMetadata);
+      for (final UpdatableItemInfo itemInfo : itemInfoList) {
+        final StorageResourceId resourceId = itemInfo.getStorageResourceId();
+        final String bucketName = resourceId.getBucketName();
+        final String objectName = resourceId.getObjectName();
 
-      Storage.Objects.Patch patch =
-          initializeRequest(
-              storage
-                  .objects()
-                  .patch(
-                      bucketName, objectName, new StorageObject().setMetadata(rewrittenMetadata)),
-              bucketName);
+        Map<String, byte[]> originalMetadata = itemInfo.getMetadata();
+        Map<String, String> rewrittenMetadata = encodeMetadata(originalMetadata);
 
-      batchHelper.queue(
-          patch,
-          new JsonBatchCallback<StorageObject>() {
-            @Override
-            public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
-              logger.atFiner().log(
-                  "updateItems: Successfully updated object '%s' for resourceId '%s'",
-                  obj, resourceId);
-              resultItemInfos.put(resourceId, createItemInfoForStorageObject(resourceId, obj));
-            }
+        Storage.Objects.Patch patch =
+            initializeRequest(
+                storage
+                    .objects()
+                    .patch(
+                        bucketName, objectName, new StorageObject().setMetadata(rewrittenMetadata)),
+                bucketName);
 
-            @Override
-            public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
-              GoogleJsonResponseException cause =
-                  createJsonResponseException(jsonError, responseHeaders);
-              if (errorExtractor.itemNotFound(cause)) {
+        batchHelper.queue(
+            patch,
+            new JsonBatchCallback<StorageObject>() {
+              @Override
+              public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
-                    "updateItems: object not found %s:%n%s", resourceId, jsonError);
-                resultItemInfos.put(
-                    resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
-              } else {
-                innerExceptions.add(
-                    new IOException(
-                        String.format("Error updating '%s' object", resourceId), cause));
+                    "updateItems: Successfully updated object '%s' for resourceId '%s'",
+                    obj, resourceId);
+                resultItemInfos.put(resourceId, createItemInfoForStorageObject(resourceId, obj));
               }
-            }
-          });
-    }
-    batchHelper.flush();
 
-    if (!innerExceptions.isEmpty()) {
-      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+              @Override
+              public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
+                GoogleJsonResponseException cause =
+                    createJsonResponseException(jsonError, responseHeaders);
+                if (errorExtractor.itemNotFound(cause)) {
+                  logger.atFiner().log(
+                      "updateItems: object not found %s:%n%s", resourceId, jsonError);
+                  resultItemInfos.put(
+                      resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
+                } else {
+                  innerExceptions.add(
+                      new IOException(
+                          String.format("Error updating '%s' object", resourceId), cause));
+                }
+              }
+            });
+      }
+      batchHelper.flush();
+
+      if (!innerExceptions.isEmpty()) {
+        throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+      }
     }
 
     // Assemble the return list in the same order as the input arguments.
@@ -2085,7 +2118,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     Storage.Buckets.Get getBucket =
         initializeRequest(storage.buckets().get(bucketName), bucketName);
-    try {
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.buckets.get")) {
       return getBucket.execute();
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
@@ -2138,7 +2171,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // Request only fields used in GoogleCloudStorageItemInfo:
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);
-    try {
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.objects.get")) {
       return getObject.execute();
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
@@ -2272,10 +2305,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? destination.getGenerationId()
             : getWriteGeneration(destination, /* overwrite= */ true));
 
-    GoogleCloudStorageItemInfo compositeInfo =
-        createItemInfoForStorageObject(destination, compose.execute());
-    logger.atFiner().log("composeObjects() done, returning: %s", compositeInfo);
-    return compositeInfo;
+    String traceName = String.format("gcs.objects.compose(size=%d)", sources.size());
+    try (ITraceOperation op = TraceOperation.addToExistingTrace(traceName)) {
+      GoogleCloudStorageItemInfo compositeInfo =
+          createItemInfoForStorageObject(destination, compose.execute());
+      logger.atFiner().log("composeObjects() done, returning: %s", compositeInfo);
+      return compositeInfo;
+    }
   }
 
   /**
