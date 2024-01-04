@@ -23,6 +23,7 @@ import com.google.storage.v2.ComposeObjectRequest;
 import com.google.storage.v2.CreateBucketRequest;
 import com.google.storage.v2.DeleteBucketRequest;
 import com.google.storage.v2.DeleteObjectRequest;
+import com.google.storage.v2.GetBucketRequest;
 import com.google.storage.v2.GetObjectRequest;
 import com.google.storage.v2.ListBucketsRequest;
 import com.google.storage.v2.ListBucketsResponse;
@@ -141,6 +142,26 @@ public final class MockStorage extends StorageImplBase {
                   "Unrecognized response type %s for method ListBuckets, expected %s or %s",
                   response == null ? "null" : response.getClass().getName(),
                   ListBucketsResponse.class.getName(),
+                  Exception.class.getName())));
+    }
+  }
+
+  @Override
+  public void getBucket(GetBucketRequest request, StreamObserver<Bucket> responseObserver) {
+    java.lang.Object response = responses.poll();
+    if (response instanceof Bucket) {
+      requests.add(request);
+      responseObserver.onNext(((Bucket) response));
+      responseObserver.onCompleted();
+    } else if (response instanceof Exception) {
+      responseObserver.onError(((Exception) response));
+    } else {
+      responseObserver.onError(
+          new IllegalArgumentException(
+              String.format(
+                  "Unrecognized response type %s for method GetBucket, expected %s or %s",
+                  response == null ? "null" : response.getClass().getName(),
+                  Bucket.class.getName(),
                   Exception.class.getName())));
     }
   }

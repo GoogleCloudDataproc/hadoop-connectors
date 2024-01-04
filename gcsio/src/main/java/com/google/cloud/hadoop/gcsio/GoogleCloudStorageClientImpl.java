@@ -611,7 +611,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       return new ArrayList<>();
     }
 
-    Map<StorageResourceId, GoogleCloudStorageItemInfo> itemInfos = new ConcurrentHashMap<>();
+    Map<StorageResourceId, GoogleCloudStorageItemInfo> itemInfos =
+        new ConcurrentHashMap<>(resourceIds.size());
     Set<IOException> innerExceptions = newConcurrentHashSet();
     BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
     // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request,
