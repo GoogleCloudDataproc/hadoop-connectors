@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.EMPTY_OBJECT_CREATE_OPTIONS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.sleeper;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateCopyArguments;
@@ -240,6 +241,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
+  /**
+   * See {@link GoogleCloudStorage#createEmptyObject(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void createEmptyObject(StorageResourceId resourceId) throws IOException {
+    logger.atFiner().log("createEmptyObject(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+    createEmptyObject(resourceId, EMPTY_OBJECT_CREATE_OPTIONS);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#createEmptyObject(StorageResourceId, CreateObjectOptions)} for
+   * details about expected behavior.
+   */
   @Override
   public void createEmptyObject(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
@@ -254,15 +271,30 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             "Ignoring exception of type %s; verified object already exists with desired state.",
             e.getClass().getSimpleName());
         logger.atFine().withCause(e).log("Ignored exception while creating empty object");
-      } else if (errorExtractor.getErrorType(e) == ErrorType.ALREADY_EXISTS) {
-        throw (FileAlreadyExistsException)
-            new FileAlreadyExistsException(String.format("Object '%s' already exists.", resourceId))
-                .initCause(e);
+      } else {
+        if (errorExtractor.getErrorType(e) == ErrorType.ALREADY_EXISTS) {
+          throw (FileAlreadyExistsException)
+              new FileAlreadyExistsException(
+                      String.format("Object '%s' already exists.", resourceId))
+                  .initCause(e);
+        }
+        throw new IOException(e);
       }
-      throw new IOException(e);
     }
   }
 
+  /**
+   * See {@link GoogleCloudStorage#createEmptyObjects(List)} for details about expected behavior.
+   */
+  @Override
+  public void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException {
+    createEmptyObjects(resourceIds, EMPTY_OBJECT_CREATE_OPTIONS);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#createEmptyObjects(List, CreateObjectOptions)} for details about
+   * expected behavior.
+   */
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException {
@@ -318,6 +350,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 } else {
                   innerExceptions.add(new IOException("Error inserting " + resourceId, se));
                 }
+              } catch (Exception e) {
+                innerExceptions.add(new IOException("Error inserting " + resourceId, e));
               }
               return null;
             },
@@ -341,7 +375,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     if (resourceId.hasGenerationId()) {
       blobTargetOptions.add(BlobTargetOption.generationMatch(resourceId.getGenerationId()));
     } else if (resourceId.isDirectory() || !createObjectOptions.isOverwriteExisting()) {
-      blobTargetOptions.add(BlobTargetOption.generationMatch(0L));
+      blobTargetOptions.add(BlobTargetOption.doesNotExist());
     }
 
     if (storageOptions.getEncryptionKey() != null) {
@@ -366,10 +400,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private boolean canIgnoreExceptionForEmptyObject(
       StorageException exceptionOnCreate, StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    if (errorExtractor.getErrorType(exceptionOnCreate) == ErrorType.RESOURCE_EXHAUSTED
-        || errorExtractor.getErrorType(exceptionOnCreate) == ErrorType.INTERNAL
-        || (resourceId.isDirectory()
-            && errorExtractor.getErrorType(exceptionOnCreate) == ErrorType.FAILED_PRECONDITION)) {
+    ErrorType errorType = errorExtractor.getErrorType(exceptionOnCreate);
+    if (errorType == ErrorType.RESOURCE_EXHAUSTED
+        || errorType == ErrorType.INTERNAL
+        || (resourceId.isDirectory() && errorType == ErrorType.FAILED_PRECONDITION)) {
       GoogleCloudStorageItemInfo existingInfo;
       Duration maxWaitTime = storageOptions.getMaxWaitTimeForEmptyObjectCreation();
 

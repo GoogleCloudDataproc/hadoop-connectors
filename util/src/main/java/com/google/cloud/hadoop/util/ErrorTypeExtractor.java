@@ -26,6 +26,7 @@ public interface ErrorTypeExtractor {
     FAILED_PRECONDITION,
     INTERNAL,
     RESOURCE_EXHAUSTED,
+    UNAVAILABLE,
     UNKNOWN
   }
 
