@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateCopyArguments;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -83,6 +82,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -224,6 +224,33 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
    * behavior.
    */
   @Override
+  public void copy(
+      String srcBucketName,
+      List<String> srcObjectNames,
+      String dstBucketName,
+      List<String> dstObjectNames)
+      throws IOException {
+    checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
+    checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+    checkArgument(
+        srcObjectNames.size() == dstObjectNames.size(),
+        "Must supply same number of elements in srcObjects and dstObjects");
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
+        new HashMap<>(srcObjectNames.size());
+    for (int i = 0; i < srcObjectNames.size(); i++) {
+      sourceToDestinationObjectsMap.put(
+          new StorageResourceId(srcBucketName, srcObjectNames.get(i)),
+          new StorageResourceId(dstBucketName, dstObjectNames.get(i)));
+    }
+    copy(sourceToDestinationObjectsMap);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
+   * behavior.
+   */
+  @Override
   public void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
 
@@ -279,6 +306,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.generationMatch(dstContentGeneration));
     } else {
       copyRequestBuilder.setTarget(BlobId.of(dstBucketName, dstObjectName));
+    }
+
+    if (storageOptions.getEncryptionKey() != null) {
+      copyRequestBuilder.setSourceOptions(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      copyRequestBuilder.setTarget(
+          copyRequestBuilder.build().getTarget().getBlobId(),
+          BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
     if (storageOptions.getMaxRewriteChunkSize() > 0) {
@@ -387,7 +422,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         bucket.asBucketInfo().getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
         bucket.asBucketInfo().getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
         bucket.getLocation(),
-        bucket.getStorageClass().name());
+        bucket.getStorageClass() == null ? null : bucket.getStorageClass().name());
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about the expected behavior. */
@@ -638,25 +673,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             new FutureCallback<>() {
               @Override
               public void onSuccess(Blob blob) {
-                logger.atFiner().log(
-                    "updateItems: Successfully updated object '%s' for resourceId '%s'",
-                    blob, resourceId);
-                resultItemInfos.put(resourceId, createItemInfoForBlob(resourceId, blob));
+                if (blob == null) {
+                  // Indicated that the blob was not found.
+                  logger.atFiner().log("updateItems: object not found %s", resourceId);
+                  resultItemInfos.put(
+                      resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
+                } else {
+                  logger.atFiner().log(
+                      "updateItems: Successfully updated object '%s' for resourceId '%s'",
+                      blob, resourceId);
+                  resultItemInfos.put(resourceId, createItemInfoForBlob(resourceId, blob));
+                }
               }
 
               @Override
               public void onFailure(Throwable throwable) {
-                if (throwable instanceof Exception
-                    && errorExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
-                  logger.atFiner().log(
-                      "updateItems: object not found %s: %s", resourceId, throwable);
-                  resultItemInfos.put(
-                      resourceId, GoogleCloudStorageItemInfo.createNotFound(resourceId));
-                } else {
-                  innerExceptions.add(
-                      new IOException(
-                          String.format("Error updating '%s' object", resourceId), throwable));
-                }
+                innerExceptions.add(
+                    new IOException(
+                        String.format("Error updating '%s' object", resourceId), throwable));
               }
             });
       }
@@ -692,6 +726,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private static Map<String, String> encodeMetadata(Map<String, byte[]> metadata) {
     return Maps.transformValues(metadata, GoogleCloudStorageClientImpl::encodeMetadataValues);
+  }
+
+  @Override
+  public void compose(
+      String bucketName, List<String> sources, String destination, String contentType)
+      throws IOException {
+    logger.atFiner().log("compose(%s, %s, %s, %s)", bucketName, sources, destination, contentType);
+    List<StorageResourceId> sourceIds =
+        sources.stream()
+            .map(objectName -> new StorageResourceId(bucketName, objectName))
+            .collect(Collectors.toList());
+    StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setContentType(contentType)
+            .setEnsureEmptyObjectsMetadataMatch(false)
+            .build();
+    composeObjects(sourceIds, destinationId, options);
   }
 
   /**
