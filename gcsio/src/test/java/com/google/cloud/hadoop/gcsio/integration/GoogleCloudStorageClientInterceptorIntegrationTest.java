@@ -107,7 +107,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
   public void testWriteLogs() throws IOException {
 
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-    int uploadChunkSize = 3 * 1024 * 1024;
+    StorageResourceId derivedResourceId = derivedResourceId(resourceId);
+    int uploadChunkSize = 2 * 1024 * 1024;
     GoogleCloudStorageOptions storageOption =
         GCS_TRACE_OPTIONS.toBuilder()
             .setWriteChannelOptions(
@@ -115,9 +116,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
             .build();
 
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
-    byte[] partition =
-        writeObject(
-            gcsImpl, resourceId, /* partitionSize= */ 5 * 1024 * 1024, /* partitionCount= */ 1);
+    gcsImpl.create(resourceId).close();
 
     assertingHandler.assertLogCount(2 * 3);
 
@@ -140,8 +139,15 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     Map<String, Object> writeObjectResponseRecord = assertingHandler.getLogRecordAtIndex(4);
     assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
         .isEqualTo(uploadId);
+    // Object is finalized
     assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.PERSISTED_SIZE.name))
+        .isNull();
+    assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE_SIZE.name))
         .isEqualTo(0);
+    assertThat(
+            (writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name))
+                .toString())
+        .contains(derivedResourceId.toString());
 
     Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(5);
     verifyCloseStatus(writeObjectCloseStatusRecord, "WriteObject", Status.OK);

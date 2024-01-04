@@ -268,8 +268,6 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
     private String streamUploadId = "";
 
-    private StorageResourceId resourceId = StorageResourceId.ROOT;
-
     WriteObjectStreamTracer(String rpcMethod) {
       super(rpcMethod);
     }
@@ -291,12 +289,13 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           FirstMessageCase.WRITE_OBJECT_SPEC)) { // For direct upload which is used in PCUs
         WriteObjectSpec objectSpec = request.getWriteObjectSpec();
         if (objectSpec.hasResource()) {
-          // Resource will only be present in the first message of stream
-          // set the uploadId globally for a stream to make it available across other req/messages
-          // in
-          // stream.
-          updateResourceId(objectSpec.getResource());
-          logRecords.put(GoogleCloudStorageTracingFields.RESOURCE.name, this.resourceId);
+          com.google.storage.v2.Object resourceObject = objectSpec.getResource();
+          logRecords.put(
+              GoogleCloudStorageTracingFields.RESOURCE.name,
+              new StorageResourceId(
+                  resourceObject.getBucket(),
+                  resourceObject.getName(),
+                  resourceObject.getGeneration()));
         }
       }
 
@@ -316,17 +315,24 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       WriteObjectResponse response = (WriteObjectResponse) message;
       WriteStatusCase writeStatusCase = response.getWriteStatusCase();
       ImmutableMap.Builder<String, Object> logRecords = getResponseTrackingInfo();
-      if (writeStatusCase.equals(WriteStatusCase.PERSISTED_SIZE)) { // For resumable upload
+      if (writeStatusCase.equals(
+          WriteStatusCase.PERSISTED_SIZE)) { // Stream response if object is not finalized yet
         logRecords.put(
             GoogleCloudStorageTracingFields.PERSISTED_SIZE.name, response.getPersistedSize());
       } else if (writeStatusCase.equals(
-          WriteStatusCase.RESOURCE)) { // For direct upload which is used PCU
-        logRecords.put(
-            GoogleCloudStorageTracingFields.RESOURCE_SIZE.name, response.getResource().getSize());
+          WriteStatusCase.RESOURCE)) { // Stream response when object is finalized
+        logRecords
+            .put(
+                GoogleCloudStorageTracingFields.RESOURCE_SIZE.name,
+                response.getResource().getSize())
+            .put(
+                GoogleCloudStorageTracingFields.RESOURCE.name,
+                new StorageResourceId(
+                    response.getResource().getBucket(),
+                    response.getResource().getName(),
+                    response.getResource().getGeneration()));
       }
-      logRecords
-          .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, this.streamUploadId)
-          .put(GoogleCloudStorageTracingFields.RESOURCE.name, this.resourceId);
+      logRecords.put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, this.streamUploadId);
       logger.atInfo().log("%s", toJson(logRecords.build()));
     }
 
@@ -339,12 +345,6 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           String.format(
               "Write stream should have unique uploadId associated with each chunk request. Expected was %s got %s",
               streamUploadId, uploadId));
-    }
-
-    private void updateResourceId(@Nonnull com.google.storage.v2.Object resourceObject) {
-      this.resourceId =
-          new StorageResourceId(
-              resourceObject.getBucket(), resourceObject.getName(), resourceObject.getGeneration());
     }
   }
 
