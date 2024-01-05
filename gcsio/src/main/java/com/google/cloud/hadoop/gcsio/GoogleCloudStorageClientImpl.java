@@ -117,17 +117,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   static final List<BlobField> BLOB_FIELDS =
       ImmutableList.of(
           BlobField.BUCKET,
-          BlobField.NAME,
-          BlobField.TIME_CREATED,
-          BlobField.UPDATED,
-          BlobField.GENERATION,
-          BlobField.METAGENERATION,
-          BlobField.SIZE,
-          BlobField.CONTENT_TYPE,
           BlobField.CONTENT_ENCODING,
-          BlobField.MD5HASH,
+          BlobField.CONTENT_TYPE,
           BlobField.CRC32C,
-          BlobField.METADATA);
+          BlobField.GENERATION,
+          BlobField.METADATA,
+          BlobField.MD5HASH,
+          BlobField.METAGENERATION,
+          BlobField.NAME,
+          BlobField.SIZE,
+          BlobField.TIME_CREATED,
+          BlobField.UPDATED);
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
