@@ -51,6 +51,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageClientInterceptorIntegrationTest {
+
   private static final GoogleCloudStorageOptions GCS_TRACE_OPTIONS =
       getStandardOptionBuilder().setTraceLogEnabled(true).build();
 
@@ -118,12 +119,13 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
     gcsImpl.create(resourceId).close();
 
-    assertingHandler.assertLogCount(2 * 3);
+    // 1 request to fetch the generation of the object.
+    assertingHandler.assertLogCount(2 * 3 + 1);
 
     verifyChannelCreation(
-        assertingHandler.getSubListOfRecords(/* startIndex= */ 0, /* endIndex= */ 2), resourceId);
+        assertingHandler.getSubListOfRecords(/* startIndex= */ 1, /* endIndex= */ 3), resourceId);
 
-    Map<String, Object> writeObjectRequestRecord = assertingHandler.getLogRecordAtIndex(3);
+    Map<String, Object> writeObjectRequestRecord = assertingHandler.getLogRecordAtIndex(4);
 
     assertThat(writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.WRITE_OFFSET.name))
         .isEqualTo(0);
@@ -136,13 +138,13 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.FINALIZE_WRITE.name))
         .isEqualTo(true);
 
-    Map<String, Object> writeObjectResponseRecord = assertingHandler.getLogRecordAtIndex(4);
+    Map<String, Object> writeObjectResponseRecord = assertingHandler.getLogRecordAtIndex(5);
     assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
         .isEqualTo(uploadId);
     assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.PERSISTED_SIZE.name))
         .isEqualTo(0);
 
-    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(5);
+    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(6);
     verifyCloseStatus(writeObjectCloseStatusRecord, "WriteObject", Status.OK);
   }
 
@@ -161,22 +163,23 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     int partitionsCount = 1;
     byte[] partition =
         writeObject(gcsImpl, resourceId, /* partitionSize= */ 2 * 1024 * 1024, partitionsCount);
-    // there wil lbe three streams
+    // there will be three streams + 1 for fetching generation of the object
     // 1. StartResumableUpload stream with 3 messages, 1 for each Req, Resp, and status
     // 2. WriteObject Stream with 3 messages, 1 for each Req, Resp, and status
     // 2. WriteObject Stream to finalize object with 3 messages, 1 for each Req, Resp, and status
-    assertingHandler.assertLogCount(3 * 3);
+    assertingHandler.assertLogCount(3 * 3 + 1);
     assertingHandler.flush();
 
     assertObjectContent(gcsImpl, resourceId, partition, partitionsCount);
 
+    // One for get object request for setting write generation.
     // One for Read Request
     // One for Read Response ( it can vary, request can be split into two chunks as well).
     // One for status
-    assertingHandler.assertLogCount(3);
+    assertingHandler.assertLogCount(3 + 1);
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
-    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(0);
+    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(1);
     assertThat(
             readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
@@ -185,7 +188,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
         .isEqualTo(partition.length);
 
-    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
+    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(2);
     assertThat(
             readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
@@ -196,7 +199,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.BYTES_READ.name))
         .isEqualTo(partition.length);
 
-    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(2);
+    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(3);
     verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
   }
 

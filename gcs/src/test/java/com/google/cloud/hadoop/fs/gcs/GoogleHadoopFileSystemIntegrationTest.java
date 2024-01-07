@@ -56,6 +56,7 @@ import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
@@ -1650,7 +1651,14 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     IOException thrown = assertThrows(IOException.class, () -> ghfs.exists(new Path("gs://")));
 
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Invalid Credentials");
+    if (storageClientType == ClientType.STORAGE_CLIENT) {
+      assertThat(thrown)
+          .hasCauseThat()
+          .hasMessageThat()
+          .contains("invalid authentication credentials");
+    } else {
+      assertThat(thrown).hasCauseThat().hasMessageThat().contains("Invalid Credentials");
+    }
   }
 
   @Test

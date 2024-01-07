@@ -91,6 +91,7 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
   }
 
   private class TrackingStreamTracer extends ClientStreamTracer {
+
     private final GrpcStreamType type;
     private final String rpcMethod;
     protected List<MessageLite> streamMessages = new ArrayList<>();
@@ -140,6 +141,7 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
   }
 
   private class WriteObjectStreamTracer extends TrackingStreamTracer {
+
     WriteObjectStreamTracer(GrpcStreamType type, String rpcMethod) {
       super(type, rpcMethod);
     }
@@ -243,5 +245,9 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
             generationId,
             contentLength);
     return requestString(requestPrefixString, requestString);
+  }
+
+  public static String getObjectRequestString() {
+    return requestPrefixString("GetObject");
   }
 }
