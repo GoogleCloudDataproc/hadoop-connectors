@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio.testing;
+package com.google.cloud.hadoop.gcsio;
 
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
@@ -38,7 +38,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
-public final class MockStorage extends StorageImplBase {
+final class MockStorage extends StorageImplBase {
 
   private List<AbstractMessage> requests;
   private Queue<java.lang.Object> responses;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio.testing;
+package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.NoCredentials;
 import com.google.cloud.storage.GrpcStorageOptions;
@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
-public final class FakeServer implements AutoCloseable {
+final class FakeServer implements AutoCloseable {
 
   private final Server server;
   private final GrpcStorageOptions grpcStorageOptions;
