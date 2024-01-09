@@ -1432,6 +1432,26 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertEquals(0, statistics.getLong("invalid").longValue());
   }
 
+  @Test
+  public void testThreadTraceEnabledRename() throws Exception {
+    Configuration config = ghfs.getConf();
+    config.set("fs.gs.tracelog.enable", "true");
+    ghfs.initialize(ghfs.getUri(), config);
+
+    Path testRoot = new Path(sharedBucketName1, "/directory1/");
+    ghfs.mkdirs(testRoot);
+    assertThat(ghfs.exists(testRoot)).isTrue();
+
+    Path source = new Path(sharedBucketName1, "/directory1/file1");
+    ghfs.mkdirs(source);
+    assertThat(ghfs.exists(source)).isTrue();
+
+    Path dest = new Path(sharedBucketName1, "/directory2/");
+    assertThat(ghfs.exists(dest)).isFalse();
+    ghfs.rename(testRoot, dest);
+    assertThat(ghfs.exists(dest)).isTrue();
+  }
+
   private void checkMetric(
       String name, StorageStatistics statistics, HashSet<String> metricNames, String statsString) {
     assertThat(metricNames.contains(name)).isTrue();

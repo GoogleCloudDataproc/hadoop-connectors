@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -69,6 +70,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   // the amount of logs which is getting logged.
   private final ImmutableSet<String> logFilterProperties;
   private final GhfsStorageStatistics storageStatistics;
+  private final ITraceFactory traceFactory;
 
   // Path of the file to read.
   private URI gcsPath;
@@ -114,6 +116,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
     this.seekStreamStats =
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
+    this.traceFactory = ghfs.getTraceFactory();
   }
 
   /**
@@ -276,6 +279,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
         storageStatistics,
         GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS,
         gcsPath,
+        traceFactory,
         () -> {
           try {
             logger.atFiner().log("close(): %s", gcsPath);

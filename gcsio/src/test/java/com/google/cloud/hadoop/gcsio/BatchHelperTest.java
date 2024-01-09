@@ -65,7 +65,8 @@ public class BatchHelperTest {
                     storage,
                     /* maxRequestsPerBatch= */ 0,
                     /* totalRequests= */ 1,
-                    /* maxThreads= */ 1));
+                    /* maxThreads= */ 1,
+                    /* threadContext */ ""));
 
     assertThat(e).hasMessageThat().startsWith("maxRequestsPerBatch should be greater than 0");
   }
@@ -83,7 +84,8 @@ public class BatchHelperTest {
                     storage,
                     /* maxRequestsPerBatch= */ 1,
                     /* totalRequests= */ 0,
-                    /* maxThreads= */ 1));
+                    /* maxThreads= */ 1,
+                    /* threadContext */ ""));
 
     assertThat(e).hasMessageThat().startsWith("totalRequests should be greater than 0");
   }
@@ -101,7 +103,8 @@ public class BatchHelperTest {
                     storage,
                     /* maxRequestsPerBatch= */ 1,
                     /* totalRequests= */ 1,
-                    /* maxThreads= */ -1));
+                    /* maxThreads= */ -1,
+                    /* threadContext */ ""));
 
     assertThat(e).hasMessageThat().startsWith("maxThreads should be greater or equal to 0");
   }
@@ -127,7 +130,8 @@ public class BatchHelperTest {
             storage,
             /* maxRequestsPerBatch= */ 2,
             /* totalRequests= */ 2,
-            /* maxThreads= */ 0);
+            /* maxThreads= */ 0,
+            /* threadContext */ "");
 
     // 4. Queue 1st GET request to BatchHelper
     batchHelper.queue(storage.objects().get(BUCKET_NAME, objectName1), assertCallback(object1));
@@ -176,7 +180,8 @@ public class BatchHelperTest {
             storage,
             /* maxRequestsPerBatch= */ 2,
             /* totalRequests= */ 2,
-            /* maxThreads= */ 1);
+            /* maxThreads= */ 1,
+            /* threadContext */ "");
 
     // 4. Queue 1st GET request to BatchHelper
     batchHelper.queue(storage.objects().get(BUCKET_NAME, objectName1), assertCallback(object1));

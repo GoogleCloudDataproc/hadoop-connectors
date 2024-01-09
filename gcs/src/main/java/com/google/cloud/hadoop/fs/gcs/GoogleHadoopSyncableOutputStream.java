@@ -19,6 +19,7 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -119,6 +120,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   private final ExecutorService cleanupThreadpool;
   private final GhfsStorageStatistics storageStatistics;
+  private final ITraceFactory traceFactory;
 
   // Current GCS path pointing at the "tail" file which will be appended to the destination
   // on each hsync() call.
@@ -184,6 +186,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
 
     this.storageStatistics = ghfs.getStorageStatistics();
+    this.traceFactory = ghfs.getTraceFactory();
   }
 
   private static RateLimiter createRateLimiter(Duration minSyncInterval) {
@@ -253,6 +256,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         storageStatistics,
         GhfsStatistic.INVOCATION_HFLUSH,
         finalGcsPath,
+        traceFactory,
         () -> {
           long startTimeNs = System.nanoTime();
           if (!options.isSyncOnFlushEnabled()) {
@@ -282,6 +286,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         storageStatistics,
         GhfsStatistic.INVOCATION_HSYNC,
         finalGcsPath,
+        traceFactory,
         () -> {
           long startTimeNs = System.nanoTime();
           if (syncRateLimiter != null) {

@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -35,6 +36,7 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final GhfsStorageStatistics storageStatistics;
+  private final ITraceFactory traceFactory;
 
   // All store IO access goes through this.
   private WritableByteChannel channel;
@@ -75,6 +77,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     this.storageStatistics = ghfs.getStorageStatistics();
     this.streamStats =
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_WRITE_OPERATIONS, gcsPath);
+    this.traceFactory = ghfs.getTraceFactory();
   }
 
   private static WritableByteChannel createChannel(
@@ -131,6 +134,7 @@ class GoogleHadoopOutputStream extends OutputStream {
         storageStatistics,
         GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS,
         gcsPath,
+        traceFactory,
         () -> {
           logger.atFiner().log("close(%s)", gcsPath);
           try {
