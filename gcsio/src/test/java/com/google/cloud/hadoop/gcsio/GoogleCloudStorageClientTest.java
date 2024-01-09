@@ -26,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -68,6 +69,9 @@ public class GoogleCloudStorageClientTest {
   private static final String TEST_BUCKET_NAME = "foo-bucket";
 
   private static final String TEST_OBJECT_NAME = "foo-object";
+
+  private static final StorageResourceId TEST_RESOURCE_ID =
+      new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
 
   private static final Timestamp CREATE_TIME = Timestamp.newBuilder().build();
 
@@ -201,6 +205,137 @@ public class GoogleCloudStorageClientTest {
 
       assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(null));
       assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(""));
+    }
+  }
+
+  @Test
+  public void createEmptyObject_ignoresException() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+    // Mock for getItemInfo in case the object already exists.
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.createEmptyObject(TEST_RESOURCE_ID);
+    }
+    assertThat(mockStorage.getRequests().size()).isEqualTo(2);
+  }
+
+  @Test
+  public void createEmptyObject_mismatchedMetadata_doesNotIgnoreException() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+    // Mock for getItemInfo in case the object already exists.
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+
+    CreateObjectOptions createOptions =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setMetadata(ImmutableMap.of("foo", new byte[0]))
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      IOException thrown =
+          assertThrows(
+              IOException.class, () -> gcs.createEmptyObject(TEST_RESOURCE_ID, createOptions));
+      assertThat(thrown).hasMessageThat().contains(ErrorType.RESOURCE_EXHAUSTED.toString());
+    }
+  }
+
+  @Test
+  public void createEmptyObject_mismatchedMetadata_ignoreException() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+    // Mock for getItemInfo in case the object already exists.
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of("foo", "bar")).build());
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      // The fetch will "mismatch" with more metadata than our default EMPTY_METADATA used in the
+      // default CreateObjectOptions, but we won't care because the metadata-check requirement
+      // will be false, so the call will complete successfully.
+      gcs.createEmptyObject(TEST_RESOURCE_ID);
+    }
+    assertThat(mockStorage.getRequests().size()).isEqualTo(2);
+  }
+
+  @Test
+  public void createEmptyObject_doesNotIgnoreExceptions() throws Exception {
+    // Non-Ignorable exception.
+    mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
+    // Mock for getItemInfo in case the object already exists.
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      IOException thrown =
+          assertThrows(IOException.class, () -> gcs.createEmptyObject(TEST_RESOURCE_ID));
+      assertThat(thrown).hasMessageThat().contains(ErrorType.UNAVAILABLE.toString());
+    }
+  }
+
+  @Test
+  public void createEmptyObject_alreadyExists_throwsException() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.ALREADY_EXISTS));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      IOException thrown =
+          assertThrows(
+              FileAlreadyExistsException.class, () -> gcs.createEmptyObject(TEST_RESOURCE_ID));
+      assertThat(thrown)
+          .hasMessageThat()
+          .isEqualTo(
+              String.format(
+                  "Object 'gs://%s/%s' already exists.", TEST_BUCKET_NAME, TEST_OBJECT_NAME));
+    }
+  }
+
+  @Test
+  public void createEmptyObjects_ignoresExceptions() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+    // Mock for getItemInfo in case the object already exists.
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.createEmptyObjects(ImmutableList.of(TEST_RESOURCE_ID, TEST_RESOURCE_ID));
+    }
+    assertThat(mockStorage.getRequests().size()).isEqualTo(4);
+  }
+
+  @Test
+  public void createEmptyObjects_doesNotIgnoreExceptions() throws Exception {
+    mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
+    mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      IOException thrown =
+          assertThrows(
+              IOException.class,
+              () -> gcs.createEmptyObjects(ImmutableList.of(TEST_RESOURCE_ID, TEST_RESOURCE_ID)));
+      assertThat(thrown).hasMessageThat().isEqualTo("Multiple IOExceptions.");
     }
   }
 

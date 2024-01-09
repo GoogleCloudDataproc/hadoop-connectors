@@ -353,8 +353,8 @@ public class GoogleCloudStorageImplTest {
 
     assertThat(trackingGcs.getAllRequestStrings())
         .containsExactly(
-            uploadRequestString(
-                resourceId.getBucketName(), resourceId.getObjectName(), /* generationId= */ null));
+            emptyUploadRequestString(
+                resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl));
     trackingGcs.delegate.close();
   }
 
@@ -753,6 +753,14 @@ public class GoogleCloudStorageImplTest {
     return ImmutableList.of(
         TrackingHttpRequestInitializer.resumableUploadChunkRequestString(
             bucketName, objectName, generationId, uploadId));
+  }
+
+  private String emptyUploadRequestString(
+      String bucketName, String objectName, boolean testStorageClientImpl) {
+    if (testStorageClientImpl) {
+      return TrackingGrpcRequestInterceptor.resumableUploadChunkRequestString(1, 1, 0, 0, true);
+    }
+    return uploadRequestString(bucketName, objectName, /* generationId= */ null);
   }
 
   private String getObjectRequestString(

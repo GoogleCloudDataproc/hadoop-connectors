@@ -43,6 +43,12 @@ public class GrpcErrorTypeExtractor implements ErrorTypeExtractor {
         return ErrorType.ALREADY_EXISTS;
       case FAILED_PRECONDITION:
         return ErrorType.FAILED_PRECONDITION;
+      case RESOURCE_EXHAUSTED:
+        return ErrorType.RESOURCE_EXHAUSTED;
+      case INTERNAL:
+        return ErrorType.INTERNAL;
+      case UNAVAILABLE:
+        return ErrorType.UNAVAILABLE;
       default:
         return ErrorType.UNKNOWN;
     }

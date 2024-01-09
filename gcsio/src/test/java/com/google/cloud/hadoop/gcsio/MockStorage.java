@@ -32,6 +32,8 @@ import com.google.storage.v2.RewriteObjectRequest;
 import com.google.storage.v2.RewriteResponse;
 import com.google.storage.v2.StorageGrpc.StorageImplBase;
 import com.google.storage.v2.UpdateObjectRequest;
+import com.google.storage.v2.WriteObjectRequest;
+import com.google.storage.v2.WriteObjectResponse;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -245,5 +247,36 @@ final class MockStorage extends StorageImplBase {
                   RewriteResponse.class.getName(),
                   Exception.class.getName())));
     }
+  }
+
+  @Override
+  public StreamObserver<WriteObjectRequest> writeObject(
+      final StreamObserver<WriteObjectResponse> responseObserver) {
+    return new StreamObserver<>() {
+      @Override
+      public void onNext(WriteObjectRequest value) {
+        requests.add(value);
+        final java.lang.Object response = responses.remove();
+        if (response instanceof WriteObjectResponse) {
+          responseObserver.onNext(((WriteObjectResponse) response));
+        } else if (response instanceof Exception) {
+          responseObserver.onError(((Exception) response));
+        } else {
+          responseObserver.onError(
+              new IllegalArgumentException(
+                  String.format(
+                      "Unrecognized response type %s for method WriteObject, expected %s or %s",
+                      response == null ? "null" : response.getClass().getName(),
+                      WriteObjectResponse.class.getName(),
+                      Exception.class.getName())));
+        }
+      }
+
+      @Override
+      public void onError(Throwable throwable) {}
+
+      @Override
+      public void onCompleted() {}
+    };
   }
 }

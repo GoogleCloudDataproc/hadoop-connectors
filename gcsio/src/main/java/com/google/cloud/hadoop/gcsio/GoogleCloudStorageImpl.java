@@ -118,7 +118,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
-  private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
+  static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
       CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
@@ -252,7 +252,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final GoogleCloudStorageOptions storageOptions;
 
   // Object to use to perform sleep operations
-  private final Sleeper sleeper = Sleeper.DEFAULT;
+  static final Sleeper sleeper = Sleeper.DEFAULT;
 
   // BackOff objects are per-request, use this to make new ones.
   private final BackOffFactory backOffFactory = BackOffFactory.DEFAULT;

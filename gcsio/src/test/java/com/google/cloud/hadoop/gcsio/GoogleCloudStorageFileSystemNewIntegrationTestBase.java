@@ -88,13 +88,15 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.mkdir(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
-        .containsExactly(
-            uploadRequestString(
-                bucketName,
-                dirObject + "/",
-                /* generationId= */ 0,
-                /* replaceGenerationId= */ false));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+          .containsExactly(
+              uploadRequestString(
+                  bucketName,
+                  dirObject + "/",
+                  /* generationId= */ 0,
+                  /* replaceGenerationId= */ false));
+    }
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -112,15 +114,17 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     gcsfsIHelper.mkdir(bucketName, dirObject);
     gcsFs.mkdir(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
-        .containsExactly(
-            uploadRequestString(
-                bucketName,
-                dirObject + "/",
-                /* generationId= */ 0,
-                /* replaceGenerationId= */ false),
-            // verifies directory exists
-            getRequestString(bucketName, dirObject + "/"));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+          .containsExactly(
+              uploadRequestString(
+                  bucketName,
+                  dirObject + "/",
+                  /* generationId= */ 0,
+                  /* replaceGenerationId= */ false),
+              // verifies directory exists
+              getRequestString(bucketName, dirObject + "/"));
+    }
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
