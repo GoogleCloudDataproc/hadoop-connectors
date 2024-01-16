@@ -146,7 +146,7 @@ public class GoogleCloudStorageFileSystem {
       case STORAGE_CLIENT:
         return GoogleCloudStorageClientImpl.builder()
             .setOptions(options.getCloudStorageOptions())
-            .setCredentials(new CredentialAdapter(credential))
+            .setCredentials(credential == null ? null : new CredentialAdapter(credential))
             .setCredential(credential)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
             .build();
