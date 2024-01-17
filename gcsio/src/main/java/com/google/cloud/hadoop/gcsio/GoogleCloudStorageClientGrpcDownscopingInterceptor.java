@@ -79,7 +79,7 @@ class GoogleCloudStorageClientGrpcDownscopingInterceptor implements ClientInterc
     logger.atFinest().log(String.format("interceptCall(): method=%s", method.getFullMethodName()));
     return new SimpleForwardingClientCall<ReqT, RespT>(next.newCall(method, callOptions)) {
       private int flowControlRequests;
-      private String methodName;
+      private final String methodName = method.getFullMethodName();;
       private Metadata headers;
       private Listener<RespT> responseListener;
 
@@ -87,7 +87,6 @@ class GoogleCloudStorageClientGrpcDownscopingInterceptor implements ClientInterc
       public void start(Listener<RespT> responseListener, Metadata headers) {
         this.responseListener = responseListener;
         this.headers = headers;
-        this.methodName = method.getFullMethodName();
 
         logger.atFinest().log("start(): method=%s", methodName);
       }
@@ -103,16 +102,15 @@ class GoogleCloudStorageClientGrpcDownscopingInterceptor implements ClientInterc
 
       @Override
       public void sendMessage(ReqT message) {
-        setAuthHeader(message);
         if (headers != null) {
-          delegate().start(responseListener, headers);
+          setAuthHeader(message);
+          super.start(responseListener, headers);
+          headers = null;
+          if (flowControlRequests != 0) {
+            super.request(flowControlRequests);
+            flowControlRequests = 0;
+          }
         }
-
-        if (flowControlRequests != 0) {
-          super.request(flowControlRequests);
-        }
-        headers = null;
-
         super.sendMessage(message);
       }
 
