@@ -20,15 +20,12 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.common.eventbus.EventBus;
-import java.io.IOException;
 
 /** Event Bus class */
 public class GoogleCloudStorageEventBus {
 
   /** Hold the instance of the event bus here */
   private static EventBus eventBus = new EventBus();
-
-  private static IOException exception = new IOException();
 
   /**
    * Method to register an obj to event bus
@@ -68,6 +65,6 @@ public class GoogleCloudStorageEventBus {
 
   /** Posting Exception to invoke corresponding Subscriber method. */
   public static void postOnException() {
-    eventBus.post(exception);
+    eventBus.post(null);
   }
 }
