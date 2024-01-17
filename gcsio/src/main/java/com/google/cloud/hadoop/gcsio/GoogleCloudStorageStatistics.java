@@ -23,7 +23,7 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 import java.util.EnumSet;
 
-/** Statistics which are collected in GCS Client Side. */
+/** Statistics which are collected in GCS Connector */
 public enum GoogleCloudStorageStatistics {
 
   /** GCS connector specific statistics */
