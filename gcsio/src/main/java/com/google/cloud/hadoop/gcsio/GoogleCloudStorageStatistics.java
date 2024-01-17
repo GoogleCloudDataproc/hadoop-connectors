@@ -26,7 +26,7 @@ import java.util.EnumSet;
 /** Statistics which are collected in GCS Client Side. */
 public enum GoogleCloudStorageStatistics {
 
-  /** Client-side Status Code statistics */
+  /** GCS connector specific statistics */
   GCS_REQUEST_COUNT(
       "gcs_total_request_count", "Counts the total number of gcs requests made", TYPE_COUNTER),
 
