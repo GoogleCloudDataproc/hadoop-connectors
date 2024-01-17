@@ -253,13 +253,21 @@ public class GhfsStorageStatistics extends StorageStatistics {
     updateGcsIOSpecificStatistics(response.getStatusCode());
   }
 
-  /** Updating the GCS_TOTAL_REQUEST_COUNT */
+
+  /**
+   * Updating the GCS_TOTAL_REQUEST_COUNT
+   *
+   * @param request
+   */
   @Subscribe
   private void subscriberOnHttpRequest(@Nonnull HttpRequest request) {
     incrementGcsTotalRequestCount();
   }
-
-  /** Updating the EXCEPTION_COUNT */
+  /**
+   * Updating the EXCEPTION_COUNT
+   *
+   * @param exception
+   */
   @Subscribe
   private void subscriberOnException(IOException exception) {
     incrementGcsExceptionCount();
