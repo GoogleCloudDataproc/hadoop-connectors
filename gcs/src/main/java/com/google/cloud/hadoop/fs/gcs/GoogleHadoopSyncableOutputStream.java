@@ -19,6 +19,7 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -233,6 +234,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         if (e instanceof InterruptedException) {
           Thread.currentThread().interrupt();
         }
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Failed to delete files while closing stream", e);
       }
     }
@@ -350,6 +352,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       final StorageResourceId tempResourceId =
           StorageResourceId.fromStringPath(curGcsPath.toString(), generationId);
       if (!destResourceId.getBucketName().equals(tempResourceId.getBucketName())) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IllegalStateException(
             String.format(
                 "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
@@ -398,6 +401,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();
     }
   }

@@ -14,15 +14,10 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.fs.gcs;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+package com.google.cloud.hadoop.gcsio;
 
 /** Enum of statistic types. */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
-public enum GhfsStatisticTypeEnum {
+public enum StatisticTypeEnum {
 
   /** Counter. Counts the number of occurrences of each operation */
   TYPE_COUNTER,

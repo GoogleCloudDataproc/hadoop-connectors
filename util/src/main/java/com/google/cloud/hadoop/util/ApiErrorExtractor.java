@@ -306,6 +306,8 @@ public class ApiErrorExtractor {
     Throwable cause = throwable;
     while (cause != null) {
       if (cause instanceof GoogleJsonResponseException) {
+        GoogleCloudStorageEventBus.postOnGoogleJsonResponseException(
+            (GoogleJsonResponseException) cause);
         return (GoogleJsonResponseException) cause;
       }
       cause = cause.getCause();
