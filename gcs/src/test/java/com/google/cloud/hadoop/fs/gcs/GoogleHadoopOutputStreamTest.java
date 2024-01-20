@@ -40,7 +40,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,14 +53,19 @@ public class GoogleHadoopOutputStreamTest {
 
   private GoogleHadoopFileSystem ghfs;
 
+  // private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
+
   @Before
   public void setUp() throws IOException {
     ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
+    // gcsFsIHelper = GoogleCloudStorageFileSystemIntegrationHelper.create();
+    // gcsFsIHelper.beforeAllTests();
   }
 
   @After
   public void tearDown() throws IOException {
     ghfs.close();
+    // gcsFsIHelper.afterAllTests();
   }
 
   @Test
@@ -257,12 +262,15 @@ public class GoogleHadoopOutputStreamTest {
   }
 
   @Test
-  public void time_statistics() throws IOException {
+  public void time_statistics() throws Exception {
+
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
             ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
+
+    GhfsStorageStatistics stats = (GhfsStorageStatistics) TestUtils.getStorageStatistics();
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
@@ -272,30 +280,30 @@ public class GoogleHadoopOutputStreamTest {
 
     fout.hsync();
 
-    verifyDurationMetric(fout.getIOStatistics(), INVOCATION_HSYNC.getSymbol(), 1);
+    verifyDurationMetric(stats, INVOCATION_HSYNC.getSymbol(), 1);
     fout.write(data1, 0, data1.length);
     fout.write(data2, 0, data2.length);
 
     fout.hflush();
 
-    verifyDurationMetric(fout.getIOStatistics(), INVOCATION_HFLUSH.getSymbol(), 1);
+    verifyDurationMetric(stats, INVOCATION_HFLUSH.getSymbol(), 1);
 
     fout.close();
 
-    verifyDurationMetric(fout.getIOStatistics(), STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
-    verifyDurationMetric(fout.getIOStatistics(), STREAM_WRITE_OPERATIONS.getSymbol(), 4);
+    verifyDurationMetric(stats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
+    verifyDurationMetric(stats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
 
-    IOStatisticsStore ghfsStats = ghfs.getInstrumentation().getIOStatistics();
-    verifyDurationMetric(ghfsStats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
-    verifyDurationMetric(ghfsStats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
-    verifyDurationMetric(ghfsStats, INVOCATION_HFLUSH.getSymbol(), 1);
-    verifyDurationMetric(ghfsStats, INVOCATION_HSYNC.getSymbol(), 1);
+    verifyDurationMetric(stats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
+    verifyDurationMetric(stats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
+    verifyDurationMetric(stats, INVOCATION_HFLUSH.getSymbol(), 1);
+    verifyDurationMetric(stats, INVOCATION_HSYNC.getSymbol(), 1);
   }
 
   @Test
   public void hsync_statistics() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    StorageStatistics stats = TestUtils.getStorageStatistics();
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
             ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
@@ -305,10 +313,10 @@ public class GoogleHadoopOutputStreamTest {
 
     fout.write(data1, 0, data1.length);
     fout.hsync();
-    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(0);
+    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_HFLUSH, 0);
     fout.write(data2, 0, data2.length);
     fout.hflush();
-    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(1);
+    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_HFLUSH, 1);
   }
 
   private byte[] readFile(Path objectPath) throws IOException {

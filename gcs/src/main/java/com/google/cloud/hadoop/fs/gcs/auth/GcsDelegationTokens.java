@@ -21,7 +21,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
@@ -241,7 +240,7 @@ public class GcsDelegationTokens extends AbstractService {
     // not bound to a token, so create a new one.
     // issued DTs are not cached so that long-lived filesystems can
     // reliably issue session/role tokens.
-    return tokenBinding.createDelegationToken(renewer, getStats());
+    return tokenBinding.createDelegationToken(renewer);
   }
 
   /**
@@ -306,10 +305,5 @@ public class GcsDelegationTokens extends AbstractService {
   private void validateAccessTokenProvider() {
     checkState(
         accessTokenProvider == null, "GCP Delegation tokens has already been bound/deployed");
-  }
-
-  /** Get the IOStatistics of GoogleHadoopFileSystem to update the Delegation token Statistics */
-  private DelegationTokenStatistics getStats() {
-    return fileSystem.getInstrumentation().newDelegationTokenStatistics();
   }
 }

@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -28,6 +27,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -55,13 +56,16 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Syncable;
-import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 class GoogleHadoopOutputStream extends OutputStream
     implements IOStatisticsSource, StreamCapabilities, Syncable {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private final GhfsStorageStatistics storageStatistics;
+
+  private final ITraceFactory traceFactory;
 
   // Prefix used for all temporary files created by this stream.
   public static final String TMP_FILE_PREFIX = "_GHFS_SYNC_TMP_FILE_";
@@ -119,9 +123,11 @@ class GoogleHadoopOutputStream extends OutputStream
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
   // Statistics tracker for output stream related statistics
-  private final GhfsOutputStreamStatistics streamStatistics;
-  // Instrumentation to track Statistics
-  private final GhfsInstrumentation instrumentation;
+  // private final GhfsOutputStreamStatistics streamStatistics;
+  // // Instrumentation to track Statistics
+  // private final GhfsInstrumentation instrumentation;
+
+  private final GhfsStreamStats streamStats;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -144,10 +150,11 @@ class GoogleHadoopOutputStream extends OutputStream
     this.ghfs = ghfs;
     this.dstGcsPath = dstGcsPath;
     this.statistics = statistics;
-    this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    this.storageStatistics = ghfs.getStorageStatistics();
 
+    this.streamStats =
+        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_WRITE_OPERATIONS, dstGcsPath);
     Duration minSyncInterval = createFileOptions.getMinSyncInterval();
-    this.instrumentation = ghfs.getInstrumentation();
 
     this.syncRateLimiter =
         minSyncInterval.isNegative() || minSyncInterval.isZero()
@@ -179,6 +186,8 @@ class GoogleHadoopOutputStream extends OutputStream
             tmpGcsPath,
             tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
     this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
+
+    this.traceFactory = ghfs.getTraceFactory();
   }
 
   private static OutputStream createOutputStream(
@@ -188,6 +197,7 @@ class GoogleHadoopOutputStream extends OutputStream
     try {
       channel = gcsfs.create(gcsPath, options);
     } catch (java.nio.file.FileAlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw (FileAlreadyExistsException)
           new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
               .initCause(e);
@@ -200,32 +210,27 @@ class GoogleHadoopOutputStream extends OutputStream
 
   @Override
   public void write(int b) throws IOException {
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.STREAM_WRITE_OPERATIONS.getSymbol(),
-        () -> {
-          throwIfNotOpen();
-          tmpOut.write(b);
-          streamStatistics.writeBytes(1);
-          statistics.incrementBytesWritten(1);
-          statistics.incrementWriteOps(1);
-          return null;
-        });
+
+    long start = System.nanoTime();
+    throwIfNotOpen();
+    tmpOut.write(b);
+    statistics.incrementBytesWritten(1);
+    statistics.incrementWriteOps(1);
+    // Using a lightweight implementation to update instrumentation. This method can be called
+    // quite
+    // frequently and need to be lightweight.
+    streamStats.updateWriteStreamStats(1, start);
   }
 
   @Override
   public void write(@Nonnull byte[] b, int offset, int len) throws IOException {
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.STREAM_WRITE_OPERATIONS.getSymbol(),
-        () -> {
-          throwIfNotOpen();
-          tmpOut.write(b, offset, len);
-          streamStatistics.writeBytes(len);
-          statistics.incrementBytesWritten(len);
-          statistics.incrementWriteOps(1);
-          return null;
-        });
+
+    long start = System.nanoTime();
+    throwIfNotOpen();
+    tmpOut.write(b, offset, len);
+    statistics.incrementBytesWritten(len);
+    statistics.incrementWriteOps(1);
+    streamStats.updateWriteStreamStats(len, start);
   }
 
   /**
@@ -238,9 +243,12 @@ class GoogleHadoopOutputStream extends OutputStream
    */
   @Override
   public void hflush() throws IOException {
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.INVOCATION_HFLUSH.getSymbol(),
+
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_HFLUSH,
+        dstGcsPath,
+        traceFactory,
         () -> {
           logger.atFiner().log("hflush(): %s", dstGcsPath);
 
@@ -262,9 +270,12 @@ class GoogleHadoopOutputStream extends OutputStream
 
   @Override
   public void hsync() throws IOException {
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.INVOCATION_HSYNC.getSymbol(),
+
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_HSYNC,
+        dstGcsPath,
+        traceFactory,
         () -> {
           logger.atFiner().log("hsync(): %s", dstGcsPath);
 
@@ -358,9 +369,11 @@ class GoogleHadoopOutputStream extends OutputStream
   @Override
   public void close() throws IOException {
     boolean isClosed = tmpOut == null;
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(),
+    GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS,
+        dstGcsPath,
+        traceFactory,
         () -> {
           logger.atFiner().log(
               "close(): temp tail file: %s final destination: %s", tmpGcsPath, dstGcsPath);
@@ -385,6 +398,7 @@ class GoogleHadoopOutputStream extends OutputStream
             try {
               deletion.get();
             } catch (ExecutionException | InterruptedException e) {
+              GoogleCloudStorageEventBus.postOnException();
               if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
               }
@@ -398,7 +412,7 @@ class GoogleHadoopOutputStream extends OutputStream
         });
 
     if (!isClosed) {
-      streamStatistics.close();
+      streamStats.close();
     }
     // TODO: do we need make a `cleanerThreadpool` an object field and close it here?
   }
@@ -407,12 +421,6 @@ class GoogleHadoopOutputStream extends OutputStream
     if (tmpOut == null) {
       throw new ClosedChannelException();
     }
-  }
-
-  /** Get the current IOStatistics from output stream */
-  @Override
-  public IOStatistics getIOStatistics() {
-    return streamStatistics.getIOStatistics();
   }
 
   @Override

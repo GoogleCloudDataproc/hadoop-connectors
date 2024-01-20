@@ -32,7 +32,7 @@ import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
-import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.cloud.hadoop.util.ThreadTrace;
@@ -123,8 +123,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   private static GoogleCloudStorage createCloudStorage(
       GoogleCloudStorageFileSystemOptions options,
       Credentials credentials,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     checkNotNull(options, "options must not be null");
 
@@ -134,14 +133,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .setGcsClientStatisticInterface(gcsClientStatisticInterface)
             .build();
       default:
         return GoogleCloudStorageImpl.builder()
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .setGcsClientStatisticInterface(gcsClientStatisticInterface)
             .build();
     }
   }
@@ -155,13 +152,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    */
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
-    this(
-        createCloudStorage(
-            options,
-            credentials,
-            /* downscopedAccessTokenFn= */ null, /* gcsClientStatisticInterface */
-            null),
-        options);
+    this(createCloudStorage(options, credentials, /* downscopedAccessTokenFn= */ null), options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 
@@ -172,18 +163,13 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @param gcsClientStatisticInterface for backporting ghfsInstrumentation
    */
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      GoogleCloudStorageFileSystemOptions options,
-      GcsClientStatisticInterface gcsClientStatisticInterface)
+      GoogleCloudStorageFileSystemOptions options)
       throws IOException {
-    this(
-        createCloudStorage(
-            options, credentials, downscopedAccessTokenFn, gcsClientStatisticInterface),
-        options);
+    this(createCloudStorage(options, credentials, downscopedAccessTokenFn), options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 
@@ -254,6 +240,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName=*/ true);
 
     if (resourceId.isDirectory()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "Cannot create a file whose name looks like a directory: '%s'", resourceId));
@@ -280,6 +267,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
       // Check if a directory with the same name exists.
       if (getFromFuture(conflictingDirExist)) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new FileAlreadyExistsException("A directory with that name exists: " + path);
       }
     }
@@ -326,6 +314,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     FileInfo fileInfo = getFileInfo(path);
     if (!fileInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
 
@@ -350,6 +339,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
                       fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
                   .getItems();
       if (!itemsToDelete.isEmpty() && !recursive) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
     } else {
@@ -430,6 +420,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       try {
         gcs.createBucket(resourceId.getBucketName());
       } catch (FileAlreadyExistsException e) {
+        GoogleCloudStorageEventBus.postOnException();
         // This means that bucket already exist, and we do not need to do anything.
         logger.atFiner().withCause(e).log(
             "mkdirs: %s already exists, ignoring creation failure", resourceId);
@@ -450,6 +441,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     try {
       gcs.createEmptyObject(resourceId);
     } catch (FileAlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
       // This means that directory object already exist, and we do not need to do anything.
       logger.atFiner().withCause(e).log(
           "mkdirs: %s already exists, ignoring creation failure", resourceId);
@@ -481,6 +473,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Throw if the source file does not exist.
     if (!srcInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + src);
     }
 
@@ -534,16 +527,19 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Throw if src is a file and dst == GCS_ROOT
     if (!srcInfo.isDirectory() && dst.equals(GCS_ROOT)) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("A file cannot be created in root.");
     }
 
     // Throw if the destination is a file that already exists, and it's not a source file.
     if (dstInfo.exists() && !dstInfo.isDirectory() && (srcInfo.isDirectory() || !dst.equals(src))) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Cannot overwrite an existing file: " + dst);
     }
 
     // Rename operation cannot be completed if parent of destination does not exist.
     if (dstParentInfo != null && !dstParentInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           "Cannot rename because path does not exist: " + dstParentInfo.getPath());
     }
@@ -570,6 +566,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
       // Throw if renaming directory to self - this is forbidden
       if (src.equals(dst)) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Rename dir to self is forbidden");
       }
 
@@ -578,6 +575,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       // because this means that src is a parent directory of dst
       // and src cannot be "renamed" to its subdirectory
       if (!dstRelativeToSrc.equals(dst)) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Rename to subdir is forbidden");
       }
 
@@ -596,6 +594,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
       if (dstInfo.isDirectory()) {
         if (!dstInfo.exists()) {
+          GoogleCloudStorageEventBus.postOnException();
           throw new IOException("Cannot rename because path does not exist: " + dstInfo.getPath());
         } else {
           dst = dst.resolve(srcItemName);
@@ -735,6 +734,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       gcs.createEmptyObject(resourceId);
       logger.atInfo().log("Successfully repaired '%s' directory.", resourceId);
     } catch (IOException e) {
+      GoogleCloudStorageEventBus.postOnException();
       logger.atWarning().withCause(e).log("Failed to repair '%s' directory", resourceId);
     }
   }
@@ -743,6 +743,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     try {
       return future.get();
     } catch (ExecutionException | InterruptedException e) {
+      GoogleCloudStorageEventBus.postOnException();
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
@@ -824,6 +825,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           return listedInfo;
         }
       } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
         dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
         throw e;
       }
@@ -831,6 +833,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
 
@@ -886,6 +889,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           return itemInfo;
         }
       } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
         listDirFuture.cancel(/* mayInterruptIfRunning= */ true);
         throw e;
       }
@@ -996,6 +1000,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // we make this check therefore this is a good faith effort and not a guarantee.
     for (GoogleCloudStorageItemInfo fileInfo : gcs.getItemInfos(fileIds)) {
       if (fileInfo.exists()) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new FileAlreadyExistsException(
             "Cannot create directories because of existing file: " + fileInfo.getResourceId());
       }

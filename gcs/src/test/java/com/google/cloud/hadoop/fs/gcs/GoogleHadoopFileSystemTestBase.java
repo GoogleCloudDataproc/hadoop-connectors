@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.junit.Test;
 
@@ -422,6 +423,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   @Test
   public void CopyFromLocalFileIOStatisticsTest() throws IOException {
+    StorageStatistics stats = TestUtils.getStorageStatistics();
     // Temporary file in GHFS.
     URI tempFileUri = getTempFilePath();
     Path tempFilePath = ghfsHelper.castAsHadoopPath(tempFileUri);
@@ -436,21 +438,12 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,src,dst)
     ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
 
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
-        .isEqualTo(1);
+    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 1);
 
     // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,[] srcs,dst)
     ghfs.copyFromLocalFile(false, true, new Path[] {localTempFilePath}, tempDirPath);
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
-        .isEqualTo(2);
+
+    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 2);
 
     if (localTempFile.exists()) {
       localTempFile.delete();

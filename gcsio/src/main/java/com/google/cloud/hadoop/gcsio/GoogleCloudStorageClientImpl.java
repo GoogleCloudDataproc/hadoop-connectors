@@ -41,7 +41,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
-import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
@@ -159,8 +159,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable ExecutorService pCUExecutorService,
-      @Nullable GcsClientStatisticInterface gcsClientStatisticInterface)
+      @Nullable ExecutorService pCUExecutorService)
       throws IOException {
     super(
         GoogleCloudStorageImpl.builder()
@@ -169,7 +168,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpTransport(httpTransport)
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .setGcsClientStatisticInterface(gcsClientStatisticInterface)
             .build());
 
     this.storageOptions = options;
@@ -232,6 +230,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     try {
       storage.create(bucketInfoBuilder.build());
     } catch (StorageException e) {
+      GoogleCloudStorageEventBus.postOnException();
       if (errorExtractor.bucketAlreadyExists(e)) {
         throw (FileAlreadyExistsException)
             new FileAlreadyExistsException(String.format("Bucket '%s' already exists.", bucketName))
@@ -273,6 +272,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         logger.atFine().withCause(e).log("Ignored exception while creating empty object");
       } else {
         if (errorExtractor.getErrorType(e) == ErrorType.ALREADY_EXISTS) {
+          GoogleCloudStorageEventBus.postOnException();
           throw (FileAlreadyExistsException)
               new FileAlreadyExistsException(
                       String.format("Object '%s' already exists.", resourceId))
@@ -362,6 +362,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
   }
@@ -513,6 +514,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
   }
@@ -562,6 +564,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             }
             logger.atFiner().log("Successfully copied %s to %s", srcString, dstString);
           } catch (StorageException e) {
+            GoogleCloudStorageEventBus.postOnException();
             if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
               innerExceptions.add(
                   createFileNotFoundException(srcBucketName, srcObjectName, new IOException(e)));
@@ -627,6 +630,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         allBuckets.add(bucket);
       }
     } catch (StorageException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(e);
     }
     return allBuckets;
@@ -684,6 +688,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
   }
@@ -733,6 +738,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
             @Override
             public void onFailure(Throwable throwable) {
+              GoogleCloudStorageEventBus.postOnException();
               innerExceptions.add(
                   new IOException(
                       String.format("Error deleting %s, stage 1", resourceId), throwable));
@@ -772,6 +778,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               resourceId, generation, attempt, throwable);
           queueSingleObjectDelete(resourceId, innerExceptions, batchExecutor, attempt + 1);
         } else {
+          GoogleCloudStorageEventBus.postOnException();
           innerExceptions.add(
               new IOException(
                   String.format(
@@ -802,6 +809,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           innerExceptions.add(createFileNotFoundException(bucketName, null, null));
         }
       } catch (StorageException e) {
+        GoogleCloudStorageEventBus.postOnException();
         innerExceptions.add(
             new IOException(String.format("Error deleting '%s' bucket", bucketName), e));
       }
@@ -846,6 +854,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       executor.shutdown();
     }
     if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
 
@@ -891,6 +900,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
       @Override
       public void onFailure(Throwable throwable) {
+        GoogleCloudStorageEventBus.postOnException();
         innerExceptions.add(
             new IOException(
                 String.format("Error getting %s bucket", resourceId.getBucketName()), throwable));
@@ -919,6 +929,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
       @Override
       public void onFailure(Throwable throwable) {
+        GoogleCloudStorageEventBus.postOnException();
         innerExceptions.add(
             new IOException(String.format("Error getting %s object", resourceId), throwable));
       }
@@ -976,6 +987,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     try {
       return storage.get(bucketName);
     } catch (StorageException e) {
+      GoogleCloudStorageEventBus.postOnException();
       if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
         return null;
       }
@@ -1003,6 +1015,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               BlobId.of(bucketName, objectName),
               BlobGetOption.fields(BLOB_FIELDS.toArray(new BlobField[0])));
     } catch (StorageException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Error accessing " + resourceId, e);
     }
     return blob;
@@ -1111,6 +1124,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
               @Override
               public void onFailure(Throwable throwable) {
+                GoogleCloudStorageEventBus.postOnException();
                 innerExceptions.add(
                     new IOException(
                         String.format("Error updating '%s' object", resourceId), throwable));
@@ -1122,6 +1136,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
 
@@ -1180,6 +1195,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     logger.atFiner().log("composeObjects(%s, %s, %s)", sources, destination, options);
     for (StorageResourceId inputId : sources) {
       if (!destination.getBucketName().equals(inputId.getBucketName())) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
             String.format(
                 "Bucket doesn't match for source '%s' and destination '%s'!",
@@ -1207,6 +1223,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     try {
       composedBlob = storage.compose(request);
     } catch (StorageException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(e);
     }
     GoogleCloudStorageItemInfo compositeInfo = createItemInfoForBlob(destination, composedBlob);
@@ -1236,6 +1253,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       checkState(generation != 0, "Generation should not be 0 for an existing item");
       return generation;
     }
+    GoogleCloudStorageEventBus.postOnException();
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
@@ -1288,6 +1306,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       case JOURNALING:
         if (writeOptions.getTemporaryPaths() == null
             || writeOptions.getTemporaryPaths().isEmpty()) {
+          GoogleCloudStorageEventBus.postOnException();
           throw new IllegalArgumentException(
               "Upload using `Journaling` requires the property:fs.gs.write.temporary.dirs to be set.");
         }
@@ -1304,6 +1323,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .withExecutorSupplier(getPCUExecutorSupplier(pCUExecutorService))
             .withPartNamingStrategy(getPartNamingStrategy(writeOptions.getPartFileNamePrefix()));
       default:
+        GoogleCloudStorageEventBus.postOnException();
         throw new IllegalArgumentException(
             String.format("Upload type:%s is not supported.", writeOptions.getUploadType()));
     }
@@ -1318,6 +1338,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       case ALWAYS:
         return PartCleanupStrategy.always();
       default:
+        GoogleCloudStorageEventBus.postOnException();
         throw new IllegalArgumentException(
             String.format("Cleanup type:%s is not handled.", cleanupType));
     }
@@ -1409,9 +1430,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setGRPCInterceptors(
         @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
-
-    public abstract Builder setGcsClientStatisticInterface(
-        @Nullable GcsClientStatisticInterface gcsClientStatisticInterface);
 
     @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);

@@ -17,10 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
-import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
-import com.google.cloud.hadoop.fs.gcs.GhfsStatistic;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
@@ -47,9 +44,6 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
 
   /** The owning filesystem. Valid after {@link #bindToFileSystem(GoogleHadoopFileSystem, Text)}. */
   private GoogleHadoopFileSystem fileSystem;
-
-  /** Statistics for the operations. */
-  private DelegationTokenStatistics stats;
 
   protected AbstractDelegationTokenBinding(Text kind) {
     this(SERVICE_NAME, kind);
@@ -115,23 +109,17 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @return the token
    * @throws IOException if one cannot be created
    */
-  public Token<DelegationTokenIdentifier> createDelegationToken(
-      String renewer, DelegationTokenStatistics stats) throws IOException {
+  public Token<DelegationTokenIdentifier> createDelegationToken(String renewer) throws IOException {
     Text renewerText = new Text();
-    this.stats = stats;
     if (renewer != null) {
       renewerText.set(renewer);
     }
     DelegationTokenIdentifier tokenIdentifier =
         requireNonNull(createTokenIdentifier(renewerText), "Token identifier");
-    Token<DelegationTokenIdentifier> token =
-        trackDuration(
-            this.stats,
-            GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol(),
-            () -> new Token<>(tokenIdentifier, secretManager));
+    Token<DelegationTokenIdentifier> token = new Token<>(tokenIdentifier, secretManager);
+
     token.setKind(getKind());
     token.setService(service);
-    noteTokenCreated(token);
 
     logger.atFine().log("Created token %s with token identifier %s", token, tokenIdentifier);
     return token;
@@ -209,13 +197,5 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
     public DelegationTokenIdentifier createIdentifier() {
       return createEmptyIdentifier();
     }
-  }
-  /**
-   * Note that a token has been created; increment counters and statistics.
-   *
-   * @param token token created
-   */
-  private void noteTokenCreated(Token<DelegationTokenIdentifier> token) {
-    stats.tokenIssued();
   }
 }
