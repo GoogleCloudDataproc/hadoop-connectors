@@ -109,8 +109,8 @@ public class GhfsStorageStatistics extends StorageStatistics {
     return incrementCounter(statistic, 1);
   }
 
-  private long increment(GoogleCloudStorageStatistics statistic) {
-    return incrementCounter(statistic, 1);
+  private void increment(GoogleCloudStorageStatistics statistic) {
+    incrementCounter(statistic, 1);
   }
 
   /**
@@ -129,10 +129,9 @@ public class GhfsStorageStatistics extends StorageStatistics {
    *
    * @param op operation
    * @param count increment value
-   * @return the new value
    */
-  long incrementCounter(GoogleCloudStorageStatistics op, long count) {
-    return opsCount.get(op.getSymbol()).addAndGet(count);
+  void incrementCounter(GoogleCloudStorageStatistics op, long count) {
+    opsCount.get(op.getSymbol()).addAndGet(count);
   }
 
   @Override
