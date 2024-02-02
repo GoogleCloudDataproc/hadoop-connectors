@@ -49,7 +49,7 @@ steps:
   # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests-hadoop3'
-    waitFor: ['integration-tests-hadoop2']
+    waitFor: ['docker-build']
     entrypoint: 'bash'
     args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'hadoop3', 'integrationtest']
     env:
@@ -59,8 +59,8 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'TRAFFIC_DIRECTOR_ENABLED=false'
-      - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
+      - 'TRAFFIC_DIRECTOR_ENABLED=true'
+      - 'GCS_TEST_DIRECT_PATH_PREFERRED=true'
 
 # Tests take on average 40 minutes to run
 timeout: 3000s
