@@ -26,6 +26,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_TRACE_LOG_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
@@ -68,7 +69,9 @@ import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactor
 import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
+import com.google.cloud.hadoop.util.TraceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
@@ -279,6 +282,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
+  private ITraceFactory traceFactory = TraceFactory.get(/* isEnabled */ false);
+
+  ITraceFactory getTraceFactory() {
+    return this.traceFactory;
+  }
+
   private final GhfsStorageStatistics storageStatistics;
 
   /**
@@ -484,6 +493,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // be sufficient (and is required) for the delegation token binding initialization.
     setConf(config);
 
+    this.traceFactory = TraceFactory.get(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+
     // Initialize the delegation token support, if it is configured
     initializeDelegationTokenSupport(config, path);
 
@@ -574,6 +585,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_OPEN,
         hadoopPath,
+        this.traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -634,6 +646,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_CREATE,
         hadoopPath,
+        traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
           checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
@@ -719,6 +732,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE,
         hadoopPath,
+        traceFactory,
         () -> {
           URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
           URI parentGcsPath = UriPaths.getParentPath(gcsPath);
@@ -819,6 +833,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_RENAME,
         String.format("rename(%s -> %s)", src, dst),
+        this.traceFactory,
         () -> {
           checkArgument(src != null, "src must not be null");
           checkArgument(dst != null, "dst must not be null");
@@ -881,6 +896,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_DELETE,
         hadoopPath,
+        traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -988,6 +1004,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_MKDIRS,
         hadoopPath,
+        traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -1031,6 +1048,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_GET_FILE_STATUS,
         hadoopPath,
+        traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -1164,6 +1182,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_GLOB_STATUS,
         String.format("path=%s; pattern=%s", pathPattern, filter),
+        traceFactory,
         () -> {
           checkOpen();
 
@@ -1821,6 +1840,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED,
         path,
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
           checkNotNull(name, "name should not be null");
@@ -1843,6 +1863,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_XATTR_GET_MAP,
         path,
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
 
@@ -1867,6 +1888,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP,
         path,
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
           checkNotNull(names, "names should not be null");
@@ -1894,6 +1916,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         storageStatistics,
         GhfsStatistic.INVOCATION_OP_XATTR_LIST,
         path,
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
 

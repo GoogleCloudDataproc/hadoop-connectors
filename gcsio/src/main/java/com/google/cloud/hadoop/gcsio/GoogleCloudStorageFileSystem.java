@@ -35,7 +35,10 @@ import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.CredentialAdapter;
+import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.LazyExecutorService;
+import com.google.cloud.hadoop.util.ThreadTrace;
+import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -59,6 +62,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -146,7 +150,7 @@ public class GoogleCloudStorageFileSystem {
       case STORAGE_CLIENT:
         return GoogleCloudStorageClientImpl.builder()
             .setOptions(options.getCloudStorageOptions())
-            .setCredentials(new CredentialAdapter(credential))
+            .setCredentials(credential == null ? null : new CredentialAdapter(credential))
             .setCredential(credential)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
             .build();
@@ -629,8 +633,10 @@ public class GoogleCloudStorageFileSystem {
           StorageResourceId.fromUriPath(
               UriPaths.getParentPath(src), /* allowEmptyObjectName= */ true);
       srcParentInfoFuture =
-          cachedExecutor.submit(
-              () -> getFileInfoInternal(srcParentId, /* inferImplicitDirectories= */ false));
+          runFuture(
+              cachedExecutor,
+              () -> getFileInfoInternal(srcParentId, /* inferImplicitDirectories= */ false),
+              "getParentFileInfo");
     }
 
     if (srcInfo.isDirectory()) {
@@ -655,6 +661,16 @@ public class GoogleCloudStorageFileSystem {
     }
 
     repairImplicitDirectory(srcParentInfoFuture);
+  }
+
+  private <T> Future<T> runFuture(ExecutorService service, Callable<T> task, String name) {
+    ThreadTrace trace = TraceOperation.current();
+    return service.submit(
+        () -> {
+          try (ITraceOperation traceOperation = TraceOperation.getChildTrace(trace, name)) {
+            return task.call();
+          }
+        });
   }
 
   private URI getDstUri(FileInfo srcInfo, FileInfo dstInfo, @Nullable FileInfo dstParentInfo)
@@ -1151,7 +1167,7 @@ public class GoogleCloudStorageFileSystem {
     try {
       List<Future<FileInfo>> infoFutures = new ArrayList<>(paths.size());
       for (URI path : paths) {
-        infoFutures.add(fileInfoExecutor.submit(() -> getFileInfo(path)));
+        infoFutures.add(runFuture(fileInfoExecutor, () -> getFileInfo(path), "getFileInfo"));
       }
       fileInfoExecutor.shutdown();
 

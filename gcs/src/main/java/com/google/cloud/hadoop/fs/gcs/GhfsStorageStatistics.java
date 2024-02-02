@@ -21,6 +21,8 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_C
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
+import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -74,10 +76,11 @@ public class GhfsStorageStatistics extends StorageStatistics {
       @Nonnull GhfsStorageStatistics stats,
       GhfsStatistic statistic,
       Object context,
+      ITraceFactory traceFactory,
       InvocationRaisingIOE<B> operation)
       throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    try {
+    try (ITraceOperation op = traceFactory.createRootWithLogging(statistic.getSymbol(), context)) {
       stats.increment(statistic);
       return operation.apply();
     } finally {
