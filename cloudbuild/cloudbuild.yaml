@@ -43,8 +43,8 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'TRAFFIC_DIRECTOR_ENABLED=true'
-      - 'GCS_TEST_DIRECT_PATH_PREFERRED=true'
+      - 'TRAFFIC_DIRECTOR_ENABLED=false'
+      - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
   # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
