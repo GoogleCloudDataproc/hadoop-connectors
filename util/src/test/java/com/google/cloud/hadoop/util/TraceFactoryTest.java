@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import java.io.IOException;
@@ -27,9 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Handler;
@@ -75,158 +72,158 @@ public class TraceFactoryTest {
     assertThat(first).isEqualTo(second);
   }
 
-//  @Test
-//  public void enabled_creates_new() {
-//    ITraceFactory first = TraceFactory.get(true);
-//    ITraceFactory second = TraceFactory.get(true);
-//
-//    assertThat(first).isNotEqualTo(second);
-//    assertThat(this.assertingHandler.logs).hasSize(0);
-//  }
-//
-//  @Test
-//  public void enabled_creates_trace() {
-//    ITraceFactory traceFactory = TraceFactory.get(true);
-//
-//    assertThreadTraceIsNull();
-//    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
-//      ThreadTrace tt = getThreadTrace();
-//      assertThat(tt).isNotNull();
-//
-//      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
-//
-//      assertThat(this.assertingHandler.logs).hasSize(0);
-//    }
-//
-//    assertThreadTraceIsNull();
-//    assertThat(this.assertingHandler.logs).hasSize(1);
-//    assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
-//
-//    assertEventAtIndex(0, 0, ImmutableMap.of("name", name, "type", "MERGED"));
-//  }
-//
-//  @Test
-//  public void multiple_nested_trace_operations() {
-//    ITraceFactory traceFactory = TraceFactory.get(true);
-//
-//    assertThreadTraceIsNull();
-//    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
-//      try (ITraceOperation operation = TraceOperation.addToExistingTrace(name2)) {
-//        ThreadTrace tt = getThreadTrace();
-//        assertThat(tt).isNotNull();
-//
-//        assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
-//
-//        assertThat(this.assertingHandler.logs).hasSize(0);
-//      }
-//
-//      assertThat(this.assertingHandler.logs).hasSize(0);
-//    }
-//
-//    assertThreadTraceIsNull();
-//    assertThat(this.assertingHandler.logs).hasSize(1);
-//    assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(3);
-//
-//    assertEventAtIndex(0, 0, ImmutableMap.of("name", name, "type", "START"));
-//    assertEventAtIndex(0, 1, ImmutableMap.of("name", name2, "type", "MERGED"));
-//    assertEventAtIndex(0, 2, ImmutableMap.of("name", name, "type", "END"));
-//  }
-//
-//  @Test
-//  public void multithreaded_trace_operations() throws ExecutionException, InterruptedException {
-//    ITraceFactory traceFactory = TraceFactory.get(true);
-//    int threadPoolSize = 2;
-//    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-//    try {
-//      assertThreadTraceIsNull();
-//      List<String> expectedSubEventNames = runMultithreaded(traceFactory, threadPool, 10);
-//
-//      assertThreadTraceIsNull();
-//      assertThat(this.assertingHandler.logs).hasSize(1);
-//      assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
-//      validateSubEvents(0, threadPoolSize, expectedSubEventNames);
-//    } finally {
-//      threadPool.shutdown();
-//    }
-//  }
-//
-//  @Test
-//  public void multiple_sequential_trace_operations() {
-//    ITraceFactory traceFactory = TraceFactory.get(true);
-//    assertThreadTraceIsNull();
-//    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
-//      ThreadTrace tt = getThreadTrace();
-//
-//      assertThat(tt).isNotNull();
-//      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
-//      assertThat(this.assertingHandler.logs).hasSize(0);
-//    }
-//
-//    assertThreadTraceIsNull();
-//
-//    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name2, context)) {
-//      ThreadTrace tt = getThreadTrace();
-//
-//      assertThat(tt).isNotNull();
-//      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name2, context));
-//      assertThat(this.assertingHandler.logs).hasSize(1);
-//    }
-//
-//    assertThat(this.assertingHandler.logs).hasSize(2);
-//    assertThat(this.getEventAtLogIndex(1).size()).isEqualTo(1);
-//    assertEventAtIndex(1, 0, ImmutableMap.of("name", name2, "type", "MERGED"));
-//  }
-//
-//  @Test
-//  public void max_events_test() {
-//    ITraceFactory traceFactory = TraceFactory.get(true);
-//    assertThreadTraceIsNull();
-//    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
-//      ThreadTrace tt = getThreadTrace();
-//
-//      assertThat(tt).isNotNull();
-//      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
-//      assertThat(this.assertingHandler.logs).hasSize(0);
-//
-//      for (int i = 0; i < ThreadTrace.MAX_EVENTS_SIZE * 2; i++) {
-//        try (ITraceOperation to = TraceOperation.addToExistingTrace(Integer.toString(i))) {}
-//      }
-//    }
-//
-//    assertThat(this.assertingHandler.logs).hasSize(1);
-//    assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(ThreadTrace.MAX_EVENTS_SIZE);
-//  }
-//
-//  @Test
-//  public void max_subevents_test() throws ExecutionException, InterruptedException {
-//    ITraceFactory traceFactory = TraceFactory.get(true);
-//    int threadPoolSize = 2;
-//    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-//    try {
-//      assertThreadTraceIsNull();
-//      runMultithreaded(traceFactory, threadPool, 100);
-//
-//      assertThreadTraceIsNull();
-//      assertThat(this.assertingHandler.logs).hasSize(1);
-//      assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
-//      validateSubEventsSize(0, threadPoolSize, threadPoolSize * ThreadTrace.MAX_EVENTS_SIZE);
-//    } finally {
-//      threadPool.shutdown();
-//    }
-//  }
-//
-//  @Test
-//  public void disabled_doesnot_have_trace() {
-//    ITraceFactory traceFactory = TraceFactory.get(false);
-//
-//    assertThreadTraceIsNull();
-//    try (ITraceOperation to =
-//        traceFactory.createRootWithLogging(getRandomString(), getRandomString())) {
-//      assertThreadTraceIsNull();
-//    }
-//
-//    assertThreadTraceIsNull();
-//  }
+  //  @Test
+  //  public void enabled_creates_new() {
+  //    ITraceFactory first = TraceFactory.get(true);
+  //    ITraceFactory second = TraceFactory.get(true);
+  //
+  //    assertThat(first).isNotEqualTo(second);
+  //    assertThat(this.assertingHandler.logs).hasSize(0);
+  //  }
+  //
+  //  @Test
+  //  public void enabled_creates_trace() {
+  //    ITraceFactory traceFactory = TraceFactory.get(true);
+  //
+  //    assertThreadTraceIsNull();
+  //    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
+  //      ThreadTrace tt = getThreadTrace();
+  //      assertThat(tt).isNotNull();
+  //
+  //      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
+  //
+  //      assertThat(this.assertingHandler.logs).hasSize(0);
+  //    }
+  //
+  //    assertThreadTraceIsNull();
+  //    assertThat(this.assertingHandler.logs).hasSize(1);
+  //    assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
+  //
+  //    assertEventAtIndex(0, 0, ImmutableMap.of("name", name, "type", "MERGED"));
+  //  }
+  //
+  //  @Test
+  //  public void multiple_nested_trace_operations() {
+  //    ITraceFactory traceFactory = TraceFactory.get(true);
+  //
+  //    assertThreadTraceIsNull();
+  //    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
+  //      try (ITraceOperation operation = TraceOperation.addToExistingTrace(name2)) {
+  //        ThreadTrace tt = getThreadTrace();
+  //        assertThat(tt).isNotNull();
+  //
+  //        assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
+  //
+  //        assertThat(this.assertingHandler.logs).hasSize(0);
+  //      }
+  //
+  //      assertThat(this.assertingHandler.logs).hasSize(0);
+  //    }
+  //
+  //    assertThreadTraceIsNull();
+  //    assertThat(this.assertingHandler.logs).hasSize(1);
+  //    assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(3);
+  //
+  //    assertEventAtIndex(0, 0, ImmutableMap.of("name", name, "type", "START"));
+  //    assertEventAtIndex(0, 1, ImmutableMap.of("name", name2, "type", "MERGED"));
+  //    assertEventAtIndex(0, 2, ImmutableMap.of("name", name, "type", "END"));
+  //  }
+  //
+  //  @Test
+  //  public void multithreaded_trace_operations() throws ExecutionException, InterruptedException {
+  //    ITraceFactory traceFactory = TraceFactory.get(true);
+  //    int threadPoolSize = 2;
+  //    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
+  //    try {
+  //      assertThreadTraceIsNull();
+  //      List<String> expectedSubEventNames = runMultithreaded(traceFactory, threadPool, 10);
+  //
+  //      assertThreadTraceIsNull();
+  //      assertThat(this.assertingHandler.logs).hasSize(1);
+  //      assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
+  //      validateSubEvents(0, threadPoolSize, expectedSubEventNames);
+  //    } finally {
+  //      threadPool.shutdown();
+  //    }
+  //  }
+  //
+  //  @Test
+  //  public void multiple_sequential_trace_operations() {
+  //    ITraceFactory traceFactory = TraceFactory.get(true);
+  //    assertThreadTraceIsNull();
+  //    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
+  //      ThreadTrace tt = getThreadTrace();
+  //
+  //      assertThat(tt).isNotNull();
+  //      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
+  //      assertThat(this.assertingHandler.logs).hasSize(0);
+  //    }
+  //
+  //    assertThreadTraceIsNull();
+  //
+  //    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name2, context)) {
+  //      ThreadTrace tt = getThreadTrace();
+  //
+  //      assertThat(tt).isNotNull();
+  //      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name2, context));
+  //      assertThat(this.assertingHandler.logs).hasSize(1);
+  //    }
+  //
+  //    assertThat(this.assertingHandler.logs).hasSize(2);
+  //    assertThat(this.getEventAtLogIndex(1).size()).isEqualTo(1);
+  //    assertEventAtIndex(1, 0, ImmutableMap.of("name", name2, "type", "MERGED"));
+  //  }
+  //
+  //  @Test
+  //  public void max_events_test() {
+  //    ITraceFactory traceFactory = TraceFactory.get(true);
+  //    assertThreadTraceIsNull();
+  //    try (ITraceOperation traceOperation = traceFactory.createRootWithLogging(name, context)) {
+  //      ThreadTrace tt = getThreadTrace();
+  //
+  //      assertThat(tt).isNotNull();
+  //      assertThat(tt.getTrackingId()).startsWith(String.format("%s(%s)", name, context));
+  //      assertThat(this.assertingHandler.logs).hasSize(0);
+  //
+  //      for (int i = 0; i < ThreadTrace.MAX_EVENTS_SIZE * 2; i++) {
+  //        try (ITraceOperation to = TraceOperation.addToExistingTrace(Integer.toString(i))) {}
+  //      }
+  //    }
+  //
+  //    assertThat(this.assertingHandler.logs).hasSize(1);
+  //    assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(ThreadTrace.MAX_EVENTS_SIZE);
+  //  }
+  //
+  //  @Test
+  //  public void max_subevents_test() throws ExecutionException, InterruptedException {
+  //    ITraceFactory traceFactory = TraceFactory.get(true);
+  //    int threadPoolSize = 2;
+  //    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
+  //    try {
+  //      assertThreadTraceIsNull();
+  //      runMultithreaded(traceFactory, threadPool, 100);
+  //
+  //      assertThreadTraceIsNull();
+  //      assertThat(this.assertingHandler.logs).hasSize(1);
+  //      assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
+  //      validateSubEventsSize(0, threadPoolSize, threadPoolSize * ThreadTrace.MAX_EVENTS_SIZE);
+  //    } finally {
+  //      threadPool.shutdown();
+  //    }
+  //  }
+  //
+  //  @Test
+  //  public void disabled_doesnot_have_trace() {
+  //    ITraceFactory traceFactory = TraceFactory.get(false);
+  //
+  //    assertThreadTraceIsNull();
+  //    try (ITraceOperation to =
+  //        traceFactory.createRootWithLogging(getRandomString(), getRandomString())) {
+  //      assertThreadTraceIsNull();
+  //    }
+  //
+  //    assertThreadTraceIsNull();
+  //  }
 
   private List<String> runMultithreaded(
       ITraceFactory traceFactory, ExecutorService threadPool, int numOperations) {
