@@ -433,7 +433,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public boolean isHnBucket(URI src) throws IOException {
-    throw new IOException("Not implemented");
+    return false;
   }
 
   @Override
