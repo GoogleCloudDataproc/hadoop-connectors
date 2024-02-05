@@ -786,6 +786,11 @@ public class GoogleCloudStorageFileSystem {
     checkArgument(dst.toString().endsWith(PATH_DELIMITER), "'%s' should be a directory", dst);
 
     URI src = srcInfo.getPath();
+    if (this.options.getCloudStorageOptions().isHnBucketRenameEnabled()
+        && this.gcs.isHnBucket(src)) {
+      this.gcs.renameHnFolder(src, dst);
+      return;
+    }
 
     // Mapping from each src to its respective dst.
     // Sort src items so that parent directories appear before their children.

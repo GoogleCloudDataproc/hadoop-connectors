@@ -35,6 +35,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -77,7 +78,10 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   public static GoogleCloudStorageOptions getInMemoryGoogleCloudStorageOptions() {
-    return GoogleCloudStorageOptions.builder().setAppName("GHFS/in-memory").build();
+    return GoogleCloudStorageOptions.builder()
+        .setAppName("GHFS/in-memory")
+        .setHnBucketRenameEnabled(true)
+        .build();
   }
 
   @Override
@@ -421,6 +425,15 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       }
     }
     return listedInfo;
+  }
+
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
+  public boolean isHnBucket(URI src) throws IOException {
+    throw new IOException("Not implemented");
   }
 
   @Override

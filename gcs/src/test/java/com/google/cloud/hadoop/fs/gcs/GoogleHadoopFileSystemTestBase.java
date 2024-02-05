@@ -64,6 +64,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     Configuration newConfig = new Configuration(config);
     newConfig.setBoolean("fs.gs.implicit.dir.repair.enable", true);
     newConfig.setBoolean("fs.gs.bucket.delete.enable", true);
+    newConfig.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
     newConfig.setEnum("fs.gs.client.type", storageClientType);
     return newConfig;
   }

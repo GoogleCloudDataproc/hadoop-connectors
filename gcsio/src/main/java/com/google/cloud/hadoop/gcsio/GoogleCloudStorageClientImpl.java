@@ -45,6 +45,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -168,6 +169,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     } finally {
       backgroundTasksThreadPool = null;
     }
+  }
+
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    super.renameHnFolder(src, dst);
   }
 
   /**

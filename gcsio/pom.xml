@@ -102,6 +102,10 @@
       <artifactId>google-cloud-storage</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-storage-control</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>grpc-google-cloud-storage-v2</artifactId>
     </dependency>
