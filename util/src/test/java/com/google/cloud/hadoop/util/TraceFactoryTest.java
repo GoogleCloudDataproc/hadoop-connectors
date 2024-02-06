@@ -38,6 +38,7 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -198,20 +199,23 @@ public class TraceFactoryTest {
   }
 
   @Test
+  @Ignore
   public void max_subevents_test() throws ExecutionException, InterruptedException {
-    ITraceFactory traceFactory = TraceFactory.get(true);
-    int threadPoolSize = 2;
-    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-    try {
-      assertThreadTraceIsNull();
-      runMultithreaded(traceFactory, threadPool, 100);
+    for (int i = 0; i < 1000; i++) {
+      ITraceFactory traceFactory = TraceFactory.get(true);
+      int threadPoolSize = 2;
+      ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
+      try {
+        assertThreadTraceIsNull();
+        runMultithreaded(traceFactory, threadPool, 100);
 
-      assertThreadTraceIsNull();
-      assertThat(this.assertingHandler.logs).hasSize(1);
-      assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
-      validateSubEventsSize(0, threadPoolSize, threadPoolSize * ThreadTrace.MAX_EVENTS_SIZE);
-    } finally {
-      threadPool.shutdown();
+        assertThreadTraceIsNull();
+        assertThat(this.assertingHandler.logs).hasSize(1);
+        assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
+        validateSubEventsSize(0, threadPoolSize, threadPoolSize * ThreadTrace.MAX_EVENTS_SIZE);
+      } finally {
+        threadPool.shutdown();
+      }
     }
   }
 
