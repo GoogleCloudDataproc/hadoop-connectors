@@ -137,7 +137,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @Test
   public void testRenameHnBucket() throws Exception {
-    logger.atInfo().log("Running testRenameHnBucket");
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
 

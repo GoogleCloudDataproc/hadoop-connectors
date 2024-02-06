@@ -199,7 +199,7 @@ public class TraceFactoryTest {
   }
 
   @Test
-  @Ignore
+  @Ignore("Disabling flaky test")
   public void max_subevents_test() throws ExecutionException, InterruptedException {
     ITraceFactory traceFactory = TraceFactory.get(true);
     int threadPoolSize = 2;
