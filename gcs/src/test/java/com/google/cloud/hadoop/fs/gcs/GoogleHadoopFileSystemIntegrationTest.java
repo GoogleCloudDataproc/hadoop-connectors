@@ -139,7 +139,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketName);
-    Configuration config = loadConfig(storageClientType);
+    Configuration config = loadConfig();
     config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
     googleHadoopFileSystem.initialize(initUri, config);
 
