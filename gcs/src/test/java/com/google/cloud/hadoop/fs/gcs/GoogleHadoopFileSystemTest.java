@@ -375,4 +375,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testInitializeCompatibleWithHadoopCredentialProvider() {}
+
+  @Override
+  public void testRenameHnBucket() {}
 }
