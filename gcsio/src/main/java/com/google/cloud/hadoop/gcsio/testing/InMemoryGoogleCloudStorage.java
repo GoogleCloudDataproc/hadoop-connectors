@@ -78,10 +78,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   public static GoogleCloudStorageOptions getInMemoryGoogleCloudStorageOptions() {
-    return GoogleCloudStorageOptions.builder()
-        .setAppName("GHFS/in-memory")
-        .setHnBucketRenameEnabled(true)
-        .build();
+    return GoogleCloudStorageOptions.builder().setAppName("GHFS/in-memory").build();
   }
 
   @Override
