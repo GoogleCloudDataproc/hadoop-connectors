@@ -325,7 +325,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private static PartNamingStrategy getPartNamingStrategy(String partFilePrefix) {
     if (Strings.isNullOrEmpty(partFilePrefix)) {
-      return PartNamingStrategy.noPrefix();
+      return PartNamingStrategy.useObjectNameAsPrefix();
     }
     return PartNamingStrategy.prefix(partFilePrefix);
   }
