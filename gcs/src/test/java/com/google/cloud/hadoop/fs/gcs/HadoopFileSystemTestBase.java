@@ -36,6 +36,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.common.collect.ImmutableList;
+import com.google.common.flogger.GoogleLogger;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -46,10 +47,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -66,6 +64,7 @@ import org.junit.Test;
  * GoogleCloudStorageFileSystemIntegrationTest.
  */
 public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSystemIntegrationTest {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // GHFS access instance.
   FileSystem ghfs;
@@ -80,7 +79,21 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /** Perform initialization after creating test instances. */
   public void postCreateInit(HadoopFileSystemIntegrationHelper helper) throws IOException {
     ghfsHelper = helper;
-    ghfsHelper.ghfs.mkdirs(new Path(ghfsHelper.ghfs.getUri()));
+
+    for (int i = 0; i < 6; i++) {
+      try {
+        ghfsHelper.ghfs.mkdirs(new Path(ghfsHelper.ghfs.getUri()));
+        break;
+      } catch (Exception e) {
+        logger.atInfo().withCause(e).log(
+            "Encountered error %s. Retrying %d", e.getMessage(), i + 1);
+        try {
+          Thread.sleep(ThreadLocalRandom.current().nextInt(3, 10));
+        } catch (InterruptedException ex) {
+        }
+      }
+    }
+
     super.postCreateInit(ghfsHelper);
 
     // Ensures that we do not accidentally end up testing wrong functionality.
