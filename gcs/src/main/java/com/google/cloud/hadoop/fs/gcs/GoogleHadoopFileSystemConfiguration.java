@@ -99,6 +99,18 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
+  /**
+   * Estimate block locations for the purpose of optimal input split assignments not just based on
+   * size, but also on deterministic locality proposal
+   */
+  public static final HadoopConfigurationProperty<Boolean> ESTIMATE_OPTIMAL_SPLITS =
+      new HadoopConfigurationProperty<>("fs.gs.estimate.optimal.splits", false);
+
+  /** Estimated size of the storage cluster to carry out deterministic block distribution */
+  public static final HadoopConfigurationProperty<Integer>
+      ESTIMATED_CLUSTER_SIZE_FOR_OPTIMAL_SPLITS =
+          new HadoopConfigurationProperty<>("fs.gs.estimated.cluster.size.for.optimal.splits", 750);
+
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
