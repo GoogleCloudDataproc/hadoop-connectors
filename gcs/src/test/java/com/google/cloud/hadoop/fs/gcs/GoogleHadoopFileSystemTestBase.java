@@ -438,12 +438,28 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,src,dst)
     ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
 
-    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 1);
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
+        .isEqualTo(1);
+
+    TestUtils.verifyCounter(
+        (GhfsGlobalStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 1);
 
     // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,[] srcs,dst)
     ghfs.copyFromLocalFile(false, true, new Path[] {localTempFilePath}, tempDirPath);
 
-    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 2);
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
+        .isEqualTo(2);
+
+    TestUtils.verifyCounter(
+        (GhfsGlobalStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 2);
 
     if (localTempFile.exists()) {
       localTempFile.delete();

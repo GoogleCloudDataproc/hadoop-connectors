@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -137,7 +138,13 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
 
     Token<?> dt = fs.getDelegationToken("current-user");
 
-    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_GET_DELEGATION_TOKEN, 1);
+    assertThat(fs.getIOStatistics().counters().get(INVOCATION_GET_DELEGATION_TOKEN.getSymbol()))
+        .isEqualTo(1);
+    assertThat(fs.getIOStatistics().counters().get(DELEGATION_TOKENS_ISSUED.getSymbol()))
+        .isEqualTo(1);
+
+    TestUtils.verifyCounter(
+        (GhfsGlobalStorageStatistics) stats, INVOCATION_GET_DELEGATION_TOKEN, 1);
     fs.close();
   }
 

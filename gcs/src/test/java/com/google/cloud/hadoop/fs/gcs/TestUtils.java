@@ -19,10 +19,28 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.truth.Truth.assertThat;
 
 import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.fs.statistics.StoreStatisticNames;
 
 class TestUtils {
 
-  static void verifyDurationMetric(GhfsStorageStatistics stats, String statistic, int expected) {
+  static void verifyDurationMetric(IOStatistics ioStatistics, String symbol, int expected) {
+    assertThat(ioStatistics.counters().get(symbol)).isEqualTo(expected);
+    String minKey = String.format("%s%s", symbol, StoreStatisticNames.SUFFIX_MIN);
+    String meanKey = String.format("%s%s", symbol, StoreStatisticNames.SUFFIX_MEAN);
+    String maxKey = String.format("%s%s", symbol, StoreStatisticNames.SUFFIX_MAX);
+
+    Long minValue = ioStatistics.minimums().get(minKey);
+    Long maxValue = ioStatistics.maximums().get(maxKey);
+    long meanValue = Double.valueOf(ioStatistics.meanStatistics().get(meanKey).mean()).longValue();
+
+    assertThat(minValue).isLessThan(maxValue + 1);
+    assertThat(minValue).isLessThan(meanValue + 1);
+    assertThat(meanValue).isLessThan(maxValue + 1);
+  }
+
+  static void verifyDurationMetric(
+      GhfsGlobalStorageStatistics stats, String statistic, int expected) {
     String symbol = statistic;
     long minValue = stats.getMin(symbol);
     long maxValue = stats.getMax(symbol);
@@ -34,14 +52,16 @@ class TestUtils {
     assertThat(meanValue).isLessThan(maxValue + 1);
   }
 
-  static GhfsStorageStatistics getStorageStatistics() {
-    GhfsStorageStatistics stats =
-        (GhfsStorageStatistics) GlobalStorageStatistics.INSTANCE.get(GhfsStorageStatistics.NAME);
+  static GhfsGlobalStorageStatistics getStorageStatistics() {
+    GhfsGlobalStorageStatistics stats =
+        (GhfsGlobalStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.get(GhfsGlobalStorageStatistics.NAME);
     stats.reset();
     return stats;
   }
 
-  static void verifyCounter(GhfsStorageStatistics stats, GhfsStatistic statName, int expected) {
+  static void verifyCounter(
+      GhfsGlobalStorageStatistics stats, GhfsStatistic statName, int expected) {
     assertThat(stats.getLong(statName.getSymbol())).isEqualTo(expected);
   }
 }

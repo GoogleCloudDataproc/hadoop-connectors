@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -270,7 +271,7 @@ public class GoogleHadoopOutputStreamTest {
         new GoogleHadoopOutputStream(
             ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
 
-    GhfsStorageStatistics stats = (GhfsStorageStatistics) TestUtils.getStorageStatistics();
+    GhfsGlobalStorageStatistics stats = TestUtils.getStorageStatistics();
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
@@ -280,18 +281,26 @@ public class GoogleHadoopOutputStreamTest {
 
     fout.hsync();
 
+    verifyDurationMetric(fout.getIOStatistics(), INVOCATION_HSYNC.getSymbol(), 1);
     verifyDurationMetric(stats, INVOCATION_HSYNC.getSymbol(), 1);
     fout.write(data1, 0, data1.length);
     fout.write(data2, 0, data2.length);
 
     fout.hflush();
 
+    verifyDurationMetric(fout.getIOStatistics(), INVOCATION_HFLUSH.getSymbol(), 1);
     verifyDurationMetric(stats, INVOCATION_HFLUSH.getSymbol(), 1);
 
     fout.close();
 
-    verifyDurationMetric(stats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
-    verifyDurationMetric(stats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
+    verifyDurationMetric(fout.getIOStatistics(), STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
+    verifyDurationMetric(fout.getIOStatistics(), STREAM_WRITE_OPERATIONS.getSymbol(), 4);
+
+    IOStatisticsStore ghfsStats = ghfs.getInstrumentation().getIOStatistics();
+    verifyDurationMetric(ghfsStats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
+    verifyDurationMetric(ghfsStats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
+    verifyDurationMetric(ghfsStats, INVOCATION_HFLUSH.getSymbol(), 1);
+    verifyDurationMetric(ghfsStats, INVOCATION_HSYNC.getSymbol(), 1);
 
     verifyDurationMetric(stats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
     verifyDurationMetric(stats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
@@ -313,10 +322,13 @@ public class GoogleHadoopOutputStreamTest {
 
     fout.write(data1, 0, data1.length);
     fout.hsync();
-    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_HFLUSH, 0);
+    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(0);
+
+    TestUtils.verifyCounter((GhfsGlobalStorageStatistics) stats, INVOCATION_HFLUSH, 0);
     fout.write(data2, 0, data2.length);
     fout.hflush();
-    TestUtils.verifyCounter((GhfsStorageStatistics) stats, INVOCATION_HFLUSH, 1);
+    TestUtils.verifyCounter((GhfsGlobalStorageStatistics) stats, INVOCATION_HFLUSH, 1);
+    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(1);
   }
 
   private byte[] readFile(Path objectPath) throws IOException {

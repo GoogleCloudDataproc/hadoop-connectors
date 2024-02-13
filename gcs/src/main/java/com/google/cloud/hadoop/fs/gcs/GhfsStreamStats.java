@@ -19,7 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import javax.annotation.Nonnull;
 
 class GhfsStreamStats {
-  private final GhfsStorageStatistics storageStatistics;
+  private final GhfsGlobalStorageStatistics storageStatistics;
   private final GhfsStatistic durationStat;
   private final Object context;
   private long maxLatencyNs;
@@ -28,7 +28,7 @@ class GhfsStreamStats {
   private long totalNs;
 
   GhfsStreamStats(
-      @Nonnull GhfsStorageStatistics storageStatistics,
+      @Nonnull GhfsGlobalStorageStatistics storageStatistics,
       GhfsStatistic durationStat,
       Object context) {
     this.storageStatistics = storageStatistics;
