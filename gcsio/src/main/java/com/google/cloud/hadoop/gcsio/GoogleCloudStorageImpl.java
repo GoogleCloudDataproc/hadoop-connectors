@@ -2292,11 +2292,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setName(StorageLayoutName.format("_", bucketName))
             .build();
 
-    try (ITraceOperation to = TraceOperation.addToExistingTrace("getStorageLayout.Hn")) {
+    try (ITraceOperation to = TraceOperation.addToExistingTrace("getStorageLayout.HN")) {
+      StorageLayout storageLayout = storageControlClient.getStorageLayout(request);
       boolean result =
-          storageControlClient.getStorageLayout(request).getHierarchicalNamespace().getEnabled();
+          storageLayout.hasHierarchicalNamespace()
+              && storageLayout.getHierarchicalNamespace().getEnabled();
 
-      logger.atFine().log("Checking if %s is HN enabled returned %s", src, result);
+      logger.atInfo().log("Checking if %s is HN enabled returned %s", src, result);
 
       cache.put(bucketName, result);
 
@@ -2329,7 +2331,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     try (ITraceOperation to = TraceOperation.addToExistingTrace("renameHnFolder")) {
       logger.atFine().log("Renaming HN folder (%s -> %s)", src, dst);
-      this.storageControlClient.renameFolderCallable().call(request).getDone();
+      this.storageControlClient.renameFolderOperationCallable().call(request);
     } catch (Throwable t) {
       logger.atSevere().withCause(t).log("Renaming %s to %s failed", src, dst);
       throw t;
