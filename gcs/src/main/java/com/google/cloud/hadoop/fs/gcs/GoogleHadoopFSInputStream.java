@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -135,6 +136,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       return -1;
     }
     if (numRead != 1) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "Somehow read %d bytes using single-byte buffer for path %s ending in position %d!",
@@ -252,6 +254,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       channel.position(pos);
       seekAPITrace(SEEK_METHOD, startTimeNs, pos);
     } catch (IllegalArgumentException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(e);
     }
 
@@ -314,6 +317,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public int available() throws IOException {
     if (!channel.isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();
     }
     return super.available();

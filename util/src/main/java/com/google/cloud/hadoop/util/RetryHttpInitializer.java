@@ -170,6 +170,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
+
+      // Incrementing GCS Static Statistics using status code of response.
+      GoogleCloudStorageEventBus.postOnHttpResponse(response);
+
       if (credential != null && credential.handleResponse(request, response, supportsRetry)) {
         // If credential decides it can handle it, the return code or message indicated something
         // specific to authentication, and no backoff is desired.

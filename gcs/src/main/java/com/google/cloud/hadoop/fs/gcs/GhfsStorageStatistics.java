@@ -18,12 +18,23 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpResponse;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
+import com.google.common.eventbus.Subscribe;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -60,11 +71,17 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
   public GhfsStorageStatistics() {
     super(NAME);
+
+    for (GoogleCloudStorageStatistics opType : GoogleCloudStorageStatistics.values()) {
+      String symbol = opType.getSymbol();
+      opsCount.put(symbol, new AtomicLong(0));
+    }
+
     for (GhfsStatistic opType : GhfsStatistic.values()) {
       String symbol = opType.getSymbol();
       opsCount.put(symbol, new AtomicLong(0));
 
-      if (opType.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION) {
         minimums.put(getMinKey(symbol), null);
         maximums.put(getMaxKey(symbol), new AtomicLong(0));
         means.put(getMeanKey(symbol), new MeanStatistic());
@@ -92,6 +109,10 @@ public class GhfsStorageStatistics extends StorageStatistics {
     return incrementCounter(statistic, 1);
   }
 
+  private void increment(GoogleCloudStorageStatistics statistic) {
+    incrementCounter(statistic, 1);
+  }
+
   /**
    * Increment a specific counter.
    *
@@ -101,6 +122,16 @@ public class GhfsStorageStatistics extends StorageStatistics {
    */
   long incrementCounter(GhfsStatistic op, long count) {
     return opsCount.get(op.getSymbol()).addAndGet(count);
+  }
+
+  /**
+   * Increment a specific counter.
+   *
+   * @param op operation
+   * @param count increment value
+   */
+  void incrementCounter(GoogleCloudStorageStatistics op, long count) {
+    opsCount.get(op.getSymbol()).addAndGet(count);
   }
 
   @Override
@@ -125,7 +156,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
   void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
     checkArgument(
-        statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION,
+        statistic.getType() == StatisticTypeEnum.TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
     updateMinMaxStats(statistic, durationMs, durationMs, context);
 
@@ -180,6 +211,67 @@ public class GhfsStorageStatistics extends StorageStatistics {
     }
   }
 
+  /**
+   * Updating the required gcs specific statistics based on httpresponse.
+   *
+   * @param statusCode
+   */
+  private void updateGcsIOSpecificStatistics(int statusCode) {
+
+    if (statusCode >= 400 && statusCode < 500) {
+      incrementGcsClientSideCounter();
+
+      if (statusCode == 429) {
+        incrementRateLimitingCounter();
+      }
+    }
+
+    if (statusCode >= 500 && statusCode < 600) {
+      incrementGcsServerSideCounter();
+    }
+  }
+
+  /**
+   * Updating the required gcs specific statistics based on GoogleJsonResponseException.
+   *
+   * @param responseException contains statusCode based on which metrics are updated
+   */
+  @Subscribe
+  private void subscriberOnGoogleJsonResponseException(
+      @Nonnull GoogleJsonResponseException responseException) {
+    updateGcsIOSpecificStatistics(responseException.getStatusCode());
+  }
+
+  /**
+   * Updating the required gcs specific statistics based on HttpResponse.
+   *
+   * @param response contains statusCode based on which metrics are updated
+   */
+  @Subscribe
+  private void subscriberOnHttpResponse(@Nonnull HttpResponse response) {
+    updateGcsIOSpecificStatistics(response.getStatusCode());
+  }
+
+  /**
+   * Updating the GCS_TOTAL_REQUEST_COUNT
+   *
+   * @param request
+   */
+  @Subscribe
+  private void subscriberOnHttpRequest(@Nonnull HttpRequest request) {
+    incrementGcsTotalRequestCount();
+  }
+
+  /**
+   * Updating the EXCEPTION_COUNT
+   *
+   * @param exception
+   */
+  @Subscribe
+  private void subscriberOnException(IOException exception) {
+    incrementGcsExceptionCount();
+  }
+
   void streamReadBytes(int bytesRead) {
     incrementCounter(GhfsStatistic.STREAM_READ_BYTES, bytesRead);
   }
@@ -214,6 +306,26 @@ public class GhfsStorageStatistics extends StorageStatistics {
 
   void getFileCheckSum() {
     increment(INVOCATION_GET_FILE_CHECKSUM);
+  }
+
+  private void incrementGcsExceptionCount() {
+    increment(EXCEPTION_COUNT);
+  }
+
+  private void incrementGcsTotalRequestCount() {
+    increment(GCS_REQUEST_COUNT);
+  }
+
+  private void incrementRateLimitingCounter() {
+    increment(GCS_CLIENT_RATE_LIMIT_COUNT);
+  }
+
+  private void incrementGcsClientSideCounter() {
+    increment(GCS_CLIENT_SIDE_ERROR_COUNT);
+  }
+
+  private void incrementGcsServerSideCounter() {
+    increment(GCS_SERVER_SIDE_ERROR_COUNT);
   }
 
   private class LongIterator implements Iterator<LongStatistic> {

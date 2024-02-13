@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 
 class TestUtils {
@@ -44,5 +45,15 @@ class TestUtils {
 
   static void verifyCounter(GhfsStorageStatistics stats, GhfsStatistic statName, int expected) {
     assertThat(stats.getLong(statName.getSymbol())).isEqualTo(expected);
+  }
+
+  static void verifyCounter(
+      GhfsStorageStatistics stats, GoogleCloudStorageStatistics statName, int expected) {
+    assertThat(stats.getLong(statName.getSymbol())).isEqualTo(expected);
+  }
+
+  static void verifyCounterNotZero(
+      GhfsStorageStatistics stats, GoogleCloudStorageStatistics statName) {
+    assertThat(stats.getLong(statName.getSymbol())).isNotEqualTo(0);
   }
 }

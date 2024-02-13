@@ -66,6 +66,7 @@ import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
@@ -359,6 +360,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           globalStats.getClass().getClassLoader(), GhfsStorageStatistics.class.getClassLoader());
       storageStatistics = GhfsStorageStatistics.DUMMY_INSTANCE;
     }
+
+    GoogleCloudStorageEventBus.register(storageStatistics);
   }
 
   /**
@@ -458,6 +461,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (scheme == null || scheme.equalsIgnoreCase(getScheme())) {
       return;
     }
+
+    GoogleCloudStorageEventBus.postOnException();
     String msg =
         String.format(
             "Wrong FS scheme: %s, in path: %s, expected scheme: %s", scheme, path, getScheme());
@@ -522,6 +527,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     dts.start();
     delegationTokens = dts;
     if (delegationTokens.isBoundToDT()) {
+      GoogleCloudStorageEventBus.postOnException();
       logger.atFine().log(
           "initializeDelegationTokenSupport(config: %s, path: %s): using existing delegation token",
           config, path);
@@ -533,6 +539,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       try {
         delegationTokens.close();
       } catch (IOException e) {
+        GoogleCloudStorageEventBus.postOnException();
         logger.atSevere().withCause(e).log("Failed to stop delegation tokens support");
       }
     }
@@ -705,6 +712,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       syncableOutputStreamOptions);
               break;
             default:
+              GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
                       "Unsupported output stream type given for key '%s': '%s'",
@@ -737,6 +745,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
           URI parentGcsPath = UriPaths.getParentPath(gcsPath);
           if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
+            GoogleCloudStorageEventBus.postOnException();
             throw new FileNotFoundException(
                 String.format(
                     "Can not create '%s' file, because parent folder does not exist: %s",
@@ -850,6 +859,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           try {
             renameInternal(src, dst);
           } catch (IOException e) {
+            GoogleCloudStorageEventBus.postOnException();
             if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
               throw e;
             }
@@ -906,9 +916,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           try {
             getGcsFs().delete(gcsPath, recursive);
           } catch (DirectoryNotEmptyException e) {
+            GoogleCloudStorageEventBus.postOnException();
             throw e;
           } catch (IOException e) {
             if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+              GoogleCloudStorageEventBus.postOnException();
               throw e;
             }
             logger.atFiner().withCause(e).log(
@@ -948,6 +960,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         status.add(getFileStatus(fileInfo, userName));
       }
     } catch (FileNotFoundException fnfe) {
+      GoogleCloudStorageEventBus.postOnException();
       throw (FileNotFoundException)
           new FileNotFoundException(
                   String.format(
@@ -1014,6 +1027,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           try {
             getGcsFs().mkdirs(gcsPath);
           } catch (java.nio.file.FileAlreadyExistsException faee) {
+            GoogleCloudStorageEventBus.postOnException();
             // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
             throw (FileAlreadyExistsException)
                 new FileAlreadyExistsException(
@@ -1057,6 +1071,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           URI gcsPath = getGcsPath(hadoopPath);
           FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
           if (!fileInfo.exists()) {
+            GoogleCloudStorageEventBus.postOnException();
             throw new FileNotFoundException(
                 String.format(
                     "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
@@ -1223,9 +1238,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               () -> flatGlobInternal(fixedPath, filter),
               () -> super.globStatus(fixedPath, filter)));
     } catch (InterruptedException e) {
+      GoogleCloudStorageEventBus.postOnException();
       Thread.currentThread().interrupt();
       throw new IOException(String.format("Concurrent glob execution failed: %s", e), e);
     } catch (ExecutionException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(String.format("Concurrent glob execution failed: %s", e.getCause()), e);
     } finally {
       globExecutor.shutdownNow();
@@ -1467,6 +1484,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           credential = null;
           break;
         default:
+          GoogleCloudStorageEventBus.postOnException();
           throw new IllegalStateException(
               String.format(
                   "Unknown AccessTokenType: %s", accessTokenProvider.getAccessTokenType()));
@@ -1585,6 +1603,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
                     return gcsFs;
                   } catch (IOException e) {
+                    GoogleCloudStorageEventBus.postOnException();
                     throw new RuntimeException("Failed to create GCS FS", e);
                   }
                 });
@@ -1609,6 +1628,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     try {
       credential = getCredential(config, gcsFsOptions, accessTokenProvider);
     } catch (GeneralSecurityException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new RuntimeException(e);
     }
 
@@ -1656,6 +1676,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** Assert that the FileSystem has been initialized and not close()d. */
   private void checkOpen() throws IOException {
     if (isClosed()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("GoogleHadoopFileSystem has been closed or not initialized.");
     }
   }
@@ -1786,6 +1807,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     URI gcsPath = getGcsPath(hadoopPath);
     final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException(
           String.format(
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
@@ -1806,6 +1828,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       case MD5:
         return new GcsFileChecksum(type, fileInfo.getMd5Checksum());
     }
+    GoogleCloudStorageEventBus.postOnException();
     throw new IOException("Unrecognized GcsFileChecksumType: " + type);
   }
 
@@ -1949,12 +1972,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Map<String, byte[]> attributes = fileInfo.getAttributes();
 
     if (attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.REPLACE)) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "REPLACE flag must be set to update XAttr (name='%s', value='%s') for '%s'",
               name, new String(value, UTF_8), path));
     }
     if (!attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.CREATE)) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "CREATE flag must be set to create XAttr (name='%s', value='%s') for '%s'",

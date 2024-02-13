@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedOutputStream;
@@ -86,6 +87,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     try {
       return gcsfs.create(gcsPath, options);
     } catch (java.nio.file.FileAlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw (FileAlreadyExistsException)
           new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
               .initCause(e);
@@ -157,6 +159,7 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();
     }
   }

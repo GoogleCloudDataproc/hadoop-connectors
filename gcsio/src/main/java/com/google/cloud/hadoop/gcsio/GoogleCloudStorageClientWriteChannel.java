@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadat
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSession;
@@ -71,6 +72,7 @@ class GoogleCloudStorageClientWriteChannel extends BaseAbstractGoogleAsyncWriteC
     try {
       uploadOperation = threadPool.submit(new UploadOperation(pipeSource, this.resourceId));
     } catch (Exception e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
   }
@@ -148,6 +150,7 @@ class GoogleCloudStorageClientWriteChannel extends BaseAbstractGoogleAsyncWriteC
         logger.atFiner().log("Uploaded all chunks for resource %s", resourceId);
         return true;
       } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
             String.format("Error occurred while uploading resource %s", resourceId), e);
       }
@@ -187,6 +190,7 @@ class GoogleCloudStorageClientWriteChannel extends BaseAbstractGoogleAsyncWriteC
       // the gcs-object.
       writableByteChannel.close();
     } catch (Exception e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(String.format("Upload failed for '%s'", resourceId), e);
     } finally {
       writableByteChannel = null;

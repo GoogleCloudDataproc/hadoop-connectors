@@ -29,6 +29,7 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
@@ -194,6 +195,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       checkState(generation != 0, "Generation should not be 0 for an existing item");
       return generation;
     }
+    GoogleCloudStorageEventBus.postOnException();
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
@@ -288,6 +290,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       case JOURNALING:
         if (writeOptions.getTemporaryPaths() == null
             || writeOptions.getTemporaryPaths().isEmpty()) {
+          GoogleCloudStorageEventBus.postOnException();
           throw new IllegalArgumentException(
               "Upload using `Journaling` requires the property:fs.gs.write.temporary.dirs to be set.");
         }
@@ -304,6 +307,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .withExecutorSupplier(getPCUExecutorSupplier(pCUExecutorService))
             .withPartNamingStrategy(getPartNamingStrategy(writeOptions.getPartFileNamePrefix()));
       default:
+        GoogleCloudStorageEventBus.postOnException();
         throw new IllegalArgumentException(
             String.format("Upload type:%s is not supported.", writeOptions.getUploadType()));
     }
@@ -318,6 +322,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       case ALWAYS:
         return PartCleanupStrategy.always();
       default:
+        GoogleCloudStorageEventBus.postOnException();
         throw new IllegalArgumentException(
             String.format("Cleanup type:%s is not handled.", cleanupType));
     }
