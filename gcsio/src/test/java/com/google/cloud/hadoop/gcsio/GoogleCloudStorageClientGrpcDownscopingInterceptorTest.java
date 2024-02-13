@@ -28,7 +28,6 @@ import io.grpc.Grpc;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.MethodDescriptor.MethodType;
-import io.grpc.internal.NoopClientCall;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
@@ -37,6 +36,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import junit.framework.TestCase;
 
 public class GoogleCloudStorageClientGrpcDownscopingInterceptorTest extends TestCase {
@@ -316,5 +316,22 @@ public class GoogleCloudStorageClientGrpcDownscopingInterceptorTest extends Test
 
       return String.format("Bearer %s", sb);
     }
+  }
+
+  private class NoopClientCall<RequestT, ResponseT> extends ClientCall<RequestT, ResponseT> {
+    @Override
+    public void start(Listener<ResponseT> listener, Metadata metadata) {}
+
+    @Override
+    public void request(int i) {}
+
+    @Override
+    public void cancel(@Nullable String s, @Nullable Throwable throwable) {}
+
+    @Override
+    public void halfClose() {}
+
+    @Override
+    public void sendMessage(RequestT requestT) {}
   }
 }

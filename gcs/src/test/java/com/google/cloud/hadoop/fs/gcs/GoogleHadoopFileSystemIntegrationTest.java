@@ -28,6 +28,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
@@ -43,7 +44,15 @@ import com.google.api.client.util.Lists;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
-import com.google.cloud.hadoop.gcsio.*;
+import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.gcsio.MethodOutcome;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -123,6 +132,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   @Override
   public void testRename() throws Exception {
+    StorageStatistics stats = TestUtils.getStorageStatistics();
+
     renameHelper(
         new HdfsBehavior() {
           /**
@@ -133,6 +144,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
           }
         });
+
+    TestUtils.verifyCounterNotZero((GhfsStorageStatistics) stats, EXCEPTION_COUNT);
   }
 
   @Test
@@ -358,11 +371,13 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void createNonRecursive_throwsExceptionWhenParentFolderNoExists() {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
+    StorageStatistics stats = TestUtils.getStorageStatistics();
     Path filePath = new Path("bad/path");
     FileNotFoundException exception =
         assertThrows(
             FileNotFoundException.class,
             () -> myGhfs.createNonRecursive(filePath, true, 1, (short) 1, 1, () -> {}));
+    TestUtils.verifyCounterNotZero((GhfsStorageStatistics) stats, EXCEPTION_COUNT);
     assertThat(exception).hasMessageThat().startsWith("Can not create");
   }
 
@@ -1454,13 +1469,22 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       String metricName = ghfsStatistic.getSymbol();
 
       checkMetric(metricName, statistics, metricNames, statsString);
-      if (ghfsStatistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+      if (ghfsStatistic.getType() == StatisticTypeEnum.TYPE_DURATION) {
         expected += 3;
 
         for (String suffix : ImmutableList.of("_min", "_max", "_mean")) {
           checkMetric(metricName + suffix, statistics, metricNames, statsString);
         }
       }
+    }
+
+    for (GoogleCloudStorageStatistics googleCloudStorageStatusStatistic :
+        GoogleCloudStorageStatistics.values()) {
+      expected++;
+
+      String metricName = googleCloudStorageStatusStatistic.getSymbol();
+
+      checkMetric(metricName, statistics, metricNames, statsString);
     }
 
     assertEquals(expected, metricNames.size());

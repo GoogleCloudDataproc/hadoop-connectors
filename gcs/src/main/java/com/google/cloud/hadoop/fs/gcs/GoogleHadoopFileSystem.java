@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UriPaths;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -91,6 +92,8 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
     if (bucket == null || bucket.equals(rootBucket)) {
       return;
     }
+
+    GoogleCloudStorageEventBus.postOnException();
     throw new IllegalArgumentException(
         String.format(
             "Wrong bucket: %s, in path: %s, expected bucket: %s", bucket, path, rootBucket));

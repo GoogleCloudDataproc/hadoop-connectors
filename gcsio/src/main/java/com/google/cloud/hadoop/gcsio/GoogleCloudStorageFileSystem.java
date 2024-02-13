@@ -35,6 +35,7 @@ import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.CredentialAdapter;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.cloud.hadoop.util.ThreadTrace;
@@ -269,6 +270,7 @@ public class GoogleCloudStorageFileSystem {
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName=*/ true);
 
     if (resourceId.isDirectory()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "Cannot create a file whose name looks like a directory: '%s'", resourceId));
@@ -295,6 +297,7 @@ public class GoogleCloudStorageFileSystem {
 
       // Check if a directory with the same name exists.
       if (getFromFuture(conflictingDirExist)) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new FileAlreadyExistsException("A directory with that name exists: " + path);
       }
     }
@@ -371,6 +374,7 @@ public class GoogleCloudStorageFileSystem {
 
     FileInfo fileInfo = getFileInfo(path);
     if (!fileInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
 
@@ -401,6 +405,7 @@ public class GoogleCloudStorageFileSystem {
                       fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
                   .getItems();
       if (!itemsToDelete.isEmpty() && !recursive) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
     } else {
@@ -589,6 +594,7 @@ public class GoogleCloudStorageFileSystem {
 
     // Throw if the source file does not exist.
     if (!srcInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + src);
     }
 
@@ -605,6 +611,7 @@ public class GoogleCloudStorageFileSystem {
       dstInfo = fileInfos.get(1);
       if (!srcInfo.exists()) {
         coopLockOp.ifPresent(CoopLockOperationRename::unlock);
+        GoogleCloudStorageEventBus.postOnException();
         throw new FileNotFoundException("Item not found: " + src);
       }
       if (!srcInfo.isDirectory()) {
@@ -680,16 +687,19 @@ public class GoogleCloudStorageFileSystem {
 
     // Throw if src is a file and dst == GCS_ROOT
     if (!srcInfo.isDirectory() && dst.equals(GCS_ROOT)) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("A file cannot be created in root.");
     }
 
     // Throw if the destination is a file that already exists, and it's not a source file.
     if (dstInfo.exists() && !dstInfo.isDirectory() && (srcInfo.isDirectory() || !dst.equals(src))) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Cannot overwrite an existing file: " + dst);
     }
 
     // Rename operation cannot be completed if parent of destination does not exist.
     if (dstParentInfo != null && !dstParentInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           "Cannot rename because path does not exist: " + dstParentInfo.getPath());
     }
@@ -716,6 +726,7 @@ public class GoogleCloudStorageFileSystem {
 
       // Throw if renaming directory to self - this is forbidden
       if (src.equals(dst)) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Rename dir to self is forbidden");
       }
 
@@ -724,6 +735,7 @@ public class GoogleCloudStorageFileSystem {
       // because this means that src is a parent directory of dst
       // and src cannot be "renamed" to its subdirectory
       if (!dstRelativeToSrc.equals(dst)) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Rename to subdir is forbidden");
       }
 
@@ -744,6 +756,7 @@ public class GoogleCloudStorageFileSystem {
 
       if (dstInfo.isDirectory()) {
         if (!dstInfo.exists()) {
+          GoogleCloudStorageEventBus.postOnException();
           throw new IOException("Cannot rename because path does not exist: " + dstInfo.getPath());
         } else {
           dst = dst.resolve(srcItemName);
@@ -928,6 +941,7 @@ public class GoogleCloudStorageFileSystem {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "Failed to get result: %s", e instanceof ExecutionException ? e.getCause() : e),
@@ -1063,6 +1077,7 @@ public class GoogleCloudStorageFileSystem {
           return listedInfo;
         }
       } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
         dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
         throw e;
       }
@@ -1070,6 +1085,7 @@ public class GoogleCloudStorageFileSystem {
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
 
@@ -1128,6 +1144,7 @@ public class GoogleCloudStorageFileSystem {
           return itemInfo;
         }
       } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
         listDirFuture.cancel(/* mayInterruptIfRunning= */ true);
         throw e;
       }
@@ -1257,6 +1274,7 @@ public class GoogleCloudStorageFileSystem {
     // we make this check therefore this is a good faith effort and not a guarantee.
     for (GoogleCloudStorageItemInfo fileInfo : gcs.getItemInfos(fileIds)) {
       if (fileInfo.exists()) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new FileAlreadyExistsException(
             "Cannot create directories because of existing file: " + fileInfo.getResourceId());
       }
