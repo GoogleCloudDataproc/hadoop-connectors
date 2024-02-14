@@ -44,7 +44,7 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
+      - 'GCS_TEST_DIRECT_PATH_PREFERRED=true'
 
 # Tests take on average 25 minutes to run
 timeout: 2400s
