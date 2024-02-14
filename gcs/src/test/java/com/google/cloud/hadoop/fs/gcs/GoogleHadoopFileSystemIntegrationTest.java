@@ -55,7 +55,6 @@ import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import java.io.FileNotFoundException;
@@ -87,8 +86,6 @@ import org.junit.Test;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
 public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
   @Before
