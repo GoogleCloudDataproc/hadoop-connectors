@@ -42,6 +42,7 @@ import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
+import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Copy;
 import com.google.api.services.storage.StorageRequest;
@@ -74,6 +75,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -84,9 +86,11 @@ import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.storage.control.v2.*;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -137,6 +141,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
+  private static Cache<String, Boolean> cache =
+      CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).build();
+
   // Object field that are used in GoogleCloudStorageItemInfo
   static final String OBJECT_FIELDS =
       String.join(
@@ -157,6 +164,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   private final MetricsRecorder metricsRecorder;
+  private final Credential credential;
+
+  // Lazily created since HN folders may not be enabled.
+  private StorageControlClient storageControlClient;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -381,6 +392,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageOptions.throwIfNotValid();
 
     this.storage = checkNotNull(storage, "storage must not be null");
+    this.credential = credential;
     this.storageRequestFactory = new StorageRequestFactory(storage);
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
@@ -573,8 +585,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Bucket bucket =
         new Bucket()
             .setName(bucketName)
+            .setHierarchicalNamespace(
+                new Bucket.HierarchicalNamespace()
+                    .setEnabled(options.getHierarchicalNamespaceEnabled()))
             .setLocation(options.getLocation())
             .setStorageClass(options.getStorageClass());
+    if (options.getHierarchicalNamespaceEnabled()) {
+      bucket.setIamConfiguration(
+          new Bucket.IamConfiguration()
+              .setUniformBucketLevelAccess(
+                  new Bucket.IamConfiguration.UniformBucketLevelAccess().setEnabled(true)));
+    }
+
     if (options.getTtl() != null) {
       Rule lifecycleRule =
           new Rule()
@@ -2124,6 +2146,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       backgroundTasksThreadPool = null;
       manualBatchingThreadPool = null;
     }
+
+    if (this.storageControlClient != null) {
+      this.storageControlClient.close();
+      this.storageControlClient = null;
+    }
   }
 
   /**
@@ -2269,6 +2296,69 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
     }
     return false;
+  }
+
+  @Override
+  public boolean isHnBucket(URI src) throws IOException {
+    String bucketName = src.getAuthority();
+    Boolean isEnabled = cache.getIfPresent(bucketName);
+    if (isEnabled != null) {
+      return isEnabled;
+    }
+
+    String prefix = src.getPath().substring(1);
+
+    StorageControlClient storageControlClient = lazyGetStorageControlClient();
+    GetStorageLayoutRequest request =
+        GetStorageLayoutRequest.newBuilder()
+            .setPrefix(prefix)
+            .setName(StorageLayoutName.format("_", bucketName))
+            .build();
+
+    try (ITraceOperation to = TraceOperation.addToExistingTrace("getStorageLayout.HN")) {
+      StorageLayout storageLayout = storageControlClient.getStorageLayout(request);
+      boolean result =
+          storageLayout.hasHierarchicalNamespace()
+              && storageLayout.getHierarchicalNamespace().getEnabled();
+
+      logger.atInfo().log("Checking if %s is HN enabled returned %s", src, result);
+
+      cache.put(bucketName, result);
+
+      return result;
+    }
+  }
+
+  private StorageControlClient lazyGetStorageControlClient() throws IOException {
+    if (this.storageControlClient == null) {
+      this.storageControlClient =
+          StorageControlClient.create(
+              StorageControlSettings.newBuilder()
+                  .setCredentialsProvider(
+                      FixedCredentialsProvider.create(new CredentialAdapter(this.credential)))
+                  .build());
+    }
+
+    return this.storageControlClient;
+  }
+
+  @Override
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    String bucketName = src.getAuthority();
+    String srcFolder = FolderName.of("_", bucketName, src.getPath().substring(1)).toString();
+    RenameFolderRequest request =
+        RenameFolderRequest.newBuilder()
+            .setDestinationFolderId(dst.getPath().substring(1))
+            .setName(srcFolder)
+            .build();
+
+    try (ITraceOperation to = TraceOperation.addToExistingTrace("renameHnFolder")) {
+      logger.atFine().log("Renaming HN folder (%s -> %s)", src, dst);
+      this.storageControlClient.renameFolderOperationCallable().call(request);
+    } catch (Throwable t) {
+      logger.atSevere().withCause(t).log("Renaming %s to %s failed", src, dst);
+      throw t;
+    }
   }
 
   @Override

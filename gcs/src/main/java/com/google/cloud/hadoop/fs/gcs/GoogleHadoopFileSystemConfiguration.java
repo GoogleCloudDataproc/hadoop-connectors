@@ -99,6 +99,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
+  /**
+   * Configuration key for enabling hierarchical namespace buckets.
+   *
+   * <p>If this is enabled, rename folder operation on a Hierarchical namespace enabled bucket will
+   * be performed by calling the rename API.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_HIERARCHICAL_NAMESPACE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", false);
+
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
@@ -599,6 +608,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
+        .setHnBucketRenameEnabled(GCS_HIERARCHICAL_NAMESPACE_ENABLE.get(config, config::getBoolean))
         .setAuthorizationHandlerImplClass(
             GCS_AUTHORIZATION_HANDLER_IMPL.get(
                 config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))

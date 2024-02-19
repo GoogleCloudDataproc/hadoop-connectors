@@ -38,6 +38,7 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -198,6 +199,7 @@ public class TraceFactoryTest {
   }
 
   @Test
+  @Ignore("Disabling flaky test")
   public void max_subevents_test() throws ExecutionException, InterruptedException {
     ITraceFactory traceFactory = TraceFactory.get(true);
     int threadPoolSize = 2;

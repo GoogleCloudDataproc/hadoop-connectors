@@ -44,7 +44,10 @@ import com.google.api.client.util.Lists;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
+import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
@@ -83,7 +86,6 @@ import org.junit.Test;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
 public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
-
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
   @Before
@@ -141,6 +143,43 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
         });
 
     TestUtils.verifyCounterNotZero((GhfsStorageStatistics) stats, EXCEPTION_COUNT);
+  }
+
+  @Test
+  public void testRenameHnBucket() throws Exception {
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
+
+    URI initUri = new URI("gs://" + bucketName);
+    Configuration config = loadConfig();
+    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
+    googleHadoopFileSystem.initialize(initUri, config);
+
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(
+        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    try {
+      GoogleCloudStorageFileSystemIntegrationHelper helper =
+          new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem, googleHadoopFileSystem);
+
+      renameHelper(
+          new HdfsBehavior() {
+            /**
+             * Returns the MethodOutcome of trying to rename an existing file into the root
+             * directory.
+             */
+            @Override
+            public MethodOutcome renameFileIntoRootOutcome() {
+              return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+            }
+          },
+          bucketName,
+          bucketName,
+          helper);
+    } finally {
+      googleHadoopFileSystem.delete(new Path(initUri));
+    }
   }
 
   @Test

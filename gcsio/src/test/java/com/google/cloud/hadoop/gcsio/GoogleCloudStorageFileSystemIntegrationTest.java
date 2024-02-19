@@ -678,7 +678,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     for (DeleteData dd : deleteData) {
 
       // Verify that items that we expect to delete are present before the operation.
-      assertPathsExist(dd.description, dd.bucketName, dd.objectsExpectedToBeDeleted, true);
+      assertPathsExist(
+          dd.description, dd.bucketName, dd.objectsExpectedToBeDeleted, true, gcsiHelper);
 
       URI path = gcsiHelper.getPath(dd.bucketName, dd.objectName);
       try {
@@ -708,10 +709,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       }
 
       // Verify that items that we expect to exist are present.
-      assertPathsExist(dd.description, dd.bucketName, dd.objectsExpectedToExist, true);
+      assertPathsExist(dd.description, dd.bucketName, dd.objectsExpectedToExist, true, gcsiHelper);
 
       // Verify that items that we expect to be deleted are not present.
-      assertPathsExist(dd.description, dd.bucketName, dd.objectsExpectedToBeDeleted, false);
+      assertPathsExist(
+          dd.description, dd.bucketName, dd.objectsExpectedToBeDeleted, false, gcsiHelper);
     }
   }
 
@@ -1024,6 +1026,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     String bucketName = sharedBucketName1;
     String otherBucketName = sharedBucketName2;
 
+    renameHelper(behavior, bucketName, otherBucketName, gcsiHelper);
+  }
+
+  protected static void renameHelper(
+      RenameBehavior behavior,
+      String bucketName,
+      String otherBucketName,
+      GoogleCloudStorageFileSystemIntegrationHelper helper)
+      throws Exception {
     String uniqueDir = "dir-" + UUID.randomUUID() + GoogleCloudStorage.PATH_DELIMITER;
     String uniqueFile = uniqueDir + "f1";
 
@@ -1064,10 +1075,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    gcsiHelper.clearBucket(bucketName);
-    gcsiHelper.clearBucket(otherBucketName);
-    gcsiHelper.createObjectsWithSubdirs(bucketName, objectNames);
-    gcsiHelper.createObjectsWithSubdirs(otherBucketName, otherObjectNames);
+    helper.clearBucket(bucketName);
+    helper.clearBucket(otherBucketName);
+    helper.createObjectsWithSubdirs(bucketName, objectNames);
+    helper.createObjectsWithSubdirs(otherBucketName, otherObjectNames);
 
     // -------------------------------------------------------
     // Initialize test data.
@@ -1338,7 +1349,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   try {
                     // Verify that items that we expect to rename are present before the operation
                     assertPathsExist(
-                        rd.description, rd.srcBucketName, rd.objectsExpectedToBeDeleted, true);
+                        rd.description,
+                        rd.srcBucketName,
+                        rd.objectsExpectedToBeDeleted,
+                        true,
+                        helper);
                   } catch (Throwable t) {
                     synchronized (errorList) {
                       errorList.add(t);
@@ -1367,13 +1382,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             threadPool.submit(
                 () -> {
                   try {
-                    URI src = gcsiHelper.getPath(rd.srcBucketName, rd.srcObjectName);
-                    URI dst = gcsiHelper.getPath(rd.dstBucketName, rd.dstObjectName);
+                    URI src = helper.getPath(rd.srcBucketName, rd.srcObjectName);
+                    URI dst = helper.getPath(rd.dstBucketName, rd.dstObjectName);
                     String desc = src + " -> " + dst;
 
                     try {
                       // Perform the rename operation.
-                      if (gcsiHelper.rename(src, dst)) {
+                      if (helper.rename(src, dst)) {
                         assertWithMessage(
                                 "Unexpected result for '%s': %s :: expected %s,"
                                     + " actually returned true.",
@@ -1426,27 +1441,35 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             threadPool.submit(
                 () -> {
                   try {
-                    URI src = gcsiHelper.getPath(rd.srcBucketName, rd.srcObjectName);
+                    URI src = helper.getPath(rd.srcBucketName, rd.srcObjectName);
 
                     // Verify that items that we expect to exist are present.
                     assertPathsExist(
-                        rd.description, rd.srcBucketName, rd.objectsExpectedToExistSrc, true);
+                        rd.description,
+                        rd.srcBucketName,
+                        rd.objectsExpectedToExistSrc,
+                        true,
+                        helper);
                     String dstBucketName;
                     if ((rd.dstBucketName == null) && (rd.dstObjectName == null)) {
                       // If both bucket and object names are null that means the destination
                       // of the rename is root path. In that case, the leaf directory
                       // of the source path becomes the destination bucket.
-                      String srcDirName = gcsiHelper.getItemName(src);
+                      String srcDirName = helper.getItemName(src);
                       dstBucketName = srcDirName;
                     } else {
                       dstBucketName = rd.dstBucketName;
                     }
                     assertPathsExist(
-                        rd.description, dstBucketName, rd.objectsExpectedToExistDst, true);
+                        rd.description, dstBucketName, rd.objectsExpectedToExistDst, true, helper);
 
                     // Verify that items that we expect to be deleted are not present.
                     assertPathsExist(
-                        rd.description, rd.srcBucketName, rd.objectsExpectedToBeDeleted, false);
+                        rd.description,
+                        rd.srcBucketName,
+                        rd.objectsExpectedToBeDeleted,
+                        false,
+                        helper);
                   } catch (Throwable t) {
                     synchronized (errorList) {
                       errorList.add(t);
@@ -1502,7 +1525,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             "test-recursive/oldA/file1",
             "test-flat/oldA/aaa",
             "test-flat/oldA/b");
-    assertPathsExist(testDescRecursive, bucketName, originalObjects, true);
+    assertPathsExist(testDescRecursive, bucketName, originalObjects, true, gcsiHelper);
 
     // Check original file content.
     for (String originalName : fileNames) {
@@ -1533,7 +1556,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             "test-recursive/newA/file1",
             "test-flat/newA/aaa",
             "test-flat/newA/b");
-    assertPathsExist(testDescRecursive, bucketName, resultingObjects, true);
+    assertPathsExist(testDescRecursive, bucketName, resultingObjects, true, gcsiHelper);
 
     // Check resulting file content.
     for (String originalName : fileNames) {
@@ -1550,7 +1573,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             "test-recursive/oldA/file1",
             "test-flat/oldA/aaa",
             "test-flat/oldA/b");
-    assertPathsExist(testDescRecursive, bucketName, deletedObjects, false);
+    assertPathsExist(testDescRecursive, bucketName, deletedObjects, false, gcsiHelper);
   }
 
   @Test
@@ -1672,15 +1695,16 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
    * If the given paths are expected to exist then asserts that they do, otherwise asserts that they
    * do not exist.
    */
-  private void assertPathsExist(
+  private static void assertPathsExist(
       String testCaseDescription,
       String bucketName,
       List<String> objectNames,
-      boolean expectedToExist)
+      boolean expectedToExist,
+      GoogleCloudStorageFileSystemIntegrationHelper helper)
       throws IOException {
     if (objectNames != null) {
       for (String object : objectNames) {
-        URI path = gcsiHelper.getPath(bucketName, object);
+        URI path = helper.getPath(bucketName, object);
         String msg =
             String.format(
                 "test-case: %s :: %s: %s",
@@ -1689,7 +1713,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                     ? "Path expected to exist but not found"
                     : "Path expected to not exist but found"),
                 path.toString());
-        assertWithMessage(msg).that(gcsiHelper.exists(path)).isEqualTo(expectedToExist);
+        assertWithMessage(msg).that(helper.exists(path)).isEqualTo(expectedToExist);
       }
     }
   }

@@ -99,6 +99,8 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
+  private static final boolean SET_HN_BUCKET_CREATE_ENABLED_DEFAULT = false;
+
   /** Default setting for authorization handler. */
   public static final Class<? extends AuthorizationHandler>
       AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
@@ -144,12 +146,15 @@ public abstract class GoogleCloudStorageOptions {
         .setMetricsSink(MetricsSink.NONE)
         .setTraceLogEnabled(false)
         .setTraceLogTimeThreshold(0)
-        .setTraceLogExcludeProperties(ImmutableSet.of());
+        .setTraceLogExcludeProperties(ImmutableSet.of())
+        .setHnBucketRenameEnabled(SET_HN_BUCKET_CREATE_ENABLED_DEFAULT);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isGrpcEnabled();
+
+  public abstract boolean isHnBucketRenameEnabled();
 
   public abstract String getGrpcServerAddress();
 
@@ -326,6 +331,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setTraceLogEnabled(Boolean enable);
 
     public abstract Builder setTraceLogTimeThreshold(long threshold);
+
+    public abstract Builder setHnBucketRenameEnabled(boolean enabled);
 
     public abstract Builder setTraceLogExcludeProperties(ImmutableSet<String> properties);
 
