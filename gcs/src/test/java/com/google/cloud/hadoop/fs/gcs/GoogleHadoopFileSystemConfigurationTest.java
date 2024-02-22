@@ -141,6 +141,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
+          put("fs.gs.operation.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
           put("fs.gs.tracelog.time.filter.threshold.ms", 0L);
           put("fs.gs.tracelog.exclude.properties", ImmutableList.of());

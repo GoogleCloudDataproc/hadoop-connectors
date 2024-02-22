@@ -467,6 +467,11 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<MetricsSink> GCS_METRICS_SINK =
       new HadoopConfigurationProperty<>("fs.gs.metrics.sink", MetricsSink.NONE);
 
+  /** Configuration key to enable operational level traces */
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_TRACE_LOG_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.tracelog.enable", GoogleCloudStorageOptions.DEFAULT.isTraceLogEnabled());
+
   /** Configuration key to enable logging of additional trace details. */
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
@@ -621,6 +626,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
+        .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
         .setTraceLogExcludeProperties(
             ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)));
