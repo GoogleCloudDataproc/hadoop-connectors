@@ -2,6 +2,8 @@
 
 ## Next
 
+## 3.0.0 - 2023-12-03
+
 1.  Remove Hadoop 2.x support.
 
 1.  Update all dependencies to the latest versions.
