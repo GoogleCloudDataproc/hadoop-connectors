@@ -1492,7 +1492,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void testThreadTraceEnabledRename() throws Exception {
     Configuration config = ghfs.getConf();
-    config.set("fs.gs.tracelog.enable", "true");
+    config.set("fs.gs.operation.tracelog.enable", "true");
     ghfs.initialize(ghfs.getUri(), config);
 
     Path testRoot = new Path(sharedBucketName1, "/directory1/");

@@ -145,6 +145,7 @@ public abstract class GoogleCloudStorageOptions {
         .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT)
         .setMetricsSink(MetricsSink.NONE)
         .setTraceLogEnabled(false)
+        .setOperationTraceLogEnabled(false)
         .setTraceLogTimeThreshold(0)
         .setTraceLogExcludeProperties(ImmutableSet.of())
         .setHnBucketRenameEnabled(SET_HN_BUCKET_CREATE_ENABLED_DEFAULT);
@@ -227,6 +228,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract MetricsSink getMetricsSink();
 
   public abstract boolean isTraceLogEnabled();
+
+  public abstract boolean isOperationTraceLogEnabled();
 
   public abstract long getTraceLogTimeThreshold();
 
@@ -329,6 +332,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
     public abstract Builder setTraceLogEnabled(Boolean enable);
+
+    public abstract Builder setOperationTraceLogEnabled(Boolean enable);
 
     public abstract Builder setTraceLogTimeThreshold(long threshold);
 
