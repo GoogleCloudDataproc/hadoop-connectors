@@ -1,6 +1,10 @@
 # Release Notes
 
 ## Next
+1. Fix downscoping not working when gRPC is enabled issue
+1. Add support for renaming folders using rename backend API for Hierarchical namespace buckets
+1. Upgrade java-storage to 2.32.1 and upgrade the version of related dependencies
+1. Introduce separate config for enabling operation tracing.
 
 ## 2.2.19 - 2024-01-02
 
