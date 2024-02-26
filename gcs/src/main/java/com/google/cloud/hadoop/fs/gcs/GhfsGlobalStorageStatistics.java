@@ -73,7 +73,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /** {@value} The key that stores all the registered metrics */
-  public static final String NAME = "GhfsGlobalStorageStatistics";
+  public static final String NAME = "GhfsStorageStatistics";
 
   public static final int LATENCY_LOGGING_THRESHOLD_MS = 150;
 
