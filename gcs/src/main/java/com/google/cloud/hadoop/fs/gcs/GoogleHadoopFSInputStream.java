@@ -195,7 +195,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           }
 
           seekStreamStats.updateReadStreamSeekStats(startTimeNs);
-
           return null;
         });
   }
@@ -245,7 +244,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       CallableRaisingIOE<B> operation)
       throws IOException {
 
-    // trackDuration(factory1, statistic1, operation);
     return GhfsGlobalStorageStatistics.trackDuration(
         factory1, stats, statistic, context, traceFactory, operation);
   }
@@ -282,7 +280,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throw new ClosedChannelException();
     }
     return super.available();
-    // }
   }
 
   /**

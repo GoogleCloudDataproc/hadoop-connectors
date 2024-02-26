@@ -54,19 +54,14 @@ public class GoogleHadoopOutputStreamTest {
 
   private GoogleHadoopFileSystem ghfs;
 
-  // private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
-
   @Before
   public void setUp() throws IOException {
     ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
-    // gcsFsIHelper = GoogleCloudStorageFileSystemIntegrationHelper.create();
-    // gcsFsIHelper.beforeAllTests();
   }
 
   @After
   public void tearDown() throws IOException {
     ghfs.close();
-    // gcsFsIHelper.afterAllTests();
   }
 
   @Test

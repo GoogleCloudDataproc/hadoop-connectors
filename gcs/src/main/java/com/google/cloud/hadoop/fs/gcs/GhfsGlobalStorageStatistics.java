@@ -120,9 +120,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     try (ITraceOperation op_fs =
         traceFactory.createRootWithLogging(statistic.getSymbol(), context)) {
       stats.increment(statistic);
-      Object fsOutput =
-          IOStatisticsBinding.trackDuration(factory, statistic.getSymbol(), operation);
-      return (B) fsOutput;
+      return IOStatisticsBinding.trackDuration(factory, statistic.getSymbol(), operation);
     } finally {
       stats.updateStats(statistic, stopwatch.elapsed().toMillis(), context);
     }

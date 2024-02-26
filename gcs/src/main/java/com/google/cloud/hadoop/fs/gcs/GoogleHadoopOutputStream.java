@@ -223,11 +223,11 @@ class GoogleHadoopOutputStream extends OutputStream
           throwIfNotOpen();
           tmpOut.write(b);
           streamStatistics.writeBytes(1);
-          statistics.incrementBytesWritten(1);
-          statistics.incrementWriteOps(1);
           // Using a lightweight implementation to update instrumentation. This method can be called
           // quite
           // frequently and need to be lightweight.
+          statistics.incrementBytesWritten(1);
+          statistics.incrementWriteOps(1);
           streamStats.updateWriteStreamStats(1, start);
           return null;
         });
