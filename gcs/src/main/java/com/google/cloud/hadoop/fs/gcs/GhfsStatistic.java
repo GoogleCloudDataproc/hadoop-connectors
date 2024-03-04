@@ -39,30 +39,14 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 @InterfaceStability.Unstable
 public enum GhfsStatistic {
   /** HTTP request counters */
-  ACTION_HTTP_HEAD_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_COUNTER),
   ACTION_HTTP_GET_REQUEST(
       StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_COUNTER),
   ACTION_HTTP_PUT_REQUEST(
       StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_COUNTER),
   ACTION_HTTP_PATCH_REQUEST(
       StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "PATCH request.", TYPE_COUNTER),
-  ACTION_HTTP_POST_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_PATCH_REQUEST, "POST request.", TYPE_COUNTER),
   ACTION_HTTP_DELETE_REQUEST(
       StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_COUNTER),
-  ACTION_HTTP_HEAD_REQUEST_FAILURE(
-      "action_http_head_request_failures", "HEAD request failure.", TYPE_COUNTER),
-  ACTION_HTTP_GET_REQUEST_FAILURE(
-      "action_http_get_request_failures", "GET request failure.", TYPE_COUNTER),
-  ACTION_HTTP_PUT_REQUEST_FAILURE(
-      "action_http_put_request_failures", "PUT request failure.", TYPE_COUNTER),
-  ACTION_HTTP_PATCH_REQUEST_FAILURE(
-      "action_http_patch_request_failures", "PATCH request failure.", TYPE_COUNTER),
-  ACTION_HTTP_POST_REQUEST_FAILURE(
-      "action_http_post_request_failures", "POST request failure.", TYPE_COUNTER),
-  ACTION_HTTP_DELETE_REQUEST_FAILURE(
-      "action_http_delete_request_failures", "DELETE request failure.", TYPE_COUNTER),
 
   /** FileSystem-level statistics */
   DIRECTORIES_CREATED(
@@ -85,7 +69,7 @@ public enum GhfsStatistic {
   INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION),
   INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER),
   INVOCATION_GET_FILE_STATUS(
-      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
+      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_DURATION),
   INVOCATION_GET_FILE_CHECKSUM(
       StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_COUNTER),
@@ -93,7 +77,7 @@ public enum GhfsStatistic {
   INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION),
   INVOCATION_LIST_FILES(StoreStatisticNames.OP_LIST_FILES, "Calls of listFiles()", TYPE_COUNTER),
   INVOCATION_LIST_STATUS(StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_COUNTER),
-  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
+  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION),
   INVOCATION_COPY_FROM_LOCAL_FILE(
@@ -114,10 +98,7 @@ public enum GhfsStatistic {
       StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS,
       "Calls of read stream close()",
       TYPE_DURATION),
-  STREAM_READ_EXCEPTIONS(
-      StreamStatisticNames.STREAM_READ_EXCEPTIONS,
-      "Count of exceptions raised during input stream reads",
-      TYPE_COUNTER),
+
   STREAM_READ_OPERATIONS(
       StreamStatisticNames.STREAM_READ_OPERATIONS, "Calls of read()", TYPE_DURATION),
 
@@ -149,10 +130,6 @@ public enum GhfsStatistic {
       TYPE_COUNTER),
 
   /** Stream writes */
-  STREAM_WRITE_EXCEPTIONS(
-      StreamStatisticNames.STREAM_WRITE_EXCEPTIONS,
-      "Count of stream write failures reported",
-      TYPE_COUNTER),
   STREAM_WRITE_BYTES(
       StreamStatisticNames.STREAM_WRITE_BYTES,
       "Count of bytes written to output stream" + " (including all not yet uploaded)",

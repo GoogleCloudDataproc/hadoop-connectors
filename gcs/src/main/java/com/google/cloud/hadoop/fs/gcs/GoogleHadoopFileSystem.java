@@ -770,48 +770,63 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_MKDIRS);
 
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_MKDIRS,
+        hadoopPath,
+        traceFactory,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
 
-    checkOpen();
-
-    URI gcsPath = getGcsPath(hadoopPath);
-    try {
-      getGcsFs().mkdirs(gcsPath);
-    } catch (java.nio.file.FileAlreadyExistsException faee) {
-      GoogleCloudStorageEventBus.postOnException();
-      // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
-      throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException(
-                  String.format(
-                      "mkdirs(hadoopPath: %s, permission: %s): failed", hadoopPath, permission))
-              .initCause(faee);
-    }
-    logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
-    boolean response = true;
-    instrumentation.directoryCreated();
-    globalStorageStatistics.directoryCreated();
-    return response;
+          URI gcsPath = getGcsPath(hadoopPath);
+          try {
+            getGcsFs().mkdirs(gcsPath);
+          } catch (java.nio.file.FileAlreadyExistsException faee) {
+            GoogleCloudStorageEventBus.postOnException();
+            // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
+            throw (FileAlreadyExistsException)
+                new FileAlreadyExistsException(
+                        String.format(
+                            "mkdirs(hadoopPath: %s, permission: %s): failed",
+                            hadoopPath, permission))
+                    .initCause(faee);
+          }
+          logger.atFiner().log(
+              "mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
+          boolean response = true;
+          instrumentation.directoryCreated();
+          globalStorageStatistics.directoryCreated();
+          return response;
+        });
   }
 
   @Override
   public FileStatus getFileStatus(Path hadoopPath) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkOpen();
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_GET_FILE_STATUS,
+        hadoopPath,
+        traceFactory,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
-    if (!fileInfo.exists()) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new FileNotFoundException(
-          String.format(
-              "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
-    }
-    String userName = getUgiUserName();
-    return getGoogleHadoopFileStatus(fileInfo, userName);
+          URI gcsPath = getGcsPath(hadoopPath);
+          FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+          if (!fileInfo.exists()) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new FileNotFoundException(
+                String.format(
+                    "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+          }
+          String userName = getUgiUserName();
+          return getGoogleHadoopFileStatus(fileInfo, userName);
+        });
   }
 
   @Override
