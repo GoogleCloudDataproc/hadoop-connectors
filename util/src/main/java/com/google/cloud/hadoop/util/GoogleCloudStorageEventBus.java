@@ -26,6 +26,14 @@ import java.io.IOException;
 /** Event Bus class */
 public class GoogleCloudStorageEventBus {
 
+<<<<<<< HEAD
+=======
+  /** Translates increment of statistics from API calls into StatisticsType */
+  public enum StatisticsType {
+    DIRECTORIES_DELETED
+  }
+
+>>>>>>> e9ce9177 (Metrics master (#1117))
   /** Hold the instance of the event bus here */
   private static EventBus eventBus = new EventBus();
 
@@ -83,4 +91,15 @@ public class GoogleCloudStorageEventBus {
   public static void postOnException() {
     eventBus.post(exception);
   }
+<<<<<<< HEAD
+=======
+
+  /**
+   * Posting StatisticsType to invoke corresponding Subscriber method. Passing an Object as EventBus
+   * has @ElementTypesAreNonnullByDefault annotation.
+   */
+  public static void postOnStatisticsType() {
+    eventBus.post(StatisticsType.DIRECTORIES_DELETED);
+  }
+>>>>>>> e9ce9177 (Metrics master (#1117))
 }
