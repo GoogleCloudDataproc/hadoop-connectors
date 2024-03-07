@@ -232,7 +232,6 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     assertThat(hsyncException.getMessage()).contains(String.format("%s", hadoopPath.getName()));
     assertThat(hsyncException.getMessage()).contains(String.format("%s", "No such object"));
 
-
     GoogleJsonResponseException closeException =
         assertThrows(GoogleJsonResponseException.class, fsos::close);
     assertThat(closeException.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_NOT_FOUND);
