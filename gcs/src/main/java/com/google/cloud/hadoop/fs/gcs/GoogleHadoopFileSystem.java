@@ -540,6 +540,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_OPEN,
         hadoopPath,
+        this.traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
           checkOpen();
@@ -565,6 +566,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_CREATE,
         hadoopPath,
+        traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
           checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
@@ -612,6 +614,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE,
         hadoopPath,
+        traceFactory,
         () -> {
 
           // incrementStatistic(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
@@ -643,6 +646,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_RENAME,
         String.format("%s->%s", src, dst),
+        this.traceFactory,
         () -> {
           checkArgument(src != null, "src must not be null");
           checkArgument(dst != null, "dst must not be null");
@@ -679,8 +683,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       @Nonnull GhfsGlobalStorageStatistics stats,
       GhfsStatistic statistic,
       Object context,
+      ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
+
     return GhfsGlobalStorageStatistics.trackDuration(
         factory, stats, statistic, context, traceFactory, operation);
   }
@@ -692,6 +698,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_DELETE,
         hadoopPath,
+        traceFactory,
         () -> {
           boolean response;
           try {
@@ -860,6 +867,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
     incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
         delSrc, overwrite, src, dst);
@@ -905,6 +913,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED,
         String.format("%s:%s", path, name),
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
           checkNotNull(name, "name should not be null");
@@ -929,6 +938,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_XATTR_GET_MAP,
         path,
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
 
@@ -953,6 +963,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP,
         String.format("%s:%s", path, names == null ? -1 : names.size()),
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
           checkNotNull(names, "names should not be null");
@@ -981,6 +992,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         globalStorageStatistics,
         GhfsStatistic.INVOCATION_OP_XATTR_LIST,
         path,
+        traceFactory,
         () -> {
           checkNotNull(path, "path should not be null");
 
