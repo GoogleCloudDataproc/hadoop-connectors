@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
+<<<<<<< HEAD
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETE_REJECTED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_EXISTS;
@@ -33,6 +34,8 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_MKDIRS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+=======
+>>>>>>> 217448db (Metrics master (#1117))
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
@@ -46,6 +49,10 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+<<<<<<< HEAD
+=======
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus.StatisticsType;
+>>>>>>> 217448db (Metrics master (#1117))
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
@@ -219,7 +226,14 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     String maxKey = getMaxKey(statistic.getSymbol());
     AtomicLong maxVal = maximums.get(maxKey);
     if (maxDurationMs > maxVal.get()) {
+<<<<<<< HEAD
       if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS) {
+=======
+
+      // Log is avoided if the first request exceedes threshold
+      if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS
+          && opsCount.get(statistic.getSymbol()).get() > 0) {
+>>>>>>> 217448db (Metrics master (#1117))
         logger.atInfo().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
             statistic, maxDurationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
@@ -303,6 +317,25 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementGcsExceptionCount();
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Updating the corresponding statistics
+   *
+   * @param strType
+   */
+  @Subscribe
+  private void subscriberOnStatisticsType(StatisticsType strType) {
+    if (strType == StatisticsType.DIRECTORIES_DELETED) {
+      incrementDirectoriesDeleted();
+    }
+  }
+
+  private void incrementDirectoriesDeleted() {
+    increment(GhfsStatistic.DIRECTORIES_DELETED);
+  }
+
+>>>>>>> 217448db (Metrics master (#1117))
   private void incrementGcsExceptionCount() {
     increment(EXCEPTION_COUNT);
   }
@@ -327,6 +360,18 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementCounter(GhfsStatistic.STREAM_READ_BYTES, bytesRead);
   }
 
+  void filesCreated() {
+    increment(FILES_CREATED);
+  }
+
+  public void fileDeleted(int count) {
+    incrementCounter(FILES_DELETED, count);
+  }
+
+  public void directoryCreated() {
+    incrementCounter(DIRECTORIES_CREATED, 1);
+  }
+
   /** If more data was requested than was actually returned, this was an incomplete read. */
   void streamReadOperationInComplete(int requested, int actual) {
     if (requested > actual) {
@@ -334,6 +379,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     }
   }
 
+<<<<<<< HEAD
   void streamReadOperations() {
     incrementCounter(STREAM_READ_OPERATIONS, 1);
   }
@@ -342,6 +388,8 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementCounter(STREAM_READ_SEEK_OPERATIONS, 1);
   }
 
+=======
+>>>>>>> 217448db (Metrics master (#1117))
   void streamReadSeekBackward(long negativeOffset) {
     increment(GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
     incrementCounter(GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS, -negativeOffset);
@@ -359,6 +407,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
   }
 
+<<<<<<< HEAD
   void filesCreated() {
     increment(FILES_CREATED);
   }
@@ -419,6 +468,8 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementCounter(INVOCATION_MKDIRS, 1);
   }
 
+=======
+>>>>>>> 217448db (Metrics master (#1117))
   private class LongIterator implements Iterator<LongStatistic> {
     private Iterator<String> iterator = getMetricNames();
 
