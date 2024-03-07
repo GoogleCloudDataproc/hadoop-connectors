@@ -18,6 +18,11 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 
+<<<<<<< HEAD
+=======
+import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+>>>>>>> 957ec02f (Metrics master (#1117))
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSession;
@@ -53,6 +58,21 @@ class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
     this.writableByteChannel = blobWriteSession.open();
   }
 
+<<<<<<< HEAD
+=======
+  @Override
+  public void startUpload(InputStream pipeSource) throws IOException {
+    // Given that the two ends of the pipe must operate asynchronous relative
+    // to each other, we need to start the upload operation on a separate thread.
+    try {
+      uploadOperation = threadPool.submit(new UploadOperation(pipeSource, this.resourceId));
+    } catch (Exception e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
+    }
+  }
+
+>>>>>>> 957ec02f (Metrics master (#1117))
   private static BlobInfo getBlobInfo(
       StorageResourceId resourceId, CreateObjectOptions createOptions) {
     BlobInfo blobInfo =
@@ -78,6 +98,64 @@ class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
         generateWriteOptions(createOptions, storageOptions));
   }
 
+<<<<<<< HEAD
+=======
+  private class UploadOperation implements Callable<Boolean> {
+
+    // Read end of the pipe.
+    private final InputStream pipeSource;
+    private final StorageResourceId resourceId;
+    private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+
+    UploadOperation(@Nonnull InputStream pipeSource, @Nonnull StorageResourceId resourceId) {
+      this.resourceId = resourceId;
+      this.pipeSource = pipeSource;
+    }
+
+    @Override
+    public Boolean call() throws Exception {
+      // Try-with-resource will close this end of the pipe so that
+      // the writer at the other end will not hang indefinitely.
+      logger.atFiner().log("Starting upload for resource %s", resourceId);
+      try (pipeSource) {
+        boolean lastChunk = false;
+        ByteBuffer byteBuffer = ByteBuffer.allocate(MAX_BYTES_PER_MESSAGE);
+        while (!lastChunk) {
+          int remainingCapacity = byteBuffer.remaining();
+          ByteString data =
+              ByteString.readFrom(
+                  ByteStreams.limit(pipeSource, remainingCapacity), remainingCapacity);
+          if (data.size() < remainingCapacity) {
+            lastChunk = true;
+          }
+          byteBuffer.put(data.toByteArray());
+          // switch to read mode
+          byteBuffer.flip();
+          // this could result into partial write
+          writeInternal(byteBuffer);
+          if (!lastChunk) {
+            // compact buffer for further writing
+            byteBuffer.compact();
+          }
+        }
+        // last chunk could be partially written
+        // uploading all bytes of last chunk
+        if (lastChunk && byteBuffer.hasRemaining()) {
+          while (byteBuffer.hasRemaining()) {
+            writeInternal(byteBuffer);
+          }
+        }
+        logger.atFiner().log("Uploaded all chunks for resource %s", resourceId);
+        return true;
+      } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IOException(
+            String.format("Error occurred while uploading resource %s", resourceId), e);
+      }
+    }
+  }
+
+>>>>>>> 957ec02f (Metrics master (#1117))
   private static BlobWriteOption[] generateWriteOptions(
       CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
     List<BlobWriteOption> blobWriteOptions = new ArrayList<>();
@@ -116,8 +194,13 @@ class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
       // the gcs-object.
       writableByteChannel.close();
     } catch (Exception e) {
+<<<<<<< HEAD
       throw new IOException(
           String.format("Upload failed for '%s'. reason=%s", resourceId, e.getMessage()), e);
+=======
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException(String.format("Upload failed for '%s'", resourceId), e);
+>>>>>>> 957ec02f (Metrics master (#1117))
     } finally {
       writableByteChannel = null;
     }

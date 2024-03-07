@@ -296,10 +296,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 () -> new GhfsStorageStatistics(instrumentation.getIOStatistics()));
 
     initializeGcsFs(config);
-<<<<<<< HEAD
 
-=======
->>>>>>> e9ce9177 (Metrics master (#1117))
     this.traceFactory = TraceFactory.get(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
   }
 

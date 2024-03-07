@@ -1,3 +1,4 @@
+<<<<<<<< HEAD:gcsio/src/main/java/com/google/cloud/hadoop/gcsio/StatisticTypeEnum.java
 /*
  * Copyright 2023 Google LLC
  *
@@ -28,3 +29,6 @@ public enum StatisticTypeEnum {
   /** Gauge. */
   TYPE_GAUGE
 }
+========
+
+>>>>>>>> b0c7fb09 (Metrics master (#1117)):gcs/src/main/java/com/google/cloud/hadoop/fs/gcs/GhfsStatisticTypeEnum.java
