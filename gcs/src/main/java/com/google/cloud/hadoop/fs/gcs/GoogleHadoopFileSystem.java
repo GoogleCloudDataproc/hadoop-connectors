@@ -34,7 +34,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
@@ -52,10 +51,10 @@ import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.ITraceFactory;
-import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.TraceFactory;
 import com.google.common.annotations.VisibleForTesting;
@@ -93,6 +92,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
@@ -110,6 +110,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
@@ -199,6 +200,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   /** Instrumentation to track Statistics */
   private GhfsInstrumentation instrumentation;
   /** Storage Statistics Bonded to the instrumentation. */
+  private GhfsGlobalStorageStatistics globalStorageStatistics;
+
   private GhfsStorageStatistics storageStatistics;
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -218,11 +221,32 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private ITraceFactory traceFactory = TraceFactory.get(/* isEnabled */ false);
 
+  /** Instrumentation to track Statistics */
+  ITraceFactory getTraceFactory() {
+    return this.traceFactory;
+  }
+
   /**
    * Constructs an instance of GoogleHadoopFileSystem; the internal GoogleCloudStorageFileSystem
    * will be set up with config settings when initialize() is called.
    */
-  public GoogleHadoopFileSystem() {}
+  public GoogleHadoopFileSystem() {
+    StorageStatistics globalStats =
+        GlobalStorageStatistics.INSTANCE.put(
+            GhfsGlobalStorageStatistics.NAME, () -> new GhfsGlobalStorageStatistics());
+
+    if (GhfsGlobalStorageStatistics.class.isAssignableFrom(globalStats.getClass())) {
+      globalStorageStatistics = (GhfsGlobalStorageStatistics) globalStats;
+    } else {
+      logger.atWarning().log(
+          "Encountered an error while registering to GlobalStorageStatistics. Some of the GCS connector metrics will not be reported to metrics sinks. globalStatsClassLoader=<%s>; classLoader=<%s>",
+          globalStats.getClass().getClassLoader(),
+          GhfsGlobalStorageStatistics.class.getClassLoader());
+      globalStorageStatistics = GhfsGlobalStorageStatistics.DUMMY_INSTANCE;
+    }
+
+    GoogleCloudStorageEventBus.register(globalStorageStatistics);
+  }
 
   /**
    * Constructs an instance of GoogleHadoopFileSystem using the provided
@@ -230,6 +254,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   @VisibleForTesting
   GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
+    this();
     checkNotNull(gcsfs, "gcsFs must not be null");
     initializeGcsFs(gcsfs);
   }
@@ -262,14 +287,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     initializeFsRoot();
     initializeWorkingDirectory(config);
     initializeDelegationTokenSupport(config);
-    initializeGcsFs(config);
-
     instrumentation = new GhfsInstrumentation(initUri);
+
     storageStatistics =
         (GhfsStorageStatistics)
             GlobalStorageStatistics.INSTANCE.put(
                 GhfsStorageStatistics.NAME,
                 () -> new GhfsStorageStatistics(instrumentation.getIOStatistics()));
+
+    initializeGcsFs(config);
 
     this.traceFactory = TraceFactory.get(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
   }
@@ -330,6 +356,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                     gcsFsInitialized = true;
                     return gcsFs;
                   } catch (IOException e) {
+                    GoogleCloudStorageEventBus.postOnException();
                     throw new RuntimeException("Failed to create GCS FS", e);
                   }
                 });
@@ -413,6 +440,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       case MD5:
         return new GcsFileChecksum(type, fileInfo.getMd5Checksum());
     }
+    GoogleCloudStorageEventBus.postOnException();
     throw new IOException("Unrecognized GcsFileChecksumType: " + type);
   }
 
@@ -424,6 +452,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     String scheme = uri.getScheme();
     if (scheme != null && !scheme.equalsIgnoreCase(getScheme())) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IllegalArgumentException(
           String.format(
               "Wrong scheme: %s, in path: %s, expected scheme: %s", scheme, path, getScheme()));
@@ -437,6 +466,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       return;
     }
 
+    GoogleCloudStorageEventBus.postOnException();
     throw new IllegalArgumentException(
         String.format(
             "Wrong bucket: %s, in path: %s, expected bucket: %s", bucket, path, rootBucket));
@@ -507,7 +537,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_OPEN.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_OPEN,
         hadoopPath,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
@@ -531,7 +562,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_CREATE.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_CREATE,
         hadoopPath,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
@@ -559,6 +591,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                           .build(),
                       statistics),
                   statistics);
+          globalStorageStatistics.filesCreated();
           instrumentation.fileCreated();
           return response;
         });
@@ -576,7 +609,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE,
         hadoopPath,
         () -> {
 
@@ -585,6 +619,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
           URI parentGcsPath = UriPaths.getParentPath(gcsPath);
           if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
+            GoogleCloudStorageEventBus.postOnException();
             throw new FileNotFoundException(
                 String.format(
                     "Can not create '%s' file, because parent folder does not exist: %s",
@@ -605,7 +640,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public boolean rename(Path src, Path dst) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_RENAME.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_RENAME,
         String.format("%s->%s", src, dst),
         () -> {
           checkArgument(src != null, "src must not be null");
@@ -623,6 +659,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           try {
             renameInternal(src, dst);
           } catch (IOException e) {
+            GoogleCloudStorageEventBus.postOnException();
             if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
               throw e;
             }
@@ -639,20 +676,21 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   private <B> B trackDurationWithTracing(
       DurationTrackerFactory factory,
-      String statistic,
+      @Nonnull GhfsGlobalStorageStatistics stats,
+      GhfsStatistic statistic,
       Object context,
       CallableRaisingIOE<B> operation)
       throws IOException {
-    try (ITraceOperation op = traceFactory.createRootWithLogging(statistic, context)) {
-      return trackDuration(factory, statistic, operation);
-    }
+    return GhfsGlobalStorageStatistics.trackDuration(
+        factory, stats, statistic, context, traceFactory, operation);
   }
 
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_DELETE.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_DELETE,
         hadoopPath,
         () -> {
           boolean response;
@@ -668,6 +706,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             } catch (DirectoryNotEmptyException e) {
               throw e;
             } catch (IOException e) {
+              GoogleCloudStorageEventBus.postOnException();
               if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
                 throw e;
               }
@@ -680,8 +719,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                   "delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
             }
             response = result;
+            globalStorageStatistics.fileDeleted(1);
             instrumentation.fileDeleted(1);
           } catch (IOException e) {
+            GoogleCloudStorageEventBus.postOnException();
             incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
             throw e;
           }
@@ -710,6 +751,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         status.add(getGoogleHadoopFileStatus(fileInfo, userName));
       }
     } catch (FileNotFoundException fnfe) {
+      GoogleCloudStorageEventBus.postOnException();
       throw (FileNotFoundException)
           new FileNotFoundException(
                   String.format(
@@ -730,6 +772,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     try {
       getGcsFs().mkdirs(gcsPath);
     } catch (java.nio.file.FileAlreadyExistsException faee) {
+      GoogleCloudStorageEventBus.postOnException();
       // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
       throw (FileAlreadyExistsException)
           new FileAlreadyExistsException(
@@ -740,6 +783,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
     boolean response = true;
     instrumentation.directoryCreated();
+    globalStorageStatistics.directoryCreated();
     return response;
   }
 
@@ -753,6 +797,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     URI gcsPath = getGcsPath(hadoopPath);
     FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException(
           String.format(
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
@@ -857,7 +902,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public byte[] getXAttr(Path path, String name) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_XATTR_GET_NAMED.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_XATTR_GET_NAMED,
         String.format("%s:%s", path, name),
         () -> {
           checkNotNull(path, "path should not be null");
@@ -880,7 +926,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public Map<String, byte[]> getXAttrs(Path path) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_XATTR_GET_MAP.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_XATTR_GET_MAP,
         path,
         () -> {
           checkNotNull(path, "path should not be null");
@@ -903,7 +950,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public Map<String, byte[]> getXAttrs(Path path, List<String> names) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP,
         String.format("%s:%s", path, names == null ? -1 : names.size()),
         () -> {
           checkNotNull(path, "path should not be null");
@@ -930,7 +978,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public List<String> listXAttrs(Path path) throws IOException {
     return trackDurationWithTracing(
         instrumentation,
-        GhfsStatistic.INVOCATION_OP_XATTR_LIST.getSymbol(),
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_OP_XATTR_LIST,
         path,
         () -> {
           checkNotNull(path, "path should not be null");
@@ -952,6 +1001,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   private void incrementStatistic(GhfsStatistic statistic) {
     incrementStatistic(statistic, 1);
+    globalStorageStatistics.incrementCounter(statistic, 1);
   }
 
   /**
@@ -965,6 +1015,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       return;
     }
     instrumentation.incrementCounter(statistic, count);
+  }
+
+  /**
+   * Get the storage statistics of this filesystem.
+   *
+   * @return the storage statistics
+   */
+  public GhfsGlobalStorageStatistics getGlobalGcsStorageStatistics() {
+    return globalStorageStatistics;
   }
 
   /**
@@ -1323,9 +1382,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
               () -> flatGlobInternal(fixedPath, filter),
               () -> super.globStatus(fixedPath, filter)));
     } catch (InterruptedException e) {
+      GoogleCloudStorageEventBus.postOnException();
       Thread.currentThread().interrupt();
       throw new IOException(String.format("Concurrent glob execution failed: %s", e), e);
     } catch (ExecutionException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(String.format("Concurrent glob execution failed: %s", e.getCause()), e);
     }
   }
@@ -1472,6 +1533,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   /** Assert that the FileSystem has been initialized and not close()d. */
   private void checkOpen() throws IOException {
     if (isClosed()) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("GoogleHadoopFileSystem has been closed or not initialized.");
     }
   }
@@ -1611,12 +1673,14 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     Map<String, byte[]> attributes = fileInfo.getAttributes();
 
     if (attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.REPLACE)) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "REPLACE flag must be set to update XAttr (name='%s', value='%s') for '%s'",
               name, new String(value, UTF_8), path));
     }
     if (!attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.CREATE)) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
               "CREATE flag must be set to create XAttr (name='%s', value='%s') for '%s'",

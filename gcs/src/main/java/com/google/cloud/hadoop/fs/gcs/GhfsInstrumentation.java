@@ -31,6 +31,7 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStat
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -947,15 +948,15 @@ public class GhfsInstrumentation
         .forEach(
             stat -> {
               // declare all counter statistics
-              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+              if (stat.getType() == StatisticTypeEnum.TYPE_COUNTER) {
                 counter(stat);
                 storeBuilder.withCounters(stat.getSymbol());
                 // declare all gauge statistics
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_GAUGE) {
                 gauge(stat);
                 storeBuilder.withGauges(stat.getSymbol());
                 // and durations
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }

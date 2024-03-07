@@ -16,9 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_COUNTER;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_COUNTER;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
@@ -80,19 +81,13 @@ public enum GhfsStatistic {
       "files_delete_rejected",
       "Total number of files whose delete request was rejected",
       TYPE_COUNTER),
-  INVOCATION_COPY_FROM_LOCAL_FILE(
-      StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
   INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_DURATION),
-  INVOCATION_CREATE_NON_RECURSIVE(
-      StoreStatisticNames.OP_CREATE_NON_RECURSIVE, "Calls of createNonRecursive()", TYPE_DURATION),
   INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION),
   INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER),
-  INVOCATION_GET_DELEGATION_TOKEN(
-      StoreStatisticNames.OP_GET_DELEGATION_TOKEN, "Calls of getDelegationToken()", TYPE_COUNTER),
-  INVOCATION_GET_FILE_CHECKSUM(
-      StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
   INVOCATION_GET_FILE_STATUS(
       StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
+  INVOCATION_GET_FILE_CHECKSUM(
+      StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_COUNTER),
   INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION),
   INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION),
@@ -101,6 +96,12 @@ public enum GhfsStatistic {
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION),
+  INVOCATION_COPY_FROM_LOCAL_FILE(
+      StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
+  INVOCATION_CREATE_NON_RECURSIVE(
+      StoreStatisticNames.OP_CREATE_NON_RECURSIVE, "Calls of createNonRecursive()", TYPE_DURATION),
+  INVOCATION_GET_DELEGATION_TOKEN(
+      StoreStatisticNames.OP_GET_DELEGATION_TOKEN, "Calls of getDelegationToken()", TYPE_COUNTER),
   INVOCATION_LIST_LOCATED_STATUS(
       StoreStatisticNames.OP_LIST_LOCATED_STATUS, "Calls of listLocatedStatus()", TYPE_COUNTER),
 
@@ -119,6 +120,7 @@ public enum GhfsStatistic {
       TYPE_COUNTER),
   STREAM_READ_OPERATIONS(
       StreamStatisticNames.STREAM_READ_OPERATIONS, "Calls of read()", TYPE_DURATION),
+
   STREAM_READ_OPERATIONS_INCOMPLETE(
       StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
       "Count of incomplete read() operations in an input stream",
@@ -191,7 +193,7 @@ public enum GhfsStatistic {
    * @param description description.
    * @param type type
    */
-  GhfsStatistic(String symbol, String description, GhfsStatisticTypeEnum type) {
+  GhfsStatistic(String symbol, String description, StatisticTypeEnum type) {
     this.symbol = symbol;
     this.description = description;
     this.type = type;
@@ -204,7 +206,7 @@ public enum GhfsStatistic {
   private final String description;
 
   /** Statistic type. */
-  private final GhfsStatisticTypeEnum type;
+  private final StatisticTypeEnum type;
 
   /** the name of the statistic */
   public String getSymbol() {
@@ -241,7 +243,7 @@ public enum GhfsStatistic {
    *
    * @return the type.
    */
-  public GhfsStatisticTypeEnum getType() {
+  public StatisticTypeEnum getType() {
     return type;
   }
 }
