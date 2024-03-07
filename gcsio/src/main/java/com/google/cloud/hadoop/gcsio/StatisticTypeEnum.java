@@ -1,4 +1,3 @@
-<<<<<<<< HEAD:gcsio/src/main/java/com/google/cloud/hadoop/gcsio/StatisticTypeEnum.java
 /*
  * Copyright 2023 Google LLC
  *
