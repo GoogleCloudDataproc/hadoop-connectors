@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. [Bug Fix] Set user agent in gRPC requests
 
 ## 2.2.20 - 2024-02-21
 1. Fix downscoping not working when gRPC is enabled issue
