@@ -18,14 +18,12 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
@@ -428,11 +426,6 @@ public class GhfsInstrumentation
     incrementCounter(DIRECTORIES_CREATED, 1);
   }
 
-  /** Indicate that GCS just deleted a directory. */
-  public void directoryDeleted() {
-    incrementCounter(DIRECTORIES_DELETED, 1);
-  }
-
   /**
    * Indicate that GCS deleted one or more files.
    *
@@ -618,17 +611,6 @@ public class GhfsInstrumentation
     }
 
     /**
-     * A read() operation in the input stream has started.
-     *
-     * @param pos starting position of the read
-     * @param len length of bytes to read
-     */
-    @Override
-    public void readOperationStarted(long pos, long len) {
-      readOperations.incrementAndGet();
-    }
-
-    /**
      * If more data was requested than was actually returned, this was an incomplete read. Increment
      * {@link #readsIncomplete}.
      */
@@ -653,117 +635,6 @@ public class GhfsInstrumentation
       // stream is being closed.
       // merge in all the IOStatistics
       GhfsInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
-    }
-
-    /**
-     * The total number of times the input stream has been closed.
-     *
-     * @return the number of close calls.
-     */
-    @Override
-    public long getCloseOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
-    }
-
-    /**
-     * The total number of executed seek operations which went forward in an input stream.
-     *
-     * @return the number of Forward seek operations.
-     */
-    @Override
-    public long getForwardSeekOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS);
-    }
-
-    /**
-     * The total number of executed seek operations which went backward in an input stream.
-     *
-     * @return the number of Backward seek operations
-     */
-    @Override
-    public long getBackwardSeekOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
-    }
-
-    /**
-     * The bytes read in read() operations.
-     *
-     * @return the number of bytes returned to the caller.
-     */
-    @Override
-    public long getBytesRead() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_BYTES);
-    }
-
-    /**
-     * The total number of bytes read, including all read and discarded when closing streams or
-     * skipped during seek calls.
-     *
-     * @return the total number of bytes read from GHFS.
-     */
-    @Override
-    public long getTotalBytesRead() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_TOTAL_BYTES);
-    }
-
-    /**
-     * The total number of bytes skipped during seek calls.
-     *
-     * @return the number of bytes skipped.
-     */
-    @Override
-    public long getBytesSkippedOnSeek() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED);
-    }
-
-    /**
-     * The total number of bytes skipped during backward seek calls.
-     *
-     * @return the number of bytes skipped.
-     */
-    @Override
-    public long getBytesBackwardsOnSeek() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS);
-    }
-
-    /**
-     * The total number of seek operations in an input stream
-     *
-     * @return the number of bytes skipped.
-     */
-    @Override
-    public long getSeekOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS);
-    }
-
-    /**
-     * The total number of exceptions raised during input stream reads
-     *
-     * @return the count of read Exceptions.
-     */
-    @Override
-    public long getReadExceptions() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_EXCEPTIONS);
-    }
-
-    /**
-     * The total number of times the read() operation in an input stream has been called.
-     *
-     * @return the count of read operations.
-     */
-    @Override
-    public long getReadOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS);
-    }
-
-    /**
-     * The total number of Incomplete read() operations
-     *
-     * @return the count of Incomplete read operations.
-     */
-    @Override
-    public long getReadsIncomplete() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
     }
 
     /**
@@ -800,7 +671,6 @@ public class GhfsInstrumentation
       implements GhfsOutputStreamStatistics {
 
     private final AtomicLong bytesWritten;
-    private final AtomicLong writeExceptions;
     private final FileSystem.Statistics filesystemStatistics;
 
     /**
@@ -812,7 +682,7 @@ public class GhfsInstrumentation
       this.filesystemStatistics = filesystemStatistics;
       IOStatisticsStore st =
           iostatisticsStore()
-              .withCounters(STREAM_WRITE_BYTES.getSymbol(), STREAM_WRITE_EXCEPTIONS.getSymbol())
+              .withCounters(STREAM_WRITE_BYTES.getSymbol())
               .withDurationTracking(
                   STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(),
                   STREAM_WRITE_OPERATIONS.getSymbol(),
@@ -823,7 +693,6 @@ public class GhfsInstrumentation
       // these are extracted to avoid lookups on heavily used counters.
 
       bytesWritten = st.getCounterReference(StreamStatisticNames.STREAM_WRITE_BYTES);
-      writeExceptions = st.getCounterReference(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
     }
 
     /**
@@ -852,44 +721,6 @@ public class GhfsInstrumentation
     public void writeBytes(long count) {
       bytesWritten.addAndGet(count);
     }
-
-    /** An ignored stream write exception was received. */
-    @Override
-    public void writeException() {
-      writeExceptions.incrementAndGet();
-    }
-
-    /** Syncable.hflush() has been invoked. */
-    @Override
-    public void hflushInvoked() {
-      incrementCounter(INVOCATION_HFLUSH.getSymbol(), 1);
-    }
-
-    /** Syncable.hsync() has been invoked. */
-    @Override
-    public void hsyncInvoked() {
-      incrementCounter(INVOCATION_HSYNC.getSymbol(), 1);
-    }
-
-    /**
-     * Get the current count of bytes written.
-     *
-     * @return the counter value.
-     */
-    @Override
-    public long getBytesWritten() {
-      return bytesWritten.get();
-    }
-
-    /**
-     * The total number of exceptions raised during ouput stream write
-     *
-     * @return the count of write Exceptions.
-     */
-    @Override
-    public long getWriteExceptions() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
-    }
   }
 
   /**
@@ -899,9 +730,6 @@ public class GhfsInstrumentation
    */
   private void mergeOutputStreamStatistics(OutputStreamStatistics source) {
 
-    incrementCounter(
-        STREAM_WRITE_EXCEPTIONS,
-        source.lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS));
     // merge in all the IOStatistics
     getIOStatistics().aggregate(source.getIOStatistics());
   }
