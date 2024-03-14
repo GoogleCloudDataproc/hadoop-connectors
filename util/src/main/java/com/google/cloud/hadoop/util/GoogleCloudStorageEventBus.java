@@ -83,4 +83,12 @@ public class GoogleCloudStorageEventBus {
   public static void postOnException() {
     eventBus.post(exception);
   }
+
+  /**
+   * Posting String to invoke corresponding Subscriber method. Passing an Object as EventBus
+   * has @ElementTypesAreNonnullByDefault annotation.
+   */
+  public static void postOnString(String str) {
+    eventBus.post(new StringBuilder(str));
+  }
 }

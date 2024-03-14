@@ -16,9 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
@@ -61,7 +58,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   /** {@value} The key that stores all the registered metrics */
   public static final String NAME = "GhfsStorageStatistics";
 
-  public static final int LATENCY_LOGGING_THRESHOLD_MS = 150;
+  public static final int LATENCY_LOGGING_THRESHOLD_MS = 300;
 
   // Instance to be used if it encounters any error while registering to Global Statistics.
   // Error can happen for e.g. when different class loaders are used.
@@ -289,6 +286,22 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementGcsExceptionCount();
   }
 
+  /**
+   * Updating the corresponding statistics
+   *
+   * @param strBuilder
+   */
+  @Subscribe
+  private void subscriberOnString(StringBuilder strBuilder) {
+    if (strBuilder.toString().contains("directories_deleted")) {
+      incrementDirectoriesDeleted();
+    }
+  }
+
+  private void incrementDirectoriesDeleted() {
+    increment(GhfsStatistic.DIRECTORIES_DELETED);
+  }
+
   private void incrementGcsExceptionCount() {
     increment(EXCEPTION_COUNT);
   }
@@ -335,18 +348,6 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   void streamWriteBytes(int bytesWritten) {
     incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
-  }
-
-  void filesCreated() {
-    increment(FILES_CREATED);
-  }
-
-  public void fileDeleted(int count) {
-    incrementCounter(FILES_DELETED, count);
-  }
-
-  public void directoryCreated() {
-    incrementCounter(DIRECTORIES_CREATED, 1);
   }
 
   private class LongIterator implements Iterator<LongStatistic> {
