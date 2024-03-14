@@ -354,6 +354,18 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
   }
 
+  void filesCreated() {
+    increment(FILES_CREATED);
+  }
+
+  public void fileDeleted(int count) {
+    incrementCounter(FILES_DELETED, count);
+  }
+
+  public void directoryCreated() {
+    incrementCounter(DIRECTORIES_CREATED, 1);
+  }
+
   private class LongIterator implements Iterator<LongStatistic> {
     private Iterator<String> iterator = getMetricNames();
 

@@ -45,7 +45,6 @@ public enum GhfsStatistic {
       StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_COUNTER),
   ACTION_HTTP_PATCH_REQUEST(
       StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "PATCH request.", TYPE_COUNTER),
-
   ACTION_HTTP_DELETE_REQUEST(
       StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_COUNTER),
 

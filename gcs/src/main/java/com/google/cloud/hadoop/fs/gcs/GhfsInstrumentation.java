@@ -17,6 +17,9 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
@@ -400,6 +403,25 @@ public class GhfsInstrumentation
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean b) {}
 
+  /** Indicate that GCS created a file. */
+  public void fileCreated() {
+    incrementCounter(FILES_CREATED, 1);
+  }
+
+  /** Indicate that GCS created a directory. */
+  public void directoryCreated() {
+    incrementCounter(DIRECTORIES_CREATED, 1);
+  }
+
+  /**
+   * Indicate that GCS deleted one or more files.
+   *
+   * @param count number of files.
+   */
+  public void fileDeleted(int count) {
+    incrementCounter(FILES_DELETED, count);
+  }
+
   /**
    * Create a stream input statistics instance.
    *
@@ -573,6 +595,17 @@ public class GhfsInstrumentation
         bytesRead.addAndGet(bytes);
         totalBytesRead.addAndGet(bytes);
       }
+    }
+
+    /**
+     * A read() operation in the input stream has started.
+     *
+     * @param pos starting position of the read
+     * @param len length of bytes to read
+     */
+    @Override
+    public void readOperationStarted(long pos, long len) {
+      readOperations.incrementAndGet();
     }
 
     /**
