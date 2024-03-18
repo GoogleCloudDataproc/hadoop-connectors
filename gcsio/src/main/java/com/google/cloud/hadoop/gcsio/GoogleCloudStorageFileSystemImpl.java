@@ -342,7 +342,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         GoogleCloudStorageEventBus.postOnException();
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
-      GoogleCloudStorageEventBus.postOnString("directories_deleted");
+      GoogleCloudStorageEventBus.postOnStatisticsType();
     } else {
       itemsToDelete = new ArrayList<>();
     }
