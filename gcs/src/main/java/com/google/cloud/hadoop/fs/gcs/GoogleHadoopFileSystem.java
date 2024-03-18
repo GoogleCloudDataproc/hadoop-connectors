@@ -623,8 +623,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                           .build(),
                       statistics),
                   statistics);
-          globalStorageStatistics.filesCreated();
-          instrumentation.fileCreated();
+
+          incrementStatistic(GhfsStatistic.FILES_CREATED);
           return response;
         });
   }
@@ -756,8 +756,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                   "delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
             }
             response = result;
-            globalStorageStatistics.fileDeleted(1);
-            instrumentation.fileDeleted(1);
+
+            incrementStatistic(GhfsStatistic.FILES_DELETED);
           } catch (IOException e) {
             GoogleCloudStorageEventBus.postOnException();
             incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
@@ -795,6 +795,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                       "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
               .initCause(fnfe);
     }
+
+    incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE, status.size());
     return status.toArray(new FileStatus[0]);
   }
 
@@ -820,8 +822,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     }
     logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
     boolean response = true;
-    instrumentation.directoryCreated();
-    globalStorageStatistics.directoryCreated();
+
+    incrementStatistic(GhfsStatistic.DIRECTORIES_CREATED);
     return response;
   }
 
@@ -1044,7 +1046,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   private void incrementStatistic(GhfsStatistic statistic) {
     incrementStatistic(statistic, 1);
-    globalStorageStatistics.incrementCounter(statistic, 1);
   }
 
   /**
@@ -1058,6 +1059,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       return;
     }
     instrumentation.incrementCounter(statistic, count);
+    globalStorageStatistics.incrementCounter(statistic, count);
   }
 
   /**

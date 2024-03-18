@@ -32,6 +32,7 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus.StatisticsType;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
@@ -289,6 +290,22 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementGcsExceptionCount();
   }
 
+  /**
+   * Updating the corresponding statistics
+   *
+   * @param strType
+   */
+  @Subscribe
+  private void subscriberOnStatisticsType(StatisticsType strType) {
+    if (strType == StatisticsType.DIRECTORIES_DELETED) {
+      incrementDirectoriesDeleted();
+    }
+  }
+
+  private void incrementDirectoriesDeleted() {
+    increment(GhfsStatistic.DIRECTORIES_DELETED);
+  }
+
   private void incrementGcsExceptionCount() {
     increment(EXCEPTION_COUNT);
   }
@@ -335,18 +352,6 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   void streamWriteBytes(int bytesWritten) {
     incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
-  }
-
-  void filesCreated() {
-    increment(FILES_CREATED);
-  }
-
-  public void fileDeleted(int count) {
-    incrementCounter(FILES_DELETED, count);
-  }
-
-  public void directoryCreated() {
-    incrementCounter(DIRECTORIES_CREATED, 1);
   }
 
   private class LongIterator implements Iterator<LongStatistic> {

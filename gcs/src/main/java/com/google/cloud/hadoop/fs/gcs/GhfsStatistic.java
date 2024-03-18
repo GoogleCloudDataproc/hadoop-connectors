@@ -55,6 +55,11 @@ public enum GhfsStatistic {
       "Total number of directories created through the object store.",
       TYPE_COUNTER),
 
+  DIRECTORIES_DELETED(
+      "directories_deleted",
+      "Total number of directories deleted through the object store.",
+      TYPE_COUNTER),
+
   FILES_CREATED(
       "files_created", "Total number of files created through the object store.", TYPE_COUNTER),
   FILES_DELETED(
@@ -70,6 +75,9 @@ public enum GhfsStatistic {
       StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
   INVOCATION_GET_FILE_CHECKSUM(
       StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
+
+  INVOCATION_LIST_STATUS_RESULT_SIZE(
+      "op_get_list_status_result_size", "Number of files returned from list call", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(
       StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_DURATION),
   INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION),
