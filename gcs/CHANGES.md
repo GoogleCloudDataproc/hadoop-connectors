@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 2.2.21 - 2024-03-15
 1. [Bug Fix] Set user agent in gRPC requests
 
 ## 2.2.20 - 2024-02-21
