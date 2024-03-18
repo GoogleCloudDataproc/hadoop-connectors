@@ -17,9 +17,6 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
@@ -198,19 +195,6 @@ public class GhfsInstrumentation
     String name = op.getSymbol();
     incrementMutableCounter(name, count);
     instanceIOStatistics.incrementCounter(name, count);
-  }
-
-  /**
-   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in
-   * GoogleCloudStorageStatusStatistics.
-   *
-   * @param op operation
-   */
-  private void incrementCounter(GoogleCloudStorageStatistics op) {
-
-    String name = op.getSymbol();
-    incrementMutableCounter(name, 1);
-    instanceIOStatistics.incrementCounter(name, 1);
   }
 
   /**
@@ -415,25 +399,6 @@ public class GhfsInstrumentation
 
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean b) {}
-
-  /** Indicate that GCS created a file. */
-  public void fileCreated() {
-    incrementCounter(FILES_CREATED, 1);
-  }
-
-  /** Indicate that GCS created a directory. */
-  public void directoryCreated() {
-    incrementCounter(DIRECTORIES_CREATED, 1);
-  }
-
-  /**
-   * Indicate that GCS deleted one or more files.
-   *
-   * @param count number of files.
-   */
-  public void fileDeleted(int count) {
-    incrementCounter(FILES_DELETED, count);
-  }
 
   /**
    * Create a stream input statistics instance.
