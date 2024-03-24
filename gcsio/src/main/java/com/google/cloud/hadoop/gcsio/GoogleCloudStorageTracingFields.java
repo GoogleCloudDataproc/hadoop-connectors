@@ -35,6 +35,7 @@ public enum GoogleCloudStorageTracingFields {
   FINALIZE_WRITE("finalizeWrite"),
   CONTENT_LENGTH("contentLength"),
   PERSISTED_SIZE("persistedSize"),
+  RESOURCE_SIZE("resourceSize"),
   READ_OFFSET("readOffset"),
   READ_LIMIT("readLimit"),
   REQUEST_START_OFFSET("requestStartOffset"),
