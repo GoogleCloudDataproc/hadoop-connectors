@@ -70,6 +70,7 @@ public abstract class GoogleCloudStorageOptions {
         .setStorageRootUrl(Storage.DEFAULT_ROOT_URL)
         .setStorageServicePath(Storage.DEFAULT_SERVICE_PATH)
         .setTraceLogEnabled(false)
+        .setOperationTraceLogEnabled(false)
         .setTrafficDirectorEnabled(true)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT);
   }
@@ -145,6 +146,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract MetricsSink getMetricsSink();
 
   public abstract boolean isTraceLogEnabled();
+
+  public abstract boolean isOperationTraceLogEnabled();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -228,6 +231,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
     public abstract Builder setTraceLogEnabled(Boolean enable);
+
+    public abstract Builder setOperationTraceLogEnabled(Boolean enable);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
