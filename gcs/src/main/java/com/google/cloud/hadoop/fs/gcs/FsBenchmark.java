@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.LongSummaryStatistics;
@@ -201,6 +202,10 @@ public class FsBenchmark extends Configured implements Tool {
     Set<LongSummaryStatistics> writeCallBytesList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> writeCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
 
+    // for all threads
+    ArrayList<Long> writeFileTime = new ArrayList<>();
+    ArrayList<Long> writeCallTime = new ArrayList<>();
+
     String tempFilenameKey = UUID.randomUUID().toString().substring(0, 6);
 
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
@@ -241,10 +246,14 @@ public class FsBenchmark extends Configured implements Tool {
                         output.write(writeBuffer);
                         fileBytesWrite += writeSize;
                         writeCallBytes.accept(writeSize);
+
+                        writeFileTime.add(System.nanoTime() - writeCallStart);
                         writeCallTimeNs.accept(System.nanoTime() - writeCallStart);
                       } while (fileBytesWrite < totalSize);
 
                       writeFileBytes.accept(fileBytesWrite);
+
+                      writeFileTime.add(System.nanoTime() - writeStart);
                       writeFileTimeNs.accept(System.nanoTime() - writeStart);
                     }
                   }
@@ -265,11 +274,11 @@ public class FsBenchmark extends Configured implements Tool {
     // Verify that all threads completed without errors
     futures.forEach(Futures::getUnchecked);
 
-    printTimeStats("Write call time", writeCallTimeNsList);
+    printTimeStats("Write call time", writeCallTimeNsList, writeCallTime);
     printSizeStats("Write call data", writeCallBytesList);
     printThroughputStats("Write call throughput", writeCallTimeNsList, writeCallBytesList);
 
-    printTimeStats("Write file time", writeFileTimeNsList);
+    printTimeStats("Write file time", writeFileTimeNsList, writeFileTime);
     printSizeStats("Write file data", writeFileBytesList);
     printThroughputStats("Write file throughput", writeFileTimeNsList, writeFileBytesList);
 
@@ -318,6 +327,10 @@ public class FsBenchmark extends Configured implements Tool {
     Set<LongSummaryStatistics> readCallBytesList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> readCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
 
+    // for all threads
+    ArrayList<Long> readFileTime = new ArrayList<>();
+    ArrayList<Long> readCallTime = new ArrayList<>();
+
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
     CountDownLatch startLatch = new CountDownLatch(1);
@@ -349,10 +362,14 @@ public class FsBenchmark extends Configured implements Tool {
                           fileBytesRead += bytesRead;
                           readCallBytes.accept(bytesRead);
                         }
+
+                        readCallTime.add(System.nanoTime() - readCallStart);
                         readCallTimeNs.accept(System.nanoTime() - readCallStart);
                       } while (bytesRead >= 0);
 
                       readFileBytes.accept(fileBytesRead);
+
+                      readFileTime.add(System.nanoTime() - readStart);
                       readFileTimeNs.accept(System.nanoTime() - readStart);
                     }
                   }
@@ -373,11 +390,11 @@ public class FsBenchmark extends Configured implements Tool {
     // Verify that all threads completed without errors
     futures.forEach(Futures::getUnchecked);
 
-    printTimeStats("Read call time", readCallTimeNsList);
+    printTimeStats("Read call time", readCallTimeNsList, readCallTime);
     printSizeStats("Read call data", readCallBytesList);
     printThroughputStats("Read call throughput", readCallTimeNsList, readCallBytesList);
 
-    printTimeStats("Read file time", readFileTimeNsList);
+    printTimeStats("Read file time", readFileTimeNsList, readFileTime);
     printSizeStats("Read file data", readFileBytesList);
     printThroughputStats("Read file throughput", readFileTimeNsList, readFileBytesList);
 
@@ -429,10 +446,20 @@ public class FsBenchmark extends Configured implements Tool {
             + " operations in %d threads%n",
         readSize, testFile, numReads, numOpen, numThreads);
 
+    Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+
     Set<LongSummaryStatistics> openLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> seekLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> readLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> closeLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
+
+    // for all threads
+    ArrayList<Long> readFileTime = new ArrayList<>();
+    ArrayList<Long> openNs = new ArrayList<>();
+    ArrayList<Long> seekNs = new ArrayList<>();
+    ArrayList<Long> readNs = new ArrayList<>();
+    ArrayList<Long> closeNs = new ArrayList<>();
 
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
@@ -447,6 +474,9 @@ public class FsBenchmark extends Configured implements Tool {
                 long fileSize = fileStatus.getLen();
                 long maxReadPositionExclusive = fileSize - readSize + 1;
 
+                LongSummaryStatistics readFileBytes = newLongSummaryStatistics(readFileBytesList);
+                LongSummaryStatistics readFileTimeNs = newLongSummaryStatistics(readFileTimeNsList);
+
                 LongSummaryStatistics openLatencyNs = newLongSummaryStatistics(openLatencyNsList);
                 LongSummaryStatistics seekLatencyNs = newLongSummaryStatistics(seekLatencyNsList);
                 LongSummaryStatistics readLatencyNs = newLongSummaryStatistics(readLatencyNsList);
@@ -460,20 +490,32 @@ public class FsBenchmark extends Configured implements Tool {
                 try {
                   for (int j = 0; j < numOpen; j++) {
                     try {
+
                       long seekPos = random.nextLong(maxReadPositionExclusive);
 
                       long openStart = System.nanoTime();
                       FSDataInputStream input = fs.open(testFile);
+                      openNs.add(System.nanoTime() - openStart);
                       openLatencyNs.accept(System.nanoTime() - openStart);
+
                       try {
+                        long fileBytesRead = 0;
+                        long fileReadStart = System.nanoTime();
+
                         for (int k = 0; k < numReads; k++) {
                           long seekStart = System.nanoTime();
                           input.seek(seekPos);
+                          seekNs.add(System.nanoTime() - seekStart);
                           seekLatencyNs.accept(System.nanoTime() - seekStart);
 
                           long readStart = System.nanoTime();
                           int numRead = input.read(readBuffer);
+                          readNs.add(System.nanoTime() - readStart);
                           readLatencyNs.accept(System.nanoTime() - readStart);
+
+                          if (numRead > 0) {
+                            fileBytesRead += numRead;
+                          }
 
                           if (numRead != readSize) {
                             System.err.printf(
@@ -481,9 +523,15 @@ public class FsBenchmark extends Configured implements Tool {
                                 numRead, readSize, seekPos);
                           }
                         }
+
+                        readFileBytes.accept(fileBytesRead);
+                        readFileTime.add(System.nanoTime() - fileReadStart);
+                        readFileTimeNs.accept(System.nanoTime() - fileReadStart);
+
                       } finally {
                         long closeStart = System.nanoTime();
                         input.close();
+                        closeNs.add(System.nanoTime() - closeStart);
                         closeLatencyNs.accept(System.nanoTime() - closeStart);
                       }
                     } catch (Throwable e) {
@@ -509,13 +557,21 @@ public class FsBenchmark extends Configured implements Tool {
     // Verify that all threads completed without errors
     futures.forEach(Futures::getUnchecked);
 
-    printTimeStats("Open latency ", combineStats(openLatencyNsList));
-    printTimeStats("Seek latency ", combineStats(seekLatencyNsList));
-    printTimeStats("Read latency ", combineStats(readLatencyNsList));
-    printTimeStats("Close latency", combineStats(closeLatencyNsList));
+    printTimeStats("Open latency ", combineStats(openLatencyNsList), openNs);
+    printTimeStats("Seek latency ", combineStats(seekLatencyNsList), seekNs);
+    printTimeStats("Read latency ", combineStats(readLatencyNsList), readNs);
+    printTimeStats("Close latency", combineStats(closeLatencyNsList), closeNs);
+    printTimeStats("Read file time", readFileTimeNsList, readFileTime);
+    printSizeStats("Read file data", readFileBytesList);
+    printThroughputStats("Read file throughput", readFileTimeNsList, readFileBytesList);
+
     System.out.printf(
         "Average QPS: %.3f (%d in total %.3fs)%n",
         operations / runtimeSeconds, operations, runtimeSeconds);
+
+    System.out.printf(
+        "Read average throughput (MiB/s): %.3f%n",
+        bytesToMebibytes(combineStats(readFileBytesList).getSum()) / runtimeSeconds);
   }
 
   private static void warmup(Map<String, String> args, Runnable warmupFn) {
@@ -555,18 +611,24 @@ public class FsBenchmark extends Configured implements Tool {
     }
   }
 
-  private static void printTimeStats(String name, Collection<LongSummaryStatistics> timeStats) {
-    printTimeStats(name, combineStats(timeStats));
+  private static void printTimeStats(
+      String name, Collection<LongSummaryStatistics> timeStats, ArrayList<Long> value) {
+    printTimeStats(name, combineStats(timeStats), value);
   }
 
-  private static void printTimeStats(String name, LongSummaryStatistics timeStats) {
+  private static void printTimeStats(
+      String name, LongSummaryStatistics timeStats, ArrayList<Long> value) {
     System.out.printf(
-        "%s (ms): min=%.5f, average=%.5f, max=%.5f (count=%d)%n",
+        "%s (ms): min=%.5f, average=%.5f, max=%.5f, (count=%d) || p50=%.5f, p95=%.5f, p99=%.5f (count=%d)\n",
         name,
         nanosToMillis(timeStats.getMin()),
         nanosToMillis(timeStats.getAverage()),
         nanosToMillis(timeStats.getMax()),
-        timeStats.getCount());
+        timeStats.getCount(),
+        percentile(value, 50),
+        percentile(value, 95),
+        percentile(value, 99),
+        value.size());
   }
 
   private static void printSizeStats(String name, Collection<LongSummaryStatistics> sizeStats) {
@@ -607,6 +669,12 @@ public class FsBenchmark extends Configured implements Tool {
             LongSummaryStatistics::new,
             LongSummaryStatistics::combine,
             LongSummaryStatistics::combine);
+  }
+
+  public static double percentile(List<Long> values, int percentile) {
+    Collections.sort(values);
+    int index = (int) Math.ceil(percentile / 100.0 * values.size()) - 1;
+    return values.get(index) / 1_000_000.0;
   }
 
   private static double nanosToMillis(double nanos) {
