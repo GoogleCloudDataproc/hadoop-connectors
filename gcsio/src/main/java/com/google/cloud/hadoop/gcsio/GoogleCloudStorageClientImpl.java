@@ -193,11 +193,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    GoogleCloudStorageClientWriteChannel channel =
-        new GoogleCloudStorageClientWriteChannel(
-            storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
-    channel.initialize();
-    return channel;
+    return new GoogleCloudStorageClientWriteChannel(
+        storage, storageOptions, resourceIdWithGeneration, options);
   }
 
   /**
