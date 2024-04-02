@@ -247,7 +247,7 @@ public class FsBenchmark extends Configured implements Tool {
                         fileBytesWrite += writeSize;
                         writeCallBytes.accept(writeSize);
 
-                        writeFileTime.add(System.nanoTime() - writeCallStart);
+                        writeCallTime.add(System.nanoTime() - writeCallStart);
                         writeCallTimeNs.accept(System.nanoTime() - writeCallStart);
                       } while (fileBytesWrite < totalSize);
 
