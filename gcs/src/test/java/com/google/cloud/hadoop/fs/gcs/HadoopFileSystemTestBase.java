@@ -24,7 +24,6 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTE
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_TOTAL_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
@@ -885,8 +884,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       readStream.read(readbuffer, 0, 1);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(2);
-      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
-          .isEqualTo(2);
+
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
           .isEqualTo(2);
 
@@ -895,8 +893,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       readStream.read(2, readbuffer1, 0, 2);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(3);
-      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
-          .isEqualTo(4);
+
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
           .isEqualTo(4);
 

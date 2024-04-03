@@ -29,39 +29,4 @@ interface GhfsOutputStreamStatistics extends Closeable, GhfsStatisticInterface {
    * @param count number of bytes
    */
   void writeBytes(long count);
-
-  /**
-   * Get the current count of bytes written.
-   *
-   * @return the counter value.
-   */
-  long getBytesWritten();
-
-  /**
-   * Get the value of a counter.
-   *
-   * @param name counter name
-   * @return the value or null if no matching counter was found.
-   */
-  Long lookupCounterValue(String name);
-
-  /**
-   * Get the value of a gauge.
-   *
-   * @param name gauge name
-   * @return the value or null if no matching gauge was found.
-   */
-  Long lookupGaugeValue(String name);
-
-  /** An ignored stream write exception was received. */
-  void writeException();
-
-  /** The total number of stream write exception. */
-  long getWriteExceptions();
-
-  /** Syncable.hflush() has been invoked. */
-  void hflushInvoked();
-
-  /** Syncable.hsync() has been invoked. */
-  void hsyncInvoked();
 }
