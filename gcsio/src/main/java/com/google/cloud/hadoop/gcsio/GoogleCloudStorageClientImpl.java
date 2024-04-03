@@ -70,8 +70,10 @@ import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -107,7 +109,7 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
-
+  private static final String USER_AGENT = "user-agent";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -1263,9 +1265,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService)
       throws IOException {
+    final ImmutableMap<String, String> headers = getUpdatedHeadersWithUserAgent(storageOptions);
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
-        .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
+        .setHeaderProvider(() -> headers)
         .setGrpcInterceptorProvider(
             () -> {
               List<ClientInterceptor> list = new ArrayList<>();
@@ -1284,6 +1287,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .setProjectId(storageOptions.getProjectId())
         .build()
         .getService();
+  }
+
+  private static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
+      GoogleCloudStorageOptions storageOptions) {
+    ImmutableMap<String, String> httpRequestHeaders =
+        MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
+    String appName = storageOptions.getAppName();
+    if (!httpRequestHeaders.containsKey(USER_AGENT) && !Strings.isNullOrEmpty(appName)) {
+      logger.atFiner().log("Setting useragent %s", appName);
+      return ImmutableMap.<String, String>builder()
+          .putAll(httpRequestHeaders)
+          .put(USER_AGENT, appName)
+          .build();
+    }
+
+    return httpRequestHeaders;
   }
 
   private static BlobWriteSessionConfig getSessionConfig(
