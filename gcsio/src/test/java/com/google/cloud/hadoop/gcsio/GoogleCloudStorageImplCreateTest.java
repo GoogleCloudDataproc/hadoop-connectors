@@ -44,16 +44,11 @@ import com.google.cloud.storage.BlobWriteSession;
 import com.google.cloud.storage.Storage.BlobField;
 import com.google.cloud.storage.Storage.BlobGetOption;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -248,7 +243,7 @@ public class GoogleCloudStorageImplCreateTest {
         .thenReturn(
             new FakeWriteChannel() {
               @Override
-              public int write(ByteBuffer src) {
+              public void close() {
                 try {
                   writeStartedLatch.countDown();
                   waitForEverLatch.await();
@@ -258,7 +253,6 @@ public class GoogleCloudStorageImplCreateTest {
                   threadsDoneLatch.countDown();
                 }
                 fail("Unexpected to get here.");
-                return 0;
               }
             });
 
