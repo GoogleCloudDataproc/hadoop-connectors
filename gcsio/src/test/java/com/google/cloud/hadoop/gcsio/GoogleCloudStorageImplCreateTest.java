@@ -41,7 +41,6 @@ import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorRespons
 import com.google.cloud.storage.BlobWriteSession;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -241,7 +240,7 @@ public class GoogleCloudStorageImplCreateTest {
         .thenReturn(
             new CoopLockIntegrationTest.FakeWriteChannel() {
               @Override
-              public int write(ByteBuffer src) {
+              public void close() {
                 try {
                   writeStartedLatch.countDown();
                   waitForEverLatch.await();
@@ -251,7 +250,6 @@ public class GoogleCloudStorageImplCreateTest {
                   threadsDoneLatch.countDown();
                 }
                 fail("Unexpected to get here.");
-                return 0;
               }
             });
 
