@@ -343,8 +343,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
     WritableByteChannel writeChannel = gcs.create(resourceId);
-    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-    Exception e = assertThrows(IOException.class, writeChannel::close);
+    Exception e =
+        assertThrows(
+            StorageException.class, () -> writeChannel.write(ByteBuffer.wrap(bytesToWrite)));
     verifyPartFileInvalidArgument(e);
   }
 
