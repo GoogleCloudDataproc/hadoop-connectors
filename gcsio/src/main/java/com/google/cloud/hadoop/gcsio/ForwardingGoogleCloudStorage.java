@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
@@ -146,9 +147,19 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public boolean isHnBucket(URI src) throws IOException {
+    return delegate.isHnBucket(src);
+  }
+
+  @Override
   public List<String> listBucketNames() throws IOException {
     logger.atFiner().log("%s.listBucketNames()", delegateClassName);
     return delegate.listBucketNames();
+  }
+
+  @Override
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    delegate.renameHnFolder(src, dst);
   }
 
   @Override
