@@ -131,6 +131,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     verifyContent(buffer, startPosition, readBytes);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
 
     verifyNoMoreInteractions(fakeReadChannel);
@@ -162,6 +163,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(chunksToRead)).read(any());
 
     verifyNoMoreInteractions(fakeReadChannel);
@@ -186,6 +188,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).seek(anyLong());
     verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).limit(anyLong());
+    verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).setChunkSize(0);
     verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).close();
     // read will be called two times for every chunk
     // Content channel will be created with size of a CHUNK
@@ -224,6 +227,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).close();
     verify(fakeReadChannel, times(2)).read(any());
     verifyNoMoreInteractions(fakeReadChannel);
@@ -257,6 +261,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).close();
     verify(fakeReadChannel, times(2)).read(any());
     verifyNoMoreInteractions(fakeReadChannel);
@@ -278,6 +283,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     verifyContent(buffer, startPosition, bytesToRead);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
     // another request within the footer will not result into `read` and served via cache
@@ -350,6 +356,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     verifyContent(buffer, startPosition, bytesToRead);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
 
     buffer.clear();
     int seekPosition =
@@ -392,6 +399,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.close();
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
     verifyNoMoreInteractions(fakeReadChannel);
@@ -411,6 +419,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThrows(IOException.class, () -> readChannel.read(buffer));
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
     assertThat(buffer.position()).isEqualTo(partialByteRead);
@@ -439,6 +448,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.read(buffer);
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(2)).read(any());
     verify(fakeReadChannel, times(1)).close();
     assertThat(buffer.position()).isEqualTo(readBytes);

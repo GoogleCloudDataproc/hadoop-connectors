@@ -554,6 +554,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       try {
         readChannel.seek(seek);
         readChannel.limit(limit);
+        readChannel.setChunkSize(0);
         return readChannel;
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
