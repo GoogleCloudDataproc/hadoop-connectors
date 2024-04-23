@@ -1,6 +1,9 @@
 # Release Notes
 
 ## Next
+1. Upgrade java-storage to 2.37.0
+
+1. [Performance] Remove buffer copy in write path for gRPC
 
 ## 2.2.21 - 2024-03-15
 1. [Bug Fix] Set user agent in gRPC requests
