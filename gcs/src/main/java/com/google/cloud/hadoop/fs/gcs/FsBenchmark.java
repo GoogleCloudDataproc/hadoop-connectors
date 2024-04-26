@@ -434,6 +434,9 @@ public class FsBenchmark extends Configured implements Tool {
     Set<LongSummaryStatistics> readLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> closeLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
 
+    Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
     CountDownLatch startLatch = new CountDownLatch(1);
@@ -452,6 +455,8 @@ public class FsBenchmark extends Configured implements Tool {
                 LongSummaryStatistics readLatencyNs = newLongSummaryStatistics(readLatencyNsList);
                 LongSummaryStatistics closeLatencyNs = newLongSummaryStatistics(closeLatencyNsList);
 
+                LongSummaryStatistics readFileBytes = newLongSummaryStatistics(readFileBytesList);
+                LongSummaryStatistics readFileTimeNs = newLongSummaryStatistics(readFileTimeNsList);
                 ThreadLocalRandom random = ThreadLocalRandom.current();
                 byte[] readBuffer = new byte[readSize];
 
@@ -463,8 +468,11 @@ public class FsBenchmark extends Configured implements Tool {
                       long seekPos = random.nextLong(maxReadPositionExclusive);
 
                       long openStart = System.nanoTime();
+                      long fileBytesRead = 0;
                       FSDataInputStream input = fs.open(testFile);
                       openLatencyNs.accept(System.nanoTime() - openStart);
+                      long readFsStart = System.nanoTime();
+
                       try {
                         for (int k = 0; k < numReads; k++) {
                           long seekStart = System.nanoTime();
@@ -480,8 +488,12 @@ public class FsBenchmark extends Configured implements Tool {
                                 "Read %d bytes from %d bytes at offset %d!%n",
                                 numRead, readSize, seekPos);
                           }
+
+                          fileBytesRead += numRead;
                         }
                       } finally {
+                        readFileTimeNs.accept(System.nanoTime() - readFsStart);
+                        readFileBytes.accept(fileBytesRead);
                         long closeStart = System.nanoTime();
                         input.close();
                         closeLatencyNs.accept(System.nanoTime() - closeStart);
@@ -513,9 +525,16 @@ public class FsBenchmark extends Configured implements Tool {
     printTimeStats("Seek latency ", combineStats(seekLatencyNsList));
     printTimeStats("Read latency ", combineStats(readLatencyNsList));
     printTimeStats("Close latency", combineStats(closeLatencyNsList));
+
+    printThroughputStats("Read file throughput", readFileTimeNsList, readFileBytesList);
+
     System.out.printf(
         "Average QPS: %.3f (%d in total %.3fs)%n",
         operations / runtimeSeconds, operations, runtimeSeconds);
+
+    System.out.printf(
+        "Read average throughput (MiB/s): %.3f%n",
+        bytesToMebibytes(combineStats(readFileBytesList).getSum()) / runtimeSeconds);
   }
 
   private static void warmup(Map<String, String> args, Runnable warmupFn) {
