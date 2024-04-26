@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.22 - 2024-04-26
 1. Upgrade java-storage to 2.37.0
 
