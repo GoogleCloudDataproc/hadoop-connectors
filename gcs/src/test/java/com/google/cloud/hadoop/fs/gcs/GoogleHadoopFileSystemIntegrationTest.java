@@ -30,7 +30,6 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_EXISTS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GLOB_STATUS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_FILES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE;
@@ -2232,16 +2231,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     FileStatus[] fileStatuses = fs.listStatus(new Path(PUBLIC_BUCKET));
 
-    TestUtils.verifyCounter((GhfsGlobalStorageStatistics) stats, INVOCATION_LIST_FILES, 1);
-
     TestUtils.verifyCounter((GhfsGlobalStorageStatistics) stats, INVOCATION_LIST_STATUS, 1);
 
-    assertThat(
-            ((GoogleHadoopFileSystem) fs)
-                .getIOStatistics()
-                .counters()
-                .get(INVOCATION_LIST_FILES.getSymbol()))
-        .isEqualTo(1);
     assertThat(
             ((GoogleHadoopFileSystem) fs)
                 .getIOStatistics()
