@@ -108,6 +108,13 @@ public class GoogleCloudStorageFileSystem {
   public static final ListFileOptions DELETE_RENAME_LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name,generation").build();
 
+  public static final ListFolderOptions GET_FOLDER_INFO_LIST_OPTIONS =
+      ListFolderOptions.DEFAULT_FOLDER_LIST
+          .toBuilder()
+          .setMaxResults(1)
+          .setFields("bucket,id,kind,name")
+          .build();
+
   // GCS access instance.
   private GoogleCloudStorage gcs;
 
@@ -393,6 +400,8 @@ public class GoogleCloudStorageFileSystem {
             : Optional.empty();
     coopLockOp.ifPresent(CoopLockOperationDelete::lock);
 
+    boolean isHnBucket = gcs.isHnBucket(path);
+    List<FolderInfo> listOfFolders = null;
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
     if (fileInfo.isDirectory()) {
@@ -404,10 +413,59 @@ public class GoogleCloudStorageFileSystem {
               : listFileInfoForPrefixPage(
                       fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
                   .getItems();
-      if (!itemsToDelete.isEmpty() && !recursive) {
+
+      if (isHnBucket) {
+        /**
+         * Get list of folders in path if the bucket is HN enabled bucket For recursive delete, get
+         * all folder resources. For non-recursive delete, only get maximum of 1 folder resources
+         * other than the path.
+         */
+        listOfFolders =
+            recursive
+                ? listFoldersInfoForPrefixPage(
+                        fileInfo.getPath(),
+                        ListFolderOptions.DEFAULT_FOLDER_LIST,
+                        /* pageToken= */ null)
+                    .getItems()
+                : listFoldersInfoForPrefixPage(
+                        fileInfo.getPath(), GET_FOLDER_INFO_LIST_OPTIONS, /* pageToken= */ null)
+                    .getItems();
+      }
+
+      /**
+       * If the Bucket is not HN enabled, following conditions should statisfy for non-recursive
+       * delete
+       *
+       * <ul>
+       *   <li>1. Delete operation should be non-recursive by user
+       *   <li>2. If directory, then it should not have any objects other than itself
+       *   <li>3. If bucket, it should not have any objects
+       * </ul>
+       *
+       * <p>If the Bucket is HN enabled, following conditions should statisfy for non-recursive
+       * delete <br>
+       * <li>1. If Directory, then :
+       *
+       *     <ul>
+       *       <li>A. The directory should not have any object other than itself
+       *       <li>B. The directory should not have any folder resources other than itself.
+       *     </ul>
+       *
+       * <li>2. If Bucket, then :
+       *
+       *     <ul>
+       *       <li>A. Bucket should be empty, ie, no objects
+       *       <li>B. Bucket should not have any folder resource
+       *     </ul>
+       *
+       * </ul>
+       */
+      if ((!itemsToDelete.isEmpty() && !recursive)
+          && (isHnBucket ? !checkNonRecursiveFolderDelete(fileInfo, listOfFolders) : true)) {
         GoogleCloudStorageEventBus.postOnException();
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
+
     } else {
       itemsToDelete = new ArrayList<>();
     }
@@ -419,12 +477,65 @@ public class GoogleCloudStorageFileSystem {
     try {
       deleteInternal(itemsToDelete, bucketsToDelete);
 
+      if (isHnBucket) {
+        deleteFolders(listOfFolders);
+      }
+
       coopLockOp.ifPresent(CoopLockOperationDelete::unlock);
     } finally {
       coopLockOp.ifPresent(CoopLockOperationDelete::cancelRenewal);
     }
 
     repairImplicitDirectory(parentInfoFuture);
+  }
+
+  /**
+   * Helper function to determine if the list of folder resources are eligible for non-recursive
+   * delete operation
+   *
+   * @param fileInfo info about the path
+   * @param listOfFolders
+   * @return boolean value, true denoted that directory can be deleted non-recursively else false
+   */
+  private boolean checkNonRecursiveFolderDelete(FileInfo fileInfo, List<FolderInfo> listOfFolders) {
+    if (!fileInfo.isDirectory()) return false;
+
+    // If a bucket
+    if (fileInfo.getItemInfo().isBucket()) return listOfFolders.size() == 0;
+
+    // If a directory
+    return listOfFolders.size() == 1;
+  }
+
+  /**
+   * Returns the list of folder resources in the prefix. It lists either all the folder resources or
+   * lists at max of 1 folder resource other than prefix
+   *
+   * @param prefix the prefix to use to list all matching folder resources.
+   * @param pageToken the page token to list
+   * @param listFolderOptions the page token to list
+   */
+  public ListPage<FolderInfo> listFoldersInfoForPrefixPage(
+      URI prefix, ListFolderOptions listFolderOptions, String pageToken) throws IOException {
+    logger.atFiner().log(
+        "listFoldersInfoForPrefixPage(prefix: %s, pageToken:%s)", prefix, pageToken);
+    StorageResourceId prefixId = getPrefixId(prefix);
+    ListPage<FolderInfo> itemInfosPage =
+        gcs.listFolderInfoForPrefixPage(
+            prefixId.getBucketName(), prefixId.getObjectName(), listFolderOptions, pageToken);
+    return itemInfosPage;
+  }
+
+  /**
+   * Deletes the folder resources given
+   *
+   * @param listOfFolders to delete
+   * @throws IOException
+   */
+  private void deleteFolders(List<FolderInfo> listOfFolders) throws IOException {
+    logger.atFiner().log(
+        "deleteFolder(listOfFolders: %s, size:%s)", listOfFolders, listOfFolders.size());
+    gcs.deleteFolders(listOfFolders);
   }
 
   /** Deletes all items in the given path list followed by all bucket items. */

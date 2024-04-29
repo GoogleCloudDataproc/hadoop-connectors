@@ -1509,6 +1509,57 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertThat(ghfs.exists(dest)).isTrue();
   }
 
+  @Test
+  public void testHnBucketDeleteOperation() throws Exception {
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+
+    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
+
+    URI initUri = new URI("gs://" + bucketName);
+    Configuration config = loadConfig();
+    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
+    googleHadoopFileSystem.initialize(initUri, config);
+
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(
+        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    assertThat(theGcs.isHnBucket(new Path(initUri.toString() + "/").toUri())).isTrue();
+
+    try {
+
+      googleHadoopFileSystem.mkdirs(new Path("A/"));
+      createDir(googleHadoopFileSystem, new Path("A/1"));
+      createDir(googleHadoopFileSystem, new Path("A/2"));
+
+      googleHadoopFileSystem.mkdirs(new Path("C/"));
+      createDir(googleHadoopFileSystem, new Path("C/1"));
+      createDir(googleHadoopFileSystem, new Path("C/2"));
+      createDir(googleHadoopFileSystem, new Path("6"));
+
+      // rename A/ to B/
+      googleHadoopFileSystem.rename(
+          new Path("gs://" + bucketName + "/A/"), new Path("gs://" + bucketName + "/B/"));
+
+      // delete B/
+      googleHadoopFileSystem.delete(new Path("/B/"), true);
+
+      // rename C/ to B/
+      googleHadoopFileSystem.rename(
+          new Path("gs://" + bucketName + "/C/"), new Path("gs://" + bucketName + "/B/"));
+
+    } finally {
+      googleHadoopFileSystem.delete(new Path(initUri));
+    }
+  }
+
+  private void createDir(GoogleHadoopFileSystem googleHadoopFileSystem, Path path)
+      throws Exception {
+    FSDataOutputStream fout = googleHadoopFileSystem.create(path);
+    fout.writeBytes("data");
+    fout.close();
+  }
+
   private void checkMetric(
       String name, StorageStatistics statistics, HashSet<String> metricNames, String statsString) {
     assertThat(metricNames.contains(name)).isTrue();

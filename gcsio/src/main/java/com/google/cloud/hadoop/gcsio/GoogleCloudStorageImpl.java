@@ -53,6 +53,7 @@ import com.google.api.services.storage.model.Bucket.Lifecycle.Rule.Action;
 import com.google.api.services.storage.model.Bucket.Lifecycle.Rule.Condition;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.ComposeRequest;
+import com.google.api.services.storage.model.Folder;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
@@ -95,6 +96,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -104,6 +106,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
@@ -160,6 +163,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "md5Hash",
           "crc32c",
           "metadata");
+
+  // Folder Fields
+  static final String FOLDER_FIELDS =
+      String.join(/* delimiter =*/ ",", "bucket", "id", "kind", "name");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
@@ -922,6 +929,147 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
+  }
+
+  /** See {@link GoogleCloudStorage#deleteFolders(List)} for details about expected behavior. */
+  @Override
+  public void deleteFolders(List<FolderInfo> folders) throws IOException {
+    logger.atFiner().log("deleteFolders(%s)", folders);
+
+    if (folders.isEmpty()) {
+      return;
+    }
+
+    // Gather exceptions to wrap in a composite exception at the end.
+    final KeySetView<IOException, Boolean> innerExceptions = ConcurrentHashMap.newKeySet();
+    String traceContext = String.format("batchFolderDelete(size=%s)", folders.size());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      BatchHelper batchHelper =
+          batchFactory.newBatchHelper(
+              httpRequestInitializer,
+              storage,
+              storageOptions.getMaxRequestsPerBatch(),
+              folders.size(),
+              storageOptions.getBatchThreads(),
+              "batchFolderDelete");
+
+      // Map to store number of occurrence of each parent Folder name
+      HashMap<String, Long> occurenceOfFolder = new HashMap<>();
+
+      // inserting each folder name
+      for (FolderInfo currentFolder : folders) {
+        occurenceOfFolder.put(currentFolder.getFolderName(), 0L);
+      }
+
+      // Mapping each parent folder name to number of its occurrence.
+      for (FolderInfo currentFolder : folders) {
+        String parent = currentFolder.getParentFolderName();
+
+        if (parent != null) {
+          occurenceOfFolder.computeIfPresent(parent, (key, value) -> value + 1);
+        }
+      }
+
+      Queue<FolderInfo> queueForFolderDeletion = new ArrayDeque<>();
+
+      for (FolderInfo currentFolder : folders) {
+        if (occurenceOfFolder.get(currentFolder.getFolderName()) == 0L) {
+          queueForFolderDeletion.offer(currentFolder);
+        }
+      }
+
+      while (!queueForFolderDeletion.isEmpty()) {
+        long sizeOfQueue = queueForFolderDeletion.size();
+        CountDownLatch latch = new CountDownLatch(1);
+        try {
+          for (long i = 0; i < sizeOfQueue; i++) {
+            FolderInfo folderToDelete = queueForFolderDeletion.poll();
+
+            // send deletion of this folder to a batch of threads.
+            queueSingleFolderDelete(folderToDelete, innerExceptions, batchHelper, 1);
+
+            // update the parent by reducing the number of children by 1
+            String parent = folderToDelete.getParentFolderName();
+            occurenceOfFolder.computeIfPresent(parent, (key, value) -> value - 1);
+
+            // if the parent folder is now empty, append in the queue
+            if (parent != null
+                && occurenceOfFolder.containsKey(parent)
+                && occurenceOfFolder.get(parent) == 0) {
+              queueForFolderDeletion.add(new FolderInfo(folderToDelete.getBucket(), parent));
+            }
+          }
+          latch.countDown(); // Signal completion after all deletions in the batch
+          latch.await(); // This ensures that the outer loop waits for all inner loop operations to
+          // complete before proceeding
+
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      batchHelper.flush();
+    }
+    if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  /** Helper function to delete a single folder resource */
+  private void queueSingleFolderDelete(
+      final FolderInfo folder,
+      final KeySetView<IOException, Boolean> innerExceptions,
+      final BatchHelper batchHelper,
+      final int attempt)
+      throws IOException {
+
+    final String bucketName = folder.getBucket();
+    final String folderName = folder.getFolderName();
+
+    Storage.Folders.Delete deleteFolder =
+        initializeRequest(storage.folders().delete(bucketName, folderName), bucketName);
+
+    batchHelper.queue(
+        deleteFolder, getDeletionCallback(folder, innerExceptions, batchHelper, attempt));
+  }
+
+  /** Helper to create a callback for a particular deletion request for folder. */
+  private JsonBatchCallback<Void> getDeletionCallback(
+      final FolderInfo resourceId,
+      final KeySetView<IOException, Boolean> innerExceptions,
+      final BatchHelper batchHelper,
+      final int attempt) {
+    return new JsonBatchCallback<Void>() {
+      @Override
+      public void onSuccess(Void obj, HttpHeaders responseHeaders) {
+        logger.atFiner().log("Successfully deleted folder %s", resourceId);
+      }
+
+      @Override
+      public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders)
+          throws IOException {
+        GoogleJsonResponseException cause = createJsonResponseException(jsonError, responseHeaders);
+        if (errorExtractor.itemNotFound(cause)) {
+          // Ignore item-not-found errors. We do not have to delete what we cannot find.
+          // This
+          // error typically shows up when we make a request to delete something and the
+          // server
+          // receives the request but we get a retry-able error before we get a response.
+          // During a retry, we no longer find the item because the server had deleted
+          // it already.
+          logger.atFiner().log("Delete folder '%s' not found:%n%s", resourceId, jsonError);
+        } else if (errorExtractor.preconditionNotMet(cause)
+            && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
+          logger.atInfo().log(
+              "Precondition not met while deleting '%s'. Attempt %s." + " Retrying:%n%s",
+              resourceId, attempt, jsonError);
+          queueSingleFolderDelete(resourceId, innerExceptions, batchHelper, attempt + 1);
+        } else {
+          innerExceptions.add(
+              new IOException(String.format("Error deleting '%s', stage 2", resourceId), cause));
+        }
+      }
+    };
   }
 
   /** Helper to create a callback for a particular deletion request. */
@@ -1716,6 +1864,116 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         getGoogleCloudStorageItemInfos(
             bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
     return new ListPage<>(objectInfos, nextPageToken);
+  }
+
+  /**
+   * @see GoogleCloudStorage#listFolderInfoForPrefixPage(String, String, ListFolderOptions, String)
+   */
+  @Override
+  public ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String objectNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
+      throws IOException {
+
+    logger.atFiner().log(
+        "listFolderInfoPage(%s, %s, %s, %s)",
+        bucketName, objectNamePrefix, listFolderOptions, pageToken);
+
+    Storage.Folders.List listFolders =
+        createFolderListRequest(
+            bucketName,
+            objectNamePrefix,
+            listFolderOptions.getFields(),
+            listFolderOptions.getDelimiter(),
+            listFolderOptions.getMaxResults());
+
+    if (pageToken != null) {
+      logger.atFiner().log("listFolderInfoPage: next page %s", pageToken);
+      listFolders.setPageToken(pageToken);
+    }
+
+    List<FolderInfo> listedFolders = new ArrayList<>();
+
+    /* If we only want to check if there is folder resource inside a path, we get only single page list of folder resources, else we get the entire list of folder resource available in the path*/
+    String nextPageToken = listStorageFoldersAndPrefixesPage(listFolders, listedFolders, pageToken);
+    if (listFolderOptions.getMaxResults() != MAX_RESULTS_UNLIMITED) {
+      return new ListPage<>(listedFolders, nextPageToken);
+    }
+
+    while (nextPageToken != null) {
+      nextPageToken = listStorageFoldersAndPrefixesPage(listFolders, listedFolders, nextPageToken);
+    }
+
+    return new ListPage<>(listedFolders, nextPageToken);
+  }
+
+  private Storage.Folders.List createFolderListRequest(
+      String bucketName,
+      String objectNamePrefix,
+      String folderFields,
+      String delimiter,
+      long maxResults)
+      throws IOException {
+
+    logger.atFiner().log(
+        "createListFolderRequest(%s, %s, %s, %d)",
+        bucketName, objectNamePrefix, delimiter, maxResults);
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+
+    Storage.Folders.List listFolders =
+        initializeRequest(
+            storage.folders().list(bucketName).setPrefix(emptyToNull(objectNamePrefix)),
+            bucketName);
+
+    if (delimiter != null) {
+      listFolders.setDelimiter(delimiter);
+    }
+
+    // Set number of items to retrieve per page
+    listFolders.setPageSize(
+        (int)
+            (maxResults == MAX_RESULTS_UNLIMITED
+                ? storageOptions.getMaxListItemsPerCall()
+                : maxResults + 1));
+
+    return listFolders;
+  }
+
+  private String listStorageFoldersAndPrefixesPage(
+      Storage.Folders.List listFolders, List<FolderInfo> listedFolders, String pageToken)
+      throws IOException {
+    checkNotNull(listedFolders, "Must provide a non-null container for listedFolders.");
+
+    listFolders.setPageToken(pageToken);
+
+    com.google.api.services.storage.model.Folders items;
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.list")) {
+      items = listFolders.execute();
+      op.annotate("resultSize", items == null ? 0 : items.size());
+    } catch (IOException e) {
+      String resource =
+          StringPaths.fromComponents(listFolders.getBucket(), listFolders.getPrefix());
+
+      if (errorExtractor.itemNotFound(e)) {
+        logger.atFiner().withCause(e).log(
+            "listStorageFoldersAndPrefixesPage(%s, %s): item not found", resource, listFolders);
+        return null;
+      }
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException("Error listing " + resource, e);
+    }
+    List<com.google.api.services.storage.model.Folder> folders = items.getItems();
+    if (folders != null) {
+      logger.atFiner().log("listFolders(%s): listed %d objects", listFolders, folders.size());
+
+      for (Folder currentFolder : folders) {
+        listedFolders.add(new FolderInfo(currentFolder));
+      }
+    }
+
+    return items.getNextPageToken();
   }
 
   private List<GoogleCloudStorageItemInfo> getGoogleCloudStorageItemInfos(
