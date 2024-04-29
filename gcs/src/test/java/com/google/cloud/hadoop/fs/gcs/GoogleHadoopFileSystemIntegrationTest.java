@@ -1529,13 +1529,17 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     try {
 
       googleHadoopFileSystem.mkdirs(new Path("A/"));
-      createDir(googleHadoopFileSystem, new Path("A/1"));
-      createDir(googleHadoopFileSystem, new Path("A/2"));
+      googleHadoopFileSystem.mkdirs(new Path("A/dir1/"));
+      googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
+      googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
+
+      createFile(googleHadoopFileSystem, new Path("A/1"));
+      createFile(googleHadoopFileSystem, new Path("A/2"));
 
       googleHadoopFileSystem.mkdirs(new Path("C/"));
-      createDir(googleHadoopFileSystem, new Path("C/1"));
-      createDir(googleHadoopFileSystem, new Path("C/2"));
-      createDir(googleHadoopFileSystem, new Path("6"));
+      createFile(googleHadoopFileSystem, new Path("C/1"));
+      createFile(googleHadoopFileSystem, new Path("C/2"));
+      createFile(googleHadoopFileSystem, new Path("6"));
 
       // rename A/ to B/
       googleHadoopFileSystem.rename(
@@ -1553,7 +1557,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     }
   }
 
-  private void createDir(GoogleHadoopFileSystem googleHadoopFileSystem, Path path)
+  private void createFile(GoogleHadoopFileSystem googleHadoopFileSystem, Path path)
       throws Exception {
     FSDataOutputStream fout = googleHadoopFileSystem.create(path);
     fout.writeBytes("data");
