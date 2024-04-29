@@ -71,7 +71,7 @@ public enum GhfsStatistic {
   INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION),
   INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER),
   INVOCATION_GET_FILE_STATUS(
-      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
+      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_DURATION),
   INVOCATION_GET_FILE_CHECKSUM(
       StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
 
@@ -81,8 +81,8 @@ public enum GhfsStatistic {
       StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_DURATION),
   INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION),
   INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION),
-  INVOCATION_LIST_FILES(StoreStatisticNames.OP_LIST_FILES, "Calls of listFiles()", TYPE_COUNTER),
-  INVOCATION_LIST_STATUS(StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_COUNTER),
+  INVOCATION_LIST_STATUS(
+      StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_DURATION),
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION),
