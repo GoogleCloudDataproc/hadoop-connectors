@@ -400,7 +400,8 @@ public class GoogleCloudStorageFileSystem {
             : Optional.empty();
     coopLockOp.ifPresent(CoopLockOperationDelete::lock);
 
-    boolean isHnBucket = gcs.isHnBucket(path);
+    boolean isHnBucket =
+        (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
     List<FolderInfo> listOfFolders = null;
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
