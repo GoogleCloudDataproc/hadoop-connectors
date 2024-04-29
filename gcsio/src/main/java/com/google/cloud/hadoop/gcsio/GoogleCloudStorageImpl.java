@@ -116,6 +116,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
@@ -980,34 +981,47 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       while (!queueForFolderDeletion.isEmpty()) {
         long sizeOfQueue = queueForFolderDeletion.size();
-        CountDownLatch latch = new CountDownLatch(1);
+
         try {
+          ExecutorService WORKER_THREAD_POOL = Executors.newFixedThreadPool((int) sizeOfQueue);
+          CountDownLatch latch = new CountDownLatch((int) sizeOfQueue);
+
           for (long i = 0; i < sizeOfQueue; i++) {
-            FolderInfo folderToDelete = queueForFolderDeletion.poll();
+            WORKER_THREAD_POOL.submit(
+                () -> {
+                  FolderInfo folderToDelete = queueForFolderDeletion.poll();
 
-            // send deletion of this folder to a batch of threads.
-            queueSingleFolderDelete(folderToDelete, innerExceptions, batchHelper, 1);
+                  try {
 
-            // update the parent by reducing the number of children by 1
-            String parent = folderToDelete.getParentFolderName();
-            occurenceOfFolder.computeIfPresent(parent, (key, value) -> value - 1);
+                    if (
+                    // send deletion of this folder to a batch of threads.
+                    queueSingleFolderDelete(folderToDelete, innerExceptions, batchHelper, 1)) {
+                      latch.countDown(); // Signals completion of this thread
+                    }
 
-            // if the parent folder is now empty, append in the queue
-            if (parent != null
-                && occurenceOfFolder.containsKey(parent)
-                && occurenceOfFolder.get(parent) == 0) {
-              queueForFolderDeletion.add(new FolderInfo(folderToDelete.getBucket(), parent));
-            }
+                  } catch (IOException e) {
+                    throw new RuntimeException(e);
+                  }
+
+                  // update the parent by reducing the number of children by 1
+                  String parent = folderToDelete.getParentFolderName();
+                  occurenceOfFolder.computeIfPresent(parent, (key, value) -> value - 1);
+
+                  // if the parent folder is now empty, append in the queue
+                  if (parent != null
+                      && occurenceOfFolder.containsKey(parent)
+                      && occurenceOfFolder.get(parent) == 0) {
+                    queueForFolderDeletion.add(new FolderInfo(folderToDelete.getBucket(), parent));
+                  }
+                });
           }
-          latch.countDown(); // Signal completion after all deletions in the batch
-          latch.await(); // This ensures that the outer loop waits for all inner loop operations to
-          // complete before proceeding
 
+          latch.await(); // This ensures that the children are always deleted before parent.
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
         }
+        batchHelper.flush();
       }
-      batchHelper.flush();
     }
     if (!innerExceptions.isEmpty()) {
       GoogleCloudStorageEventBus.postOnException();
@@ -1016,7 +1030,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /** Helper function to delete a single folder resource */
-  private void queueSingleFolderDelete(
+  private boolean queueSingleFolderDelete(
       final FolderInfo folder,
       final KeySetView<IOException, Boolean> innerExceptions,
       final BatchHelper batchHelper,
@@ -1029,20 +1043,25 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Storage.Folders.Delete deleteFolder =
         initializeRequest(storage.folders().delete(bucketName, folderName), bucketName);
 
+    AtomicBoolean success = new AtomicBoolean(false);
     batchHelper.queue(
-        deleteFolder, getDeletionCallback(folder, innerExceptions, batchHelper, attempt));
+        deleteFolder, getDeletionCallback(folder, innerExceptions, success, batchHelper, attempt));
+
+    return success.get();
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
   private JsonBatchCallback<Void> getDeletionCallback(
       final FolderInfo resourceId,
       final KeySetView<IOException, Boolean> innerExceptions,
+      final AtomicBoolean success,
       final BatchHelper batchHelper,
       final int attempt) {
     return new JsonBatchCallback<Void>() {
       @Override
       public void onSuccess(Void obj, HttpHeaders responseHeaders) {
         logger.atFiner().log("Successfully deleted folder %s", resourceId);
+        success.set(true);
       }
 
       @Override
@@ -1058,6 +1077,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           // During a retry, we no longer find the item because the server had deleted
           // it already.
           logger.atFiner().log("Delete folder '%s' not found:%n%s", resourceId, jsonError);
+          success.set(true);
         } else if (errorExtractor.preconditionNotMet(cause)
             && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
           logger.atInfo().log(
@@ -1065,6 +1085,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               resourceId, attempt, jsonError);
           queueSingleFolderDelete(resourceId, innerExceptions, batchHelper, attempt + 1);
         } else {
+          success.set(false);
           innerExceptions.add(
               new IOException(String.format("Error deleting '%s', stage 2", resourceId), cause));
         }
