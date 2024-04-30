@@ -72,12 +72,15 @@ public abstract class GoogleCloudStorageOptions {
         .setTraceLogEnabled(false)
         .setOperationTraceLogEnabled(false)
         .setTrafficDirectorEnabled(true)
-        .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT);
+        .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
+        .setHnBucketRenameEnabled(false);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isGrpcEnabled();
+
+  public abstract boolean isHnBucketRenameEnabled();
 
   public abstract String getGrpcServerAddress();
 
@@ -233,6 +236,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setTraceLogEnabled(Boolean enable);
 
     public abstract Builder setOperationTraceLogEnabled(Boolean enable);
+
+    public abstract Builder setHnBucketRenameEnabled(boolean enabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
