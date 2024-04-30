@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
@@ -270,8 +271,28 @@ public interface GoogleCloudStorage {
     copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
   }
 
+  /**
+   * Checks if {@code resourceId} belongs to a Hierarchical namespace enabled bucket. This takes a
+   * path and not the bucket name since the caller may not have permission to query the bucket.
+   *
+   * @param path Path for which the check need to be performed
+   * @return
+   * @throws IOException
+   */
+  boolean isHnBucket(URI path) throws IOException;
+
   /** Gets a list of names of buckets in this project. */
   List<String> listBucketNames() throws IOException;
+
+  /**
+   * Renames {@code src} to {@code dst} using the rename LRO API. This should be called only on an
+   * Hierarchical namespace enabled bucket.
+   *
+   * @param src source path
+   * @param dst destination path
+   * @throws IOException
+   */
+  void renameHnFolder(URI src, URI dst) throws IOException;
 
   /**
    * Gets a list of GoogleCloudStorageItemInfo for all buckets of this project. This is no more
