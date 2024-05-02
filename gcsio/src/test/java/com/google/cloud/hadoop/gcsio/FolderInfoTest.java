@@ -28,9 +28,8 @@ public class FolderInfoTest {
   private final String FOLDER_NAME = "test-parent-folder/test-folder-name/";
 
   @Test
-  public void checkForRootFolder() throws Exception {
+  public void checkForRootFolder() {
     FolderInfo rootFolderInfo = new FolderInfo(new Folder().setBucket(null).setName(null));
-
     assertThat(rootFolderInfo.getBucket()).isEqualTo(null);
     assertThat(rootFolderInfo.getFolderName()).isEqualTo(null);
     assertThat(rootFolderInfo.isBucket()).isFalse();
@@ -38,9 +37,8 @@ public class FolderInfoTest {
   }
 
   @Test
-  public void checkForBucket() throws Exception {
+  public void checkForBucket() {
     FolderInfo bucketFolderInfo = new FolderInfo(new Folder().setBucket(BUCKET_NAME).setName(null));
-
     assertThat(bucketFolderInfo.getBucket()).isEqualTo(BUCKET_NAME);
     assertThat(bucketFolderInfo.getFolderName()).isEqualTo(null);
     assertThat(bucketFolderInfo.isBucket()).isTrue();
@@ -48,7 +46,7 @@ public class FolderInfoTest {
   }
 
   @Test
-  public void checkForFolder() throws Exception {
+  public void checkForFolder() {
     FolderInfo testFolderInfo =
         new FolderInfo(new Folder().setBucket(BUCKET_NAME).setName(FOLDER_NAME));
     assertThat(testFolderInfo.getBucket()).isEqualTo(BUCKET_NAME);

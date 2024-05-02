@@ -29,6 +29,7 @@ import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.services.storage.model.Folder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
@@ -56,6 +57,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -107,13 +109,6 @@ public class GoogleCloudStorageFileSystem {
 
   public static final ListFileOptions DELETE_RENAME_LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name,generation").build();
-
-  public static final ListFolderOptions GET_FOLDER_INFO_LIST_OPTIONS =
-      ListFolderOptions.DEFAULT_FOLDER_LIST
-          .toBuilder()
-          .setMaxResults(1)
-          .setFields("bucket,id,kind,name")
-          .build();
 
   // GCS access instance.
   private GoogleCloudStorage gcs;
@@ -417,6 +412,7 @@ public class GoogleCloudStorageFileSystem {
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
+
         /**
          * Get list of folders in path if the bucket is HN enabled bucket For recursive delete, get
          * all folder resources. For non-recursive delete, only get maximum of 1 folder resources
@@ -429,14 +425,14 @@ public class GoogleCloudStorageFileSystem {
                         ListFolderOptions.DEFAULT_FOLDER_LIST,
                         /* pageToken= */ null)
                     .getItems()
-                : listFoldersInfoForPrefixPage(
-                        fileInfo.getPath(), GET_FOLDER_INFO_LIST_OPTIONS, /* pageToken= */ null)
-                    .getItems();
+                : Arrays.asList(
+                    new FolderInfo(
+                        new Folder().setBucket(getBucketName(path)).setName(getFolderName(path))));
       }
 
       /**
        * If the Bucket is HN enabled, following conditions should statisfy for non-recursive delete
-       * <br>
+       * else exception is thrown <br>
        * <li>1. If Directory, then :
        *
        *     <ul>
@@ -453,8 +449,7 @@ public class GoogleCloudStorageFileSystem {
        *
        * </ul>
        */
-      if ((!itemsToDelete.isEmpty() && !recursive)
-          && (isHnBucket ? !checkNonRecursiveFolderDelete(fileInfo, listOfFolders) : true)) {
+      if ((!itemsToDelete.isEmpty() && !recursive)) {
         GoogleCloudStorageEventBus.postOnException();
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
@@ -473,7 +468,6 @@ public class GoogleCloudStorageFileSystem {
       if (isHnBucket) {
         deleteFolders(listOfFolders);
       }
-
       coopLockOp.ifPresent(CoopLockOperationDelete::unlock);
     } finally {
       coopLockOp.ifPresent(CoopLockOperationDelete::cancelRenewal);
@@ -482,22 +476,15 @@ public class GoogleCloudStorageFileSystem {
     repairImplicitDirectory(parentInfoFuture);
   }
 
-  /**
-   * Helper function to determine if the list of folder resources are eligible for non-recursive
-   * delete operation
-   *
-   * @param fileInfo info about the path
-   * @param listOfFolders
-   * @return boolean value, true denoted that directory can be deleted non-recursively else false
-   */
-  private boolean checkNonRecursiveFolderDelete(FileInfo fileInfo, List<FolderInfo> listOfFolders) {
-    if (!fileInfo.isDirectory()) return false;
+  private String getBucketName(URI path) {
+    if (path.toString() == null || path.toString() == "") return "";
+    int ind = path.toString().replace("gs://", "").indexOf("/");
+    return path.toString().replace("gs://", "").substring(0, ind);
+  }
 
-    // If a bucket
-    if (fileInfo.getItemInfo().isBucket()) return listOfFolders.size() == 0;
-
-    // If a directory
-    return listOfFolders.size() == 1;
+  private String getFolderName(URI path) {
+    if (path.getPath() == null || path.getPath() == "") return "";
+    return path.getPath().substring(path.getPath().indexOf("/") + 1);
   }
 
   /**

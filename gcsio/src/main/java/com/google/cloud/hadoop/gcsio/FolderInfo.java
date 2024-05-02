@@ -32,14 +32,7 @@ public class FolderInfo {
    */
   public FolderInfo(Folder folder) {
     this.bucket = folder.getBucket();
-
-    // Construct the path once.
     this.folderName = folder.getName();
-  }
-
-  public FolderInfo(String bucket, String folderName) {
-    this.bucket = bucket;
-    this.folderName = folderName;
   }
 
   /** Gets the path of this file or directory. */
