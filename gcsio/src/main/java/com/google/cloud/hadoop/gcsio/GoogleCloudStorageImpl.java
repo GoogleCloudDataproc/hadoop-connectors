@@ -164,10 +164,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "crc32c",
           "metadata");
 
-  // Folder Fields
-  static final String FOLDER_FIELDS =
-      String.join(/* delimiter =*/ ",", "bucket", "id", "kind", "name");
-
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   private final MetricsRecorder metricsRecorder;
@@ -934,7 +930,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** See {@link GoogleCloudStorage#deleteFolders(List)} for details about expected behavior. */
   @Override
   public void deleteFolders(List<FolderInfo> folders) throws IOException {
-    logger.atFiner().log("deleteFolders(%s)", folders);
 
     if (folders.isEmpty()) {
       return;
@@ -945,21 +940,22 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String traceContext = String.format("batchFolderDelete(size=%s)", folders.size());
     try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
 
-      // Map to store number of occurrence of each parent Folder name
+      // Map to store number of children for each parent object
       HashMap<String, Long> occurenceOfFolder = new HashMap<>();
 
-      // inserting each folder name
       for (FolderInfo currentFolder : folders) {
-        occurenceOfFolder.put(currentFolder.getFolderName(), 0L);
-      }
 
-      // Mapping each parent folder name to number of its occurrence.
-      for (FolderInfo currentFolder : folders) {
-        String parent = currentFolder.getParentFolderName();
-
-        if (parent != null) {
-          occurenceOfFolder.computeIfPresent(parent, (key, value) -> value + 1);
+        // inserting each folder name
+        if (!occurenceOfFolder.containsKey(currentFolder)) {
+          occurenceOfFolder.put(currentFolder.getFolderName(), 0L);
         }
+
+        String parentFolder = currentFolder.getParentFolderName();
+        assert (parentFolder != "" || parentFolder != null);
+        occurenceOfFolder.put(
+            parentFolder,
+            (occurenceOfFolder.containsKey(parentFolder) ? occurenceOfFolder.get(parentFolder) : 0)
+                + 1);
       }
 
       Queue<FolderInfo> queueForFolderDeletion = new ArrayDeque<>();
@@ -993,14 +989,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           queueSingleFolderDelete(folderToDelete, innerExceptions, batchHelper, 1);
 
           // update the parent by reducing the number of children by 1
-          String parent = folderToDelete.getParentFolderName();
-          occurenceOfFolder.computeIfPresent(parent, (key, value) -> value - 1);
+          String parentFolder = folderToDelete.getParentFolderName();
+          occurenceOfFolder.replace(parentFolder, occurenceOfFolder.get(parentFolder) - 1);
 
           // if the parent folder is now empty, append in the queue
-          if (parent != null
-              && occurenceOfFolder.containsKey(parent)
-              && occurenceOfFolder.get(parent) == 0) {
-            queueForFolderDeletion.add(new FolderInfo(folderToDelete.getBucket(), parent));
+          if (occurenceOfFolder.get(parentFolder) == 0) {
+            queueForFolderDeletion.add(new FolderInfo(folderToDelete.getBucket(), parentFolder));
           }
         }
 

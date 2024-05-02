@@ -415,6 +415,7 @@ public class GoogleCloudStorageFileSystem {
                       fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
                   .getItems();
 
+      /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
         /**
          * Get list of folders in path if the bucket is HN enabled bucket For recursive delete, get
@@ -434,17 +435,8 @@ public class GoogleCloudStorageFileSystem {
       }
 
       /**
-       * If the Bucket is not HN enabled, following conditions should statisfy for non-recursive
-       * delete
-       *
-       * <ul>
-       *   <li>1. Delete operation should be non-recursive by user
-       *   <li>2. If directory, then it should not have any objects other than itself
-       *   <li>3. If bucket, it should not have any objects
-       * </ul>
-       *
-       * <p>If the Bucket is HN enabled, following conditions should statisfy for non-recursive
-       * delete <br>
+       * If the Bucket is HN enabled, following conditions should statisfy for non-recursive delete
+       * <br>
        * <li>1. If Directory, then :
        *
        *     <ul>

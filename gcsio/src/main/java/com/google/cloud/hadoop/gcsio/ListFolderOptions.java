@@ -16,13 +16,15 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.FOLDER_FIELDS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT;
 
 import com.google.auto.value.AutoValue;
 import javax.annotation.Nullable;
 
-/** Options that can be specified when listing Folders in the {@link GoogleCloudStorage}. */
+/**
+ * Options that can be specified when listing Folders in the {@link GoogleCloudStorage} and is valid
+ * for only HN enabled bucket
+ */
 @AutoValue
 public abstract class ListFolderOptions {
 
@@ -36,8 +38,7 @@ public abstract class ListFolderOptions {
     return new AutoValue_ListFolderOptions.Builder()
         .setDelimiter(PATH_DELIMITER)
         .setMaxResults(MAX_RESULTS_UNLIMITED)
-        .setPageSize(MAX_LIST_ITEMS_PER_CALL_DEFAULT)
-        .setFields(FOLDER_FIELDS);
+        .setPageSize(MAX_LIST_ITEMS_PER_CALL_DEFAULT);
   }
 
   public abstract Builder toBuilder();

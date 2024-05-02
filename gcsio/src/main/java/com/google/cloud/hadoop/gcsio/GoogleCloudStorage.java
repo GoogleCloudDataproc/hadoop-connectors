@@ -193,7 +193,6 @@ public interface GoogleCloudStorage {
    * errors.
    *
    * @param folders names of folder resources to delete
-   * @throws java.io.FileNotFoundException if the given folder does not exist
    * @throws IOException if folder exists but cannot be deleted
    */
   void deleteFolders(List<FolderInfo> folders) throws IOException;

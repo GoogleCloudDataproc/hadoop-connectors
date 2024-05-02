@@ -18,13 +18,11 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.services.storage.model.Folder;
 
-/** Contains information about a Folder resource */
+/** Contains information about a Folder resource and is applicable for only HN enabled bucket */
 public class FolderInfo {
 
-  // Folder bucket
   private final String bucket;
 
-  // Folder name
   private final String folderName;
 
   /**
@@ -59,11 +57,13 @@ public class FolderInfo {
   }
 
   /**
-   * Returns the parent folder name if exists, else returns null
+   * Returns the parent folder name if exists, else returns empty string
    *
    * @return parent folderName
    */
   public String getParentFolderName() {
+    if (this.folderName == null) return "";
+
     int lastIndex = this.folderName.lastIndexOf('/', this.folderName.length() - 2);
     return this.folderName.substring(0, lastIndex + 1);
   }
