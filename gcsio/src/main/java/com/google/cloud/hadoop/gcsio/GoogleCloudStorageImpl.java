@@ -970,7 +970,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         }
       }
 
-      while (!countOfChildren.isEmpty() && innerExceptions.isEmpty()) {
+      while (!countOfChildren.isEmpty()) {
         while (!folderDeleteBlockingQueue.isEmpty()) {
           FolderInfo folderToDelete = folderDeleteBlockingQueue.poll();
           queueSingleFolderDelete(
@@ -996,7 +996,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** Helper function to delete a single folder resource */
   public void queueSingleFolderDelete(
       final FolderInfo folder,
-      HashMap<String, Long> occurenceOfFolder,
+      HashMap<String, Long> countOfChildren,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       final KeySetView<IOException, Boolean> innerExceptions,
       final BatchHelper batchHelper,
@@ -1019,7 +1019,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         deleteFolder,
         getDeletionCallback(
             folder,
-            occurenceOfFolder,
+            countOfChildren,
             folderDeleteBlockingQueue,
             innerExceptions,
             batchHelper,
@@ -1031,25 +1031,25 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * queue
    *
    * @param folderResource of the folder that is now deleted
-   * @param occurenceOfFolder hashmap to store the number of children for a folder resources
+   * @param countOfChildren hashmap to store the number of children for a folder resources
    * @param folderDeleteBlockingQueue blocking queue
    */
   private void successfullDeletionOfFolderResource(
       FolderInfo folderResource,
-      HashMap<String, Long> occurenceOfFolder,
+      HashMap<String, Long> countOfChildren,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       KeySetView<IOException, Boolean> innerExceptions) {
     // remove the folderResource from list of map
-    occurenceOfFolder.remove(folderResource.getFolderName());
+    countOfChildren.remove(folderResource.getFolderName());
 
     String parentFolder = folderResource.getParentFolderName();
-    if (occurenceOfFolder.containsKey(parentFolder)) {
+    if (countOfChildren.containsKey(parentFolder)) {
 
       // update the parent's count of children
-      occurenceOfFolder.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue - newValue);
+      countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue - newValue);
 
       // if the parent folder is now empty, append in the queue
-      if (occurenceOfFolder.get(parentFolder) == 0) {
+      if (countOfChildren.get(parentFolder) == 0) {
         addFolderResourceInBlockingQueue(
             new FolderInfo(
                 new Folder().setBucket(folderResource.getBucket()).setName(parentFolder)),
@@ -1084,7 +1084,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** Helper to create a callback for a particular deletion request for folder. */
   private JsonBatchCallback<Void> getDeletionCallback(
       final FolderInfo resourceId,
-      HashMap<String, Long> occurenceOfFolder,
+      HashMap<String, Long> countOfChildren,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       final KeySetView<IOException, Boolean> innerExceptions,
       final BatchHelper batchHelper,
@@ -1094,7 +1094,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       public void onSuccess(Void obj, HttpHeaders responseHeaders) {
         logger.atFiner().log("Successfully deleted folder %s", resourceId.toString());
         successfullDeletionOfFolderResource(
-            resourceId, occurenceOfFolder, folderDeleteBlockingQueue, innerExceptions);
+            resourceId, countOfChildren, folderDeleteBlockingQueue, innerExceptions);
       }
 
       @Override
@@ -1111,7 +1111,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           // it already.
           logger.atFiner().log("Delete folder '%s' not found:%n%s", resourceId, jsonError);
           successfullDeletionOfFolderResource(
-              resourceId, occurenceOfFolder, folderDeleteBlockingQueue, innerExceptions);
+              resourceId, countOfChildren, folderDeleteBlockingQueue, innerExceptions);
         } else if (errorExtractor.preconditionNotMet(cause)
             && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
           logger.atInfo().log(
@@ -1119,7 +1119,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               resourceId, attempt, jsonError);
           queueSingleFolderDelete(
               resourceId,
-              occurenceOfFolder,
+              countOfChildren,
               folderDeleteBlockingQueue,
               innerExceptions,
               batchHelper,
@@ -1954,7 +1954,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     List<FolderInfo> listedFolders = new ArrayList<>();
-
     String nextPageToken = listStorageFoldersAndPrefixesPage(listFolders, listedFolders, pageToken);
     while (nextPageToken != null) {
       nextPageToken = listStorageFoldersAndPrefixesPage(listFolders, listedFolders, nextPageToken);
@@ -1982,7 +1981,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     listFolders.setPageSize((int) storageOptions.getMaxListItemsPerCall());
-
     return listFolders;
   }
 
@@ -1990,7 +1988,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Storage.Folders.List listFolders, List<FolderInfo> listedFolders, String pageToken)
       throws IOException {
     checkNotNull(listedFolders, "Must provide a non-null container for listedFolders.");
-
     listFolders.setPageToken(pageToken);
 
     com.google.api.services.storage.model.Folders items;
@@ -2012,12 +2009,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<com.google.api.services.storage.model.Folder> folders = items.getItems();
     if (folders != null) {
       logger.atFiner().log("listFolders(%s): listed %d objects", listFolders, folders.size());
-
       for (Folder currentFolder : folders) {
         listedFolders.add(new FolderInfo(currentFolder));
       }
     }
-
     return items.getNextPageToken();
   }
 

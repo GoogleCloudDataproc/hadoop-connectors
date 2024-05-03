@@ -470,7 +470,7 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * Return the bucket name if exits else return empty string
+   * Return the bucket name if exists else return empty string
    *
    * @param path
    * @return bucket name
@@ -510,7 +510,7 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * Deletes the folder resources given
+   * Deletes the given folder resources
    *
    * @param listOfFolders to delete
    * @throws IOException
