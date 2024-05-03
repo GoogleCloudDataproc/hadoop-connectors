@@ -53,14 +53,6 @@ public abstract class ListFolderOptions {
   /** Maximum folder resources in a single page */
   public abstract long getPageSize();
 
-  /**
-   * Comma separated list of folder fields to include in the list response.
-   *
-   * <p>See <a href="">folder resource</a> for reference.
-   */
-  @Nullable
-  public abstract String getFields();
-
   /** Builder for {@link ListObjectOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -69,8 +61,6 @@ public abstract class ListFolderOptions {
     public abstract Builder setMaxResults(long maxResults);
 
     public abstract Builder setPageSize(long pageSize);
-
-    public abstract Builder setFields(String fields);
 
     public abstract ListFolderOptions build();
   }

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import javax.annotation.Nonnull;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -195,7 +196,7 @@ public interface GoogleCloudStorage {
    * @param folders names of folder resources to delete
    * @throws IOException if folder exists but cannot be deleted
    */
-  void deleteFolders(List<FolderInfo> folders) throws IOException;
+  void deleteFolders(@Nonnull List<FolderInfo> folders) throws IOException;
 
   /**
    * Copies metadata of the given objects. After the copy is successfully complete, each object blob
@@ -376,7 +377,7 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Returns folder resources.
+   * Returns the list of folder resources.
    *
    * @param bucketName bucket name
    * @param folderNamePrefix folder resource name prefix

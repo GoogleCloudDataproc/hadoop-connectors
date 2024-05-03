@@ -76,6 +76,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -929,7 +930,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** See {@link GoogleCloudStorage#deleteFolders(List)} for details about expected behavior. */
   @Override
   public void deleteFolders(List<FolderInfo> folders) throws IOException {
-
     if (folders.isEmpty()) {
       return;
     }
@@ -950,50 +950,36 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               "batchFolderDelete");
 
       // Map to store number of children for each parent object
-      HashMap<String, Long> occurenceOfFolder = new HashMap<>();
+      HashMap<String, Long> countOfChildren = new HashMap<>();
       for (FolderInfo currentFolder : folders) {
-        // inserting each folder
-        if (!occurenceOfFolder.containsKey(currentFolder)) {
-          occurenceOfFolder.put(currentFolder.getFolderName(), 0L);
+        if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
+          countOfChildren.put(currentFolder.getFolderName(), 0L);
         }
 
         String parentFolder = currentFolder.getParentFolderName();
-
-        if (parentFolder != "" && parentFolder != null) {
-          occurenceOfFolder.put(
-              parentFolder,
-              (occurenceOfFolder.containsKey(parentFolder)
-                      ? occurenceOfFolder.get(parentFolder)
-                      : 0)
-                  + 1);
+        if (!Strings.isNullOrEmpty(parentFolder)) {
+          countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue + newValue);
         }
       }
 
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue = new LinkedBlockingQueue<>();
       for (FolderInfo currentFolder : folders) {
-        if (occurenceOfFolder.get(currentFolder.getFolderName()) == 0L) {
+        if (countOfChildren.get(currentFolder.getFolderName()) == 0L) {
           addFolderResourceInBlockingQueue(
               currentFolder, folderDeleteBlockingQueue, innerExceptions);
         }
       }
 
-      while (!occurenceOfFolder.isEmpty() && innerExceptions.isEmpty()) {
+      while (!countOfChildren.isEmpty() && innerExceptions.isEmpty()) {
         while (!folderDeleteBlockingQueue.isEmpty()) {
-          FolderInfo folderToDelete = null;
-          try {
-            folderToDelete = folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
-            queueSingleFolderDelete(
-                folderToDelete,
-                occurenceOfFolder,
-                folderDeleteBlockingQueue,
-                innerExceptions,
-                batchHelper,
-                1);
-
-          } catch (InterruptedException e) {
-            logger.atInfo().log("Blocking queue is not receiving any more folder resource");
-            break;
-          }
+          FolderInfo folderToDelete = folderDeleteBlockingQueue.poll();
+          queueSingleFolderDelete(
+              folderToDelete,
+              countOfChildren,
+              folderDeleteBlockingQueue,
+              innerExceptions,
+              batchHelper,
+              1);
         }
       }
 
@@ -1016,16 +1002,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       final BatchHelper batchHelper,
       final int attempt)
       throws IOException {
-    checkArgument(
-        folder.getBucket() != "" && folder.getBucket() != null,
-        String.format("No bucket for folder resource %s", folder.toString()));
-
-    checkArgument(
-        folder.getFolderName() != "" && folder.getFolderName() != null,
-        String.format("No folder path for folder resource %s", folder.toString()));
-
     final String bucketName = folder.getBucket();
     final String folderName = folder.getFolderName();
+
+    checkArgument(
+        !Strings.isNullOrEmpty(bucketName),
+        String.format("No bucket for folder resource %s", folder.toString()));
+    checkArgument(
+        !Strings.isNullOrEmpty(folderName),
+        String.format("No folder path for folder resource %s", folder.toString()));
 
     Storage.Folders.Delete deleteFolder =
         initializeRequest(storage.folders().delete(bucketName, folderName), bucketName);
@@ -1061,7 +1046,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (occurenceOfFolder.containsKey(parentFolder)) {
 
       // update the parent's count of children
-      occurenceOfFolder.replace(parentFolder, occurenceOfFolder.get(parentFolder) - 1);
+      occurenceOfFolder.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue - newValue);
 
       // if the parent folder is now empty, append in the queue
       if (occurenceOfFolder.get(parentFolder) == 0) {
@@ -1075,18 +1060,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * Helper function to add resourceId to blocking queue
+   * Helper function to add folderResource to blocking queue
    *
    * @param folderResource
    * @param folderDeleteBlockingQueue blocking queue
    */
-  private synchronized void addFolderResourceInBlockingQueue(
+  private void addFolderResourceInBlockingQueue(
       FolderInfo folderResource,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       KeySetView<IOException, Boolean> innerExceptions) {
     try {
-      // waits for a maximum of 1 minute if the queue is overflowing
-      folderDeleteBlockingQueue.offer(folderResource, 1, TimeUnit.MINUTES);
+      // waits for a maximum of 1 second if the queue is overflowing
+      folderDeleteBlockingQueue.offer(folderResource, 1, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       innerExceptions.add(
           new IOException(
@@ -1960,7 +1945,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createFolderListRequest(
             bucketName,
             objectNamePrefix,
-            listFolderOptions.getFields(),
             listFolderOptions.getDelimiter(),
             listFolderOptions.getMaxResults());
 
@@ -1971,12 +1955,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     List<FolderInfo> listedFolders = new ArrayList<>();
 
-    /* If we only want to check if there is folder resource inside a path, we get only single page list of folder resources, else we get the entire list of folder resource available in the path*/
     String nextPageToken = listStorageFoldersAndPrefixesPage(listFolders, listedFolders, pageToken);
-    if (listFolderOptions.getMaxResults() != MAX_RESULTS_UNLIMITED) {
-      return new ListPage<>(listedFolders, nextPageToken);
-    }
-
     while (nextPageToken != null) {
       nextPageToken = listStorageFoldersAndPrefixesPage(listFolders, listedFolders, nextPageToken);
     }
@@ -1985,11 +1964,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   private Storage.Folders.List createFolderListRequest(
-      String bucketName,
-      String objectNamePrefix,
-      String folderFields,
-      String delimiter,
-      long maxResults)
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
       throws IOException {
 
     logger.atFiner().log(
@@ -2006,12 +1981,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       listFolders.setDelimiter(delimiter);
     }
 
-    // Set number of items to retrieve per page
-    listFolders.setPageSize(
-        (int)
-            (maxResults == MAX_RESULTS_UNLIMITED
-                ? storageOptions.getMaxListItemsPerCall()
-                : maxResults + 1));
+    listFolders.setPageSize((int) storageOptions.getMaxListItemsPerCall());
 
     return listFolders;
   }

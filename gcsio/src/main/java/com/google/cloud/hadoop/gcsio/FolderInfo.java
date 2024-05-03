@@ -17,7 +17,10 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.services.storage.model.Folder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 
+@VisibleForTesting
 /** Contains information about a Folder resource and is applicable for only HN enabled bucket */
 public class FolderInfo {
 
@@ -55,8 +58,7 @@ public class FolderInfo {
    * @return parent folderName
    */
   public String getParentFolderName() {
-    if (this.folderName == null) return "";
-
+    if (Strings.isNullOrEmpty(this.folderName)) return "";
     int lastIndex = this.folderName.lastIndexOf('/', this.folderName.length() - 2);
     return this.folderName.substring(0, lastIndex + 1);
   }

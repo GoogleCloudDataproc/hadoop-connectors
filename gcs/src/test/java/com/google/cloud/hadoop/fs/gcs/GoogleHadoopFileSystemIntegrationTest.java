@@ -1584,6 +1584,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       // create bucket with same name
       theGcs.createBucket(
           bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+      assertThat(theGcs.isHnBucket(new Path(initUri.toString() + "/").toUri())).isTrue();
 
       // create the same folders
       googleHadoopFileSystem.mkdirs(new Path("A/"));
