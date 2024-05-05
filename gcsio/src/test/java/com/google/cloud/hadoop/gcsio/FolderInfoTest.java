@@ -15,8 +15,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
-import com.google.api.services.storage.model.Folder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,27 +28,59 @@ public class FolderInfoTest {
   private final String FOLDER_NAME = "test-parent-folder/test-folder-name/";
 
   @Test
-  public void checkForRootFolder() {
-    FolderInfo rootFolderInfo = new FolderInfo(new Folder().setBucket(null).setName(null));
-    assertThat(rootFolderInfo.getBucket()).isEqualTo(null);
-    assertThat(rootFolderInfo.getFolderName()).isEqualTo(null);
-    assertThat(rootFolderInfo.isBucket()).isFalse();
-    assertThat(rootFolderInfo.getParentFolderName()).isEqualTo("");
+  public void checkForRootFolderWithNull() {
+    assertThrows(
+        "Incorrect folder argument",
+        RuntimeException.class,
+        () -> new FolderInfo(FolderInfo.createFolderInfoObject(null, null)));
   }
 
   @Test
-  public void checkForBucket() {
-    FolderInfo bucketFolderInfo = new FolderInfo(new Folder().setBucket(BUCKET_NAME).setName(null));
+  public void checkForRootFolderWithEmptyString() {
+    assertThrows(
+        "Incorrect folder argument",
+        RuntimeException.class,
+        () -> new FolderInfo(FolderInfo.createFolderInfoObject("", "")));
+  }
+
+  @Test
+  public void checkForBucketWithNull() {
+    assertThrows(
+        "Incorrect folder argument",
+        RuntimeException.class,
+        () -> new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, null)));
+  }
+
+  @Test
+  public void checkForBucketWithEmptyString() {
+    FolderInfo bucketFolderInfo =
+        new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, ""));
     assertThat(bucketFolderInfo.getBucket()).isEqualTo(BUCKET_NAME);
-    assertThat(bucketFolderInfo.getFolderName()).isEqualTo(null);
+    assertThat(bucketFolderInfo.getFolderName()).isEqualTo("");
     assertThat(bucketFolderInfo.isBucket()).isTrue();
     assertThat(bucketFolderInfo.getParentFolderName()).isEqualTo("");
   }
 
   @Test
-  public void checkForFolder() {
+  public void checkForNullBucket() {
+    assertThrows(
+        "Incorrect folder argument",
+        RuntimeException.class,
+        () -> new FolderInfo(FolderInfo.createFolderInfoObject(null, FOLDER_NAME)));
+  }
+
+  @Test
+  public void checkForEmptyBucket() {
+    assertThrows(
+        "Incorrect folder argument",
+        RuntimeException.class,
+        () -> new FolderInfo(FolderInfo.createFolderInfoObject("", FOLDER_NAME)));
+  }
+
+  @Test
+  public void checkForFolderWithNull() {
     FolderInfo testFolderInfo =
-        new FolderInfo(new Folder().setBucket(BUCKET_NAME).setName(FOLDER_NAME));
+        new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, FOLDER_NAME));
     assertThat(testFolderInfo.getBucket()).isEqualTo(BUCKET_NAME);
     assertThat(testFolderInfo.getFolderName()).isEqualTo(FOLDER_NAME);
     assertThat(testFolderInfo.isBucket()).isFalse();

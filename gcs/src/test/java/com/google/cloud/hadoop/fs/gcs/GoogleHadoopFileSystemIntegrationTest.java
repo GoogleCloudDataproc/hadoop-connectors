@@ -1513,9 +1513,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void testHnBucketNonRecursiveDeleteOperation() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
-
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
-
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
     config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
@@ -1550,9 +1548,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void testHnBucketRecursiveDeleteOperationOnBucket() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
-
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
-
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
     config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
@@ -1603,9 +1599,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void testHnBucketRecursiveDeleteOperationOnDirectory() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
-
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
-
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
     config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
@@ -1614,22 +1608,18 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
     theGcs.createBucket(
         bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
-
     assertThat(theGcs.isHnBucket(new Path(initUri.toString() + "/").toUri())).isTrue();
 
     try {
-
       googleHadoopFileSystem.mkdirs(new Path("A/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 15; i++) {
         Random r = new Random();
         googleHadoopFileSystem.mkdirs(new Path("A/dir1/" + r.nextInt() + "/"));
       }
-
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
-
       createFile(googleHadoopFileSystem, new Path("A/1"));
       createFile(googleHadoopFileSystem, new Path("A/2"));
 

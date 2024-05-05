@@ -180,12 +180,12 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public ListPage<FolderInfo> listFolderInfoForPrefixPage(
       String bucketName,
-      String objectNamePrefix,
+      String folderNamePrefix,
       ListFolderOptions listFolderOptions,
       String pageToken)
       throws IOException {
     return delegate.listFolderInfoForPrefixPage(
-        bucketName, objectNamePrefix, listFolderOptions, pageToken);
+        bucketName, folderNamePrefix, listFolderOptions, pageToken);
   }
 
   @Override

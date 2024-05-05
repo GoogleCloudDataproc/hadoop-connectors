@@ -14,12 +14,9 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT;
 
 import com.google.auto.value.AutoValue;
-import javax.annotation.Nullable;
 
 /**
  * Options that can be specified when listing Folders in the {@link GoogleCloudStorage} and is valid
@@ -31,36 +28,21 @@ public abstract class ListFolderOptions {
   /** List all folders in the directory. */
   public static final ListFolderOptions DEFAULT = builder().build();
 
-  /** List all folders with the prefix. */
-  public static final ListFolderOptions DEFAULT_FOLDER_LIST = builder().setDelimiter(null).build();
-
   public static Builder builder() {
     return new AutoValue_ListFolderOptions.Builder()
-        .setDelimiter(PATH_DELIMITER)
-        .setMaxResults(MAX_RESULTS_UNLIMITED)
-        .setPageSize(MAX_LIST_ITEMS_PER_CALL_DEFAULT);
+        .setPageSize((int) MAX_LIST_ITEMS_PER_CALL_DEFAULT);
   }
 
   public abstract Builder toBuilder();
 
-  /** Delimiter to use (typically {@code /}), otherwise {@code null}. */
-  @Nullable
-  public abstract String getDelimiter();
-
-  /** Maximum number of results to return, unlimited if negative or zero. */
-  public abstract long getMaxResults();
-
   /** Maximum folder resources in a single page */
-  public abstract long getPageSize();
+  public abstract int getPageSize();
 
   /** Builder for {@link ListObjectOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
-    public abstract Builder setDelimiter(String delimiter);
 
-    public abstract Builder setMaxResults(long maxResults);
-
-    public abstract Builder setPageSize(long pageSize);
+    public abstract Builder setPageSize(int pageSize);
 
     public abstract ListFolderOptions build();
   }

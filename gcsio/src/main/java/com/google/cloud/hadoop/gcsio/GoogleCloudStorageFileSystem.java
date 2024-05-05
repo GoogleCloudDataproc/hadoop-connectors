@@ -29,7 +29,6 @@ import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.services.storage.model.Folder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
@@ -61,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -399,7 +399,7 @@ public class GoogleCloudStorageFileSystem {
 
     boolean isHnBucket =
         (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
-    List<FolderInfo> listOfFolders = null;
+    List<FolderInfo> listOfFolders = new LinkedList<>();
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
     if (fileInfo.isDirectory()) {
@@ -424,13 +424,11 @@ public class GoogleCloudStorageFileSystem {
         listOfFolders =
             recursive
                 ? listFoldersInfoForPrefixPage(
-                        fileInfo.getPath(),
-                        ListFolderOptions.DEFAULT_FOLDER_LIST,
-                        /* pageToken= */ null)
+                        fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
                     .getItems()
                 : isFolderResource(bucketName, folderName)
                     ? Arrays.asList(
-                        new FolderInfo(new Folder().setBucket(bucketName).setName(folderName)))
+                        new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName)))
                     : null;
       }
 
@@ -446,10 +444,7 @@ public class GoogleCloudStorageFileSystem {
     (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
     coopLockOp.ifPresent(o -> o.persistAndScheduleRenewal(itemsToDelete, bucketsToDelete));
     try {
-      deleteInternal(itemsToDelete, bucketsToDelete);
-      if (isHnBucket) {
-        deleteFolders(listOfFolders);
-      }
+      deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
       coopLockOp.ifPresent(CoopLockOperationDelete::unlock);
     } finally {
       coopLockOp.ifPresent(CoopLockOperationDelete::cancelRenewal);
@@ -476,7 +471,7 @@ public class GoogleCloudStorageFileSystem {
    * @return bucket name
    */
   private String getBucketName(@Nonnull URI path) {
-    return (Strings.isNullOrEmpty(path.toString())) ? "" : path.getAuthority();
+    return (Strings.isNullOrEmpty(path.getAuthority())) ? "" : path.getAuthority();
   }
 
   /**
@@ -485,8 +480,8 @@ public class GoogleCloudStorageFileSystem {
    * @param path
    * @return folder path
    */
-  private String getFolderName(URI path) {
-    return (path.equals(null) || Strings.isNullOrEmpty(path.getPath()))
+  private String getFolderName(@Nonnull URI path) {
+    return (Strings.isNullOrEmpty(path.getPath()))
         ? ""
         : path.getPath().substring(path.getPath().indexOf("/") + 1);
   }
@@ -515,15 +510,31 @@ public class GoogleCloudStorageFileSystem {
    * @param listOfFolders to delete
    * @throws IOException
    */
-  private void deleteFolders(List<FolderInfo> listOfFolders) throws IOException {
+  private void deleteFolders(@Nonnull List<FolderInfo> listOfFolders) throws IOException {
+    if (listOfFolders.isEmpty()) return;
     logger.atFiner().log(
         "deleteFolder(listOfFolders: %s, size:%s)", listOfFolders, listOfFolders.size());
     gcs.deleteFolders(listOfFolders);
   }
 
-  /** Deletes all items in the given path list followed by all bucket items. */
+  /** Deletes all objects in the given path list followed by all bucket items. */
   private void deleteInternal(List<FileInfo> itemsToDelete, List<FileInfo> bucketsToDelete)
       throws IOException {
+    deleteObjects(itemsToDelete);
+    deleteBucket(bucketsToDelete);
+  }
+
+  /** Deleted all objects, folders and buckets in the order mentioned */
+  private void deleteInternalWithFolders(
+      List<FileInfo> itemsToDelete, List<FolderInfo> listOfFolders, List<FileInfo> bucketsToDelete)
+      throws IOException {
+    deleteObjects(itemsToDelete);
+    deleteFolders(listOfFolders);
+    deleteBucket(bucketsToDelete);
+  }
+
+  /** Helper function to delete objects */
+  private void deleteObjects(List<FileInfo> itemsToDelete) throws IOException {
     // TODO(user): We might need to separate out children into separate batches from parents to
     // avoid deleting a parent before somehow failing to delete a child.
 
@@ -547,7 +558,10 @@ public class GoogleCloudStorageFileSystem {
       }
       gcs.deleteObjects(objectsToDelete);
     }
+  }
 
+  /** Helper function to delete buckets */
+  private void deleteBucket(List<FileInfo> bucketsToDelete) throws IOException {
     if (!bucketsToDelete.isEmpty()) {
       List<String> bucketNames = new ArrayList<>(bucketsToDelete.size());
       for (FileInfo bucketInfo : bucketsToDelete) {

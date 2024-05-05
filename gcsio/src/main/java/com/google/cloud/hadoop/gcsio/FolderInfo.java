@@ -16,13 +16,17 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.api.services.storage.model.Folder;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.storage.control.v2.Folder;
+import javax.annotation.Nonnull;
 
 @VisibleForTesting
 /** Contains information about a Folder resource and is applicable for only HN enabled bucket */
 public class FolderInfo {
+  public static final String BUCKET_PREFIX = "projects/_/buckets/";
+  public static final String FOLDER_PREFIX = "/folders/";
+  private static final String PATH = "/";
 
   private final String bucket;
 
@@ -33,9 +37,32 @@ public class FolderInfo {
    *
    * @param folder Information about the underlying folder.
    */
-  public FolderInfo(Folder folder) {
-    this.bucket = folder.getBucket();
-    this.folderName = folder.getName();
+  public FolderInfo(@Nonnull Folder folder) {
+    this.bucket = getBucket(folder.getName());
+    this.folderName = getName(folder.getName());
+  }
+
+  public static Folder createFolderInfoObject(@Nonnull String bucketName, String folderName)
+      throws RuntimeException {
+    if (Strings.isNullOrEmpty(bucketName) || folderName.equals(null))
+      throw new RuntimeException("Incorrect folder argument");
+
+    return Folder.newBuilder()
+        .setName(BUCKET_PREFIX + bucketName + FOLDER_PREFIX + folderName)
+        .build();
+  }
+
+  private String getBucket(String path) {
+    if (Strings.isNullOrEmpty(path)) return "";
+    path = path.split(BUCKET_PREFIX)[1];
+    String bucketName = path.equals("") ? "" : path.substring(0, path.indexOf(PATH));
+    return bucketName;
+  }
+
+  private String getName(String path) {
+    if (Strings.isNullOrEmpty(path)) return "";
+    String folderName = path.split(FOLDER_PREFIX).length > 1 ? path.split(FOLDER_PREFIX)[1] : "";
+    return folderName;
   }
 
   /** Gets the path of this file or directory. */
@@ -49,7 +76,7 @@ public class FolderInfo {
   }
 
   public boolean isBucket() {
-    return this.bucket != null && this.folderName == null;
+    return !Strings.isNullOrEmpty(this.bucket) && Strings.isNullOrEmpty(this.folderName);
   }
 
   /**
@@ -59,12 +86,12 @@ public class FolderInfo {
    */
   public String getParentFolderName() {
     if (Strings.isNullOrEmpty(this.folderName)) return "";
-    int lastIndex = this.folderName.lastIndexOf('/', this.folderName.length() - 2);
+    int lastIndex = this.folderName.lastIndexOf(PATH, this.folderName.length() - 2);
     return this.folderName.substring(0, lastIndex + 1);
   }
 
   /** Gets string representation of this instance. */
   public String toString() {
-    return getBucket() + "/" + getFolderName();
+    return BUCKET_PREFIX + getBucket() + FOLDER_PREFIX + getFolderName();
   }
 }
