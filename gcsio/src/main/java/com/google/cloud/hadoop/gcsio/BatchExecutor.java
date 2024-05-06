@@ -64,7 +64,7 @@ class BatchExecutor {
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(numThreads * 20),
             new ThreadFactoryBuilder()
-                .setNameFormat("gcs-grpc-manual-batching-pool-%d")
+                .setNameFormat("gcs-manual-batching-pool-%d")
                 .setDaemon(true)
                 .build());
     executor.allowCoreThreadTimeOut(true);
@@ -102,20 +102,20 @@ class BatchExecutor {
 
   /** Awaits until all tasks are terminated and then shutdowns the executor. */
   public void shutdown() throws IOException {
-    awaitRequestsCompletion();
     try {
+      awaitRequestsCompletion();
       checkState(responseFutures.isEmpty(), "responseFutures should be empty after flush");
     } finally {
       requestsExecutor.shutdown();
       try {
         if (!requestsExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
-          logger.atWarning().log("Forcibly shutting down grpc manual batching thread pool.");
+          logger.atWarning().log("Forcibly shutting down manual batching thread pool.");
           requestsExecutor.shutdownNow();
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         logger.atFine().withCause(e).log(
-            "Failed to await termination: forcibly shutting down grpc manual batching thread pool.");
+            "Failed to await termination: forcibly shutting down manual batching thread pool.");
         requestsExecutor.shutdownNow();
       }
     }
@@ -128,7 +128,7 @@ class BatchExecutor {
     }
   }
 
-  static <T> T getFromFuture(Future<T> future) throws IOException {
+  <T> T getFromFuture(Future<T> future) throws IOException {
     try {
       return future.get();
     } catch (ExecutionException | InterruptedException e) {
@@ -136,6 +136,9 @@ class BatchExecutor {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      logger.atFine().withCause(e).log(
+          "Failed to await termination: forcibly shutting down manual batching thread pool.");
+      requestsExecutor.shutdownNow();
       throw new IOException(
           String.format(
               "Failed to get result: %s", e instanceof ExecutionException ? e.getCause() : e),

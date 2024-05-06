@@ -1566,6 +1566,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
+      googleHadoopFileSystem.mkdirs(new Path("A/dir2/subdir3/"));
       createFile(googleHadoopFileSystem, new Path("A/1"));
       createFile(googleHadoopFileSystem, new Path("A/2"));
 
@@ -1588,6 +1589,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
+      googleHadoopFileSystem.mkdirs(new Path("A/dir2/subdir3/"));
       createFile(googleHadoopFileSystem, new Path("A/1"));
       createFile(googleHadoopFileSystem, new Path("A/2"));
 
@@ -1620,6 +1622,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       }
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
       googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
+      googleHadoopFileSystem.mkdirs(new Path("A/dir2/subdir3/"));
       createFile(googleHadoopFileSystem, new Path("A/1"));
       createFile(googleHadoopFileSystem, new Path("A/2"));
 

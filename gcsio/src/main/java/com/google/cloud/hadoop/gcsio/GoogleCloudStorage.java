@@ -376,7 +376,7 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Returns the list of folder resources.
+   * Returns the list of folder resources. Applicable only for HN enabled bucket
    *
    * @param bucketName bucket name
    * @param folderNamePrefix folder resource name prefix

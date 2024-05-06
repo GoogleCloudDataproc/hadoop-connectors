@@ -123,6 +123,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -947,7 +948,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
 
       // Map to store number of children for each parent object
-      HashMap<String, Long> countOfChildren = new HashMap<>();
+      ConcurrentHashMap<String, Long> countOfChildren = new ConcurrentHashMap<>();
+
       for (FolderInfo currentFolder : folders) {
         if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
           countOfChildren.put(currentFolder.getFolderName(), 0L);
@@ -959,7 +961,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         }
       }
 
-      BlockingQueue<FolderInfo> folderDeleteBlockingQueue = new LinkedBlockingQueue<>();
+      BlockingQueue<FolderInfo> folderDeleteBlockingQueue =
+          new LinkedBlockingQueue<>(folders.size());
       for (FolderInfo currentFolder : folders) {
         if (countOfChildren.get(currentFolder.getFolderName()) == 0L) {
           addFolderResourceInBlockingQueue(
@@ -967,20 +970,26 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         }
       }
 
-      while (!countOfChildren.isEmpty()) {
-        while (!folderDeleteBlockingQueue.isEmpty()) {
-          FolderInfo folderToDelete = folderDeleteBlockingQueue.poll();
-          queueSingleFolderDelete(
-              folderToDelete,
-              countOfChildren,
-              folderDeleteBlockingQueue,
-              innerExceptions,
-              executor,
-              1);
+      while (innerExceptions.isEmpty()) {
+        FolderInfo folderToDelete = folderDeleteBlockingQueue.poll(1L, TimeUnit.MINUTES);
+
+        // if after 1 minute, the queue is still empty it will return null and loop is exited
+        if (folderToDelete == null || countOfChildren.isEmpty()) {
+          break;
         }
+        queueSingleFolderDelete(
+            folderToDelete,
+            countOfChildren,
+            folderDeleteBlockingQueue,
+            innerExceptions,
+            executor,
+            1);
       }
+
       // deleting any remaining resources
       executor.shutdown();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
 
     if (!innerExceptions.isEmpty()) {
@@ -990,12 +999,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /* Callable class specifically for deletion of folder resource */
-  public class DeleteFolder implements Callable<Void> {
+  private class DeleteFolder implements Callable<Void> {
     private DeleteFolderRequest deleteFolderRequest;
 
     @Override
     public Void call() throws IOException {
-      storageControlClient.deleteFolder(deleteFolderRequest);
+      logger.atFiner().log("Deleting folder resource %s", deleteFolderRequest.getName());
+      lazyGetStorageControlClient().deleteFolder(deleteFolderRequest);
       return null;
     }
 
@@ -1007,8 +1017,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   /** Helper function to delete a single folder resource */
   public void queueSingleFolderDelete(
-      final FolderInfo folder,
-      HashMap<String, Long> countOfChildren,
+      @Nonnull final FolderInfo folder,
+      ConcurrentHashMap<String, Long> countOfChildren,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       final KeySetView<IOException, Boolean> innerExceptions,
       final BatchExecutor batchExecutor,
@@ -1016,7 +1026,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     final String bucketName = folder.getBucket();
     final String folderName = folder.getFolderName();
-
     checkArgument(
         !Strings.isNullOrEmpty(bucketName),
         String.format("No bucket for folder resource %s", folder.toString()));
@@ -1046,9 +1055,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       KeySetView<IOException, Boolean> innerExceptions) {
     try {
-      // waits for a maximum of 1 second if the queue is overflowing
-      folderDeleteBlockingQueue.offer(folderResource, 1, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
+      folderDeleteBlockingQueue.add(folderResource);
+    } catch (IllegalStateException e) {
       innerExceptions.add(
           new IOException(
               String.format(
@@ -1067,7 +1075,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   private void successfullDeletionOfFolderResource(
       FolderInfo folderResource,
-      HashMap<String, Long> countOfChildren,
+      ConcurrentHashMap<String, Long> countOfChildren,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       KeySetView<IOException, Boolean> innerExceptions) {
     // remove the folderResource from list of map
@@ -1077,7 +1085,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (countOfChildren.containsKey(parentFolder)) {
 
       // update the parent's count of children
-      countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue - newValue);
+      countOfChildren.replace(parentFolder, countOfChildren.get(parentFolder) - 1);
 
       // if the parent folder is now empty, append in the queue
       if (countOfChildren.get(parentFolder) == 0) {
@@ -1093,7 +1101,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** Helper to create a callback for a particular deletion request for folder. */
   private JsonBatchCallback<Void> getDeletionCallback(
       final FolderInfo resourceId,
-      HashMap<String, Long> countOfChildren,
+      ConcurrentHashMap<String, Long> countOfChildren,
       BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
       final KeySetView<IOException, Boolean> innerExceptions,
       final BatchExecutor batchExecutor,

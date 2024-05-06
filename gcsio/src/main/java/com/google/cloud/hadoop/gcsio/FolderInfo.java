@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.storage.control.v2.Folder;
@@ -24,7 +26,7 @@ import javax.annotation.Nonnull;
 @VisibleForTesting
 /** Contains information about a Folder resource and is applicable for only HN enabled bucket */
 public class FolderInfo {
-  public static final String BUCKET_PREFIX = "projects/_/buckets/";
+  public static final String BUCKET_PREFIX = "projects/_/buckets/"; // TODO : check it !!
   public static final String FOLDER_PREFIX = "/folders/";
   private static final String PATH = "/";
 
@@ -38,31 +40,41 @@ public class FolderInfo {
    * @param folder Information about the underlying folder.
    */
   public FolderInfo(@Nonnull Folder folder) {
-    this.bucket = getBucket(folder.getName());
-    this.folderName = getName(folder.getName());
+    checkState(!Strings.isNullOrEmpty(folder.getName()), "Folder resource has invalid path");
+    this.bucket = getBucketString(folder.getName());
+    this.folderName = getFolderString(folder.getName());
   }
 
-  public static Folder createFolderInfoObject(@Nonnull String bucketName, String folderName)
+  /**
+   * Returns the folder object with provided bucket and path
+   *
+   * @param bucketName
+   * @param folderName
+   * @return FolderInfo object
+   */
+  public static Folder createFolderInfoObject(String bucketName, String folderName)
       throws RuntimeException {
-    if (Strings.isNullOrEmpty(bucketName) || folderName.equals(null))
-      throw new RuntimeException("Incorrect folder argument");
+    checkState(
+        !Strings.isNullOrEmpty(bucketName), "Folder resource has invalid bucket name", bucketName);
+    checkState(folderName != null, "Folder resource has invalid folder name", bucketName);
 
     return Folder.newBuilder()
-        .setName(BUCKET_PREFIX + bucketName + FOLDER_PREFIX + folderName)
+        .setName(String.join("", BUCKET_PREFIX, bucketName, FOLDER_PREFIX, folderName))
         .build();
   }
 
-  private String getBucket(String path) {
-    if (Strings.isNullOrEmpty(path)) return "";
-    path = path.split(BUCKET_PREFIX)[1];
-    String bucketName = path.equals("") ? "" : path.substring(0, path.indexOf(PATH));
-    return bucketName;
+  private String getBucketString(String path) {
+    checkState(
+        path.startsWith(BUCKET_PREFIX),
+        "Invalid bucket resource name. Bucket resource name must begin with 'projects/_/buckets/' for global-namespaced buckets or 'projects/{project number}/buckets/' for project-namespaced buckets, and contain no invalid characters or patterns.");
+    int startIndexOfBucketPrefix = path.indexOf(BUCKET_PREFIX) + BUCKET_PREFIX.length();
+    return path.substring(startIndexOfBucketPrefix, path.indexOf(PATH, startIndexOfBucketPrefix));
   }
 
-  private String getName(String path) {
-    if (Strings.isNullOrEmpty(path)) return "";
-    String folderName = path.split(FOLDER_PREFIX).length > 1 ? path.split(FOLDER_PREFIX)[1] : "";
-    return folderName;
+  private String getFolderString(String path) {
+    checkState(path.contains(FOLDER_PREFIX), "Invalid folder path");
+    int startIndex = path.indexOf(FOLDER_PREFIX) + FOLDER_PREFIX.length();
+    return path.substring(startIndex);
   }
 
   /** Gets the path of this file or directory. */
@@ -76,7 +88,7 @@ public class FolderInfo {
   }
 
   public boolean isBucket() {
-    return !Strings.isNullOrEmpty(this.bucket) && Strings.isNullOrEmpty(this.folderName);
+    return this.folderName.equals("");
   }
 
   /**
@@ -85,13 +97,12 @@ public class FolderInfo {
    * @return parent folderName
    */
   public String getParentFolderName() {
-    if (Strings.isNullOrEmpty(this.folderName)) return "";
     int lastIndex = this.folderName.lastIndexOf(PATH, this.folderName.length() - 2);
     return this.folderName.substring(0, lastIndex + 1);
   }
 
   /** Gets string representation of this instance. */
   public String toString() {
-    return BUCKET_PREFIX + getBucket() + FOLDER_PREFIX + getFolderName();
+    return String.join("", BUCKET_PREFIX, this.bucket, FOLDER_PREFIX, this.folderName);
   }
 }

@@ -426,10 +426,8 @@ public class GoogleCloudStorageFileSystem {
                 ? listFoldersInfoForPrefixPage(
                         fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
                     .getItems()
-                : isFolderResource(bucketName, folderName)
-                    ? Arrays.asList(
-                        new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName)))
-                    : null;
+                : Arrays.asList(
+                    new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName)));
       }
 
       if ((!itemsToDelete.isEmpty() && !recursive)) {
@@ -449,41 +447,29 @@ public class GoogleCloudStorageFileSystem {
     } finally {
       coopLockOp.ifPresent(CoopLockOperationDelete::cancelRenewal);
     }
-
     repairImplicitDirectory(parentInfoFuture);
   }
 
   /**
-   * Helper function to check if the folderResource is a directory or bucket.
-   *
-   * @param bucketName
-   * @param folderName
-   * @return true if directory else false
-   */
-  private boolean isFolderResource(String bucketName, String folderName) {
-    return !Strings.isNullOrEmpty(bucketName) && !Strings.isNullOrEmpty(folderName);
-  }
-
-  /**
-   * Return the bucket name if exists else return empty string
+   * Return the bucket name if exists
    *
    * @param path
    * @return bucket name
    */
   private String getBucketName(@Nonnull URI path) {
-    return (Strings.isNullOrEmpty(path.getAuthority())) ? "" : path.getAuthority();
+    checkState(!Strings.isNullOrEmpty(path.getAuthority()), "Bucket name cannot be null");
+    return path.getAuthority();
   }
 
   /**
-   * Returns the folder name if exists else return empty string
+   * Returns the folder name if exists else return empty string.
    *
    * @param path
    * @return folder path
    */
   private String getFolderName(@Nonnull URI path) {
-    return (Strings.isNullOrEmpty(path.getPath()))
-        ? ""
-        : path.getPath().substring(path.getPath().indexOf("/") + 1);
+    checkState(path.getPath().startsWith(PATH_DELIMITER), "Invalid folder name");
+    return path.getPath().substring(1);
   }
 
   /**
@@ -498,10 +484,8 @@ public class GoogleCloudStorageFileSystem {
     logger.atFiner().log(
         "listFoldersInfoForPrefixPage(prefix: %s, pageToken:%s)", prefix, pageToken);
     StorageResourceId prefixId = getPrefixId(prefix);
-    ListPage<FolderInfo> itemInfosPage =
-        gcs.listFolderInfoForPrefixPage(
-            prefixId.getBucketName(), prefixId.getObjectName(), listFolderOptions, pageToken);
-    return itemInfosPage;
+    return gcs.listFolderInfoForPrefixPage(
+        prefixId.getBucketName(), prefixId.getObjectName(), listFolderOptions, pageToken);
   }
 
   /**
