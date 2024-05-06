@@ -426,8 +426,11 @@ public class GoogleCloudStorageFileSystem {
                 ? listFoldersInfoForPrefixPage(
                         fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
                     .getItems()
-                : Arrays.asList(
-                    new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName)));
+                // will not delete for a bucket
+                : (folderName == ""
+                    ? null
+                    : Arrays.asList(
+                        new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName))));
       }
 
       if ((!itemsToDelete.isEmpty() && !recursive)) {

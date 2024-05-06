@@ -66,9 +66,7 @@ import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.CredentialAdapter;
-import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
-import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -268,8 +266,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // Helper delegate for turning IOExceptions from API calls into higher-level semantics.
   private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
-
-  private static final ErrorTypeExtractor errorTypeExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
   // Helper for interacting with objects involved with the API client libraries.
   private final ClientRequestHelper<StorageObject> clientRequestHelper =
@@ -973,8 +969,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       while (innerExceptions.isEmpty()) {
         FolderInfo folderToDelete = folderDeleteBlockingQueue.poll(1L, TimeUnit.MINUTES);
 
-        // if after 1 minute, the queue is still empty it will return null and loop is exited
-        if (folderToDelete == null || countOfChildren.isEmpty()) {
+        // if after 1 minute, if the queue is still empty it will return null and loop is exited
+        if (folderToDelete == null) {
           break;
         }
         queueSingleFolderDelete(
@@ -985,7 +981,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             executor,
             1);
       }
-
       // deleting any remaining resources
       executor.shutdown();
     } catch (InterruptedException e) {

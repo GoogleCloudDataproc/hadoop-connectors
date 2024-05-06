@@ -136,8 +136,7 @@ class BatchExecutor {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      logger.atFine().withCause(e).log(
-          "Failed to await termination: forcibly shutting down manual batching thread pool.");
+      logger.atFine().withCause(e).log("Forcibly shutting down manual batching thread pool.");
       requestsExecutor.shutdownNow();
       throw new IOException(
           String.format(
