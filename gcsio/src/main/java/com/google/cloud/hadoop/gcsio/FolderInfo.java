@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
 @VisibleForTesting
 /** Contains information about a Folder resource and is applicable for only HN enabled bucket */
 public class FolderInfo {
-  public static final String BUCKET_PREFIX = "projects/_/buckets/"; // TODO : check it !!
+  public static final String BUCKET_PREFIX = "projects/_/buckets/";
   public static final String FOLDER_PREFIX = "/folders/";
   private static final String PATH = "/";
 
@@ -40,7 +40,10 @@ public class FolderInfo {
    * @param folder Information about the underlying folder.
    */
   public FolderInfo(@Nonnull Folder folder) {
-    checkState(!Strings.isNullOrEmpty(folder.getName()), "Folder resource has invalid path");
+    checkState(
+        !Strings.isNullOrEmpty(folder.getName()),
+        "Folder resource has invalid path : %s",
+        folder.getName());
     this.bucket = getBucketString(folder.getName());
     this.folderName = getFolderString(folder.getName());
   }
@@ -52,27 +55,45 @@ public class FolderInfo {
    * @param folderName
    * @return FolderInfo object
    */
-  public static Folder createFolderInfoObject(String bucketName, String folderName)
-      throws RuntimeException {
+  public static Folder createFolderInfoObject(String bucketName, String folderName) {
     checkState(
-        !Strings.isNullOrEmpty(bucketName), "Folder resource has invalid bucket name", bucketName);
-    checkState(folderName != null, "Folder resource has invalid folder name", bucketName);
+        !Strings.isNullOrEmpty(bucketName),
+        "Folder resource has invalid bucket name: %s",
+        bucketName);
+    checkState(folderName != null, "Folder resource has invalid folder name: %s", folderName);
 
     return Folder.newBuilder()
         .setName(String.join("", BUCKET_PREFIX, bucketName, FOLDER_PREFIX, folderName))
         .build();
   }
 
+  /**
+   * Returns the bucket string. Eg : /projects/_/buckets/BUCKET_NAME/folders/FOLDER_NAME is the
+   * template of path, then bucket string will be BUCKET_NAME
+   *
+   * @param path
+   * @return bucket string
+   */
   private String getBucketString(String path) {
     checkState(
         path.startsWith(BUCKET_PREFIX),
-        "Invalid bucket resource name. Bucket resource name must begin with 'projects/_/buckets/' for global-namespaced buckets or 'projects/{project number}/buckets/' for project-namespaced buckets, and contain no invalid characters or patterns.");
+        "Invalid bucket resource name. Bucket resource name must begin with 'projects/_/buckets/' for global-namespaced buckets and contain no invalid characters or patterns : %s",
+        path);
     int startIndexOfBucketPrefix = path.indexOf(BUCKET_PREFIX) + BUCKET_PREFIX.length();
     return path.substring(startIndexOfBucketPrefix, path.indexOf(PATH, startIndexOfBucketPrefix));
   }
 
+  /**
+   * Returns the Folder string. Eg : /projects/_/buckets/BUCKET_NAME/folders/FOLDER_NAME is the
+   * template of path, then folder string will be FOLDER_NAME eg :
+   * /projects/_/buckets/BUCKET_NAME/folders/A/B/ -> returns A/B/ eg :
+   * /projects/_/buckets/BUCKET_NAME/folders/ -> returns ""
+   *
+   * @param path
+   * @return
+   */
   private String getFolderString(String path) {
-    checkState(path.contains(FOLDER_PREFIX), "Invalid folder path");
+    checkState(path.contains(FOLDER_PREFIX), "Invalid folder path: %s", path);
     int startIndex = path.indexOf(FOLDER_PREFIX) + FOLDER_PREFIX.length();
     return path.substring(startIndex);
   }

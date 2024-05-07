@@ -966,13 +966,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         }
       }
 
+      int folderSize = folders.size();
       while (innerExceptions.isEmpty()) {
-        FolderInfo folderToDelete = folderDeleteBlockingQueue.poll(1L, TimeUnit.MINUTES);
-
-        // if after 1 minute, if the queue is still empty it will return null and loop is exited
-        if (folderToDelete == null) {
+        if (folderSize == 0) {
           break;
         }
+
+        FolderInfo folderToDelete = folderDeleteBlockingQueue.take();
+        folderSize--;
+
+        // if while deleting any exception happens and folder is not able to delete, outer while
+        // loop will exit
         queueSingleFolderDelete(
             folderToDelete,
             countOfChildren,

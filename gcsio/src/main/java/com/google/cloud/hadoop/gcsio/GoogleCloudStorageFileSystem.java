@@ -427,7 +427,7 @@ public class GoogleCloudStorageFileSystem {
                         fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
                     .getItems()
                 // will not delete for a bucket
-                : (folderName == ""
+                : (folderName.equals("")
                     ? null
                     : Arrays.asList(
                         new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName))));
@@ -460,7 +460,10 @@ public class GoogleCloudStorageFileSystem {
    * @return bucket name
    */
   private String getBucketName(@Nonnull URI path) {
-    checkState(!Strings.isNullOrEmpty(path.getAuthority()), "Bucket name cannot be null");
+    checkState(
+        !Strings.isNullOrEmpty(path.getAuthority()),
+        "Bucket name cannot be null: %s",
+        path.getAuthority());
     return path.getAuthority();
   }
 
@@ -471,7 +474,8 @@ public class GoogleCloudStorageFileSystem {
    * @return folder path
    */
   private String getFolderName(@Nonnull URI path) {
-    checkState(path.getPath().startsWith(PATH_DELIMITER), "Invalid folder name");
+    checkState(
+        path.getPath().startsWith(PATH_DELIMITER), "Invalid folder name: %s", path.getPath());
     return path.getPath().substring(1);
   }
 
