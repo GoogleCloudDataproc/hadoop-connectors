@@ -75,6 +75,7 @@ import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -93,12 +94,15 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
@@ -3377,6 +3381,95 @@ public class GoogleCloudStorageTest {
 
     assertThat(testGetRequest.getRequestHeaders().getAuthorization())
         .isEqualTo("Bearer testDownscopedAccessToken");
+  }
+
+  @Test
+  public void checkDeletionOrderForHnBucketBalancedFolders() {
+    String folderString = "test-folder-start/";
+    List<FolderInfo> foldersToDelete = new LinkedList<>();
+    List<FolderInfo> orderOfDeletion = new LinkedList<>();
+
+    addFolders(foldersToDelete, folderString);
+    int folderSize = foldersToDelete.size();
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+
+    deleteFolderOperation.computeChildrenForFolderResource();
+    while (folderSize != 0 && deleteFolderOperation.isInnerExceptionEmpty()) {
+      FolderInfo folderToDelete = deleteFolderOperation.getElementFromBlockingQueue();
+      orderOfDeletion.add(folderToDelete);
+      folderSize--;
+      deleteFolderOperation.queueSingleFolderDelete(folderToDelete);
+    }
+
+    assertThat(orderOfDeletion.size()).isEqualTo(foldersToDelete.size());
+
+    // Map to store the index at which a folder was deleted
+    HashMap<String, Integer> deletionOrder = new HashMap<>();
+    for (int i = 0; i < orderOfDeletion.size(); i++) {
+      deletionOrder.put(orderOfDeletion.get(i).getFolderName(), i);
+    }
+
+    for (int i = 0; i < orderOfDeletion.size(); i++) {
+      FolderInfo curFolder = orderOfDeletion.get(i);
+      String curFolderName = curFolder.getFolderName();
+      String parentFolderName = curFolder.getParentFolderName();
+
+      if (!Strings.isNullOrEmpty(parentFolderName)) {
+        assertThat(deletionOrder.get(parentFolderName) > deletionOrder.get(curFolderName)).isTrue();
+      }
+    }
+  }
+
+  @Test
+  public void checkDeletionOrderForHnBucketSkewedFolders() {
+    String folderString = "test-folder-start/";
+    List<FolderInfo> foldersToDelete = new LinkedList<>();
+    List<FolderInfo> orderOfDeletion = new LinkedList<>();
+
+    for (int i = 0; i < 10; i++) {
+      foldersToDelete.add(
+          new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, folderString)));
+      folderString += ("test-folder-" + i + "/");
+    }
+
+    int folderSize = foldersToDelete.size();
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+
+    deleteFolderOperation.computeChildrenForFolderResource();
+    while (folderSize != 0 && deleteFolderOperation.isInnerExceptionEmpty()) {
+      FolderInfo folderToDelete = deleteFolderOperation.getElementFromBlockingQueue();
+      orderOfDeletion.add(folderToDelete);
+      folderSize--;
+      deleteFolderOperation.queueSingleFolderDelete(folderToDelete);
+    }
+
+    assertThat(orderOfDeletion.size()).isEqualTo(foldersToDelete.size());
+    for (int i = 1; i < orderOfDeletion.size(); i++) {
+      FolderInfo prev = orderOfDeletion.get(i - 1);
+      FolderInfo cur = orderOfDeletion.get(i);
+      assertThat(prev.getParentFolderName()).isEqualTo(cur.getFolderName());
+    }
+  }
+
+  /** Helper function to create a balanced set of folder resources */
+  private void addFolders(List<FolderInfo> foldersToDelete, String curFolderName) {
+    Random r = new Random();
+    String abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    Queue<String> q = new ArrayDeque<>();
+    q.add(curFolderName);
+
+    while (!q.isEmpty()) {
+      String top = q.poll();
+      foldersToDelete.add(new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, top)));
+      if (foldersToDelete.size() > 30) return;
+
+      for (int i = 0; i < 3; i++) {
+        char letter = abc.charAt(r.nextInt(abc.length()));
+        q.add(top + letter + "/");
+      }
+    }
   }
 
   private GoogleCloudStorage mockedGcs(HttpTransport transport) {

@@ -110,8 +110,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.CountDownLatch;
@@ -121,7 +119,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -935,217 +932,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** See {@link GoogleCloudStorage#deleteFolders(List)} for details about expected behavior. */
   @Override
   public void deleteFolders(List<FolderInfo> folders) throws IOException {
-    // Gather exceptions to wrap in a composite exception at the end.
-    final KeySetView<IOException, Boolean> innerExceptions = ConcurrentHashMap.newKeySet();
     String traceContext = String.format("batchFolderDelete(size=%s)", folders.size());
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(folders, storageOptions, lazyGetStorageControlClient());
     try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
-
-      // threads for parallel delete of folder resources
-      BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
-
-      // Map to store number of children for each parent object
-      ConcurrentHashMap<String, Long> countOfChildren = new ConcurrentHashMap<>();
-
-      for (FolderInfo currentFolder : folders) {
-        if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
-          countOfChildren.put(currentFolder.getFolderName(), 0L);
-        }
-
-        String parentFolder = currentFolder.getParentFolderName();
-        if (!Strings.isNullOrEmpty(parentFolder)) {
-          countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue + newValue);
-        }
-      }
-
-      BlockingQueue<FolderInfo> folderDeleteBlockingQueue =
-          new LinkedBlockingQueue<>(folders.size());
-      for (FolderInfo currentFolder : folders) {
-        if (countOfChildren.get(currentFolder.getFolderName()) == 0L) {
-          addFolderResourceInBlockingQueue(
-              currentFolder, folderDeleteBlockingQueue, innerExceptions);
-        }
-      }
-
-      int folderSize = folders.size();
-      while (innerExceptions.isEmpty()) {
-        if (folderSize == 0) {
-          break;
-        }
-
-        FolderInfo folderToDelete = folderDeleteBlockingQueue.take();
-        folderSize--;
-
-        // if while deleting any exception happens and folder is not able to delete, outer while
-        // loop will exit
-        queueSingleFolderDelete(
-            folderToDelete,
-            countOfChildren,
-            folderDeleteBlockingQueue,
-            innerExceptions,
-            executor,
-            1);
-      }
-      // deleting any remaining resources
-      executor.shutdown();
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+      deleteFolderOperation.performDeleteOperation();
     }
 
-    if (!innerExceptions.isEmpty()) {
+    if (!deleteFolderOperation.isInnerExceptionEmpty()) {
       GoogleCloudStorageEventBus.postOnException();
-      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+      throw GoogleCloudStorageExceptions.createCompositeException(
+          deleteFolderOperation.getInnerExceptions());
     }
-  }
-
-  /* Callable class specifically for deletion of folder resource */
-  private class DeleteFolder implements Callable<Void> {
-    private DeleteFolderRequest deleteFolderRequest;
-
-    @Override
-    public Void call() throws IOException {
-      logger.atFiner().log("Deleting folder resource %s", deleteFolderRequest.getName());
-      lazyGetStorageControlClient().deleteFolder(deleteFolderRequest);
-      return null;
-    }
-
-    DeleteFolder(FolderInfo folder) {
-      this.deleteFolderRequest =
-          DeleteFolderRequest.newBuilder().setName(folder.toString()).build();
-    }
-  }
-
-  /** Helper function to delete a single folder resource */
-  public void queueSingleFolderDelete(
-      @Nonnull final FolderInfo folder,
-      ConcurrentHashMap<String, Long> countOfChildren,
-      BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
-      final KeySetView<IOException, Boolean> innerExceptions,
-      final BatchExecutor batchExecutor,
-      final int attempt)
-      throws IOException {
-    final String bucketName = folder.getBucket();
-    final String folderName = folder.getFolderName();
-    checkArgument(
-        !Strings.isNullOrEmpty(bucketName),
-        String.format("No bucket for folder resource %s", folder.toString()));
-    checkArgument(
-        !Strings.isNullOrEmpty(folderName),
-        String.format("No folder path for folder resource %s", folder.toString()));
-
-    batchExecutor.queue(
-        new DeleteFolder(folder),
-        getDeletionCallback(
-            folder,
-            countOfChildren,
-            folderDeleteBlockingQueue,
-            innerExceptions,
-            batchExecutor,
-            attempt));
-  }
-
-  /**
-   * Helper function to add folderResource to blocking queue
-   *
-   * @param folderResource
-   * @param folderDeleteBlockingQueue blocking queue
-   */
-  private void addFolderResourceInBlockingQueue(
-      FolderInfo folderResource,
-      BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
-      KeySetView<IOException, Boolean> innerExceptions) {
-    try {
-      folderDeleteBlockingQueue.add(folderResource);
-    } catch (IllegalStateException e) {
-      innerExceptions.add(
-          new IOException(
-              String.format(
-                  "Exception in adding folder resource %s to blocking queue : %s", folderResource),
-              e));
-    }
-  }
-
-  /**
-   * Helper function to add the parent of successfully deleted folder resource into the blocking
-   * queue
-   *
-   * @param folderResource of the folder that is now deleted
-   * @param countOfChildren hashmap to store the number of children for a folder resources
-   * @param folderDeleteBlockingQueue blocking queue
-   */
-  private void successfullDeletionOfFolderResource(
-      FolderInfo folderResource,
-      ConcurrentHashMap<String, Long> countOfChildren,
-      BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
-      KeySetView<IOException, Boolean> innerExceptions) {
-    // remove the folderResource from list of map
-    countOfChildren.remove(folderResource.getFolderName());
-
-    String parentFolder = folderResource.getParentFolderName();
-    if (countOfChildren.containsKey(parentFolder)) {
-
-      // update the parent's count of children
-      countOfChildren.replace(parentFolder, countOfChildren.get(parentFolder) - 1);
-
-      // if the parent folder is now empty, append in the queue
-      if (countOfChildren.get(parentFolder) == 0) {
-        addFolderResourceInBlockingQueue(
-            new FolderInfo(
-                FolderInfo.createFolderInfoObject(folderResource.getBucket(), parentFolder)),
-            folderDeleteBlockingQueue,
-            innerExceptions);
-      }
-    }
-  }
-
-  /** Helper to create a callback for a particular deletion request for folder. */
-  private JsonBatchCallback<Void> getDeletionCallback(
-      final FolderInfo resourceId,
-      ConcurrentHashMap<String, Long> countOfChildren,
-      BlockingQueue<FolderInfo> folderDeleteBlockingQueue,
-      final KeySetView<IOException, Boolean> innerExceptions,
-      final BatchExecutor batchExecutor,
-      final int attempt) {
-    return new JsonBatchCallback<Void>() {
-      @Override
-      public void onSuccess(Void obj, HttpHeaders responseHeaders) {
-        logger.atFiner().log("Successfully deleted folder %s", resourceId.toString());
-        successfullDeletionOfFolderResource(
-            resourceId, countOfChildren, folderDeleteBlockingQueue, innerExceptions);
-      }
-
-      @Override
-      public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders)
-          throws IOException {
-        GoogleJsonResponseException cause = createJsonResponseException(jsonError, responseHeaders);
-        if (errorExtractor.itemNotFound(cause)) {
-          // Ignore item-not-found errors. We do not have to delete what we cannot find.
-          // This
-          // error typically shows up when we make a request to delete something and the
-          // server
-          // receives the request but we get a retry-able error before we get a response.
-          // During a retry, we no longer find the item because the server had deleted
-          // it already.
-          logger.atFiner().log("Delete folder '%s' not found:%n%s", resourceId, jsonError);
-          successfullDeletionOfFolderResource(
-              resourceId, countOfChildren, folderDeleteBlockingQueue, innerExceptions);
-        } else if (errorExtractor.preconditionNotMet(cause)
-            && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
-          logger.atInfo().log(
-              "Precondition not met while deleting '%s'. Attempt %s." + " Retrying:%n%s",
-              resourceId, attempt, jsonError);
-          queueSingleFolderDelete(
-              resourceId,
-              countOfChildren,
-              folderDeleteBlockingQueue,
-              innerExceptions,
-              batchExecutor,
-              attempt + 1);
-        } else {
-          innerExceptions.add(
-              new IOException(String.format("Error deleting '%s', stage 2", resourceId), cause));
-        }
-      }
-    };
   }
 
   /** Helper to create a callback for a particular deletion request. */

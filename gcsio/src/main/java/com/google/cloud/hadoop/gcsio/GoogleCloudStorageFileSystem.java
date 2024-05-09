@@ -461,9 +461,7 @@ public class GoogleCloudStorageFileSystem {
    */
   private String getBucketName(@Nonnull URI path) {
     checkState(
-        !Strings.isNullOrEmpty(path.getAuthority()),
-        "Bucket name cannot be null: %s",
-        path.getAuthority());
+        !Strings.isNullOrEmpty(path.getAuthority()), "Bucket name cannot be null : %s", path);
     return path.getAuthority();
   }
 
