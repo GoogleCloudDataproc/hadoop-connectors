@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
@@ -8,6 +24,7 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 import com.google.storage.control.v2.DeleteFolderRequest;
@@ -21,17 +38,18 @@ import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.annotation.Nonnull;
 
-public class DeleteFolderOperation {
+@VisibleForTesting
+class DeleteFolderOperation {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
-  private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
-  private GoogleCloudStorageOptions storageOptions;
+  private static final ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
+  private final GoogleCloudStorageOptions storageOptions;
   private final KeySetView<IOException, Boolean> innerExceptions;
-  private List<FolderInfo> folders;
-  private BatchExecutor batchExecutor;
-  private StorageControlClient storageControlClient;
+  private final List<FolderInfo> folders;
+  private final BatchExecutor batchExecutor;
+  private final StorageControlClient storageControlClient;
   private BlockingQueue<FolderInfo> folderDeleteBlockingQueue;
   private ConcurrentHashMap<String, Long> countOfChildren;
 
@@ -55,7 +73,7 @@ public class DeleteFolderOperation {
   }
 
   /** Helper function that performs the deletion process for folder resources */
-  public void performDeleteOperation() throws IOException {
+  public void performDeleteOperation() {
     int folderSize = this.folders.size();
     computeChildrenForFolderResource();
 
@@ -67,8 +85,18 @@ public class DeleteFolderOperation {
       // Queue the deletion request
       queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
     }
-    // deleting any remaining resources
-    this.batchExecutor.shutdown();
+    batchExecutorShutdown();
+  }
+
+  /** Shutting down batch executor and flushing any remaining requests */
+  private void batchExecutorShutdown() {
+    try {
+      this.batchExecutor.shutdown();
+    } catch (IOException e) {
+      this.innerExceptions.add(
+          new IOException(
+              String.format("Error in shutting down batch executor : %s", e.getMessage())));
+    }
   }
 
   public boolean isInnerExceptionEmpty() {
