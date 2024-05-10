@@ -27,7 +27,6 @@ import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
-import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfigs;

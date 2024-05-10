@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import javax.annotation.Nonnull;
 
+/** Manages a specific duration statistic */
 class GhfsStreamStats {
   private final GhfsGlobalStorageStatistics storageStatistics;
   private final GhfsStatistic durationStat;
