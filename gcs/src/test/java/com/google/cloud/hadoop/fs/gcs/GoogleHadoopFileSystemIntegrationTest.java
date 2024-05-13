@@ -1518,7 +1518,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   private static Long getMetricValue(StorageStatistics stats, GhfsStatistic invocationCreate) {
-
     return stats.getLong(invocationCreate.getSymbol());
   }
 }
