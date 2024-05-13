@@ -244,7 +244,8 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_CONNECT_TIMEOUT =
-      new HadoopConfigurationProperty<>("fs.gs.http.connect-timeout", 20 * 1000);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.http.connect-timeout", GoogleCloudStorageOptions.HTTP_REQUEST_CONNECT_TIMEOUT);
 
   /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_READ_TIMEOUT =
