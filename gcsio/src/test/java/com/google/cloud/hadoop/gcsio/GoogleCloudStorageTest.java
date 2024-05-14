@@ -3399,9 +3399,8 @@ public class GoogleCloudStorageTest {
       FolderInfo folderToDelete = deleteFolderOperation.getElementFromBlockingQueue();
       orderOfDeletion.add(folderToDelete);
       folderSize--;
-      deleteFolderOperation.queueSingleFolderDelete(folderToDelete);
+      deleteFolderOperation.addToToBatchExecutorQueue(() -> null, folderToDelete, 1);
     }
-
     assertThat(orderOfDeletion.size()).isEqualTo(foldersToDelete.size());
 
     // Map to store the index at which a folder was deleted
@@ -3442,7 +3441,7 @@ public class GoogleCloudStorageTest {
       FolderInfo folderToDelete = deleteFolderOperation.getElementFromBlockingQueue();
       orderOfDeletion.add(folderToDelete);
       folderSize--;
-      deleteFolderOperation.queueSingleFolderDelete(folderToDelete);
+      deleteFolderOperation.addToToBatchExecutorQueue(() -> null, folderToDelete, 1);
     }
 
     assertThat(orderOfDeletion.size()).isEqualTo(foldersToDelete.size());

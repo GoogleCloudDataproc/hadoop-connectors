@@ -88,7 +88,7 @@ class BatchExecutor {
             }));
   }
 
-  private static <T> void execute(Callable<T> task, FutureCallback<T> callback) throws Exception {
+  private static <T> void execute(Callable<T> task, FutureCallback<T> callback) {
     checkArgument(callback != null, "FutureCallBack cannot be null : %s", callback);
     try {
       T result = task.call();
@@ -100,8 +100,8 @@ class BatchExecutor {
 
   /** Awaits until all tasks are terminated and then shutdowns the executor. */
   public void shutdown() throws IOException {
-    awaitRequestsCompletion();
     try {
+      awaitRequestsCompletion();
       checkState(responseFutures.isEmpty(), "responseFutures should be empty after flush");
     } finally {
       requestsExecutor.shutdown();
@@ -119,7 +119,7 @@ class BatchExecutor {
     }
   }
 
-  /** Awaits until all sent requests are completed. Should be serialized */
+  /** Awaits until all sent requests are completed */
   private void awaitRequestsCompletion() throws IOException {
     while (!responseFutures.isEmpty()) {
       getFromFuture(responseFutures.remove());

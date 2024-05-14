@@ -16,13 +16,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
-import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpHeaders;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
@@ -59,8 +54,8 @@ class DeleteFolderOperation {
   private final List<FolderInfo> folders;
   private final BatchExecutor batchExecutor;
   private final StorageControlClient storageControlClient;
-  private BlockingQueue<FolderInfo> folderDeleteBlockingQueue;
-  private ConcurrentHashMap<String, Long> countOfChildren;
+  private final BlockingQueue<FolderInfo> folderDeleteBlockingQueue;
+  private final ConcurrentHashMap<String, Long> countOfChildren;
 
   DeleteFolderOperation(
       List<FolderInfo> folders,
@@ -119,6 +114,12 @@ class DeleteFolderOperation {
   /** Gets the head from the blocking queue */
   public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     return this.folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+  }
+
+  /** Adding to batch executor's queue */
+  public void addToToBatchExecutorQueue(
+      Callable callable, final FolderInfo folder, final int attempt) {
+    this.batchExecutor.queue(callable, getDeletionCallback(folder, this.allExceptions, attempt));
   }
 
   /** Computes the number of children for each folder resource */
@@ -186,9 +187,8 @@ class DeleteFolderOperation {
         !Strings.isNullOrEmpty(folderName),
         String.format("No folder path for folder resource %s", folderName));
 
-    this.batchExecutor.queue(
-        new DeleteFolderRequestBuilder(folder, this.storageControlClient),
-        getDeletionCallback(folder, this.allExceptions, attempt));
+    addToToBatchExecutorQueue(
+        new DeleteFolderRequestCallable(folder, this.storageControlClient), folder, attempt);
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
@@ -197,7 +197,6 @@ class DeleteFolderOperation {
       final KeySetView<IOException, Boolean> allExceptions,
       final int attempt) {
     return new FutureCallback<Void>() {
-
       @Override
       public void onSuccess(Void result) {
         logger.atFiner().log("Successfully deleted folder %s", resourceId.toString());
@@ -237,7 +236,7 @@ class DeleteFolderOperation {
   }
 
   /* Callable class specifically for deletion of folder resource */
-  private class DeleteFolderRequestBuilder implements Callable<Void> {
+  private class DeleteFolderRequestCallable implements Callable<Void> {
     private StorageControlClient storageControlClient;
     private DeleteFolderRequest deleteFolderRequest;
 
@@ -248,23 +247,11 @@ class DeleteFolderOperation {
       return null;
     }
 
-    DeleteFolderRequestBuilder(FolderInfo folder, StorageControlClient storageControlClient) {
+    DeleteFolderRequestCallable(FolderInfo folder, StorageControlClient storageControlClient) {
       checkArgument(storageControlClient != null, "StorageControlClient cannot be null");
       this.storageControlClient = storageControlClient;
       this.deleteFolderRequest =
           DeleteFolderRequest.newBuilder().setName(folder.toString()).build();
     }
-  }
-
-  /*Only for testing purposes. This bypasses the storageControlClient.deleteFolder call*/
-  public void queueSingleFolderDelete(@Nonnull final FolderInfo folder) {
-    this.batchExecutor.queue(
-        new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            return null;
-          }
-        },
-        getDeletionCallback(folder, this.allExceptions, 1));
   }
 }
