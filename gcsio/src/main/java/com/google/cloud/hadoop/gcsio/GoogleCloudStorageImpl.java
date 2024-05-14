@@ -937,12 +937,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new DeleteFolderOperation(folders, storageOptions, lazyGetStorageControlClient());
     try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
       deleteFolderOperation.performDeleteOperation();
+    } catch (InterruptedException e) {
+      logger.atSevere().log("Recieved thread interruption exception : %s", e);
+      throw new RuntimeException(e);
     }
 
-    if (!deleteFolderOperation.isInnerExceptionEmpty()) {
+    if (!deleteFolderOperation.encounteredNoExceptions()) {
       GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(
-          deleteFolderOperation.getInnerExceptions());
+          deleteFolderOperation.getAllExceptions());
     }
   }
 

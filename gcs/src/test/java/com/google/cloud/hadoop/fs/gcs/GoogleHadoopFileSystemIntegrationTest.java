@@ -1515,147 +1515,113 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void testHnBucketNonRecursiveDeleteOperation() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
-    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
-    URI initUri = new URI("gs://" + bucketName);
-    Configuration config = loadConfig();
-    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
-    googleHadoopFileSystem.initialize(initUri, config);
-
-    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
-    theGcs.createBucket(
-        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
-
-    assertThat(theGcs.isHnBucket(new Path(initUri.toString() + "/").toUri())).isTrue();
+    GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
+    String bucketPath = "gs://" + bucketName;
     try {
-      googleHadoopFileSystem.mkdirs(new Path("A/"));
+      googleHadoopFileSystem.mkdirs(new Path("/A/"));
       assertThrows(
           "Cannot delete a non-empty directory",
           java.nio.file.DirectoryNotEmptyException.class,
-          () -> googleHadoopFileSystem.delete(new Path("gs://" + bucketName + "/"), false));
+          () -> googleHadoopFileSystem.delete(new Path(bucketPath), false));
 
-      // delete /A/ non recursively
-      googleHadoopFileSystem.delete(new Path("gs://" + bucketName + "/A"), false);
+      // verify only "A/" folder exists
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(1);
 
-      // check that on listing we get no folders for folder "/A/"
-      List<FolderInfo> folderList =
-          googleHadoopFileSystem
-              .getGcsFs()
-              .listFoldersInfoForPrefixPage(
-                  new Path("gs://" + bucketName + "/A").toUri(),
-                  ListFolderOptions.builder().build(),
-                  null)
-              .getItems();
+      // delete A/ non recursively
+      googleHadoopFileSystem.delete(new Path(bucketPath + "/A"), false);
 
-      assertThat(folderList.size()).isEqualTo(0);
+      // check that on listing we get no folders for folder "A/"
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(0);
     } finally {
-      googleHadoopFileSystem.delete(new Path(initUri));
+      googleHadoopFileSystem.delete(new Path(bucketPath));
     }
   }
 
   @Test
   public void testHnBucketRecursiveDeleteOperationOnBucket() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
-    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
-    URI initUri = new URI("gs://" + bucketName);
-    Configuration config = loadConfig();
-    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
-    googleHadoopFileSystem.initialize(initUri, config);
+    String bucketPath = "gs://" + bucketName;
+    GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
+    createResources(googleHadoopFileSystem);
+    assertThat(numberOfFolders(googleHadoopFileSystem, "gs://" + bucketName)).isEqualTo(22);
+    assertThrows(
+        "Cannot delete a non-empty directory",
+        java.nio.file.DirectoryNotEmptyException.class,
+        () -> googleHadoopFileSystem.delete(new Path(bucketPath), false));
 
-    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
-    theGcs.createBucket(
-        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    // delete bucket
+    googleHadoopFileSystem.delete(new Path(bucketPath), true);
 
-    assertThat(theGcs.isHnBucket(new Path(initUri.toString() + "/").toUri())).isTrue();
-
-    try {
-      googleHadoopFileSystem.mkdirs(new Path("A/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir1/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir2/subdir3/"));
-      createFile(googleHadoopFileSystem, new Path("A/1"));
-      createFile(googleHadoopFileSystem, new Path("A/2"));
-
-      assertThrows(
-          "Cannot delete a non-empty directory",
-          java.nio.file.DirectoryNotEmptyException.class,
-          () -> googleHadoopFileSystem.delete(new Path("gs://" + bucketName), false));
-
-      List<FolderInfo> initialListOfFolders =
-          googleHadoopFileSystem
-              .getGcsFs()
-              .listFoldersInfoForPrefixPage(
-                  new Path("gs://" + bucketName).toUri(), ListFolderOptions.builder().build(), null)
-              .getItems();
-      assertThat(initialListOfFolders.size()).isEqualTo(6);
-
-      // delete bucket
-      googleHadoopFileSystem.delete(new Path("gs://" + bucketName), true);
-
-      List<FolderInfo> finalListOfFolders =
-          googleHadoopFileSystem
-              .getGcsFs()
-              .listFoldersInfoForPrefixPage(
-                  new Path("gs://" + bucketName).toUri(), ListFolderOptions.builder().build(), null)
-              .getItems();
-      assertThat(finalListOfFolders.size()).isEqualTo(0);
-    } finally {
-      googleHadoopFileSystem.delete(new Path(initUri));
-    }
+    // TODO: flaky as maybe deletion of bucket is asynchronous and still ongoing so should we add a
+    // sleep ? Thread.sleep(5000);
+    // bucket should not exist
+    assertThrows(
+        "The specified bucket does not exist",
+        com.google.api.gax.rpc.NotFoundException.class,
+        () -> assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath)).isEqualTo(0));
   }
 
   @Test
   public void testHnBucketRecursiveDeleteOperationOnDirectory() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
-    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
-    URI initUri = new URI("gs://" + bucketName);
-    Configuration config = loadConfig();
-    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
-    googleHadoopFileSystem.initialize(initUri, config);
+    String bucketPath = "gs://" + bucketName;
+    GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
+    try {
+      createResources(googleHadoopFileSystem);
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(21);
+      assertThrows(
+          "Cannot delete a non-empty directory",
+          java.nio.file.DirectoryNotEmptyException.class,
+          () -> googleHadoopFileSystem.delete(new Path(bucketPath + "/A"), false));
 
-    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
-    theGcs.createBucket(
-        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
-    assertThat(theGcs.isHnBucket(new Path(initUri.toString() + "/").toUri())).isTrue();
+      // rename A/ to B/
+      googleHadoopFileSystem.rename(new Path(bucketPath + "/A/"), new Path(bucketPath + "/B/"));
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/B/")).isEqualTo(21);
+
+      // delete B/
+      googleHadoopFileSystem.delete(new Path("/B"), true);
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/B")).isEqualTo(0);
+
+      // rename C/ to B/
+      googleHadoopFileSystem.rename(new Path(bucketPath + "/C/"), new Path(bucketPath + "/B/"));
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/B")).isEqualTo(1);
+    } finally {
+      googleHadoopFileSystem.delete(new Path(bucketPath));
+    }
+  }
+
+  @Test
+  public void testHnBucketDeleteOperationOnNonExistingFolder() throws Exception {
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    String bucketPath = "gs://" + bucketName;
+    GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
 
     try {
-      googleHadoopFileSystem.mkdirs(new Path("A/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir1/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
-      for (int i = 0; i < 15; i++) {
-        Random r = new Random();
-        googleHadoopFileSystem.mkdirs(new Path("A/dir1/" + r.nextInt() + "/"));
-      }
-      googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
-      googleHadoopFileSystem.mkdirs(new Path("A/dir2/subdir3/"));
-      createFile(googleHadoopFileSystem, new Path("A/1"));
-      createFile(googleHadoopFileSystem, new Path("A/2"));
-
-      googleHadoopFileSystem.mkdirs(new Path("C/"));
-      createFile(googleHadoopFileSystem, new Path("C/1"));
-      createFile(googleHadoopFileSystem, new Path("C/2"));
-      createFile(googleHadoopFileSystem, new Path("6"));
+      googleHadoopFileSystem.mkdirs(new Path("/A/"));
+      googleHadoopFileSystem.mkdirs(new Path("/A/C/"));
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(2);
 
       assertThrows(
           "Cannot delete a non-empty directory",
           java.nio.file.DirectoryNotEmptyException.class,
-          () -> googleHadoopFileSystem.delete(new Path("gs://" + bucketName + "/A"), false));
+          () -> googleHadoopFileSystem.delete(new Path(bucketPath + "/A"), false));
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(2);
 
-      // // rename A/ to B/
-      googleHadoopFileSystem.rename(
-          new Path("gs://" + bucketName + "/A/"), new Path("gs://" + bucketName + "/B/"));
+      // try to delete a non existing folder
+      List<FolderInfo> folderInfoList = new ArrayList<>();
+      folderInfoList.add(new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, "A/")));
+      folderInfoList.add(new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, "A/B/")));
+      assertThrows(
+          "The folder you tried to delete is not empty.",
+          java.io.IOException.class,
+          () -> googleHadoopFileSystem.getGcsFs().getGcs().deleteFolders(folderInfoList));
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(2);
 
-      // delete B/
-      googleHadoopFileSystem.delete(new Path("/B"), true);
-
-      // rename C/ to B/
-      googleHadoopFileSystem.rename(
-          new Path("gs://" + bucketName + "/C/"), new Path("gs://" + bucketName + "/B/"));
-
+      // delete A/
+      googleHadoopFileSystem.delete(new Path("/A"), true);
+      assertThat(numberOfFolders(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(0);
     } finally {
-      googleHadoopFileSystem.delete(new Path(initUri));
+      googleHadoopFileSystem.delete(new Path(bucketPath));
     }
   }
 
@@ -1664,6 +1630,50 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     FSDataOutputStream fout = googleHadoopFileSystem.create(path);
     fout.writeBytes("data");
     fout.close();
+  }
+
+  private GoogleHadoopFileSystem createHnEnabledBucket(String bucketName) throws Exception {
+    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
+    URI initUri = new URI("gs://" + bucketName);
+    Configuration config = loadConfig();
+    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
+    googleHadoopFileSystem.initialize(initUri, config);
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(
+        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    assertThat(theGcs.isHnBucket(new Path(initUri + "/").toUri())).isTrue();
+    return googleHadoopFileSystem;
+  }
+
+  private Integer numberOfFolders(
+      GoogleHadoopFileSystem googleHadoopFileSystem, String pathLocation) throws IOException {
+    List<FolderInfo> initialListOfFolders =
+        googleHadoopFileSystem
+            .getGcsFs()
+            .listFoldersInfoForPrefixPage(
+                new Path(pathLocation).toUri(), ListFolderOptions.builder().build(), null)
+            .getItems();
+    return initialListOfFolders.size();
+  }
+
+  private void createResources(GoogleHadoopFileSystem googleHadoopFileSystem) throws Exception {
+    googleHadoopFileSystem.mkdirs(new Path("A/"));
+    googleHadoopFileSystem.mkdirs(new Path("A/dir1/"));
+    googleHadoopFileSystem.mkdirs(new Path("A/dir2/"));
+    for (int i = 0; i < 15; i++) {
+      Random r = new Random();
+      googleHadoopFileSystem.mkdirs(new Path("A/dir1/" + r.nextInt() + "/"));
+    }
+    googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir1/"));
+    googleHadoopFileSystem.mkdirs(new Path("A/dir1/subdir2/"));
+    googleHadoopFileSystem.mkdirs(new Path("A/dir2/subdir3/"));
+    createFile(googleHadoopFileSystem, new Path("A/1"));
+    createFile(googleHadoopFileSystem, new Path("A/2"));
+
+    googleHadoopFileSystem.mkdirs(new Path("C/"));
+    createFile(googleHadoopFileSystem, new Path("C/1"));
+    createFile(googleHadoopFileSystem, new Path("C/2"));
+    createFile(googleHadoopFileSystem, new Path("6"));
   }
 
   private void checkMetric(

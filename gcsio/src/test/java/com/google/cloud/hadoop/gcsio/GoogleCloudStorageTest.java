@@ -3384,7 +3384,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void checkDeletionOrderForHnBucketBalancedFolders() {
+  public void checkDeletionOrderForHnBucketBalancedFolders() throws InterruptedException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
     List<FolderInfo> orderOfDeletion = new LinkedList<>();
@@ -3395,7 +3395,7 @@ public class GoogleCloudStorageTest {
         new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
 
     deleteFolderOperation.computeChildrenForFolderResource();
-    while (folderSize != 0 && deleteFolderOperation.isInnerExceptionEmpty()) {
+    while (folderSize != 0 && deleteFolderOperation.encounteredNoExceptions()) {
       FolderInfo folderToDelete = deleteFolderOperation.getElementFromBlockingQueue();
       orderOfDeletion.add(folderToDelete);
       folderSize--;
@@ -3422,7 +3422,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void checkDeletionOrderForHnBucketSkewedFolders() {
+  public void checkDeletionOrderForHnBucketSkewedFolders() throws InterruptedException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
     List<FolderInfo> orderOfDeletion = new LinkedList<>();
@@ -3438,7 +3438,7 @@ public class GoogleCloudStorageTest {
         new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
 
     deleteFolderOperation.computeChildrenForFolderResource();
-    while (folderSize != 0 && deleteFolderOperation.isInnerExceptionEmpty()) {
+    while (folderSize != 0 && deleteFolderOperation.encounteredNoExceptions()) {
       FolderInfo folderToDelete = deleteFolderOperation.getElementFromBlockingQueue();
       orderOfDeletion.add(folderToDelete);
       folderSize--;

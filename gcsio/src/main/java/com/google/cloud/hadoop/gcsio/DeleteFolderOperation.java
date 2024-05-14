@@ -16,17 +16,17 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
-import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpHeaders;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.storage.control.v2.DeleteFolderRequest;
 import com.google.storage.control.v2.StorageControlClient;
 import java.io.IOException;
@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 
 @VisibleForTesting
@@ -45,8 +46,11 @@ class DeleteFolderOperation {
   // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
   private static final ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
+
+  // Error extractor to map APi exception to meaningful ErrorTypes.
+  private static final ErrorTypeExtractor errorTypeExtractor = GrpcErrorTypeExtractor.INSTANCE;
   private final GoogleCloudStorageOptions storageOptions;
-  private final KeySetView<IOException, Boolean> innerExceptions;
+  private final KeySetView<IOException, Boolean> allExceptions;
   private final List<FolderInfo> folders;
   private final BatchExecutor batchExecutor;
   private final StorageControlClient storageControlClient;
@@ -66,19 +70,19 @@ class DeleteFolderOperation {
     this.batchExecutor = new BatchExecutor(this.storageOptions.getBatchThreads());
 
     // Gather exceptions to wrap in a composite exception at the end.
-    this.innerExceptions = ConcurrentHashMap.newKeySet();
+    this.allExceptions = ConcurrentHashMap.newKeySet();
 
     // Map to store number of children for each parent object
     this.countOfChildren = new ConcurrentHashMap<>();
   }
 
   /** Helper function that performs the deletion process for folder resources */
-  public void performDeleteOperation() {
+  public void performDeleteOperation() throws InterruptedException {
     int folderSize = this.folders.size();
     computeChildrenForFolderResource();
 
     // this will avoid infinite loop when all folders are deleted
-    while (folderSize != 0 && isInnerExceptionEmpty()) {
+    while (folderSize != 0 && encounteredNoExceptions()) {
       FolderInfo folderToDelete = getElementFromBlockingQueue();
       folderSize--;
 
@@ -93,31 +97,24 @@ class DeleteFolderOperation {
     try {
       this.batchExecutor.shutdown();
     } catch (IOException e) {
-      this.innerExceptions.add(
+      this.allExceptions.add(
           new IOException(
               String.format("Error in shutting down batch executor : %s", e.getMessage())));
     }
   }
 
-  public boolean isInnerExceptionEmpty() {
-    return this.innerExceptions.isEmpty();
+  public boolean encounteredNoExceptions() {
+    return this.allExceptions.isEmpty();
   }
 
-  public KeySetView<IOException, Boolean> getInnerExceptions() {
-    return innerExceptions;
+  public KeySetView<IOException, Boolean> getAllExceptions() {
+    return allExceptions;
   }
 
   /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue() {
-    try {
-      return this.folderDeleteBlockingQueue.take();
-    } catch (InterruptedException e) {
-      innerExceptions.add(
-          new IOException(
-              String.format(
-                  "Error while getting folder resource from blocking queue : %s", e.getMessage())));
-      return null;
-    }
+  public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
+
+    return this.folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
   }
 
   /** Computes the number of children for each folder resource */
@@ -187,27 +184,26 @@ class DeleteFolderOperation {
 
     this.batchExecutor.queue(
         new DeleteFolderRequestBuilder(folder, this.storageControlClient),
-        getDeletionCallback(folder, this.innerExceptions, attempt));
+        getDeletionCallback(folder, this.allExceptions, attempt));
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
-  private JsonBatchCallback<Void> getDeletionCallback(
+  private FutureCallback getDeletionCallback(
       final FolderInfo resourceId,
-      final KeySetView<IOException, Boolean> innerExceptions,
+      final KeySetView<IOException, Boolean> allExceptions,
       final int attempt) {
-    return new JsonBatchCallback<Void>() {
+    return new FutureCallback<Void>() {
 
       @Override
-      public void onSuccess(Void obj, HttpHeaders responseHeaders) {
+      public void onSuccess(Void result) {
         logger.atFiner().log("Successfully deleted folder %s", resourceId.toString());
         successfullDeletionOfFolderResource(resourceId);
       }
 
       @Override
-      public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders)
-          throws IOException {
-        GoogleJsonResponseException cause = createJsonResponseException(jsonError, responseHeaders);
-        if (errorExtractor.itemNotFound(cause)) {
+      public void onFailure(Throwable throwable) {
+        if (throwable instanceof Exception
+            & errorTypeExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
           // Ignore item-not-found errors. We do not have to delete what we cannot find.
           // This
           // error typically shows up when we make a request to delete something and the
@@ -215,17 +211,22 @@ class DeleteFolderOperation {
           // receives the request but we get a retry-able error before we get a response.
           // During a retry, we no longer find the item because the server had deleted
           // it already.
-          logger.atFiner().log("Delete folder '%s' not found:%n%s", resourceId, jsonError);
+          logger.atFiner().log(
+              "Delete folder '%s' not found: %s", resourceId, throwable.getMessage());
           successfullDeletionOfFolderResource(resourceId);
-        } else if (errorExtractor.preconditionNotMet(cause)
+        } else if (throwable instanceof Exception
+            && errorTypeExtractor.getErrorType((Exception) throwable)
+                == ErrorType.FAILED_PRECONDITION
             && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
           logger.atInfo().log(
-              "Precondition not met while deleting '%s'. Attempt %s." + " Retrying:%n%s",
-              resourceId, attempt, jsonError);
+              "Precondition not met while deleting '%s'. Attempt %s." + " Retrying:%s",
+              resourceId, attempt, throwable);
           queueSingleFolderDelete(resourceId, attempt + 1);
         } else {
-          innerExceptions.add(
-              new IOException(String.format("Error deleting '%s', stage 2", resourceId), cause));
+          GoogleCloudStorageEventBus.postOnException();
+          allExceptions.add(
+              new IOException(
+                  String.format("Error deleting '%s', stage 2", resourceId), throwable));
         }
       }
     };
@@ -260,6 +261,6 @@ class DeleteFolderOperation {
             return null;
           }
         },
-        getDeletionCallback(folder, this.innerExceptions, 1));
+        getDeletionCallback(folder, this.allExceptions, 1));
   }
 }

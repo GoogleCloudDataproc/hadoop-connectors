@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Google LLC
+ * Copyright 2023 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,13 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
-import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.Queue;
@@ -46,8 +45,11 @@ import java.util.concurrent.TimeUnit;
  * <p>Instance of this class can not be used again after {@link #shutdown()} method has been called.
  */
 class BatchExecutor {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   private final ExecutorService requestsExecutor;
+
   private final Queue<Future<Void>> responseFutures = new ConcurrentLinkedQueue<>();
 
   public BatchExecutor(int numThreads) {
@@ -64,7 +66,7 @@ class BatchExecutor {
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(numThreads * 20),
             new ThreadFactoryBuilder()
-                .setNameFormat("gcs-manual-batching-pool-%d")
+                .setNameFormat("gcs-grpc-manual-batching-pool-%d")
                 .setDaemon(true)
                 .build());
     executor.allowCoreThreadTimeOut(true);
@@ -73,7 +75,7 @@ class BatchExecutor {
   }
 
   /** Adds a task to the execution queue. */
-  public <T> void queue(Callable<T> task, JsonBatchCallback<T> callback) {
+  public <T> void queue(Callable<T> task, FutureCallback<T> callback) {
     checkState(
         !requestsExecutor.isShutdown() && !requestsExecutor.isTerminated(),
         "requestExecutor should not be terminated to queue request");
@@ -86,36 +88,32 @@ class BatchExecutor {
             }));
   }
 
-  private static <T> void execute(Callable<T> task, JsonBatchCallback<T> callback)
-      throws Exception {
+  private static <T> void execute(Callable<T> task, FutureCallback<T> callback) throws Exception {
+    checkArgument(callback != null, "FutureCallBack cannot be null : %s", callback);
     try {
-      T res = task.call();
-      callback.onSuccess(res, /* httpHeaders */ null);
-    } catch (IOException e) {
-      GoogleJsonResponseException jsonException = ApiErrorExtractor.getJsonResponseException(e);
-      if (jsonException == null) {
-        throw e;
-      }
-      callback.onFailure(jsonException.getDetails(), jsonException.getHeaders());
+      T result = task.call();
+      callback.onSuccess(result);
+    } catch (Throwable throwable) {
+      callback.onFailure(throwable);
     }
   }
 
   /** Awaits until all tasks are terminated and then shutdowns the executor. */
   public void shutdown() throws IOException {
+    awaitRequestsCompletion();
     try {
-      awaitRequestsCompletion();
       checkState(responseFutures.isEmpty(), "responseFutures should be empty after flush");
     } finally {
       requestsExecutor.shutdown();
       try {
         if (!requestsExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
-          logger.atWarning().log("Forcibly shutting down manual batching thread pool.");
+          logger.atWarning().log("Forcibly shutting down grpc manual batching thread pool.");
           requestsExecutor.shutdownNow();
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         logger.atFine().withCause(e).log(
-            "Failed to await termination: forcibly shutting down manual batching thread pool.");
+            "Failed to await termination: forcibly shutting down grpc manual batching thread pool.");
         requestsExecutor.shutdownNow();
       }
     }
@@ -128,7 +126,7 @@ class BatchExecutor {
     }
   }
 
-  <T> T getFromFuture(Future<T> future) throws IOException {
+  static <T> T getFromFuture(Future<T> future) throws IOException {
     try {
       return future.get();
     } catch (ExecutionException | InterruptedException e) {
@@ -136,11 +134,10 @@ class BatchExecutor {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      logger.atSevere().withCause(e).log("Forcibly shutting down manual batching thread pool.");
-      requestsExecutor.shutdownNow();
       throw new IOException(
           String.format(
-              "Failed to get result: %s", e instanceof ExecutionException ? e.getCause() : e),
+              "Failed to get result: %s with message : %s",
+              e instanceof ExecutionException ? e.getCause() : e, e.getMessage()),
           e);
     }
   }
