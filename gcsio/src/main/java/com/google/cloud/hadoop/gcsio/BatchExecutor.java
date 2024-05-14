@@ -66,7 +66,7 @@ class BatchExecutor {
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(numThreads * 20),
             new ThreadFactoryBuilder()
-                .setNameFormat("gcs-grpc-manual-batching-pool-%d")
+                .setNameFormat("gcs-manual-batching-pool-%d")
                 .setDaemon(true)
                 .build());
     executor.allowCoreThreadTimeOut(true);
@@ -107,13 +107,13 @@ class BatchExecutor {
       requestsExecutor.shutdown();
       try {
         if (!requestsExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
-          logger.atWarning().log("Forcibly shutting down grpc manual batching thread pool.");
+          logger.atWarning().log("Forcibly shutting down manual batching thread pool.");
           requestsExecutor.shutdownNow();
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         logger.atFine().withCause(e).log(
-            "Failed to await termination: forcibly shutting down grpc manual batching thread pool.");
+            "Failed to await termination: forcibly shutting down manual batching thread pool.");
         requestsExecutor.shutdownNow();
       }
     }
