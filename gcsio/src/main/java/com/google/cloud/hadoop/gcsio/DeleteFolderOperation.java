@@ -16,8 +16,13 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
+import com.google.api.client.googleapis.json.GoogleJsonError;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpHeaders;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
@@ -113,7 +118,6 @@ class DeleteFolderOperation {
 
   /** Gets the head from the blocking queue */
   public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
-
     return this.folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
   }
 

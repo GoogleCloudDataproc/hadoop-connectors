@@ -938,8 +938,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
       deleteFolderOperation.performDeleteOperation();
     } catch (InterruptedException e) {
-      logger.atSevere().log("Recieved thread interruption exception : %s", e);
-      throw new RuntimeException(e);
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          String.format(
+              "Recieved thread interruption exception while deletion of folder resource : %s",
+              e.getMessage()),
+          e);
     }
 
     if (!deleteFolderOperation.encounteredNoExceptions()) {
