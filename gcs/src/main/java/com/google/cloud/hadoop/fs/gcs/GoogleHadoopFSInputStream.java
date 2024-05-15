@@ -134,6 +134,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             }
             response = numRead;
           } catch (IOException e) {
+            System.out.println("huraayyyyyyyyyyyyyyyyyyy");
             streamStatistics.readException();
             throw e;
           }
