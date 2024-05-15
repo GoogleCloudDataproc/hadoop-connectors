@@ -31,6 +31,7 @@ import java.net.URISyntaxException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -198,6 +199,25 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     ghfs.initialize(gsUri, config);
 
     assertThat(ghfs.getDefaultPort()).isEqualTo(-1);
+  }
+
+  @Test
+  public void read_non_existing_file_throws_exception() throws Exception {
+    URI path = new URI("gs://test-non-existent/read-throws-exception");
+    Configuration configuration = new Configuration();
+
+    // try to read a non-existing file
+    configuration.setBoolean("fs.gs.inputstream.fast.fail.on.not.found.enable", false);
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, configuration);
+
+    byte[] value = new byte[100];
+    try (FSDataInputStream in = ghfs.open(new Path(path.getPath()))) {
+      assertThrows(
+          "Item not found: '" + path.getAuthority() + "/" + path.getPath() + "'.",
+          java.io.IOException.class,
+          () -> in.read(value, 0, 100));
+    }
   }
 
   // -----------------------------------------------------------------
