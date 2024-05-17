@@ -20,5 +20,4 @@ import com.google.common.annotations.VisibleForTesting;
 
 @VisibleForTesting
 public class GcsRequestExecutionEvent {
-  public GcsRequestExecutionEvent() {}
 }
