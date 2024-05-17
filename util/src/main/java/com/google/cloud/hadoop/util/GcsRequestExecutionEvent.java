@@ -18,6 +18,6 @@ package com.google.cloud.hadoop.util;
 
 import com.google.common.annotations.VisibleForTesting;
 
+/** This an Event which is published in EvenBus queue whenever a gcs request is created/executed. */
 @VisibleForTesting
-public class GcsRequestExecutionEvent {
-}
+public class GcsRequestExecutionEvent {}

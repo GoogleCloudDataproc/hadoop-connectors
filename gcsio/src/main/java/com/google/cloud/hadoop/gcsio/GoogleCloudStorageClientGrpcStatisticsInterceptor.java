@@ -29,9 +29,7 @@ import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
-/**
- * This is a gRPC interceptor to capture the statistics related to calls made to gcs backend.
- */
+/** This is a gRPC interceptor to capture the statistics related to calls made to gcs backend. */
 @VisibleForTesting
 public class GoogleCloudStorageClientGrpcStatisticsInterceptor implements ClientInterceptor {
 
