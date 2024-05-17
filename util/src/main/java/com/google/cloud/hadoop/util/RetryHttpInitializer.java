@@ -172,7 +172,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         throws IOException {
 
       // Incrementing GCS Static Statistics using status code of response.
-      GoogleCloudStorageEventBus.postOnHttpResponse(response);
+      GoogleCloudStorageEventBus.postOnHttpResponseStatus(response.getStatusCode());
 
       if (credential != null && credential.handleResponse(request, response, supportsRetry)) {
         // If credential decides it can handle it, the return code or message indicated something

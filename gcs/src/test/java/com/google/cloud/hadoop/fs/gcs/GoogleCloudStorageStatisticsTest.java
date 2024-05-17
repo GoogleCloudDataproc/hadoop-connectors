@@ -1,170 +1,126 @@
+/*
+ * Copyright 2024 Google LLC. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQUEST_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestFactory;
-import com.google.api.client.http.HttpResponse;
-import com.google.api.client.http.HttpStatusCodes;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.LowLevelHttpRequest;
-import com.google.api.client.json.GenericJson;
-import com.google.api.client.json.Json;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.testing.http.HttpTesting;
-import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.api.client.testing.http.MockLowLevelHttpRequest;
-import com.google.api.client.testing.http.MockLowLevelHttpResponse;
-import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
-import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.Collections;
-import org.apache.hadoop.fs.StorageStatistics;
+import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.common.flogger.GoogleLogger;
+import io.grpc.Status;
+import java.util.Iterator;
+import org.apache.hadoop.fs.StorageStatistics.LongStatistic;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class GoogleCloudStorageStatisticsTest {
-
-  private GoogleJsonResponseException accessDenied; // STATUS_CODE_FORBIDDEN
-  private GoogleJsonResponseException statusOk; // STATUS_CODE_OK
-
-  private GoogleHadoopFileSystem myGhfs;
-
-  private final ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  private GhfsStorageStatistics subscriber = new GhfsStorageStatistics();
 
   @Before
   public void setUp() throws Exception {
 
-    myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GoogleCloudStorageEventBus.register(subscriber);
+  }
 
-    accessDenied =
-        googleJsonResponseException(
-            HttpStatusCodes.STATUS_CODE_FORBIDDEN, "Forbidden", "Forbidden");
-    statusOk = googleJsonResponseException(HttpStatusCodes.STATUS_CODE_OK, "A reason", "ok");
+  @After
+  public void cleanup() throws Exception {
+
+    GoogleCloudStorageEventBus.unregister(subscriber);
+  }
+
+  private void verifyStatistics(GhfsStorageStatistics expectedStats) {
+    Iterator<LongStatistic> statsIterator = expectedStats.getLongStatistics();
+    boolean metricsVerified = true;
+    while (statsIterator.hasNext()) {
+      LongStatistic stats = statsIterator.next();
+      Long value = subscriber.getLong(stats.getName());
+      if (stats.getValue() != value) {
+        logger.atWarning().log(
+            "Metric values not matching. for: %s, expected: %d, got: %d",
+            stats.getName(), stats.getValue(), value);
+        metricsVerified = false;
+        break;
+      }
+    }
+    assertThat(metricsVerified).isTrue();
   }
 
   @Test
-  public void gcs_request_count_status_metrics() throws Exception {
-    StorageStatistics stats = TestUtils.getStorageStatistics();
-    mockStatusCode(429);
-    TestUtils.verifyCounter((GhfsStorageStatistics) stats, GCS_REQUEST_COUNT, 1);
+  public void gcs_requestCounter() throws Exception {
+    GoogleCloudStorageEventBus.onGcsRequest(new GcsRequestExecutionEvent());
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_REQUEST_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
   }
 
   @Test
-  public void gcs_client_429_status_metrics() throws Exception {
-    StorageStatistics stats = TestUtils.getStorageStatistics();
-    mockStatusCode(429);
-    TestUtils.verifyCounterNotZero((GhfsStorageStatistics) stats, GCS_CLIENT_RATE_LIMIT_COUNT);
-  }
+  public void gcs_rateLimitCounter() {
+    // verify for http event i.e. via Apiary
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(429);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
 
-  /** Validates accessDenied(). */
-  @Test
-  public void testAccessDenied() {
-    StorageStatistics stats = TestUtils.getStorageStatistics();
+    subscriber.reset();
 
-    // Check success case.
-    assertThat(errorExtractor.accessDenied(accessDenied)).isTrue();
-    assertThat(errorExtractor.accessDenied(new IOException(accessDenied))).isTrue();
-    assertThat(errorExtractor.accessDenied(new IOException(new IOException(accessDenied))))
-        .isTrue();
-
-    // Check failure case.
-    assertThat(errorExtractor.accessDenied(statusOk)).isFalse();
-    assertThat(errorExtractor.accessDenied(new IOException(statusOk))).isFalse();
-
-    TestUtils.verifyCounterNotZero((GhfsStorageStatistics) stats, GCS_CLIENT_SIDE_ERROR_COUNT);
+    // verify for gRPC event i.e. via java-storage
+    GoogleCloudStorageEventBus.onGrpcStatus(Status.RESOURCE_EXHAUSTED);
+    verifyStatistics(verifyCounterStats);
   }
 
   @Test
-  public void isClientError_GoogleJsonErrorWithStatusBadGatewayReturnFalse() throws IOException {
-    StorageStatistics stats = TestUtils.getStorageStatistics();
+  public void gcs_clientSideErrorCounter() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(404);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
 
-    IOException withJsonError =
-        googleJsonResponseException(
-            HttpStatusCodes.STATUS_CODE_BAD_GATEWAY, "Bad gateway", "Bad gateway", "Bad gateway");
-    assertThat(errorExtractor.clientError(withJsonError)).isFalse();
+    subscriber.reset();
 
-    TestUtils.verifyCounterNotZero((GhfsStorageStatistics) stats, GCS_SERVER_SIDE_ERROR_COUNT);
+    // verify for gRPC event i.e. via java-storage
+    GoogleCloudStorageEventBus.onGrpcStatus(Status.CANCELLED);
+    verifyStatistics(verifyCounterStats);
   }
 
-  /** Builds a fake GoogleJsonResponseException for testing API error handling. */
-  private static GoogleJsonResponseException googleJsonResponseException(
-      int httpStatus, String reason, String message) throws IOException {
-    return googleJsonResponseException(httpStatus, reason, message, message);
+  @Test
+  public void gcs_serverSideErrorCounter() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(503);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+
+    subscriber.reset();
+
+    // verify for gRPC event i.e. via java-storage
+    GoogleCloudStorageEventBus.onGrpcStatus(Status.INTERNAL);
+    verifyStatistics(verifyCounterStats);
   }
 
-  /** Builds a fake GoogleJsonResponseException for testing API error handling. */
-  private static GoogleJsonResponseException googleJsonResponseException(
-      int httpStatus, String reason, String message, String httpStatusString) throws IOException {
-    ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setReason(reason);
-    errorInfo.setMessage(message);
-    return googleJsonResponseException(httpStatus, errorInfo, httpStatusString);
-  }
-
-  private static GoogleJsonResponseException googleJsonResponseException(
-      int status, ErrorInfo errorInfo, String httpStatusString) throws IOException {
-    JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
-    HttpTransport transport =
-        new MockHttpTransport() {
-          @Override
-          public LowLevelHttpRequest buildRequest(String method, String url) throws IOException {
-            errorInfo.setFactory(jsonFactory);
-            GoogleJsonError jsonError = new GoogleJsonError();
-            jsonError.setCode(status);
-            jsonError.setErrors(Collections.singletonList(errorInfo));
-            jsonError.setMessage(httpStatusString);
-            jsonError.setFactory(jsonFactory);
-            GenericJson errorResponse = new GenericJson();
-            errorResponse.set("error", jsonError);
-            errorResponse.setFactory(jsonFactory);
-            return new MockLowLevelHttpRequest()
-                .setResponse(
-                    new MockLowLevelHttpResponse()
-                        .setContent(errorResponse.toPrettyString())
-                        .setContentType(Json.MEDIA_TYPE)
-                        .setStatusCode(status));
-          }
-        };
-    HttpRequest request =
-        transport.createRequestFactory().buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL);
-    request.setThrowExceptionOnExecuteError(false);
-    HttpResponse response = request.execute();
-    return GoogleJsonResponseException.from(jsonFactory, response);
-  }
-
-  private void mockStatusCode(int statusCode) throws IOException {
-    RetryHttpInitializer retryHttpInitializer =
-        new RetryHttpInitializer(
-            null,
-            RetryHttpInitializerOptions.builder()
-                .setDefaultUserAgent("foo-user-agent")
-                .setHttpHeaders(ImmutableMap.of("header-key", "header-value"))
-                .setMaxRequestRetries(5)
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(5))
-                .build());
-
-    HttpRequestFactory requestFactory =
-        mockTransport(emptyResponse(statusCode), emptyResponse(statusCode), emptyResponse(200))
-            .createRequestFactory(retryHttpInitializer);
-
-    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
-    HttpResponse res = req.execute();
+  @Test
+  public void gcs_ExceptionCounter() {
+    GoogleCloudStorageEventBus.postOnException();
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(EXCEPTION_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
   }
 }
