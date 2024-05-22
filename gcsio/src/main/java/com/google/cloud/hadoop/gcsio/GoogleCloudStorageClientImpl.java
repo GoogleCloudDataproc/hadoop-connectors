@@ -83,7 +83,6 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Paths;
@@ -1021,14 +1020,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("open(%s, %s)", resourceId, readOptions);
     return open(resourceId, /* itemInfo= */ null, readOptions);
   }
 
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
@@ -1041,7 +1040,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return open(resourceId, itemInfo, readOptions);
   }
 
-  private SeekableByteChannel open(
+  private GoogleCloudStorageReadableByteChannel open(
       StorageResourceId resourceId,
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
