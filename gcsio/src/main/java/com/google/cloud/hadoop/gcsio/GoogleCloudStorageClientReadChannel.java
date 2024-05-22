@@ -50,7 +50,7 @@ import javax.annotation.Nullable;
 
 /** Provides seekable read access to GCS via java-storage library. */
 @VisibleForTesting
-class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
+class GoogleCloudStorageClientReadChannel implements GoogleCloudStorageReadableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -117,11 +117,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   }
 
   @Override
-  public int write(ByteBuffer src) throws IOException {
-    throw new UnsupportedOperationException("Cannot mutate read-only channel");
-  }
-
-  @Override
   public long position() throws IOException {
     return currentPosition;
   }
@@ -156,12 +151,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   @Override
   public long size() throws IOException {
     return objectSize;
-  }
-
-  @Override
-  public SeekableByteChannel truncate(long size) throws IOException {
-    GoogleCloudStorageEventBus.postOnException();
-    throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
   @Override
