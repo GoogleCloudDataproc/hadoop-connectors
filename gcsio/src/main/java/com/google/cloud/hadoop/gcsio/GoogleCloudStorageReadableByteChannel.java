@@ -22,6 +22,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.List;
 import java.util.function.IntFunction;
 
+/** Interface the permits positional reading. */
 public interface GoogleCloudStorageReadableByteChannel extends SeekableByteChannel {
 
   @Override
@@ -54,6 +55,6 @@ public interface GoogleCloudStorageReadableByteChannel extends SeekableByteChann
   default void readVectored(
       List<GoogleCloudStorageFileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    throw new UnsupportedOperationException("readVectored is not supported yet");
+    throw new UnsupportedOperationException("readVectored is not supported.");
   }
 }

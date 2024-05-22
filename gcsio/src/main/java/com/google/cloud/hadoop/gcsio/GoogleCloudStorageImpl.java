@@ -78,7 +78,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
@@ -617,7 +616,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   /** See {@link GoogleCloudStorage#open(StorageResourceId)} for details about expected behavior. */
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("open(%s, %s)", resourceId, readOptions);
     checkArgument(
@@ -631,7 +630,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * behavior.
    */
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
@@ -644,7 +643,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return open(resourceId, itemInfo, readOptions);
   }
 
-  private SeekableByteChannel open(
+  private GoogleCloudStorageReadableByteChannel open(
       StorageResourceId resourceId,
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)

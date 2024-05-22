@@ -46,7 +46,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
@@ -284,8 +283,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   @Override
-  public SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
+  public GoogleCloudStorageReadableByteChannel open(
+      URI path, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("open(path: %s, readOptions: %s)", path, readOptions);
     checkNotNull(path, "path should not be null");
     StorageResourceId resourceId =
@@ -296,8 +295,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   @Override
-  public SeekableByteChannel open(FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
+  public GoogleCloudStorageReadableByteChannel open(
+      FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("open(fileInfo : %s, readOptions: %s)", fileInfo, readOptions);
     checkNotNull(fileInfo, "fileInfo should not be null");
     checkArgument(

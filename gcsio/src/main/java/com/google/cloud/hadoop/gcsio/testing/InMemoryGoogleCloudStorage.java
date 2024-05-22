@@ -29,6 +29,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadableByteChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -196,13 +197,13 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     return open(getItemInfo(resourceId), readOptions);
   }
 
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     if (!itemInfo.exists()) {
@@ -216,7 +217,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
       // We'll need to simulate a lazy-evaluating byte channel which only detects nonexistence
       // on size() and read(ByteBuffer) calls.
-      return new SeekableByteChannel() {
+      return new GoogleCloudStorageReadableByteChannel() {
         private long position = 0;
         private boolean isOpen = true;
 
@@ -240,16 +241,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         @Override
         public long size() throws IOException {
           throw notFoundException;
-        }
-
-        @Override
-        public SeekableByteChannel truncate(long size) {
-          throw new UnsupportedOperationException("Cannot mutate read-only channel");
-        }
-
-        @Override
-        public int write(ByteBuffer src) {
-          throw new UnsupportedOperationException("Cannot mutate read-only channel");
         }
 
         @Override

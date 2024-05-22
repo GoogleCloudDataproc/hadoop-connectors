@@ -25,6 +25,7 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadableByteChannel;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
@@ -81,7 +82,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel =
+    GoogleCloudStorageReadableByteChannel channel =
         gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     return new GoogleHadoopFSInputStream(ghfs, gcsPath, channel, statistics);
   }
@@ -91,7 +92,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel =
+    GoogleCloudStorageReadableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), channel, statistics);
   }

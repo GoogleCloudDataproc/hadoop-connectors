@@ -20,6 +20,7 @@ import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterrup
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadableByteChannel;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.VerificationAttributes;
 import com.google.common.collect.ImmutableMap;
@@ -32,7 +33,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.Map;
@@ -242,7 +242,7 @@ public class InMemoryObjectEntry {
    * writer must have already closed the associated WritableByteChannel to commit the byte contents
    * and make them available for reading.
    */
-  public synchronized SeekableByteChannel getReadChannel(
+  public synchronized GoogleCloudStorageReadableByteChannel getReadChannel(
       String bucketName, String objectName, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     if (!isCompleted()) {

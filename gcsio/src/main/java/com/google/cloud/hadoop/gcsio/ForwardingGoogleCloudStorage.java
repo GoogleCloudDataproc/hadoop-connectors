@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
@@ -94,14 +93,14 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("%s.open(%s, %s)", delegateClassName, resourceId, readOptions);
     return delegate.open(resourceId, readOptions);
   }
 
   @Override
-  public SeekableByteChannel open(
+  public GoogleCloudStorageReadableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("%s.open(%s, %s)", delegateClassName, itemInfo, readOptions);

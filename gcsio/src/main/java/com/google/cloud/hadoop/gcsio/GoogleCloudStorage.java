@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
@@ -151,7 +150,8 @@ public interface GoogleCloudStorage {
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  default SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
+  default GoogleCloudStorageReadableByteChannel open(StorageResourceId resourceId)
+      throws IOException {
     return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
@@ -164,8 +164,8 @@ public interface GoogleCloudStorage {
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  SeekableByteChannel open(StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions)
-      throws IOException;
+  GoogleCloudStorageReadableByteChannel open(
+      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException;
 
   /**
    * Opens an object for reading using GoogleCloudStorageItemInfo.
@@ -175,7 +175,8 @@ public interface GoogleCloudStorage {
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  default SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo) throws IOException {
+  default GoogleCloudStorageReadableByteChannel open(GoogleCloudStorageItemInfo itemInfo)
+      throws IOException {
     return open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
@@ -188,7 +189,7 @@ public interface GoogleCloudStorage {
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  SeekableByteChannel open(
+  GoogleCloudStorageReadableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException;
 

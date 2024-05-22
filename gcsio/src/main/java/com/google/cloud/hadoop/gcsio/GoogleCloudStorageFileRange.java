@@ -45,7 +45,7 @@ public class GoogleCloudStorageFileRange {
   @Override
   public String toString() {
     return String.format(
-        "range [%d-%d], length=%,d", getOffset(), getOffset() + getLength(), getLength());
+        "range [%d-%d), length=%,d", getOffset(), getOffset() + getLength(), getLength());
   }
 
   public long getOffset() {

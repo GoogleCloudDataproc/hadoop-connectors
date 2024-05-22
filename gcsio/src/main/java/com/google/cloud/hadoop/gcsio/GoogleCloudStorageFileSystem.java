@@ -20,7 +20,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
 
@@ -71,7 +70,7 @@ public interface GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    * @throws IOException if object exists but cannot be opened.
    */
-  default SeekableByteChannel open(URI path) throws IOException {
+  default GoogleCloudStorageReadableByteChannel open(URI path) throws IOException {
     return open(path, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
@@ -84,7 +83,8 @@ public interface GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    * @throws IOException if object exists but cannot be opened.
    */
-  SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions) throws IOException;
+  GoogleCloudStorageReadableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
+      throws IOException;
 
   /**
    * Opens an object for reading using {@link FileInfo}.
@@ -95,8 +95,8 @@ public interface GoogleCloudStorageFileSystem {
    * @return Seekable Byte Channel to enable file open
    * @throws IOException IOException on IO Error
    */
-  SeekableByteChannel open(FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions)
-      throws IOException;
+  GoogleCloudStorageReadableByteChannel open(
+      FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions) throws IOException;
 
   /**
    * Deletes one or more items indicated by the given path.
