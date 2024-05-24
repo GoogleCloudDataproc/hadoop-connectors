@@ -45,13 +45,11 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksum
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
-import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.FolderInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFolderOptions;
@@ -1554,16 +1552,19 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     // delete bucket
     googleHadoopFileSystem.delete(new Path(bucketPath), true);
-    assertThat(googleHadoopFileSystem.getGcsFs().getGcs().getItemInfo(new StorageResourceId(bucketName)).exists()).isFalse();
+    assertThat(
+            googleHadoopFileSystem
+                .getGcsFs()
+                .getGcs()
+                .getItemInfo(new StorageResourceId(bucketName))
+                .exists())
+        .isFalse();
 
     assertThrows(
         "The specified bucket does not exist : " + bucketPath,
         com.google.api.gax.rpc.NotFoundException.class,
         () -> assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath)).isEqualTo(0));
   }
-
-
-
 
   @Test
   public void testHnBucketRecursiveDeleteOperationOnDirectory() throws Exception {

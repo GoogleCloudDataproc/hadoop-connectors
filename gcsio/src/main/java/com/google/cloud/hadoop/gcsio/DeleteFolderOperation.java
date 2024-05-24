@@ -205,8 +205,7 @@ class DeleteFolderOperation {
 
       @Override
       public void onFailure(Throwable throwable) {
-        if (throwable instanceof Exception
-            & errorTypeExtractor.getErrorType((Exception) throwable) == ErrorType.NOT_FOUND) {
+        if (isErrorType(throwable, ErrorType.NOT_FOUND)) {
           // Ignore item-not-found errors. We do not have to delete what we cannot find.
           // This
           // error typically shows up when we make a request to delete something and the
@@ -217,9 +216,7 @@ class DeleteFolderOperation {
           logger.atFiner().log(
               "Delete folder '%s' not found: %s", resourceId, throwable.getMessage());
           successfullDeletionOfFolderResource(resourceId);
-        } else if (throwable instanceof Exception
-            && errorTypeExtractor.getErrorType((Exception) throwable)
-                == ErrorType.FAILED_PRECONDITION
+        } else if (isErrorType(throwable, ErrorType.FAILED_PRECONDITION)
             && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
           logger.atInfo().log(
               "Precondition not met while deleting '%s'. Attempt %s." + " Retrying:%s",
@@ -235,6 +232,11 @@ class DeleteFolderOperation {
     };
   }
 
+  private boolean isErrorType(Throwable throwable, ErrorType errorType) {
+    return throwable instanceof Exception
+        && (errorTypeExtractor.getErrorType((Exception) throwable) == errorType);
+  }
+
   /* Callable class specifically for deletion of folder resource */
   private class DeleteFolderRequestCallable implements Callable<Void> {
     private StorageControlClient storageControlClient;
@@ -242,7 +244,6 @@ class DeleteFolderOperation {
 
     @Override
     public Void call() {
-      // deletion of folder takes place
       this.storageControlClient.deleteFolder(deleteFolderRequest);
       return null;
     }

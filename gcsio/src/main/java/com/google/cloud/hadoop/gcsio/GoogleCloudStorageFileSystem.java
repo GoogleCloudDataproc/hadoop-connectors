@@ -431,6 +431,10 @@ public class GoogleCloudStorageFileSystem {
                     ? null
                     : Arrays.asList(
                         new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName))));
+
+        logger.atFiner().log(
+            "Encountered HN enabled bucket with %s number of folder in path : %s",
+            listOfFolders.size(), path);
       }
 
       if ((!itemsToDelete.isEmpty() && !recursive)) {
