@@ -21,37 +21,20 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.cr
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.testing.InMemoryObjectReadChannel;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.ObjectInputFilter.Config;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
-import java.util.Arrays;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.commons.compress.utils.SeekableInMemoryByteChannel;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.util.ByteArrayManager.Conf;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -75,8 +58,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Test
   public void verifyHadoopPath() throws Exception {
-    GoogleHadoopFileSystem eagerFs =
-        createInMemoryGoogleHadoopFileSystem();
+    GoogleHadoopFileSystem eagerFs = createInMemoryGoogleHadoopFileSystem();
     String fileNameWithColon = "empty:file";
     eagerFs.create(new Path(/* schema= */ null, /* authority= */ null, fileNameWithColon)).close();
     FileStatus[] fileStatus =
@@ -218,28 +200,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(ghfs.getDefaultPort()).isEqualTo(-1);
   }
 
-<<<<<<< HEAD
-  @Test
-  public void read_non_existing_file_throws_exception() throws Exception {
-    URI path = new URI("gs://test-non-existent/read-throws-exception");
-    Configuration configuration = new Configuration();
-
-    // try to read a non-existing file
-    configuration.setBoolean("fs.gs.inputstream.fast.fail.on.not.found.enable", false);
-    GoogleHadoopFileSystem ghfs =
-        GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, configuration);
-
-    byte[] value = new byte[100];
-    try (FSDataInputStream in = ghfs.open(new Path(path.getPath()))) {
-      assertThrows(
-          "Item not found: '" + path.getAuthority() + "/" + path.getPath() + "'.",
-          java.io.IOException.class,
-          () -> in.read(value, 0, 100));
-    }
-  }
-
-=======
->>>>>>> 258d7b2d (Adding Integration test in place of UT)
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.
