@@ -218,6 +218,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(ghfs.getDefaultPort()).isEqualTo(-1);
   }
 
+<<<<<<< HEAD
   @Test
   public void read_non_existing_file_throws_exception() throws Exception {
     URI path = new URI("gs://test-non-existent/read-throws-exception");
@@ -237,6 +238,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     }
   }
 
+=======
+>>>>>>> 258d7b2d (Adding Integration test in place of UT)
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.

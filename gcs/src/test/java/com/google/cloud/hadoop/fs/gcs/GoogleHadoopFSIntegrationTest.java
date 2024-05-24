@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -321,5 +322,22 @@ public class GoogleHadoopFSIntegrationTest {
 
     assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(srcPath));
     assertThat(ghfs.listStatus(dstPath)).hasLength(1);
+  }
+
+  @Test
+  public void read_non_existing_file_throws_exception() throws Exception {
+    URI path = new URI("read-throws-exception");
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    config.setBoolean("fs.gs.inputstream.fast.fail.on.not.found.enable", false);
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    // try to read a non-existing file
+    byte[] value = new byte[100];
+    try (FSDataInputStream in = ghfs.open(new Path(path.getPath()))) {
+      assertThrows(
+          "Item not found: '" + path.getAuthority() + "/" + path.getPath() + "'.",
+          java.io.IOException.class,
+          () -> in.read(value, 0, 100));
+    }
   }
 }
