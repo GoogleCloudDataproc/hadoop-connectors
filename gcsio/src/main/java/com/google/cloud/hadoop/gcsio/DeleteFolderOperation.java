@@ -113,7 +113,13 @@ class DeleteFolderOperation {
 
   /** Gets the head from the blocking queue */
   public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
-    return this.folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+    try {
+      return this.folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+    } catch (InterruptedException e) {
+      logger.atSevere().log(
+          "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
+      throw e;
+    }
   }
 
   /** Adding to batch executor's queue */
