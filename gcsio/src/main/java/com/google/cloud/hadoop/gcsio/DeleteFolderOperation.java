@@ -97,7 +97,7 @@ class DeleteFolderOperation {
     try {
       this.batchExecutor.shutdown();
     } catch (IOException e) {
-      this.allExceptions.add(
+      addException(
           new IOException(
               String.format("Error in shutting down batch executor : %s", e.getMessage())));
     }
@@ -224,7 +224,7 @@ class DeleteFolderOperation {
           queueSingleFolderDelete(resourceId, attempt + 1);
         } else {
           GoogleCloudStorageEventBus.postOnException();
-          allExceptions.add(
+          addException(
               new IOException(
                   String.format("Error deleting '%s', stage 2", resourceId), throwable));
         }
@@ -235,6 +235,10 @@ class DeleteFolderOperation {
   private boolean isErrorType(Throwable throwable, ErrorType errorType) {
     return throwable instanceof Exception
         && (errorTypeExtractor.getErrorType((Exception) throwable) == errorType);
+  }
+
+  private synchronized void addException(IOException e) {
+    this.allExceptions.add(e);
   }
 
   /* Callable class specifically for deletion of folder resource */
