@@ -26,6 +26,7 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
@@ -84,7 +85,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), channel, statistics);
   }
 
-  private GoogleHadoopFSInputStream(
+  @VisibleForTesting
+  GoogleHadoopFSInputStream(
       GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       SeekableByteChannel channel,

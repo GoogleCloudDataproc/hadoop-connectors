@@ -21,6 +21,8 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.cr
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
@@ -29,6 +31,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
@@ -138,6 +141,32 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         .isAnyOf(
             "non-existent.json (No such file or directory)",
             "non-existent.json (The system cannot find the file specified)");
+  }
+
+  @Test
+  public void read_non_existing_file_throws_exception() throws IOException {
+    URI bucketPath = new Path("gs://test-non-existent").toUri();
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(bucketPath, new Configuration());
+
+    // custom channel
+    GoogleCloudStorageReadChannel channel =
+        new GoogleCloudStorageReadChannel(
+            null,
+            null,
+            null,
+            null,
+            GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build()) {
+          @Override
+          public int read(ByteBuffer buffer) throws IOException {
+            throw new IOException();
+          }
+        };
+
+    GoogleHadoopFSInputStream inputStream =
+        new GoogleHadoopFSInputStream(myGhfs, bucketPath, channel, null);
+
+    assertThrows(java.io.IOException.class, () -> inputStream.read(new byte[100], 0, 100));
   }
 
   // -----------------------------------------------------------------
