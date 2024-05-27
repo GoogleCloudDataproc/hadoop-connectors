@@ -78,7 +78,7 @@ class DeleteFolderOperation {
 
   /** Helper function that performs the deletion process for folder resources */
   public void performDeleteOperation() throws InterruptedException {
-    int folderSize = this.folders.size();
+    int folderSize = folders.size();
     computeChildrenForFolderResource();
 
     // this will avoid infinite loop when all folders are deleted
@@ -95,7 +95,7 @@ class DeleteFolderOperation {
   /** Shutting down batch executor and flushing any remaining requests */
   private void batchExecutorShutdown() {
     try {
-      this.batchExecutor.shutdown();
+      batchExecutor.shutdown();
     } catch (IOException e) {
       addException(
           new IOException(
@@ -104,7 +104,7 @@ class DeleteFolderOperation {
   }
 
   public boolean encounteredNoExceptions() {
-    return this.allExceptions.isEmpty();
+    return allExceptions.isEmpty();
   }
 
   public KeySetView<IOException, Boolean> getAllExceptions() {
@@ -114,7 +114,7 @@ class DeleteFolderOperation {
   /** Gets the head from the blocking queue */
   public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
-      return this.folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+      return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
     } catch (InterruptedException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
@@ -125,24 +125,24 @@ class DeleteFolderOperation {
   /** Adding to batch executor's queue */
   public void addToToBatchExecutorQueue(
       Callable callable, final FolderInfo folder, final int attempt) {
-    this.batchExecutor.queue(callable, getDeletionCallback(folder, this.allExceptions, attempt));
+    batchExecutor.queue(callable, getDeletionCallback(folder, allExceptions, attempt));
   }
 
   /** Computes the number of children for each folder resource */
   public void computeChildrenForFolderResource() {
-    for (FolderInfo currentFolder : this.folders) {
-      if (!this.countOfChildren.containsKey(currentFolder.getFolderName())) {
-        this.countOfChildren.put(currentFolder.getFolderName(), 0L);
+    for (FolderInfo currentFolder : folders) {
+      if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
+        countOfChildren.put(currentFolder.getFolderName(), 0L);
       }
 
       String parentFolder = currentFolder.getParentFolderName();
       if (!Strings.isNullOrEmpty(parentFolder)) {
-        this.countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue + newValue);
+        countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue + newValue);
       }
     }
     // Add leaf folders to blocking queue
-    for (FolderInfo currentFolder : this.folders) {
-      if (this.countOfChildren.get(currentFolder.getFolderName()) == 0L) {
+    for (FolderInfo currentFolder : folders) {
+      if (countOfChildren.get(currentFolder.getFolderName()) == 0L) {
         addFolderResourceInBlockingQueue(currentFolder);
       }
     }
@@ -154,7 +154,7 @@ class DeleteFolderOperation {
    * @param folderResource
    */
   private void addFolderResourceInBlockingQueue(FolderInfo folderResource) {
-    this.folderDeleteBlockingQueue.add(folderResource);
+    folderDeleteBlockingQueue.add(folderResource);
   }
 
   /**
@@ -165,16 +165,16 @@ class DeleteFolderOperation {
    */
   private void successfullDeletionOfFolderResource(FolderInfo folderResource) {
     // remove the folderResource from list of map
-    this.countOfChildren.remove(folderResource.getFolderName());
+    countOfChildren.remove(folderResource.getFolderName());
 
     String parentFolder = folderResource.getParentFolderName();
-    if (this.countOfChildren.containsKey(parentFolder)) {
+    if (countOfChildren.containsKey(parentFolder)) {
 
       // update the parent's count of children
-      this.countOfChildren.replace(parentFolder, this.countOfChildren.get(parentFolder) - 1);
+      countOfChildren.replace(parentFolder, countOfChildren.get(parentFolder) - 1);
 
       // if the parent folder is now empty, append in the queue
-      if (this.countOfChildren.get(parentFolder) == 0) {
+      if (countOfChildren.get(parentFolder) == 0) {
         addFolderResourceInBlockingQueue(
             new FolderInfo(
                 FolderInfo.createFolderInfoObject(folderResource.getBucket(), parentFolder)));
@@ -194,7 +194,7 @@ class DeleteFolderOperation {
         String.format("No folder path for folder resource %s", folderName));
 
     addToToBatchExecutorQueue(
-        new DeleteFolderRequestCallable(folder, this.storageControlClient), folder, attempt);
+        new DeleteFolderRequestCallable(folder, storageControlClient), folder, attempt);
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
@@ -244,7 +244,7 @@ class DeleteFolderOperation {
   }
 
   private synchronized void addException(IOException e) {
-    this.allExceptions.add(e);
+    allExceptions.add(e);
   }
 
   /* Callable class specifically for deletion of folder resource */
@@ -254,7 +254,7 @@ class DeleteFolderOperation {
 
     @Override
     public Void call() {
-      this.storageControlClient.deleteFolder(deleteFolderRequest);
+      storageControlClient.deleteFolder(deleteFolderRequest);
       return null;
     }
 

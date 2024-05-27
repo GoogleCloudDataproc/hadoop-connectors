@@ -16,11 +16,11 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.getFromFuture;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
-import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -106,7 +105,7 @@ class BatchExecutor {
     } finally {
       requestsExecutor.shutdown();
       try {
-        if (!requestsExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
+        if (!requestsExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
           logger.atWarning().log("Forcibly shutting down manual batching thread pool.");
           requestsExecutor.shutdownNow();
         }
@@ -119,26 +118,10 @@ class BatchExecutor {
     }
   }
 
-  /** Awaits until all sent requests are completed */
+  /** Awaits until all sent requeests are completed */
   private void awaitRequestsCompletion() throws IOException {
     while (!responseFutures.isEmpty()) {
       getFromFuture(responseFutures.remove());
-    }
-  }
-
-  static <T> T getFromFuture(Future<T> future) throws IOException {
-    try {
-      return future.get();
-    } catch (ExecutionException | InterruptedException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new IOException(
-          String.format(
-              "Failed to get result: %s with message : %s",
-              e instanceof ExecutionException ? e.getCause() : e, e.getMessage()),
-          e);
     }
   }
 }

@@ -1045,7 +1045,8 @@ public class GoogleCloudStorageFileSystem {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format(
-              "Failed to get result: %s", e instanceof ExecutionException ? e.getCause() : e),
+              "Failed to get result: %s with message : %s",
+              e instanceof ExecutionException ? e.getCause() : e, e.getMessage()),
           e);
     }
   }

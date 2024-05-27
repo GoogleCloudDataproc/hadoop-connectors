@@ -100,16 +100,16 @@ public class FolderInfo {
 
   /** Gets the path of this file or directory. */
   public String getBucket() {
-    return this.bucket;
+    return bucket;
   }
 
   /** Returns the folder name, ie path excluding the bucket name */
   public String getFolderName() {
-    return this.folderName;
+    return folderName;
   }
 
   public boolean isBucket() {
-    return this.folderName.equals("");
+    return folderName.equals("");
   }
 
   /**
@@ -118,12 +118,12 @@ public class FolderInfo {
    * @return parent folderName
    */
   public String getParentFolderName() {
-    int lastIndex = this.folderName.lastIndexOf(PATH, this.folderName.length() - 2);
-    return this.folderName.substring(0, lastIndex + 1);
+    int lastIndex = folderName.lastIndexOf(PATH, folderName.length() - 2);
+    return folderName.substring(0, lastIndex + 1);
   }
 
   /** Gets string representation of this instance. */
   public String toString() {
-    return String.join("", BUCKET_PREFIX, this.bucket, FOLDER_PREFIX, this.folderName);
+    return String.join("", BUCKET_PREFIX, bucket, FOLDER_PREFIX, folderName);
   }
 }
