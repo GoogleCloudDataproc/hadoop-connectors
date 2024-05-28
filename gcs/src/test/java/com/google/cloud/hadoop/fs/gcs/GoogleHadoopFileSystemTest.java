@@ -21,8 +21,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.cr
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
@@ -32,6 +30,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
@@ -144,29 +143,59 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  public void read_non_existing_file_throws_exception() throws IOException {
-    URI bucketPath = new Path("gs://test-non-existent").toUri();
+  public void read_file_throws_exception() throws IOException {
+    URI bucketPath = new Path("gs://test-file").toUri();
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(bucketPath, new Configuration());
 
     // custom channel
-    GoogleCloudStorageReadChannel channel =
-        new GoogleCloudStorageReadChannel(
-            null,
-            null,
-            null,
-            null,
-            GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build()) {
+    SeekableByteChannel channel =
+        new SeekableByteChannel() {
+          @Override
+          public boolean isOpen() {
+            return false;
+          }
+
+          @Override
+          public void close() throws IOException {
+            throw new IOException("close not implemented");
+          }
+
           @Override
           public int read(ByteBuffer buffer) throws IOException {
-            throw new IOException();
+            throw new IOException("read throws exception");
+          }
+
+          @Override
+          public int write(ByteBuffer byteBuffer) throws IOException {
+            throw new IOException("write not implemented");
+          }
+
+          @Override
+          public long position() throws IOException {
+            throw new IOException("position not present");
+          }
+
+          @Override
+          public SeekableByteChannel position(long l) throws IOException {
+            throw new IOException("set position not implemented");
+          }
+
+          @Override
+          public long size() throws IOException {
+            throw new IOException("size not present");
+          }
+
+          @Override
+          public SeekableByteChannel truncate(long l) throws IOException {
+            throw new IOException("truncate not implemented");
           }
         };
 
     GoogleHadoopFSInputStream inputStream =
         new GoogleHadoopFSInputStream(myGhfs, bucketPath, channel, null);
-
-    assertThrows(java.io.IOException.class, () -> inputStream.read(new byte[100], 0, 100));
+    assertThrows(
+        "read throws exception", IOException.class, () -> inputStream.read(new byte[1], 0, 1));
   }
 
   // -----------------------------------------------------------------

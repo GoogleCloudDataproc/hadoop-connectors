@@ -39,6 +39,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
+@VisibleForTesting
+/* This class should only be called via static function. Creating instance via constructor is not recommended */
 class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSource {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -85,7 +87,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), channel, statistics);
   }
 
-  @VisibleForTesting
   GoogleHadoopFSInputStream(
       GoogleHadoopFileSystem ghfs,
       URI gcsPath,
