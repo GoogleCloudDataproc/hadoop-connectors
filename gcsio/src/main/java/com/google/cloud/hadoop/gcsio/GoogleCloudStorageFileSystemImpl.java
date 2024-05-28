@@ -291,7 +291,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
     checkArgument(!resourceId.isDirectory(), "Cannot open a directory for reading: %s", path);
-    gcs.getItemInfo(resourceId);
 
     return gcs.open(resourceId, readOptions);
   }
