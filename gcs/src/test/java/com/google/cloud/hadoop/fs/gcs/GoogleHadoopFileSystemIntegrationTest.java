@@ -1526,13 +1526,13 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
           () -> googleHadoopFileSystem.delete(new Path(bucketPath), false));
 
       // verify only "A/" folder exists
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(1);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(1);
 
       // delete A/ non recursively
       googleHadoopFileSystem.delete(new Path(bucketPath + "/A"), false);
 
       // check that on listing we get no folders for folder "A/"
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(0);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(0);
     } finally {
       googleHadoopFileSystem.delete(new Path(bucketPath));
     }
@@ -1544,7 +1544,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     String bucketPath = "gs://" + bucketName;
     GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
     createResources(googleHadoopFileSystem);
-    assertThat(getSubFolderCount(googleHadoopFileSystem, "gs://" + bucketName)).isEqualTo(22);
+    assertThat(getSubFolderCount(googleHadoopFileSystem, "gs://" + bucketName + "/")).isEqualTo(22);
     assertThrows(
         "Cannot delete a non-empty directory",
         java.nio.file.DirectoryNotEmptyException.class,
@@ -1573,7 +1573,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
     try {
       createResources(googleHadoopFileSystem);
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(21);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(21);
       assertThrows(
           "Cannot delete a non-empty directory",
           java.nio.file.DirectoryNotEmptyException.class,
@@ -1585,11 +1585,11 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
       // delete B/
       googleHadoopFileSystem.delete(new Path("/B"), true);
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/B")).isEqualTo(0);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/B/")).isEqualTo(0);
 
       // rename C/ to B/
       googleHadoopFileSystem.rename(new Path(bucketPath + "/C/"), new Path(bucketPath + "/B/"));
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/B")).isEqualTo(1);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/B/")).isEqualTo(1);
     } finally {
       googleHadoopFileSystem.delete(new Path(bucketPath));
     }
@@ -1604,7 +1604,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     try {
       googleHadoopFileSystem.mkdirs(new Path("/A/"));
       googleHadoopFileSystem.mkdirs(new Path("/A/C/"));
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(2);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(2);
 
       assertThrows(
           "Cannot delete a non-empty directory",
@@ -1624,7 +1624,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
       // delete A/
       googleHadoopFileSystem.delete(new Path("/A"), true);
-      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A")).isEqualTo(0);
+      assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(0);
     } finally {
       googleHadoopFileSystem.delete(new Path(bucketPath));
     }
@@ -1650,13 +1650,15 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     return googleHadoopFileSystem;
   }
 
+  /** Pathlocation should end with "/" prefix */
   private Integer getSubFolderCount(
-      GoogleHadoopFileSystem googleHadoopFileSystem, String pathLocation) throws IOException {
+      GoogleHadoopFileSystem googleHadoopFileSystem, String pathLocation)
+      throws IOException, URISyntaxException {
     List<FolderInfo> initialListOfFolders =
         googleHadoopFileSystem
             .getGcsFs()
             .listFoldersInfoForPrefixPage(
-                new Path(pathLocation).toUri(), ListFolderOptions.builder().build(), null)
+                new URI(pathLocation), ListFolderOptions.builder().build(), null)
             .getItems();
     return initialListOfFolders.size();
   }

@@ -28,7 +28,7 @@ import javax.annotation.Nonnull;
 public class FolderInfo {
   public static final String BUCKET_PREFIX = "projects/_/buckets/";
   public static final String FOLDER_PREFIX = "/folders/";
-  private static final String PATH = "/";
+  public static final String PATH = "/";
 
   private final String bucket;
 
@@ -62,8 +62,10 @@ public class FolderInfo {
         bucketName);
     checkState(folderName != null, "Folder resource has invalid folder name: %s", folderName);
 
+    // Add "/" suffix only if foldername is not empty and does not end with "/"
+    String suffix = (folderName.equals("") ? "" : (folderName.endsWith(PATH) ? "" : PATH));
     return Folder.newBuilder()
-        .setName(String.join("", BUCKET_PREFIX, bucketName, FOLDER_PREFIX, folderName))
+        .setName(String.join("", BUCKET_PREFIX, bucketName, FOLDER_PREFIX, folderName, suffix))
         .build();
   }
 
@@ -88,6 +90,9 @@ public class FolderInfo {
    * template of path, then folder string will be FOLDER_NAME eg :
    * /projects/_/buckets/BUCKET_NAME/folders/A/B/ -> returns A/B/ eg :
    * /projects/_/buckets/BUCKET_NAME/folders/ -> returns ""
+   *
+   * <p>Since this method is always called after createFolderInfoObject() method, "/" suffix is
+   * already taken care of.
    *
    * @param path
    * @return

@@ -428,7 +428,7 @@ public class GoogleCloudStorageFileSystem {
                     .getItems()
                 // will not delete for a bucket
                 : (folderName.equals("")
-                    ? null
+                    ? new LinkedList<>()
                     : Arrays.asList(
                         new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName))));
 

@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.FolderInfo.PATH;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -25,7 +26,7 @@ import org.junit.runners.JUnit4;
 public class FolderInfoTest {
 
   private final String BUCKET_NAME = "folder-info-test-bucket";
-  private final String FOLDER_NAME = "test-parent-folder/test-folder-name/";
+  private final String FOLDER_NAME = "test-parent-folder/test-folder-name";
 
   @Test
   public void checkForRootFolderWithNull() {
@@ -82,7 +83,7 @@ public class FolderInfoTest {
     FolderInfo testFolderInfo =
         new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, FOLDER_NAME));
     assertThat(testFolderInfo.getBucket()).isEqualTo(BUCKET_NAME);
-    assertThat(testFolderInfo.getFolderName()).isEqualTo(FOLDER_NAME);
+    assertThat(testFolderInfo.getFolderName()).isEqualTo(FOLDER_NAME + PATH);
     assertThat(testFolderInfo.isBucket()).isFalse();
     assertThat(testFolderInfo.getParentFolderName()).isEqualTo("test-parent-folder/");
   }
@@ -90,9 +91,9 @@ public class FolderInfoTest {
   @Test
   public void checkForFolderParent() {
     FolderInfo testFolderInfo =
-        new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, "test-parent-folder/"));
+        new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, "test-parent-folder"));
     assertThat(testFolderInfo.getBucket()).isEqualTo(BUCKET_NAME);
-    assertThat(testFolderInfo.getFolderName()).isEqualTo("test-parent-folder/");
+    assertThat(testFolderInfo.getFolderName()).isEqualTo("test-parent-folder" + PATH);
     assertThat(testFolderInfo.isBucket()).isFalse();
     assertThat(testFolderInfo.getParentFolderName()).isEqualTo("");
   }
