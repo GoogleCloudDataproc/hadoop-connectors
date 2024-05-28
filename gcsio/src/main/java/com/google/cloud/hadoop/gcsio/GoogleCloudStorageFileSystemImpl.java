@@ -291,6 +291,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
     checkArgument(!resourceId.isDirectory(), "Cannot open a directory for reading: %s", path);
+    gcs.getItemInfo(resourceId);
 
     return gcs.open(resourceId, readOptions);
   }
@@ -858,6 +859,20 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         FileInfo.fromItemInfo(
             getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true));
     logger.atFiner().log("getFileInfo(path: %s): %s", path, fileInfo);
+    return fileInfo;
+  }
+
+  @Override
+  public FileInfo getFileInfoObject(URI path) throws IOException {
+    checkArgument(path != null, "path must not be null");
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+    checkArgument(
+        !resourceId.isDirectory(),
+        String.format(
+            "path must be an object and not a directory, path: %s, resourceId: %s",
+            path, resourceId));
+    FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getItemInfo(resourceId));
+    logger.atFiner().log("getFileInfoObject(path: %s): %s", path, fileInfo);
     return fileInfo;
   }
 
