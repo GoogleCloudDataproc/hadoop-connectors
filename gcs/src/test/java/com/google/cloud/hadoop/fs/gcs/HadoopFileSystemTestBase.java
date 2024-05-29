@@ -983,6 +983,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testGetFileInfos() {}
 
   @Override
+  public void testGetFileInfoObject() {}
+
+  @Override
   public void testFileCreationSetsAttributes() {}
 
   @Override
