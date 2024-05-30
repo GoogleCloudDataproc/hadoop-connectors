@@ -341,10 +341,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         private long position = 0;
         private boolean isOpen = true;
 
-        public IOException getException() {
-          return exceptionThrown;
-        }
-
         @Override
         public long position() {
           return position;
