@@ -18,13 +18,22 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
+import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -34,6 +43,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -143,59 +153,46 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  public void read_file_throws_exception() throws IOException {
-    URI bucketPath = new Path("gs://test-file").toUri();
-    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
-    myGhfs.initialize(bucketPath, new Configuration());
+  public void read_throws_exception() throws Exception {
+    String rootBucketName = ghfsHelper.getUniqueBucketName("read-throws-exception");
+    URI initUri = new Path("gs://" + rootBucketName).toUri();
+    GoogleCloudStorageFileSystem fakeGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            InMemoryGoogleCloudStorageForRead::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
+    fs.initialize(initUri, new Configuration());
 
-    // custom channel
-    SeekableByteChannel channel =
-        new SeekableByteChannel() {
-          @Override
-          public boolean isOpen() {
-            return false;
-          }
+    try (FSDataInputStream inputStream = fs.open(new Path("read-throws-exception-file"))) {
+      IOException exception =
+          assertThrows(IOException.class, () -> inputStream.read(new byte[2], 0, 1));
+      assertThat(exception)
+          .hasMessageThat()
+          .isEqualTo("read_throws_exception test : read call throws exception");
+    }
+  }
 
-          @Override
-          public void close() throws IOException {
-            throw new IOException("close not implemented");
-          }
+  @Test
+  public void read_single_byte__throws_exception() throws Exception {
+    String rootBucketName = ghfsHelper.getUniqueBucketName("read-throws-exception");
+    URI initUri = new Path("gs://" + rootBucketName).toUri();
+    GoogleCloudStorageFileSystem fakeGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            InMemoryGoogleCloudStorageForRead::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
+    fs.initialize(initUri, new Configuration());
 
-          @Override
-          public int read(ByteBuffer buffer) throws IOException {
-            throw new IOException("read throws exception");
-          }
-
-          @Override
-          public int write(ByteBuffer byteBuffer) throws IOException {
-            throw new IOException("write not implemented");
-          }
-
-          @Override
-          public long position() throws IOException {
-            throw new IOException("position not present");
-          }
-
-          @Override
-          public SeekableByteChannel position(long l) throws IOException {
-            throw new IOException("set position not implemented");
-          }
-
-          @Override
-          public long size() throws IOException {
-            throw new IOException("size not present");
-          }
-
-          @Override
-          public SeekableByteChannel truncate(long l) throws IOException {
-            throw new IOException("truncate not implemented");
-          }
-        };
-
-    GoogleHadoopFSInputStream inputStream =
-        new GoogleHadoopFSInputStream(myGhfs, bucketPath, channel, null);
-    assertThrows(
-        "read throws exception", IOException.class, () -> inputStream.read(new byte[1], 0, 1));
+    try (FSDataInputStream inputStream = fs.open(new Path("read-throws-exception-file"))) {
+      IOException exception = assertThrows(IOException.class, () -> inputStream.read());
+      assertThat(exception)
+          .hasMessageThat()
+          .isEqualTo("read_throws_exception test : read call throws exception");
+    }
   }
 
   // -----------------------------------------------------------------
@@ -324,4 +321,72 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testRenameHnBucket() {}
+
+  private class InMemoryGoogleCloudStorageForRead extends InMemoryGoogleCloudStorage {
+    private IOException exceptionThrown =
+        new IOException("read_throws_exception test : read call throws exception");
+
+    InMemoryGoogleCloudStorageForRead(GoogleCloudStorageOptions storageOptions) {
+      super(storageOptions);
+    }
+
+    @Override
+    public SeekableByteChannel open(
+        GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions) {
+      return returnChannel();
+    }
+
+    public SeekableByteChannel returnChannel() {
+      return new SeekableByteChannel() {
+        private long position = 0;
+        private boolean isOpen = true;
+
+        public IOException getException() {
+          return exceptionThrown;
+        }
+
+        @Override
+        public long position() {
+          return position;
+        }
+
+        @CanIgnoreReturnValue
+        @Override
+        public SeekableByteChannel position(long newPosition) {
+          position = newPosition;
+          return this;
+        }
+
+        @Override
+        public int read(ByteBuffer dst) throws IOException {
+          throw exceptionThrown;
+        }
+
+        @Override
+        public long size() throws IOException {
+          throw exceptionThrown;
+        }
+
+        @Override
+        public SeekableByteChannel truncate(long size) {
+          throw new UnsupportedOperationException("Cannot mutate read-only channel");
+        }
+
+        @Override
+        public int write(ByteBuffer src) {
+          throw new UnsupportedOperationException("Cannot mutate read-only channel");
+        }
+
+        @Override
+        public void close() {
+          isOpen = false;
+        }
+
+        @Override
+        public boolean isOpen() {
+          return isOpen;
+        }
+      };
+    }
+  }
 }
