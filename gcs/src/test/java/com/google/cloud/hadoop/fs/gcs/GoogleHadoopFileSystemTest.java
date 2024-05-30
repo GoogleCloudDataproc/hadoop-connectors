@@ -175,7 +175,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  public void read_single_byte__throws_exception() throws Exception {
+  public void read_single_byte_throws_exception() throws Exception {
     String rootBucketName = ghfsHelper.getUniqueBucketName("read-throws-exception");
     URI initUri = new Path("gs://" + rootBucketName).toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
