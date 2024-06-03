@@ -123,7 +123,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
             getRequestString(
                 testBucketName,
                 name.getMethodName(),
-                /* fields= */ "contentEncoding,generation,size"));
+                /* fields= */ "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding,md5Hash,crc32c,metadata"));
 
     String fileContent;
     try (FSDataInputStream is = isFuture.get()) {
@@ -136,7 +136,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
             getRequestString(
                 testBucketName,
                 name.getMethodName(),
-                /* fields= */ "contentEncoding,generation,size"),
+                /* fields= */ "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding,md5Hash,crc32c,metadata"),
             getMediaRequestString(
                 testBucketName, name.getMethodName(), itemInfo.getContentGeneration()))
         .inOrder();

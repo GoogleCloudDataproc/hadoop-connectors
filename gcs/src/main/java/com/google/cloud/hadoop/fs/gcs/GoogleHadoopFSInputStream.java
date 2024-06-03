@@ -25,6 +25,8 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
@@ -81,29 +83,67 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private final VectoredIOImpl vectoredIO;
 
   static GoogleHadoopFSInputStream create(
-      GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
+      GoogleHadoopFileSystem ghfs,
+      URI gcsPath,
+      VectoredReadOptions vectoredReadOptions,
+      FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel =
-        gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-    return new GoogleHadoopFSInputStream(ghfs, gcsPath, channel, statistics);
+    FileInfo fileInfo = null;
+    SeekableByteChannel channel;
+    // Extract out the fileInfo call here and use it in readChannel as well as in vectoredRead API
+    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+      // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
+      fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      channel =
+          gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    } else {
+      // cases where fileInfo wouldn't have been requested in gcsio layer.
+      channel =
+          gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    }
+    return new GoogleHadoopFSInputStream(
+        ghfs, gcsPath, fileInfo, channel, vectoredReadOptions, statistics);
+  }
+
+  private static boolean shouldPreFetchFileInfo(GoogleCloudStorageFileSystemOptions gcsFSOptions) {
+    // FileInfo is requested while opening the channel in gcsio channel layer in following
+    // conditions
+    // 1. failFastOnNotFound is enabled
+    // 2. java-storage library is in use (failedFast in no-op for grpc flow).
+    // prefecthing the fileInfo in FsInputSteam. So, that it can be used across other read API i.e.
+    // vectoredRead
+    if (gcsFSOptions.getClientType() == ClientType.STORAGE_CLIENT
+        || gcsFSOptions
+            .getCloudStorageOptions()
+            .getReadChannelOptions()
+            .isFastFailOnNotFoundEnabled()) {
+      return true;
+    }
+    return false;
   }
 
   static GoogleHadoopFSInputStream create(
-      GoogleHadoopFileSystem ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
+      GoogleHadoopFileSystem ghfs,
+      FileInfo fileInfo,
+      VectoredReadOptions vectoredReadOptions,
+      FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-    return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), channel, statistics);
+    return new GoogleHadoopFSInputStream(
+        ghfs, fileInfo.getPath(), fileInfo, channel, vectoredReadOptions, statistics);
   }
 
   private GoogleHadoopFSInputStream(
       GoogleHadoopFileSystem ghfs,
       URI gcsPath,
+      FileInfo fileInfo,
       SeekableByteChannel channel,
+      VectoredReadOptions vectoredReadOptions,
       FileSystem.Statistics statistics) {
     logger.atFiner().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
     this.gcsPath = gcsPath;
@@ -119,7 +159,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
 
     this.traceFactory = ghfs.getTraceFactory();
-    this.vectoredIO = VectoredIOImpl.create(ghfs, gcsPath, statistics);
+    this.vectoredIO = new VectoredIOImpl(ghfs.getGcsFs(), gcsPath, fileInfo, vectoredReadOptions);
   }
 
   /**
@@ -232,10 +272,25 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             closed = true;
             try {
               logger.atFiner().log("close(): %s", gcsPath);
-              if (channel != null) {
-                logger.atFiner().log(
-                    "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-                channel.close();
+              try {
+                if (channel != null) {
+                  logger.atFiner().log(
+                      "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+                  channel.close();
+                }
+              } catch (Exception e) {
+                logger.atWarning().withCause(e).log(
+                    "Error while closing underneath read channel resources for path: %s", gcsPath);
+              }
+
+              try {
+                if (vectoredIO != null) {
+                  logger.atFiner().log("Closing vectored read for path:%s ", gcsPath);
+                  vectoredIO.close();
+                }
+              } catch (Exception e) {
+                logger.atWarning().withCause(e).log(
+                    "Error while closing vectoredRead resources for path: %s", gcsPath);
               }
             } finally {
               streamStats.close();
@@ -247,7 +302,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
     if (!isClosed) {
       streamStatistics.close();
-      vectoredIO.close();
     }
   }
 

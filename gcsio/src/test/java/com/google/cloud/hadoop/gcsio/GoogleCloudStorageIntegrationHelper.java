@@ -220,6 +220,17 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     return allReadBytes.toByteArray();
   }
 
+  public byte[] readFile(URI objectPath, long offset, int len) throws IOException {
+    ByteBuffer readBuffer = ByteBuffer.allocate(len);
+    try (SeekableByteChannel in = open(objectPath)) {
+      if (offset > 0) {
+        in.position(offset);
+      }
+      in.read(readBuffer);
+    }
+    return readBuffer.array();
+  }
+
   /**
    * Helper that reads text from the given file at the given offset and returns it. If checkOverflow
    * is true, it will make sure that no more than 'len' bytes were read.
