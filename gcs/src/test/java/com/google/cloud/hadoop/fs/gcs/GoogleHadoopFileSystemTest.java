@@ -158,7 +158,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     URI initUri = new Path("gs://" + rootBucketName).toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
         new GoogleCloudStorageFileSystemImpl(
-            InMemoryGoogleCloudStorageForRead::new,
+            CustomInMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
@@ -180,7 +180,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     URI initUri = new Path("gs://" + rootBucketName).toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
         new GoogleCloudStorageFileSystemImpl(
-            InMemoryGoogleCloudStorageForRead::new,
+            CustomInMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
@@ -322,11 +322,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Override
   public void testRenameHnBucket() {}
 
-  private class InMemoryGoogleCloudStorageForRead extends InMemoryGoogleCloudStorage {
+  /* Custom InMemoryGoogleCloudStorage object which throws exception when reading */
+  private class CustomInMemoryGoogleCloudStorage extends InMemoryGoogleCloudStorage {
     private IOException exceptionThrown =
         new IOException("read_throws_exception test : read call throws exception");
 
-    InMemoryGoogleCloudStorageForRead(GoogleCloudStorageOptions storageOptions) {
+    CustomInMemoryGoogleCloudStorage(GoogleCloudStorageOptions storageOptions) {
       super(storageOptions);
     }
 
