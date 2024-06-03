@@ -91,7 +91,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics)) {
+    try (GoogleHadoopFSInputStream in =
+        GoogleHadoopFSInputStream.create(ghfs, path, VectoredReadOptions.DEFAULT, statistics)) {
       assertThat(in.read(value, 0, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(1);
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
@@ -131,7 +132,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     gcsFsIHelper.writeTextFile(path, testContent);
 
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+    GoogleHadoopFSInputStream in =
+        GoogleHadoopFSInputStream.create(ghfs, path, VectoredReadOptions.DEFAULT, statistics);
     in.close();
     assertThrows(IOException.class, in::read);
   }
@@ -233,6 +235,6 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   private static GoogleHadoopFSInputStream createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
     return GoogleHadoopFSInputStream.create(
-        ghfs, path, new FileSystem.Statistics(ghfs.getScheme()));
+        ghfs, path, VectoredReadOptions.DEFAULT, new FileSystem.Statistics(ghfs.getScheme()));
   }
 }

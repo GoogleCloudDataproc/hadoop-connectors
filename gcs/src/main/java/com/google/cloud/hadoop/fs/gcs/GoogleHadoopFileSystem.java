@@ -216,6 +216,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * GoogleHadoopFileSystemConfiguration#GCS_WORKING_DIRECTORY} is set.
    */
   private Path workingDirectory;
+
+  private VectoredReadOptions vectoredReadOptions;
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
@@ -283,6 +285,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
+    vectoredReadOptions =
+        GoogleHadoopFileSystemConfiguration.getVectoredReadOptionBuilder(config).build();
 
     initializeFsRoot();
     initializeWorkingDirectory(config);
@@ -547,7 +551,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           logger.atFiner().log(
               "open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
           URI gcsPath = getGcsPath(hadoopPath);
-          return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
+          return new FSDataInputStream(
+              GoogleHadoopFSInputStream.create(this, gcsPath, vectoredReadOptions, statistics));
         });
   }
 
@@ -1213,7 +1218,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 result,
                 () ->
                     new FSDataInputStream(
-                        GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
+                        GoogleHadoopFSInputStream.create(
+                            this, fileInfo, vectoredReadOptions, statistics))));
     return result;
   }
 

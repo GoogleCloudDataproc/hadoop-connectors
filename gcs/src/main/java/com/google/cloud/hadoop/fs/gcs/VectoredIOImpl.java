@@ -1,7 +1,33 @@
+/*
+ * Copyright 2024 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.fs.gcs;
 
+import static org.apache.hadoop.fs.VectoredReadUtils.isOrderedDisjoint;
+import static org.apache.hadoop.fs.VectoredReadUtils.mergeSortedRanges;
+import static org.apache.hadoop.fs.VectoredReadUtils.sliceTo;
+import static org.apache.hadoop.fs.VectoredReadUtils.validateRangeRequest;
+
+import com.google.cloud.hadoop.gcsio.FileInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
+import java.io.Closeable;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -14,36 +40,35 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FileRange;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.VectoredReadUtils;
 import org.apache.hadoop.fs.impl.CombinedFileRange;
 import org.apache.hadoop.util.functional.FutureIO;
 
-public class VectoredIOImpl {
+@VisibleForTesting
+public class VectoredIOImpl implements Closeable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private final FileSystem.Statistics statistics;
   private final URI gcsPath;
-  private final GoogleCloudStorageReadOptions readVectoredOptions;
-  private final GoogleHadoopFileSystem ghfs;
-  private final int maxReadVectoredParallelism = 8;
-  private final int maxReadSizeForVectorReads = 128 * 1024 * 1024;
-  private final int minSeekForVectorReads = 4 * 1024;
+  private final FileInfo fileInfo;
+  private final GoogleCloudStorageReadOptions channelReadOptions;
+  private final VectoredReadOptions vectoredReadOptions;
+  private final GoogleCloudStorageFileSystem gcsFs;
   private final ExecutorService boundedThreadPool;
 
-  static VectoredIOImpl create(
-      GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics) {
-    return new VectoredIOImpl(ghfs, gcsPath, statistics);
-  }
-
-  private VectoredIOImpl(
-      GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics) {
-    this.ghfs = ghfs;
+  public VectoredIOImpl(
+      GoogleCloudStorageFileSystem gcsFs,
+      URI gcsPath,
+      FileInfo fileInfo,
+      VectoredReadOptions vectoredReadOptions) {
+    this.gcsFs = gcsFs;
     this.gcsPath = gcsPath;
-    this.statistics = statistics;
-    this.readVectoredOptions =
-        getReadVectoredOptions(
-            ghfs.getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions());
-    this.boundedThreadPool = Executors.newFixedThreadPool(maxReadVectoredParallelism);
+    this.fileInfo = fileInfo;
+    this.vectoredReadOptions = vectoredReadOptions;
+    this.channelReadOptions =
+        channelReadOptions(gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    // TODO: this needs to be thought about a little bit more, should we have our own executor
+    // service, what about waiting tasks and it's queue
+    this.boundedThreadPool =
+        Executors.newFixedThreadPool(this.vectoredReadOptions.getReadThreads());
   }
 
   /**
@@ -53,64 +78,83 @@ public class VectoredIOImpl {
    * @param allocate Function to allocate ByteBuffer for reading.
    * @throws IOException if an I/O error occurs.
    */
+  // TODO: capture the count of ranges being requested.
   public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-
     List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
     for (FileRange range : ranges) {
-      VectoredReadUtils.validateRangeRequest(range);
+      validateRangeRequest(range);
       CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
       range.setData(result);
     }
 
-    if (VectoredReadUtils.isOrderedDisjoint(ranges, 1, minSeekForVectorReads)) {
+    if (shouldMergeRanges(ranges)) {
+      // case when ranges are not merged
       for (FileRange range : sortedRanges) {
-        ByteBuffer buffer = allocate.apply(range.getLength());
-        boundedThreadPool.submit(() -> readSingleRange(range, buffer));
-        statistics.incrementBytesRead(range.getLength());
-        statistics.incrementReadOps(1);
+        boundedThreadPool.submit(() -> readSingleRange(range, allocate));
       }
     } else {
+      // case where ranges can be merged
       List<CombinedFileRange> combinedFileRanges =
-          VectoredReadUtils.mergeSortedRanges(
-              sortedRanges, 1, minSeekForVectorReads, maxReadSizeForVectorReads);
+          mergeSortedRanges(
+              sortedRanges,
+              1,
+              vectoredReadOptions.getMinSeekVectoredReadSize(),
+              vectoredReadOptions.getMergeRangeMaxSize());
       for (CombinedFileRange combinedFileRange : combinedFileRanges) {
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         combinedFileRange.setData(result);
-
-        ByteBuffer buffer = allocate.apply(combinedFileRange.getLength());
-        boundedThreadPool.submit(() -> readSingleRange(combinedFileRange, buffer));
+        // how do we make sure whatever was submitted first is the one getting processed first?
+        boundedThreadPool.submit(() -> readSingleRange(combinedFileRange, allocate));
       }
+      updateChildRanges(combinedFileRanges);
+    }
+  }
 
-      for (CombinedFileRange combinedFileRange : combinedFileRanges) {
-        try {
-          ByteBuffer combinedBuffer = FutureIO.awaitFuture(combinedFileRange.getData());
-          for (FileRange child : combinedFileRange.getUnderlying()) {
-            updateOriginalRange(child, combinedBuffer, combinedFileRange);
-          }
-        } catch (Exception ex) {
-          logger.atSevere().withCause(ex).log(
-              "Exception occurred while reading combined range from file");
-          for (FileRange child : combinedFileRange.getUnderlying()) {
-            child.getData().completeExceptionally(ex);
+  private void updateChildRanges(List<CombinedFileRange> combinedFileRanges) {
+    for (CombinedFileRange combinedFileRange : combinedFileRanges) {
+      try {
+        ByteBuffer combinedBuffer = FutureIO.awaitFuture(combinedFileRange.getData());
+        for (FileRange child : combinedFileRange.getUnderlying()) {
+          ByteBuffer childBuffer = sliceTo(combinedBuffer, combinedFileRange.getOffset(), child);
+          child.getData().complete(childBuffer);
+        }
+      } catch (Exception e) {
+        logger.atWarning().withCause(e).log(
+            "Error while reading combinedRange: %s for path: %s", combinedFileRange, gcsPath);
+        // complete exception all the underlying ranges which have not already
+        // finished.
+        for (FileRange child : combinedFileRange.getUnderlying()) {
+          // TODO: how an individual range's exception is handled at caller i.e. parquet-java end?
+          if (!child.getData().isDone()) {
+            child
+                .getData()
+                .completeExceptionally(
+                    new IOException(
+                        String.format(
+                            "Error while populating childRange: %s from combinedRange: %s for path: %s",
+                            child, combinedFileRange, gcsPath),
+                        e));
           }
         }
-        statistics.incrementBytesRead(combinedFileRange.getLength());
-        statistics.incrementReadOps(1);
       }
     }
   }
 
   /**
-   * Returns modified GoogleCloudStorageReadOptions with vectored read options set.
+   * Returns Overriden GCS read options. These options will be used while creating channel per
+   * FileRange. By default, channel is optimized to perform multiple read request from same channel.
+   * Given in readVectored, only one read is performed per channel overriding some configuration to
+   * optimize it.
    *
-   * @param readOptions The original read options.
-   * @return The modified read options with vectored read options set.
+   * @param readOptions original read options extracted from GCSFileSystem
+   * @return The modified read options.
    */
-  private GoogleCloudStorageReadOptions getReadVectoredOptions(
+  private GoogleCloudStorageReadOptions channelReadOptions(
       GoogleCloudStorageReadOptions readOptions) {
     GoogleCloudStorageReadOptions.Builder builder = readOptions.toBuilder();
-    builder.setFastFailOnNotFoundEnabled(false);
+    // For single range read we don't want Read channel to adjust around on channel boundaries as
+    // channel is used just for one read request.
     builder.setFadvise(GoogleCloudStorageReadOptions.Fadvise.SEQUENTIAL);
     return builder.build();
   }
@@ -119,37 +163,40 @@ public class VectoredIOImpl {
    * Read data from GCS for this range and populate the buffer.
    *
    * @param range range of data to read.
-   * @param buffer buffer to fill.
+   * @param allocate lambda function to allocate byteBuffer.
    */
-  private void readSingleRange(FileRange range, ByteBuffer buffer) {
-    try {
-      VectoredReadUtils.validateRangeRequest(range);
-      try (SeekableByteChannel channel = ghfs.getGcsFs().open(gcsPath, readVectoredOptions)) {
-        channel.position(range.getOffset());
-        int numRead = channel.read(ByteBuffer.wrap(buffer.array(), 0, range.getLength()));
-        range.getData().complete(buffer);
-        logger.atInfo().log(
-            "Read single range completed from offset: %d with a length of %d",
-            range.getOffset(), numRead);
+  private void readSingleRange(FileRange range, IntFunction<ByteBuffer> allocate) {
+    try (SeekableByteChannel channel = getReadChannel()) {
+      channel.position(range.getOffset());
+      ByteBuffer dst = allocate.apply(range.getLength());
+      // TODO: will duplicate work for direct buffers
+      int numRead = channel.read(dst.duplicate());
+      if (numRead < 0) {
+        throw new EOFException(
+            String.format(
+                "EOF reached before whole range can be read, range: %s, path: %s", range, gcsPath));
       }
-    } catch (Exception ex) {
-      logger.atInfo().withCause(ex).log("Exception while reading a range %s", range.toString());
-      range.getData().completeExceptionally(ex);
+      range.getData().complete(dst);
+      logger.atFiner().log("Read single range completed from range: %s, path: %s", range, gcsPath);
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log(
+          "Exception while reading range:%s for path: %s", range, gcsPath);
+      range.getData().completeExceptionally(e);
     }
   }
 
-  /**
-   * Update data in child range from combined range.
-   *
-   * @param child child range.
-   * @param combinedBuffer combined buffer.
-   * @param combinedFileRange combined range.
-   */
-  private void updateOriginalRange(
-      FileRange child, ByteBuffer combinedBuffer, CombinedFileRange combinedFileRange) {
-    ByteBuffer childBuffer =
-        VectoredReadUtils.sliceTo(combinedBuffer, combinedFileRange.getOffset(), child);
-    child.getData().complete(childBuffer);
+  private boolean shouldMergeRanges(List<? extends FileRange> ranges) {
+    if (isOrderedDisjoint(ranges, 1, vectoredReadOptions.getMinSeekVectoredReadSize())) {
+      return true;
+    }
+    return false;
+  }
+
+  private SeekableByteChannel getReadChannel() throws IOException {
+    if (fileInfo != null) {
+      return gcsFs.open(fileInfo, channelReadOptions);
+    }
+    return gcsFs.open(gcsPath, channelReadOptions);
   }
 
   /**
@@ -178,7 +225,9 @@ public class VectoredIOImpl {
   }
 
   /** Closes the VectoredIOImpl instance, releasing any allocated resources. */
+  @Override
   public void close() {
+    // TODO: this needs to have better exception handling.
     boundedThreadPool.shutdown();
     try {
       if (!boundedThreadPool.awaitTermination(10, TimeUnit.SECONDS)) {

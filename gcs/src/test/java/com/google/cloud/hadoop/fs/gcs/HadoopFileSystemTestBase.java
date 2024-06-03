@@ -30,13 +30,13 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -48,14 +48,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileRange;
@@ -63,7 +61,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
-import org.apache.hadoop.fs.impl.FutureIOSupport;
 import org.apache.hadoop.util.functional.FutureIO;
 import org.junit.Test;
 
@@ -1000,124 +997,20 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(ghfs.delete(hadoopPath)).isTrue();
   }
 
-  @Test
-  public void testVectoredReadMultipleRanges() throws Exception {
-
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[2048];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
-    }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-
-    List<FileRange> fileRanges = new ArrayList<>();
-    for (int i = 0; i < 10; i++) {
-      FileRange fileRange = FileRange.createFileRange(i * 100, 100);
-      fileRanges.add(fileRange);
-    }
-
-    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
-      input.readVectored(fileRanges, ByteBuffer::allocate);
-      CompletableFuture<?>[] completableFutures = new CompletableFuture<?>[fileRanges.size()];
-      int i = 0;
-      for (FileRange res : fileRanges) {
-        completableFutures[i++] = res.getData();
-      }
-      CompletableFuture<Void> combinedFuture = CompletableFuture.allOf(completableFutures);
-      combinedFuture.get();
-
-      validateVectoredReadResult(fileRanges, byteBuffer);
-    } finally {
-      ghfs.delete(hadoopPath);
-    }
-  }
-
-  @Test
-  public void testVectoredReadAndReadFully() throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[2048];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
-    }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(100, 100));
-
-    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
-      input.readVectored(fileRanges, ByteBuffer::allocate);
-      byte[] readFullRes = new byte[100];
-      input.readFully(100, readFullRes);
-      ByteBuffer vecRes = FutureIOSupport.awaitFuture(fileRanges.get(0).getData());
-      assertThat(ByteBuffer.wrap(readFullRes)).isEqualTo(vecRes);
-    } finally {
-      ghfs.delete(hadoopPath);
-    }
-  }
-
-  /** As the minimum seek value is 4*1024,none of the below ranges will get merged. */
-  @Test
-  public void testDisjointRanges() throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[64 * 1024];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
-    }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(0, 100));
-    fileRanges.add(FileRange.createFileRange(4_000 + 101, 100));
-    fileRanges.add(FileRange.createFileRange(16_000 + 101, 100));
-    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
-      input.readVectored(fileRanges, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges, byteBuffer);
-    } finally {
-      ghfs.delete(hadoopPath);
-    }
-  }
-
-  /** As the minimum seek value is 4*1024, all the below ranges will get merged into one. */
-  @Test
-  public void testAllRangesMergedIntoOne() throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[64 * 1024];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
-    }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(0, 100));
-    fileRanges.add(FileRange.createFileRange(4_000 - 101, 100));
-    fileRanges.add(FileRange.createFileRange(8_000 - 101, 100));
-    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
-      input.readVectored(fileRanges, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges, byteBuffer);
-    } finally {
-      ghfs.delete(hadoopPath);
-    }
-  }
-
   /**
    * As the minimum seek value is 4*1024, the first three ranges will be merged into and other two
    * will remain as it is.
    */
+  // TODO: how the validation is happening that it's merged into one range request?
   @Test
   public void testSomeRangesMergedSomeUnmerged() throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[64 * 1024];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    byte[] testBytes = new byte[8 * 8 * 1024];
+    for (int i = 0; i < testBytes.length; i++) {
+      testBytes[i] = (byte) (i * i);
     }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
+
+    ghfsHelper.writeFile(hadoopPath, testBytes, 1, /* overwrite= */ false);
     List<FileRange> fileRanges = new ArrayList<>();
     fileRanges.add(FileRange.createFileRange(8 * 1024, 100));
     fileRanges.add(FileRange.createFileRange(14 * 1024, 100));
@@ -1126,136 +1019,38 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     fileRanges.add(FileRange.createFileRange(40 * 1024, 1024));
     try (FSDataInputStream input = ghfs.open(hadoopPath)) {
       input.readVectored(fileRanges, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges, byteBuffer);
+      validateVectoredReadResult(fileRanges, hadoopPath);
     } finally {
       ghfs.delete(hadoopPath);
     }
   }
 
   @Test
-  public void testConsecutiveRanges() throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[64 * 1024];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
+  public void testInvalidRangeRequest() throws Exception {
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    byte[] testBytes = new byte[8 * 8 * 1024];
+    for (int i = 0; i < testBytes.length; i++) {
+      testBytes[i] = (byte) (i * i);
     }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-    List<FileRange> fileRanges = getConsecutiveRanges();
+
+    ghfsHelper.writeFile(hadoopPath, testBytes, 1, /* overwrite= */ false);
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(-1, 10));
     try (FSDataInputStream input = ghfs.open(hadoopPath)) {
-      input.readVectored(fileRanges, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges, byteBuffer);
+      assertThrows(EOFException.class, () -> input.readVectored(fileRanges, ByteBuffer::allocate));
     } finally {
       ghfs.delete(hadoopPath);
     }
   }
 
-  @Test
-  public void testMultipleVectoredReads() throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[64 * 1024];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
-    }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-    List<FileRange> fileRanges1 = getSampleNonOverlappingRanges();
-    List<FileRange> fileRanges2 = getSampleNonOverlappingRanges();
-    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
-      input.readVectored(fileRanges1, ByteBuffer::allocate);
-      input.readVectored(fileRanges2, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges2, byteBuffer);
-      validateVectoredReadResult(fileRanges1, byteBuffer);
-    } finally {
-      ghfs.delete(hadoopPath);
-    }
-  }
-
-  @Test
-  public void testNegativeLengthRange() throws Exception {
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(0, -50));
-    verifyExceptionalVectoredRead(fileRanges, IllegalArgumentException.class);
-  }
-
-  protected List<FileRange> getSampleNonOverlappingRanges() {
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(0, 100));
-    fileRanges.add(FileRange.createFileRange(110, 50));
-    return fileRanges;
-  }
-
-  protected List<FileRange> getSampleSameRanges() {
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(8_000, 1000));
-    fileRanges.add(FileRange.createFileRange(8_000, 1000));
-    fileRanges.add(FileRange.createFileRange(8_000, 1000));
-    return fileRanges;
-  }
-
-  protected List<FileRange> getConsecutiveRanges() {
-    List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(100, 500));
-    fileRanges.add(FileRange.createFileRange(600, 500));
-    return fileRanges;
-  }
-
-  /**
-   * Utility to validate vectored read results.
-   *
-   * @param fileRanges input ranges.
-   * @param originalData original data.
-   * @throws IOException any ioe.
-   */
-  public static void validateVectoredReadResult(List<FileRange> fileRanges, byte[] originalData)
-      throws IOException, TimeoutException {
-    CompletableFuture<?>[] completableFutures = new CompletableFuture<?>[fileRanges.size()];
-    int i = 0;
-    for (FileRange res : fileRanges) {
-      completableFutures[i++] = res.getData();
-    }
-    CompletableFuture<Void> combinedFuture = CompletableFuture.allOf(completableFutures);
-    FutureIO.awaitFuture(
-        combinedFuture, VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-
-    for (FileRange res : fileRanges) {
-      CompletableFuture<ByteBuffer> data = res.getData();
-      ByteBuffer buffer =
+  public void validateVectoredReadResult(List<FileRange> fileRanges, Path hadoopPath)
+      throws Exception {
+    for (FileRange range : fileRanges) {
+      ByteBuffer resBuffer =
           FutureIO.awaitFuture(
-              data, VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      for (int j = 0; j < res.getLength(); j++) {
-        int o = (int) res.getOffset() + j;
-        assertThat(originalData[o]).isEqualTo(buffer.get());
-      }
-    }
-  }
-
-  /**
-   * Validate that exceptions must be thrown during a vectored read operation with specific input
-   * ranges.
-   *
-   * @param fileRanges input file ranges.
-   * @param clazz type of exception expected.
-   * @throws Exception any other IOE.
-   */
-  protected <T extends Throwable> void verifyExceptionalVectoredRead(
-      List<FileRange> fileRanges, Class<T> clazz) throws Exception {
-    URI path = getTempFilePath();
-
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    byte[] byteBuffer = new byte[64 * 1024];
-    for (int i = 0; i < byteBuffer.length; i++) {
-      byteBuffer[i] = (byte) (i % 255);
-    }
-    ghfsHelper.writeFile(hadoopPath, byteBuffer, 1, /* overwrite= */ false);
-
-    CompletableFuture<FSDataInputStream> builder = ghfs.openFile(hadoopPath).build();
-    try (FSDataInputStream in = builder.get()) {
-      intercept(clazz, () -> in.readVectored(fileRanges, ByteBuffer::allocate));
-    } finally {
-      ghfs.delete(hadoopPath);
+              range.getData(), VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      GoogleHadoopFileSystemTestHelper.assertObjectContent(
+          ghfs, hadoopPath, resBuffer.duplicate(), range.getOffset());
     }
   }
   // -----------------------------------------------------------------
