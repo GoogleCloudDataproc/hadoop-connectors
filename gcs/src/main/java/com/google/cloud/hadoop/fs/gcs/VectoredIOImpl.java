@@ -42,7 +42,6 @@ import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.VectoredReadUtils;
 import org.apache.hadoop.fs.impl.CombinedFileRange;
-import org.apache.hadoop.util.functional.FutureIO;
 
 @VisibleForTesting
 public class VectoredIOImpl implements Closeable {
@@ -78,7 +77,6 @@ public class VectoredIOImpl implements Closeable {
    * @param allocate Function to allocate ByteBuffer for reading.
    * @throws IOException if an I/O error occurs.
    */
-  // TODO: capture the count of ranges being requested.
   public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
     List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
@@ -105,37 +103,53 @@ public class VectoredIOImpl implements Closeable {
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         combinedFileRange.setData(result);
         // how do we make sure whatever was submitted first is the one getting processed first?
-        boundedThreadPool.submit(() -> readSingleRange(combinedFileRange, allocate));
+        boundedThreadPool.submit(() -> readCombinedRange(combinedFileRange, allocate));
       }
-      updateChildRanges(combinedFileRanges);
     }
   }
 
-  private void updateChildRanges(List<CombinedFileRange> combinedFileRanges) {
-    for (CombinedFileRange combinedFileRange : combinedFileRanges) {
-      try {
-        ByteBuffer combinedBuffer = FutureIO.awaitFuture(combinedFileRange.getData());
-        for (FileRange child : combinedFileRange.getUnderlying()) {
-          ByteBuffer childBuffer = sliceTo(combinedBuffer, combinedFileRange.getOffset(), child);
-          child.getData().complete(childBuffer);
-        }
-      } catch (Exception e) {
-        logger.atWarning().withCause(e).log(
-            "Error while reading combinedRange: %s for path: %s", combinedFileRange, gcsPath);
-        // complete exception all the underlying ranges which have not already
-        // finished.
-        for (FileRange child : combinedFileRange.getUnderlying()) {
-          // TODO: how an individual range's exception is handled at caller i.e. parquet-java end?
-          if (!child.getData().isDone()) {
-            child
-                .getData()
-                .completeExceptionally(
-                    new IOException(
-                        String.format(
-                            "Error while populating childRange: %s from combinedRange: %s for path: %s",
-                            child, combinedFileRange, gcsPath),
-                        e));
-          }
+  /**
+   * function for reading combined or merged FileRanges. It reads the range and update the child
+   * fileRange's content.
+   *
+   * @param combinedFileRange merge file range, keeps track of source file ranges which were merged
+   * @param allocate Byte buffer allocator
+   */
+  private void readCombinedRange(
+      CombinedFileRange combinedFileRange, IntFunction<ByteBuffer> allocate) {
+    try (SeekableByteChannel channel = getReadChannel()) {
+      channel.position(combinedFileRange.getOffset());
+      ByteBuffer dst = allocate.apply(combinedFileRange.getLength());
+      int numRead = channel.read(dst.duplicate());
+      if (numRead < 0) {
+        throw new EOFException(
+            String.format(
+                "EOF reached before whole combinedFileRange can be read, range: %s, path: %s",
+                combinedFileRange, gcsPath));
+      }
+      combinedFileRange.getData().complete(dst);
+      logger.atFiner().log(
+          "Read combinedFileRange completed from range: %s, path: %s", combinedFileRange, gcsPath);
+      for (FileRange child : combinedFileRange.getUnderlying()) {
+        ByteBuffer childBuffer = sliceTo(dst, combinedFileRange.getOffset(), child);
+        child.getData().complete(childBuffer);
+      }
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log(
+          "Exception while reading combinedFileRange:%s for path: %s", combinedFileRange, gcsPath);
+      combinedFileRange.getData().completeExceptionally(e);
+      // complete exception all the underlying ranges which have not already
+      // finished.
+      for (FileRange child : combinedFileRange.getUnderlying()) {
+        if (!child.getData().isDone()) {
+          child
+              .getData()
+              .completeExceptionally(
+                  new IOException(
+                      String.format(
+                          "Error while populating childRange: %s from combinedRange: %s for path: %s",
+                          child, combinedFileRange, gcsPath),
+                      e));
         }
       }
     }

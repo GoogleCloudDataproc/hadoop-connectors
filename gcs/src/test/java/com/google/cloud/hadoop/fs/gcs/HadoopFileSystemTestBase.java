@@ -997,11 +997,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(ghfs.delete(hadoopPath)).isTrue();
   }
 
-  /**
-   * As the minimum seek value is 4*1024, the first three ranges will be merged into and other two
-   * will remain as it is.
-   */
-  // TODO: how the validation is happening that it's merged into one range request?
   @Test
   public void testSomeRangesMergedSomeUnmerged() throws Exception {
     Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
@@ -1043,7 +1038,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     }
   }
 
-  public void validateVectoredReadResult(List<FileRange> fileRanges, Path hadoopPath)
+  private void validateVectoredReadResult(List<FileRange> fileRanges, Path hadoopPath)
       throws Exception {
     for (FileRange range : fileRanges) {
       ByteBuffer resBuffer =
