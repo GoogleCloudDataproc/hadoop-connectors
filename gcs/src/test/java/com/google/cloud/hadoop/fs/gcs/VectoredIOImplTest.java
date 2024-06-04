@@ -202,6 +202,18 @@ public class VectoredIOImplTest {
     assertThat(fileInfoArgumentCaptor.getValue().getPath()).isEqualTo(fileInfo.getPath());
   }
 
+  @Test
+  public void overlappingRangeTest() {
+    List<FileRange> fileRanges = new ArrayList<>();
+    // overlapping range
+    fileRanges.add(FileRange.createFileRange(/* offset */ 0, /* length */ 10));
+    fileRanges.add(FileRange.createFileRange(/* offset */ 5, /* length */ 10));
+    Throwable e =
+        assertThrows(
+            IllegalArgumentException.class, () -> vectoredIO.readVectored(fileRanges, allocate));
+    assertThat((e.getMessage())).contains("overlapping");
+  }
+
   /**
    * Ranges should have been merged based on minSeek value but still denied because merged range
    * size is beyond maxMergedRange.
@@ -248,6 +260,27 @@ public class VectoredIOImplTest {
 
     assertThat(channel1.position()).isEqualTo(expectedCombinedRanges.get(0).getOffset());
     assertThat(channel2.position()).isEqualTo(expectedCombinedRanges.get(1).getOffset());
+  }
+
+  @Test
+  public void verifyRangeSorting() {
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(/* offset */ 22, /* length */ 2));
+    fileRanges.add(FileRange.createFileRange(/* offset */ 18, /* length */ 2));
+    fileRanges.add(FileRange.createFileRange(/* offset */ 16, /* length */ 2));
+    fileRanges.add(FileRange.createFileRange(/* offset */ 1, /* length */ 2));
+    fileRanges.add(FileRange.createFileRange(/* offset */ 9, /* length */ 2));
+    fileRanges.add(FileRange.createFileRange(/* offset */ 3, /* length */ 2));
+    List<? extends FileRange> sortedRanges =
+        vectoredIO.validateNonOverlappingAndReturnSortedRanges(fileRanges);
+    FileRange prev = null;
+    for (FileRange current : sortedRanges) {
+      if (prev != null) {
+        assertThat(fileRanges).contains(current);
+        assertThat(current.getOffset()).isGreaterThan(prev.getOffset());
+      }
+      prev = current;
+    }
   }
 
   private void verifyRangeExceptionOrContent(List<FileRange> fileRanges) throws Exception {

@@ -30,6 +30,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.EOFException;
 import java.io.IOException;
@@ -142,6 +143,22 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       in.readVectored(fileRanges, ByteBuffer::allocate);
       validateVectoredReadResult(fileRanges, path);
     }
+  }
+
+  @Test
+  public void testClose() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_mergedRange");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "verify vectored read ranges are getting"; // length = 40
+    gcsFsIHelper.writeTextFile(path, testContent);
+    GoogleHadoopFSInputStream in =
+        GoogleHadoopFSInputStream.create(
+            ghfs, path, VectoredReadOptions.DEFAULT, new FileSystem.Statistics(ghfs.getScheme()));
+    GoogleCloudStorageFileSystem gcsFS = ghfs.getGcsFs();
   }
 
   @Test

@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.VectoredReadUtils;
@@ -51,7 +50,7 @@ public class VectoredIOImpl implements Closeable {
   private final GoogleCloudStorageReadOptions channelReadOptions;
   private final VectoredReadOptions vectoredReadOptions;
   private final GoogleCloudStorageFileSystem gcsFs;
-  private final ExecutorService boundedThreadPool;
+  private ExecutorService boundedThreadPool;
 
   public VectoredIOImpl(
       GoogleCloudStorageFileSystem gcsFs,
@@ -64,8 +63,6 @@ public class VectoredIOImpl implements Closeable {
     this.vectoredReadOptions = vectoredReadOptions;
     this.channelReadOptions =
         channelReadOptions(gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-    // TODO: this needs to be thought about a little bit more, should we have our own executor
-    // service, what about waiting tasks and it's queue
     this.boundedThreadPool =
         Executors.newFixedThreadPool(this.vectoredReadOptions.getReadThreads());
   }
@@ -221,19 +218,24 @@ public class VectoredIOImpl implements Closeable {
    * @param input list if input ranges.
    * @return true/false based on logic explained above.
    */
-  private List<? extends FileRange> validateNonOverlappingAndReturnSortedRanges(
+  @VisibleForTesting
+  public List<? extends FileRange> validateNonOverlappingAndReturnSortedRanges(
       List<? extends FileRange> input) {
 
-    if (input.size() <= 1) {
+    if (input.size() == 1) {
       return input;
     }
     FileRange[] sortedRanges = VectoredReadUtils.sortRanges(input);
-    FileRange prev = sortedRanges[0];
-    for (int i = 1; i < sortedRanges.length; i++) {
-      if (sortedRanges[i].getOffset() < prev.getOffset() + prev.getLength()) {
-        throw new UnsupportedOperationException("Overlapping ranges are not supported");
+    FileRange prev = null;
+    for (FileRange current : sortedRanges) {
+      if (prev != null) {
+        if (current.getOffset() < prev.getOffset() + prev.getLength()) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Overlapping ranges not supported, overlapping range: %s, %s", prev, current));
+        }
       }
-      prev = sortedRanges[i];
+      prev = current;
     }
     return Arrays.asList(sortedRanges);
   }
@@ -241,18 +243,10 @@ public class VectoredIOImpl implements Closeable {
   /** Closes the VectoredIOImpl instance, releasing any allocated resources. */
   @Override
   public void close() {
-    // TODO: this needs to have better exception handling.
-    boundedThreadPool.shutdown();
     try {
-      if (!boundedThreadPool.awaitTermination(10, TimeUnit.SECONDS)) {
-        logger.atWarning().log(
-            "Executor did not terminate within timeout. Forcibly shutting down.");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
+      boundedThreadPool.shutdown();
     } finally {
-      boundedThreadPool.shutdownNow();
+      boundedThreadPool = null;
     }
   }
 }
