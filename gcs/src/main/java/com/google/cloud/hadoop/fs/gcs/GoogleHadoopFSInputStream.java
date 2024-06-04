@@ -25,6 +25,7 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
@@ -91,25 +92,36 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
-    // Extract out the fileInfo call at this layaer and share it across other api i.e. readVectored
-    // FileInfo is requested while opening the channel if
-    // 1. java-storage library is in use (failedFast in no-op for grpc flow).
-    // 2. failFastOnNotFound is enabled
-    if (gcsFs.getOptions().getClientType() == ClientType.STORAGE_CLIENT
-        || gcsFs
-            .getOptions()
-            .getCloudStorageOptions()
-            .getReadChannelOptions()
-            .isFastFailOnNotFoundEnabled()) {
+    // Extract out the fileInfo call here and use it in readChannel as well as in vectoredRead API
+    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+      // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
       fileInfo = gcsFs.getFileInfoObject(gcsPath);
       channel =
           gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     } else {
+      // cases where fileInfo wouldn't have been requested in gcsio layer.
       channel =
           gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     }
     return new GoogleHadoopFSInputStream(
         ghfs, gcsPath, fileInfo, channel, vectoredReadOptions, statistics);
+  }
+
+  private static boolean shouldPreFetchFileInfo(GoogleCloudStorageFileSystemOptions gcsFSOptions) {
+    // FileInfo is requested while opening the channel in gcsio channel layer in following
+    // conditions
+    // 1. failFastOnNotFound is enabled
+    // 2. java-storage library is in use (failedFast in no-op for grpc flow).
+    // prefecthing the fileInfo in FsInputSteam. So, that it can be used across other read API i.e.
+    // vectoredRead
+    if (gcsFSOptions.getClientType() == ClientType.STORAGE_CLIENT
+        || gcsFSOptions
+            .getCloudStorageOptions()
+            .getReadChannelOptions()
+            .isFastFailOnNotFoundEnabled()) {
+      return true;
+    }
+    return false;
   }
 
   static GoogleHadoopFSInputStream create(
@@ -290,7 +302,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
     if (!isClosed) {
       streamStatistics.close();
-      vectoredIO.close();
     }
   }
 

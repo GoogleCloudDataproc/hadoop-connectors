@@ -244,7 +244,9 @@ public class VectoredIOImpl implements Closeable {
   @Override
   public void close() {
     try {
-      boundedThreadPool.shutdown();
+      if (boundedThreadPool != null) {
+        boundedThreadPool.shutdown();
+      }
     } finally {
       boundedThreadPool = null;
     }
