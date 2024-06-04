@@ -29,7 +29,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.as
 import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.EOFException;
@@ -40,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
@@ -180,7 +180,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     byte[] readBytes = gcsFsIHelper.readFile(path, fileRange1.getOffset(), fileRange1.getLength());
     assertByteBuffers(fileRange1.getData().get(), ByteBuffer.wrap(readBytes));
 
-    assertTrue(fileRange2.getData().isCompletedExceptionally());
+    Throwable e = assertThrows(ExecutionException.class, () -> fileRange2.getData().get());
+    assertThat(e.getCause()).isInstanceOf(IOException.class);
   }
 
   private void validateVectoredReadResult(List<FileRange> fileRanges, URI path) throws Exception {
