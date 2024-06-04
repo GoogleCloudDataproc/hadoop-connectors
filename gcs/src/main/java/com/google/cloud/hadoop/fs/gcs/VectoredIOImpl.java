@@ -99,7 +99,6 @@ public class VectoredIOImpl implements Closeable {
       for (CombinedFileRange combinedFileRange : combinedFileRanges) {
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         combinedFileRange.setData(result);
-        // how do we make sure whatever was submitted first is the one getting processed first?
         boundedThreadPool.submit(() -> readCombinedRange(combinedFileRange, allocate));
       }
     }
