@@ -287,7 +287,7 @@ public class VectoredIOImplTest {
     List<FileRange> fileRanges = new ArrayList<>();
     // Ranges should be merged together
     int rangeLength = 5;
-    int offset = (int) fileInfo.getSize() - rangeLength;
+    int offset = (int) fileInfo.getSize() - 1 - rangeLength;
     FileRange validRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(validRange);
     offset += rangeLength;
@@ -303,7 +303,7 @@ public class VectoredIOImplTest {
   public void rangeOverFLowSingleRange() throws Exception {
     List<FileRange> fileRanges = new ArrayList<>();
     int rangeLength = 5;
-    int offset = (int) fileInfo.getSize();
+    int offset = (int) fileInfo.getSize() - 1;
     FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(overFlowRange);
     vectoredIO.readVectored(fileRanges, allocate);
