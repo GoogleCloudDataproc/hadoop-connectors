@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.as
 import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.EOFException;
@@ -166,13 +167,20 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
             ghfs, path, vectoredReadOptions, new FileSystem.Statistics(ghfs.getScheme()));
 
     List<FileRange> fileRanges = new ArrayList<>();
-    // range.offset < fileSize & range.offset + range.length > fileSize
-    fileRanges.add(FileRange.createFileRange(35, 15));
+    // range inside file size
+    FileRange fileRange1 = FileRange.createFileRange(33, 2);
+    fileRanges.add(fileRange1);
+    // range going beyond filesize
+    FileRange fileRange2 = FileRange.createFileRange(35, 15);
+    fileRanges.add(fileRange2);
 
     try (GoogleHadoopFSInputStream ignore = in) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges, path);
     }
+    byte[] readBytes = gcsFsIHelper.readFile(path, fileRange1.getOffset(), fileRange1.getLength());
+    assertByteBuffers(fileRange1.getData().get(), ByteBuffer.wrap(readBytes));
+
+    assertTrue(fileRange2.getData().isCompletedExceptionally());
   }
 
   private void validateVectoredReadResult(List<FileRange> fileRanges, URI path) throws Exception {

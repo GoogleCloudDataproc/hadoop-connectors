@@ -117,19 +117,10 @@ public class VectoredIOImpl implements Closeable {
       channel.position(combinedFileRange.getOffset());
       ByteBuffer dst = allocate.apply(combinedFileRange.getLength());
       int numRead = channel.read(dst.duplicate());
-      if (numRead < 0) {
-        throw new EOFException(
-            String.format(
-                "EOF reached before whole combinedFileRange can be read, range: %s, path: %s",
-                combinedFileRange, gcsPath));
-      }
-      combinedFileRange.getData().complete(dst);
       logger.atFiner().log(
-          "Read combinedFileRange completed from range: %s, path: %s", combinedFileRange, gcsPath);
-      for (FileRange child : combinedFileRange.getUnderlying()) {
-        ByteBuffer childBuffer = sliceTo(dst, combinedFileRange.getOffset(), child);
-        child.getData().complete(childBuffer);
-      }
+          "Read combinedFileRange completed from range: %s, path: %s, readBytes: %d",
+          combinedFileRange, gcsPath, numRead);
+      populateChildBuffer(combinedFileRange, dst, numRead);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log(
           "Exception while reading combinedFileRange:%s for path: %s", combinedFileRange, gcsPath);
@@ -149,6 +140,52 @@ public class VectoredIOImpl implements Closeable {
         }
       }
     }
+  }
+
+  /**
+   * Populate the child ranges from the ByteBuffer and update the combinedFileRange completion
+   * status. If readBytes < requested Populate the child ranges which can be served from
+   * partialContent and throw afterwards.
+   *
+   * @param combinedFileRange
+   * @param readContent
+   * @param numRead size of read content
+   * @throws EOFException in case partial content is read.
+   */
+  private void populateChildBuffer(
+      CombinedFileRange combinedFileRange, ByteBuffer readContent, int numRead)
+      throws EOFException {
+    if (numRead < 0) {
+      throw new EOFException(
+          String.format(
+              "EOF reached before whole combinedFileRange can be read, range: %s, path: %s",
+              combinedFileRange, gcsPath));
+    }
+    // content was read partially
+    // can happen when request range is beyond file size
+    if (numRead < combinedFileRange.getLength()) {
+      int readBytesCumulative = 0;
+      // populating all child ranges for which we have content
+      for (FileRange child : combinedFileRange.getUnderlying()) {
+        readBytesCumulative += child.getLength();
+        if (readBytesCumulative <= numRead) {
+          ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
+          child.getData().complete(childBuffer);
+        } else {
+          // remaining child ranges needs be marked appropriately in caller.
+          throw new EOFException(
+              String.format(
+                  "EOF reached before whole range can be read, combinedFileRange: %s, expected length: %s, readBytes: %s, path: %s",
+                  combinedFileRange, combinedFileRange.getLength(), numRead, gcsPath));
+        }
+      }
+    }
+
+    for (FileRange child : combinedFileRange.getUnderlying()) {
+      ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
+      child.getData().complete(childBuffer);
+    }
+    combinedFileRange.getData().complete(readContent);
   }
 
   /**
@@ -179,9 +216,8 @@ public class VectoredIOImpl implements Closeable {
     try (SeekableByteChannel channel = getReadChannel()) {
       channel.position(range.getOffset());
       ByteBuffer dst = allocate.apply(range.getLength());
-      // TODO: will duplicate work for direct buffers
       int numRead = channel.read(dst.duplicate());
-      if (numRead < 0) {
+      if (numRead < range.getLength()) {
         throw new EOFException(
             String.format(
                 "EOF reached before whole range can be read, range: %s, path: %s", range, gcsPath));

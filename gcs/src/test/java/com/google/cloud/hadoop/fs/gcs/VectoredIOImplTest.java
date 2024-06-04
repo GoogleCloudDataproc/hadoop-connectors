@@ -38,9 +38,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -80,7 +80,6 @@ public class VectoredIOImplTest {
     this.path = new Path(ghfs.getUri().resolve(OBJECT_NAME));
     FSDataOutputStream outputStream = ghfs.create(path);
     writeObject(outputStream, /* partSize */ 1024, /*partCount*/ 10);
-
     // Update fileInfo
     FileStatus fileStatus = ghfs.getFileStatus(path);
     this.fileInfo =
@@ -125,7 +124,7 @@ public class VectoredIOImplTest {
         FileRange.createFileRange(
             /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() + 10, /* length */ 10));
     vectoredIO.readVectored(fileRanges, this.allocate);
-    verifyRangeExceptionOrContent(fileRanges);
+    verifyRangeContent(fileRanges);
     // callCount is equal to disjointRangeRequests
     verifyGcsFsOpenCalls(/* callCount */ 2);
   }
@@ -138,7 +137,7 @@ public class VectoredIOImplTest {
         FileRange.createFileRange(
             /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() - 1, /* length */ 10));
     vectoredIO.readVectored(fileRanges, this.allocate);
-    verifyRangeExceptionOrContent(fileRanges);
+    verifyRangeContent(fileRanges);
     // Ranges are merged, data is read from single channel
     verifyGcsFsOpenCalls(/* callCount */ 1);
   }
@@ -164,7 +163,7 @@ public class VectoredIOImplTest {
 
     vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions);
     vectoredIO.readVectored(fileRanges, allocate);
-    verifyRangeExceptionOrContent(fileRanges);
+    verifyRangeException(fileRanges);
 
     verify(mockedGcsFs, times(2)).open((FileInfo) any(), any());
 
@@ -194,7 +193,7 @@ public class VectoredIOImplTest {
     vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions);
     vectoredIO.readVectored(fileRanges, allocate);
 
-    verifyRangeExceptionOrContent(fileRanges);
+    verifyRangeException(fileRanges);
 
     verify(mockedGcsFs, times(1)).open((FileInfo) any(), any());
 
@@ -253,7 +252,7 @@ public class VectoredIOImplTest {
             fileInfo,
             vectoredReadOptions.toBuilder().setReadThreads(1).build());
     vectoredIO.readVectored(fileRanges, allocate);
-    verifyRangeExceptionOrContent(fileRanges);
+    verifyRangeException(fileRanges);
 
     // open is called only as per combinedRange and not as per request FileRange
     verify(mockedGcsFs, times(expectedCombinedRanges.size())).open((FileInfo) any(), any());
@@ -283,27 +282,48 @@ public class VectoredIOImplTest {
     }
   }
 
-  private void verifyRangeExceptionOrContent(List<FileRange> fileRanges) throws Exception {
-    CountDownLatch countDownLatch = new CountDownLatch(fileRanges.size());
+  @Test
+  public void rangeOverFlowMergedRange() throws Exception {
+    List<FileRange> fileRanges = new ArrayList<>();
+    // Ranges should be merged together
+    int rangeLength = 5;
+    int offset = (int) fileInfo.getSize() - rangeLength;
+    FileRange validRange = FileRange.createFileRange(offset, rangeLength);
+    fileRanges.add(validRange);
+    offset += rangeLength;
+    FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
+    fileRanges.add(overFlowRange);
+
+    vectoredIO.readVectored(fileRanges, allocate);
+    verifyRangeContent(Arrays.asList(validRange));
+    verifyRangeException(Arrays.asList(overFlowRange));
+  }
+
+  @Test
+  public void rangeOverFLowSingleRange() throws Exception {
+    List<FileRange> fileRanges = new ArrayList<>();
+    int rangeLength = 5;
+    int offset = (int) fileInfo.getSize();
+    FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
+    fileRanges.add(overFlowRange);
+    vectoredIO.readVectored(fileRanges, allocate);
+
+    verifyRangeException(fileRanges);
+  }
+
+  private void verifyRangeContent(List<FileRange> fileRanges) throws Exception {
     for (FileRange range : fileRanges) {
-      CompletableFuture<ByteBuffer> resultFuture = range.getData();
-      resultFuture.whenCompleteAsync(
-          (resultBuffer, ex) -> {
-            countDownLatch.countDown();
-            if (ex != null) {
-              try {
-                assertObjectContent(ghfs, path, resultBuffer.duplicate(), range.getOffset());
-              } catch (IOException e) {
-                throw new RuntimeException(
-                    String.format("Error while verifying range data Range:%s", range), e);
-              }
-            } else {
-              assertThat(resultFuture.isCompletedExceptionally()).isTrue();
-              assertThat(ex.getCause()).isInstanceOf(IOException.class);
-            }
-          });
+      ByteBuffer result = range.getData().get(1, TimeUnit.MINUTES);
+      assertObjectContent(ghfs, path, result.duplicate(), range.getOffset());
     }
-    countDownLatch.await(1, TimeUnit.MINUTES);
+  }
+
+  private void verifyRangeException(List<FileRange> fileRanges) {
+    for (FileRange range : fileRanges) {
+      Throwable e =
+          assertThrows(ExecutionException.class, () -> range.getData().get(1, TimeUnit.MINUTES));
+      assertThat(e.getCause()).isInstanceOf(IOException.class);
+    }
   }
 
   private class MockedReadChannel implements SeekableByteChannel {
