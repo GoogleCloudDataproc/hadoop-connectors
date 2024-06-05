@@ -262,6 +262,15 @@ public interface GoogleCloudStorageFileSystem {
   FileInfo getFileInfo(URI path) throws IOException;
 
   /**
+   * Gets information about the given path item. Here path should be pointing to a gcs object and
+   * can't be a directory
+   *
+   * @param path The path we want information about.
+   * @return Information about the given path item.
+   */
+  FileInfo getFileInfoObject(URI path) throws IOException;
+
+  /**
    * Gets information about each path in the given list; more efficient than calling getFileInfo()
    * on each path individually in a loop.
    *
