@@ -1637,7 +1637,7 @@ public class GoogleCloudStorageTest {
     assertThat(itemInfo2.toString()).contains("exists: no");
   }
 
-  static <K, V> void assertMapsEqual(
+  public static <K, V> void assertMapsEqual(
       Map<K, V> expected, Map<K, V> result, Equivalence<V> valueEquivalence) {
     MapDifference<K, V> diff = Maps.difference(expected, result, valueEquivalence);
     if (!diff.areEqual()) {

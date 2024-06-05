@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl.BLOB_FIELDS;
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsClientImpl;
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
@@ -37,18 +38,17 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobWriteSession;
+import com.google.cloud.storage.Storage.BlobField;
+import com.google.cloud.storage.Storage.BlobGetOption;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -104,6 +104,10 @@ public class GoogleCloudStorageImplCreateTest {
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeError)));
     // Below mocks will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.get(
+            BlobId.of(BUCKET_NAME, OBJECT_NAME),
+            BlobGetOption.fields(BLOB_FIELDS.toArray(new BlobField[0]))))
+        .thenReturn(null);
     when(mockedJavaClientStorage.blobWriteSession(any(), any())).thenReturn(mockBlobWriteSession);
     when(mockBlobWriteSession.open())
         .thenReturn(
@@ -152,6 +156,15 @@ public class GoogleCloudStorageImplCreateTest {
             jsonDataResponse(
                 GoogleCloudStorageTestHelper.newStorageObject(BUCKET_NAME, OBJECT_NAME)));
     GoogleCloudStorage gcs = getCloudStorageImpl(transport, gcsOptions);
+
+    // Below mocks will be used only when JavaClientStorage is enabled.
+    Blob mockedBlob = mock(Blob.class);
+    when(mockedJavaClientStorage.get(
+            BlobId.of(BUCKET_NAME, OBJECT_NAME),
+            BlobGetOption.fields(BLOB_FIELDS.toArray(new BlobField[0]))))
+        .thenReturn(mockedBlob);
+    when(mockedBlob.getBucket()).thenReturn(BUCKET_NAME);
+    when(mockedBlob.getName()).thenReturn(OBJECT_NAME);
 
     FileAlreadyExistsException thrown =
         assertThrows(
@@ -230,7 +243,7 @@ public class GoogleCloudStorageImplCreateTest {
         .thenReturn(
             new FakeWriteChannel() {
               @Override
-              public int write(ByteBuffer src) {
+              public void close() {
                 try {
                   writeStartedLatch.countDown();
                   waitForEverLatch.await();
@@ -240,7 +253,6 @@ public class GoogleCloudStorageImplCreateTest {
                   threadsDoneLatch.countDown();
                 }
                 fail("Unexpected to get here.");
-                return 0;
               }
             });
 

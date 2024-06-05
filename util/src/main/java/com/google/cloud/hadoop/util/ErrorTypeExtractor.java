@@ -24,6 +24,9 @@ public interface ErrorTypeExtractor {
     OUT_OF_RANGE,
     ALREADY_EXISTS,
     FAILED_PRECONDITION,
+    INTERNAL,
+    RESOURCE_EXHAUSTED,
+    UNAVAILABLE,
     UNKNOWN
   }
 

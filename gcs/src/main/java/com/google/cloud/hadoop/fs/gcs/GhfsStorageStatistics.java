@@ -26,7 +26,7 @@ import org.apache.hadoop.fs.statistics.impl.StorageStatisticsFromIOStatistics;
 public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
 
   /** {@value} The key that stores all the registered metrics */
-  public static final String NAME = "GhfsStorageStatistics";
+  public static final String NAME = "GhfsFileSystemBasedStorageStatistics";
 
   /** Exention for minimum */
   private static final String MINIMUM = StoreStatisticNames.SUFFIX_MIN;

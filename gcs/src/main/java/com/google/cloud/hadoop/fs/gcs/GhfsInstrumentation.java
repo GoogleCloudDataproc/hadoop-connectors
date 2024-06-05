@@ -17,24 +17,17 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatusStatistics;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
-import com.google.cloud.hadoop.util.GcsClientStatisticInterface;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -64,18 +57,14 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  * Instrumentation of GCS.
  *
  * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic}
- * and {@link GoogleCloudStorageStatusStatistics} key. There <i>may</i> be some Statistics which do
- * not have an entry here. To avoid attempts to access such counters failing, the operations to
- * increment/query metric values are designed to handle lookup failures.
+ * key. There <i>may</i> be some Statistics which do not have an entry here. To avoid attempts to
+ * access such counters failing, the operations to increment/query metric values are designed to
+ * handle lookup failures.
  *
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
 public class GhfsInstrumentation
-    implements Closeable,
-        MetricsSource,
-        IOStatisticsSource,
-        DurationTrackerFactory,
-        GcsClientStatisticInterface {
+    implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
 
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
@@ -209,19 +198,6 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in
-   * GoogleCloudStorageStatusStatistics.
-   *
-   * @param op operation
-   */
-  private void incrementCounter(GoogleCloudStorageStatusStatistics op) {
-
-    String name = op.getSymbol();
-    incrementMutableCounter(name, 1);
-    instanceIOStatistics.incrementCounter(name, 1);
-  }
-
-  /**
    * Get the metrics system.
    *
    * @return metricsSystem
@@ -263,7 +239,7 @@ public class GhfsInstrumentation
    * @param op statistic to count
    * @return a new counter
    */
-  private final MutableCounterLong counter(GoogleCloudStorageStatusStatistics op) {
+  private final MutableCounterLong counter(GoogleCloudStorageStatistics op) {
     return counter(op.getSymbol(), op.getDescription());
   }
 
@@ -354,20 +330,6 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Counter Metrics updation based on the Http response
-   *
-   * @param statusCode of ther Http response
-   */
-  @Override
-  public void statusMetricsUpdation(int statusCode) {
-    switch (statusCode) {
-      case 429:
-        incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT);
-        break;
-    }
-  }
-
-  /**
    * A duration tracker which updates a mutable counter with a metric. The metric is updated with
    * the count on start; after a failure the failures count is incremented by one.
    */
@@ -437,30 +399,6 @@ public class GhfsInstrumentation
 
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean b) {}
-
-  /** Indicate that GCS created a file. */
-  public void fileCreated() {
-    incrementCounter(FILES_CREATED, 1);
-  }
-
-  /** Indicate that GCS created a directory. */
-  public void directoryCreated() {
-    incrementCounter(DIRECTORIES_CREATED, 1);
-  }
-
-  /** Indicate that GCS just deleted a directory. */
-  public void directoryDeleted() {
-    incrementCounter(DIRECTORIES_DELETED, 1);
-  }
-
-  /**
-   * Indicate that GCS deleted one or more files.
-   *
-   * @param count number of files.
-   */
-  public void fileDeleted(int count) {
-    incrementCounter(FILES_DELETED, count);
-  }
 
   /**
    * Create a stream input statistics instance.
@@ -637,17 +575,6 @@ public class GhfsInstrumentation
     }
 
     /**
-     * A read() operation in the input stream has started.
-     *
-     * @param pos starting position of the read
-     * @param len length of bytes to read
-     */
-    @Override
-    public void readOperationStarted(long pos, long len) {
-      readOperations.incrementAndGet();
-    }
-
-    /**
      * If more data was requested than was actually returned, this was an incomplete read. Increment
      * {@link #readsIncomplete}.
      */
@@ -672,117 +599,6 @@ public class GhfsInstrumentation
       // stream is being closed.
       // merge in all the IOStatistics
       GhfsInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
-    }
-
-    /**
-     * The total number of times the input stream has been closed.
-     *
-     * @return the number of close calls.
-     */
-    @Override
-    public long getCloseOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
-    }
-
-    /**
-     * The total number of executed seek operations which went forward in an input stream.
-     *
-     * @return the number of Forward seek operations.
-     */
-    @Override
-    public long getForwardSeekOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS);
-    }
-
-    /**
-     * The total number of executed seek operations which went backward in an input stream.
-     *
-     * @return the number of Backward seek operations
-     */
-    @Override
-    public long getBackwardSeekOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
-    }
-
-    /**
-     * The bytes read in read() operations.
-     *
-     * @return the number of bytes returned to the caller.
-     */
-    @Override
-    public long getBytesRead() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_BYTES);
-    }
-
-    /**
-     * The total number of bytes read, including all read and discarded when closing streams or
-     * skipped during seek calls.
-     *
-     * @return the total number of bytes read from GHFS.
-     */
-    @Override
-    public long getTotalBytesRead() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_TOTAL_BYTES);
-    }
-
-    /**
-     * The total number of bytes skipped during seek calls.
-     *
-     * @return the number of bytes skipped.
-     */
-    @Override
-    public long getBytesSkippedOnSeek() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED);
-    }
-
-    /**
-     * The total number of bytes skipped during backward seek calls.
-     *
-     * @return the number of bytes skipped.
-     */
-    @Override
-    public long getBytesBackwardsOnSeek() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS);
-    }
-
-    /**
-     * The total number of seek operations in an input stream
-     *
-     * @return the number of bytes skipped.
-     */
-    @Override
-    public long getSeekOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS);
-    }
-
-    /**
-     * The total number of exceptions raised during input stream reads
-     *
-     * @return the count of read Exceptions.
-     */
-    @Override
-    public long getReadExceptions() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_EXCEPTIONS);
-    }
-
-    /**
-     * The total number of times the read() operation in an input stream has been called.
-     *
-     * @return the count of read operations.
-     */
-    @Override
-    public long getReadOperations() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS);
-    }
-
-    /**
-     * The total number of Incomplete read() operations
-     *
-     * @return the count of Incomplete read operations.
-     */
-    @Override
-    public long getReadsIncomplete() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
     }
 
     /**
@@ -819,7 +635,6 @@ public class GhfsInstrumentation
       implements GhfsOutputStreamStatistics {
 
     private final AtomicLong bytesWritten;
-    private final AtomicLong writeExceptions;
     private final FileSystem.Statistics filesystemStatistics;
 
     /**
@@ -831,7 +646,7 @@ public class GhfsInstrumentation
       this.filesystemStatistics = filesystemStatistics;
       IOStatisticsStore st =
           iostatisticsStore()
-              .withCounters(STREAM_WRITE_BYTES.getSymbol(), STREAM_WRITE_EXCEPTIONS.getSymbol())
+              .withCounters(STREAM_WRITE_BYTES.getSymbol())
               .withDurationTracking(
                   STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(),
                   STREAM_WRITE_OPERATIONS.getSymbol(),
@@ -842,7 +657,6 @@ public class GhfsInstrumentation
       // these are extracted to avoid lookups on heavily used counters.
 
       bytesWritten = st.getCounterReference(StreamStatisticNames.STREAM_WRITE_BYTES);
-      writeExceptions = st.getCounterReference(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
     }
 
     /**
@@ -871,44 +685,6 @@ public class GhfsInstrumentation
     public void writeBytes(long count) {
       bytesWritten.addAndGet(count);
     }
-
-    /** An ignored stream write exception was received. */
-    @Override
-    public void writeException() {
-      writeExceptions.incrementAndGet();
-    }
-
-    /** Syncable.hflush() has been invoked. */
-    @Override
-    public void hflushInvoked() {
-      incrementCounter(INVOCATION_HFLUSH.getSymbol(), 1);
-    }
-
-    /** Syncable.hsync() has been invoked. */
-    @Override
-    public void hsyncInvoked() {
-      incrementCounter(INVOCATION_HSYNC.getSymbol(), 1);
-    }
-
-    /**
-     * Get the current count of bytes written.
-     *
-     * @return the counter value.
-     */
-    @Override
-    public long getBytesWritten() {
-      return bytesWritten.get();
-    }
-
-    /**
-     * The total number of exceptions raised during ouput stream write
-     *
-     * @return the count of write Exceptions.
-     */
-    @Override
-    public long getWriteExceptions() {
-      return lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
-    }
   }
 
   /**
@@ -918,9 +694,6 @@ public class GhfsInstrumentation
    */
   private void mergeOutputStreamStatistics(OutputStreamStatistics source) {
 
-    incrementCounter(
-        STREAM_WRITE_EXCEPTIONS,
-        source.lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS));
     // merge in all the IOStatistics
     getIOStatistics().aggregate(source.getIOStatistics());
   }
@@ -1004,14 +777,6 @@ public class GhfsInstrumentation
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }
-            });
-
-    // registering metrics of GoogleCloudStorageStatusStatistics which are all counters
-    EnumSet.allOf(GoogleCloudStorageStatusStatistics.class)
-        .forEach(
-            stat -> {
-              counter(stat);
-              storeBuilder.withCounters(stat.getSymbol());
             });
 
     return storeBuilder;

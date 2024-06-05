@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -224,6 +225,22 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     FileInfo fileInfo = gcsfs.getFileInfo(path);
     assertThat(fileInfo.getPath()).isEqualTo(path);
     validateFileInfoInternal(bucketName, objectName, expectedToExist, fileInfo);
+  }
+
+  protected void validateGetFileInfoObject(
+      String bucketName, String objectName, boolean expectedToExist) throws IOException {
+    URI path = gcsiHelper.getPath(bucketName, objectName);
+    if (StringPaths.isDirectoryPath(objectName)) {
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> gcsfs.getFileInfoObject(path));
+      assertThat(exception)
+          .hasMessageThat()
+          .containsMatch(Pattern.compile("path must be an object and not a directory"));
+    } else {
+      FileInfo fileInfo = gcsfs.getFileInfoObject(path);
+      assertThat(fileInfo.getPath()).isEqualTo(path);
+      validateFileInfoInternal(bucketName, objectName, expectedToExist, fileInfo);
+    }
   }
 
   /**
@@ -467,11 +484,40 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // At non-existent path.
     validateListFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
     validateListFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
+
     validateListFileInfo(
-        "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, /* expectedToExist= */ false);
+        "dataproc-gcsio-test-bucket-" + objDoesNotExist,
+        objDoesNotExist,
+        /* expectedToExist= */ false);
 
     validateListFileInfo(
         null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);
+  }
+
+  @Test
+  public void testGetFileInfoObject() throws Exception {
+    // Objects created for this test.
+    String[] objectNames = {"d1/c1"};
+
+    // -------------------------------------------------------
+    // Create test objects.
+    String testBucket = gcsiHelper.createUniqueBucket("list");
+    gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
+
+    // -------------------------------------------------------
+    // Tests for getItemInfoObject().
+    // -------------------------------------------------------
+
+    // Verify that getItemInfoObject() returns correct info for each object.
+    for (String objectName : objectNames) {
+      validateGetFileInfoObject(testBucket, objectName, /* expectedToExist= */ true);
+    }
+
+    String[] pathDoesNotExist = {"/", "d1", "d1/"};
+
+    for (String objectName : pathDoesNotExist) {
+      validateGetFileInfoObject(testBucket, objectName, /* expectedToExist= */ false);
+    }
   }
 
   @Test
