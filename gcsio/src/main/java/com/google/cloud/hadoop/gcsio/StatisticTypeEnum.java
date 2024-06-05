@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.fs.gcs;
+package com.google.cloud.hadoop.gcsio;
 
 /** Enum of statistic types. */
-public enum GhfsStatisticTypeEnum {
+public enum StatisticTypeEnum {
 
   /** Counter. Counts the number of occurrences of each operation */
   TYPE_COUNTER,
