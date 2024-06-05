@@ -28,16 +28,16 @@ import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus.StatisticsType;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.flogger.GoogleLogger;
+import io.grpc.Status;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -239,6 +239,43 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     }
   }
 
+  private int grpcToHttpStatusCodeMapping(Status grpcStatusCode) {
+    // using code.proto as reference
+    // https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
+    switch (grpcStatusCode.getCode()) {
+      case OK:
+        return 200;
+      case CANCELLED:
+        return 499;
+      case INVALID_ARGUMENT:
+      case FAILED_PRECONDITION:
+      case OUT_OF_RANGE:
+        return 400;
+      case DEADLINE_EXCEEDED:
+        return 504;
+      case NOT_FOUND:
+        return 404;
+      case ALREADY_EXISTS:
+      case ABORTED:
+        return 409;
+      case PERMISSION_DENIED:
+        return 403;
+      case RESOURCE_EXHAUSTED:
+        return 429;
+      case UNIMPLEMENTED:
+        return 501;
+      case UNAVAILABLE:
+        return 503;
+      case UNAUTHENTICATED:
+        return 401;
+      case UNKNOWN:
+      case INTERNAL:
+      case DATA_LOSS:
+      default:
+        return 500;
+    }
+  }
+
   /**
    * Updating the required gcs specific statistics based on HttpResponseException.
    *
@@ -263,21 +300,21 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   /**
    * Updating the required gcs specific statistics based on HttpResponse.
    *
-   * @param response contains statusCode based on which metrics are updated
+   * @param responseStatus responseStatus status code from HTTP response
    */
   @Subscribe
-  private void subscriberOnHttpResponse(@Nonnull HttpResponse response) {
-    updateGcsIOSpecificStatistics(response.getStatusCode());
+  private void subscriberOnHttpResponseStatus(@Nonnull Integer responseStatus) {
+    updateGcsIOSpecificStatistics(responseStatus);
   }
 
-  /**
-   * Updating the GCS_TOTAL_REQUEST_COUNT
-   *
-   * @param request
-   */
   @Subscribe
-  private void subscriberOnHttpRequest(@Nonnull HttpRequest request) {
+  private void subscriberOnGcsRequest(@Nonnull GcsRequestExecutionEvent event) {
     incrementGcsTotalRequestCount();
+  }
+
+  @Subscribe
+  private void subscriberOnGrpcStatus(@Nonnull Status status) {
+    updateGcsIOSpecificStatistics(grpcToHttpStatusCodeMapping(status));
   }
 
   /**

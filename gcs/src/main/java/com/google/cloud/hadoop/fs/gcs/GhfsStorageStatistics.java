@@ -38,6 +38,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   /** IOStatistics Instance */
   private final IOStatistics ioStatistics;
 
+
   /** Create the Storage Statistics instance from the IOStatistics */
   public GhfsStorageStatistics(IOStatistics ioStatistics) {
     super(NAME, "Ghfs", ioStatistics);
