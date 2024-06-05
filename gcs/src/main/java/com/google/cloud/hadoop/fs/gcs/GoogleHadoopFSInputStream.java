@@ -237,7 +237,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    * {@code ThreadTrace}.
    */
   private <B> B trackDurationWithTracing(
-      DurationTrackerFactory factory1,
+      DurationTrackerFactory durationTracker,
       @Nonnull GhfsGlobalStorageStatistics stats,
       GhfsStatistic statistic,
       Object context,
@@ -246,7 +246,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
 
     return GhfsGlobalStorageStatistics.trackDuration(
-        factory1, stats, statistic, context, traceFactory, operation);
+        durationTracker, stats, statistic, context, traceFactory, operation);
   }
 
   /**
