@@ -34,9 +34,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.VectoredReadUtils;
@@ -45,26 +48,36 @@ import org.apache.hadoop.fs.impl.CombinedFileRange;
 @VisibleForTesting
 public class VectoredIOImpl implements Closeable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  private static final BlockingQueue taskQueue = new LinkedBlockingQueue<Runnable>();
   private final URI gcsPath;
   private final FileInfo fileInfo;
   private final GoogleCloudStorageReadOptions channelReadOptions;
   private final VectoredReadOptions vectoredReadOptions;
   private final GoogleCloudStorageFileSystem gcsFs;
+  private final GhfsStreamStats vectoredReadStats;
   private ExecutorService boundedThreadPool;
 
   public VectoredIOImpl(
       GoogleCloudStorageFileSystem gcsFs,
       URI gcsPath,
       FileInfo fileInfo,
-      VectoredReadOptions vectoredReadOptions) {
+      VectoredReadOptions vectoredReadOptions,
+      GhfsStreamStats readStats) {
     this.gcsFs = gcsFs;
     this.gcsPath = gcsPath;
     this.fileInfo = fileInfo;
     this.vectoredReadOptions = vectoredReadOptions;
     this.channelReadOptions =
         channelReadOptions(gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    // same fixedThreadPool executor, but provided a way to query task queue
     this.boundedThreadPool =
-        Executors.newFixedThreadPool(this.vectoredReadOptions.getReadThreads());
+        new ThreadPoolExecutor(
+            vectoredReadOptions.getReadThreads(),
+            vectoredReadOptions.getReadThreads(),
+            0L,
+            TimeUnit.MILLISECONDS,
+            taskQueue);
+    this.vectoredReadStats = readStats;
   }
 
   /**
@@ -79,14 +92,24 @@ public class VectoredIOImpl implements Closeable {
     List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
     for (FileRange range : ranges) {
       validateRangeRequest(range);
+      vectoredReadStats.incrementOpsAndUpdate(
+          GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE, range.getLength());
       CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
       range.setData(result);
     }
-
     if (shouldMergeRanges(ranges)) {
       // case when ranges are not merged
       for (FileRange range : sortedRanges) {
-        boundedThreadPool.submit(() -> readSingleRange(range, allocate));
+        vectoredReadStats.incrementOpsAndUpdate(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING, taskQueue.size());
+        long startTimer = System.currentTimeMillis();
+        boundedThreadPool.submit(
+            () -> {
+              readSingleRange(range, allocate);
+              long endTimer = System.currentTimeMillis();
+              vectoredReadStats.incrementOpsAndUpdate(
+                  GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION, endTimer - startTimer);
+            });
       }
     } else {
       // case where ranges can be merged
@@ -97,9 +120,21 @@ public class VectoredIOImpl implements Closeable {
               vectoredReadOptions.getMinSeekVectoredReadSize(),
               vectoredReadOptions.getMergeRangeMaxSize());
       for (CombinedFileRange combinedFileRange : combinedFileRanges) {
+        vectoredReadStats.incrementOpsAndUpdate(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING, taskQueue.size());
+        vectoredReadStats.incrementOpsAndUpdate(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE, combinedFileRange.getLength());
+
+        long startTimer = System.currentTimeMillis();
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         combinedFileRange.setData(result);
-        boundedThreadPool.submit(() -> readCombinedRange(combinedFileRange, allocate));
+        boundedThreadPool.submit(
+            () -> {
+              long endTimer = System.currentTimeMillis();
+              readCombinedRange(combinedFileRange, allocate);
+              vectoredReadStats.incrementOpsAndUpdate(
+                  GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION, endTimer - startTimer);
+            });
       }
     }
   }
@@ -180,11 +215,17 @@ public class VectoredIOImpl implements Closeable {
         }
       }
     }
-
+    long totalBytesRequested = 0;
     for (FileRange child : combinedFileRange.getUnderlying()) {
+      totalBytesRequested += child.getLength();
       ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
       child.getData().complete(childBuffer);
     }
+    long discardedBytes = combinedFileRange.getLength() - totalBytesRequested;
+    logger.atFiner().log(
+        "For combinedRange: %s, discarded: %d bytes", combinedFileRange, discardedBytes);
+    vectoredReadStats.incrementCounter(
+        GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED, discardedBytes);
     combinedFileRange.getData().complete(readContent);
   }
 

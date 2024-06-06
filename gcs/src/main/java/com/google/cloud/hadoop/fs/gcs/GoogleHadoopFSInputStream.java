@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_RAED_VECTORED_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -77,6 +78,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   private final GhfsStreamStats streamStats;
   private final GhfsStreamStats seekStreamStats;
+  private final GhfsStreamStats vectoredReadStats;
 
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
@@ -157,9 +159,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
     this.seekStreamStats =
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
+    this.vectoredReadStats =
+        new GhfsStreamStats(
+            storageStatistics, GhfsStatistic.STREAM_RAED_VECTORED_OPERATIONS, gcsPath);
 
     this.traceFactory = ghfs.getTraceFactory();
-    this.vectoredIO = new VectoredIOImpl(ghfs.getGcsFs(), gcsPath, fileInfo, vectoredReadOptions);
+    this.vectoredIO =
+        new VectoredIOImpl(
+            ghfs.getGcsFs(), gcsPath, fileInfo, vectoredReadOptions, vectoredReadStats);
   }
 
   /**
@@ -172,7 +179,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    vectoredIO.readVectored(ranges, allocate);
+    trackDuration(
+        streamStatistics,
+        STREAM_RAED_VECTORED_OPERATIONS.getSymbol(),
+        () -> {
+          streamStats.incrementCounter(STREAM_RAED_VECTORED_OPERATIONS);
+          vectoredIO.readVectored(ranges, allocate);
+          return null;
+        });
   }
 
   @Override
