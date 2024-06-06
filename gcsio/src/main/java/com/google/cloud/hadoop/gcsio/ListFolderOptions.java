@@ -14,8 +14,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT;
-
 import com.google.auto.value.AutoValue;
 
 /**
@@ -29,8 +27,7 @@ public abstract class ListFolderOptions {
   public static final ListFolderOptions DEFAULT = builder().build();
 
   public static Builder builder() {
-    return new AutoValue_ListFolderOptions.Builder()
-        .setPageSize((int) MAX_LIST_ITEMS_PER_CALL_DEFAULT);
+    return new AutoValue_ListFolderOptions.Builder().setPageSize(5000);
   }
 
   public abstract Builder toBuilder();

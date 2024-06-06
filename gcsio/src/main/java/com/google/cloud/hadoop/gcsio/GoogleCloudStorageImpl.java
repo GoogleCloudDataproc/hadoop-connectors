@@ -68,7 +68,6 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -1641,7 +1640,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       ListFolderOptions listFolderOptions,
       String pageToken) {
     logger.atFiner().log(
-        "createListFolderRequest(%s, %s, %s, %d)",
+        "createListFolderRequest(%s, %s, %s, %s)",
         bucketName, objectNamePrefix, listFolderOptions, pageToken);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 

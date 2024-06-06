@@ -17,54 +17,12 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
-import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
-import com.google.cloud.hadoop.util.AccessBoundary;
-import com.google.cloud.hadoop.util.CheckedFunction;
-import com.google.cloud.hadoop.util.CredentialAdapter;
-import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
-import com.google.cloud.hadoop.util.ITraceOperation;
-import com.google.cloud.hadoop.util.LazyExecutorService;
-import com.google.cloud.hadoop.util.ThreadTrace;
-import com.google.cloud.hadoop.util.TraceOperation;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.flogger.GoogleLogger;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.file.DirectoryNotEmptyException;
-import java.nio.file.FileAlreadyExistsException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.TreeMap;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.regex.Pattern;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
@@ -294,6 +252,16 @@ public interface GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    */
   List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException;
+
+  /**
+   * Returns the list of folder resources in the prefix. It lists all the folder resources
+   *
+   * @param prefix the prefix to use to list all matching folder resources.
+   * @param pageToken the page token to list
+   * @param listFolderOptions the page token to list
+   */
+  ListPage<FolderInfo> listFoldersInfoForPrefixPage(
+      URI prefix, ListFolderOptions listFolderOptions, String pageToken) throws IOException;
 
   /**
    * Gets information about the given path item.

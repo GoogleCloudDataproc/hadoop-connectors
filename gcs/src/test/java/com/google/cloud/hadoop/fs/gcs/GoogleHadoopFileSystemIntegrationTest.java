@@ -55,6 +55,7 @@ import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpResponseException;
@@ -62,6 +63,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.FolderInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -69,12 +71,9 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFolderOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
-import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -91,6 +90,7 @@ import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -2434,7 +2434,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       String name, StorageStatistics statistics, HashSet<String> metricNames, String statsString) {
     assertThat(metricNames.contains(name)).isTrue();
     assertThat(statistics.isTracked(name)).isTrue();
-    assertThat(statsString.contains(name + "="));
+    assertThat(statsString.contains(name + "=")).isTrue();
     assertEquals(0, statistics.getLong(name).longValue());
   }
 
