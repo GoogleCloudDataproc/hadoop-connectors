@@ -16,60 +16,87 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.MessageLite;
-import com.google.storage.v2.ReadObjectRequest;
+import com.google.protobuf.MessageOrBuilder;
 import com.google.storage.v2.ReadObjectResponse;
-import com.google.storage.v2.StartResumableWriteRequest;
-import com.google.storage.v2.StartResumableWriteResponse;
 import com.google.storage.v2.WriteObjectRequest;
-import com.google.storage.v2.WriteObjectResponse;
-import io.grpc.Attributes;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
 import io.grpc.ClientInterceptor;
-import io.grpc.ClientStreamTracer;
-import io.grpc.ClientStreamTracer.StreamInfo;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import javax.annotation.Nonnull;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 /** Interceptor to create a trace of the lifecycle of GRPC api calls. */
 @VisibleForTesting
 public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
-  private static final String DEFAULT_INVOCATION_ID = "NOT-FOUND";
+  private static final DateTimeFormatter dtf =
+      DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS");
   private static final Metadata.Key<String> idempotencyKey =
       Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
+
+  @NonNull
+  static String fmtProto(@NonNull Object obj) {
+    if (obj instanceof WriteObjectRequest) {
+      return fmtProto((WriteObjectRequest) obj);
+    } else if (obj instanceof ReadObjectResponse) {
+      return fmtProto((ReadObjectResponse) obj);
+    } else if (obj instanceof MessageOrBuilder) {
+      return fmtProto((MessageOrBuilder) obj);
+    } else {
+      return obj.toString();
+    }
+  }
+
+  @NonNull
+  static String fmtProto(@NonNull final MessageOrBuilder msg) {
+    return msg.toString();
+  }
+
+  @NonNull
+  static String fmtProto(@NonNull WriteObjectRequest msg) {
+    if (msg.hasChecksummedData()) {
+      ByteString content = msg.getChecksummedData().getContent();
+      WriteObjectRequest.Builder b = msg.toBuilder();
+      ByteString snip = ByteString.copyFromUtf8(String.format("<size (%d)>", content.size()));
+      b.getChecksummedDataBuilder().setContent(snip);
+      return b.build().toString();
+    }
+    return msg.toString();
+  }
+
+  @NonNull
+  static String fmtProto(@NonNull ReadObjectResponse msg) {
+    if (msg.hasChecksummedData()) {
+      ByteString content = msg.getChecksummedData().getContent();
+      ReadObjectResponse.Builder b = msg.toBuilder();
+      ByteString snip = ByteString.copyFromUtf8(String.format("<size (%d)>", content.size()));
+      b.getChecksummedDataBuilder().setContent(snip);
+      return b.build().toString();
+    }
+    return msg.toString();
+  }
 
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
     String rpcMethodName = method.getBareMethodName();
 
-    TrackingStreamTracer streamTracer = getStreamTracer(rpcMethodName);
-    return new SimpleForwardingClientCall<ReqT, RespT>(
-        next.newCall(
-            method,
-            callOptions.withStreamTracerFactory(
-                new ClientStreamTracer.Factory() {
-                  @Override
-                  public ClientStreamTracer newClientStreamTracer(
-                      StreamInfo info, Metadata headers) {
-                    return streamTracer;
-                  }
-                }))) {
+    TrackingStreamTracer streamTracer = new TrackingStreamTracer(rpcMethodName);
+    return new SimpleForwardingClientCall<ReqT, RespT>(next.newCall(method, callOptions)) {
       @Override
       public void sendMessage(ReqT message) {
         try {
@@ -81,6 +108,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
       @Override
       public void start(Listener<RespT> responseListener, Metadata headers) {
+        streamTracer.streamStarted(headers);
         super.start(
             new SimpleForwardingClientCallListener<RespT>(responseListener) {
               @Override
@@ -106,110 +134,75 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     };
   }
 
-  private TrackingStreamTracer getStreamTracer(String rpcMethodName) {
-    GrpcStreamType type = GrpcStreamType.getTypeFromName(rpcMethodName);
-    /**
-     * We are choosing a tracer based on stream type. A designated stream tracer for specific type
-     * of stream helps in casting the request/responses to desired types. It also helps in adding
-     * custom logic too e.g. WriteObject stream have uploadId common across the stream and need to
-     * maintain it in tracers state which is not applicable for ReadObject stream.
-     */
-    switch (type) {
-      case START_RESUMABLE_WRITE:
-        return new StartResumableUploadStreamTracer(rpcMethodName);
-      case WRITE_OBJECT:
-        return new WriteObjectStreamTracer(rpcMethodName);
-      case READ_OBJECT:
-        return new ReadObjectStreamTracer(rpcMethodName);
-      default:
-        return new TrackingStreamTracer(rpcMethodName);
-    }
-  }
-
-  /**
-   * ClientStreamTracer support added in grpc helps in tracing the flow of messages over socket and
-   * have less control over the actual message. Via this customised Tracer of every stream type we
-   * added support to trace the messages sent over stream and also extract and log the meaningful
-   * information from it i.e. invocationId header, request parameters. reponse values etc.
-   *
-   * <p>Via {@link #logRequestMessage(MessageLite)} and {@link #logRequestMessage(MessageLite)}
-   * hooks we associate request and response messages to a stream.
-   *
-   * <p>{@link #statusOnClose(Status)} helps in tracing the closing status of stream.
-   */
-  private class TrackingStreamTracer extends ClientStreamTracer {
-
+  private class TrackingStreamTracer {
     private final Gson gson = new Gson();
     private final String rpcMethod;
     private Metadata headers;
-    protected int requestMessageCounter = 0;
-    protected int responseMessageCounter = 0;
+    private long streamStartTimeMs;
+    private int requestCounter = 0;
+    private int responseCounter = 0;
 
     TrackingStreamTracer(String rpcMethod) {
       this.rpcMethod = rpcMethod;
     }
 
-    private void updateRequestCounter() {
-      requestMessageCounter++;
-    }
-
-    private void updateResponseCounter() {
-      responseMessageCounter++;
-    }
-
-    /**
-     * This helps in tracing the actual message sent over the stream. By adding this hook in {@link
-     * ClientCall#sendMessage(Object)} of ClientCall we can associate request to a stream tracer.
-     *
-     * @param message Message which is supposed to be sent over the wire.
-     */
     public void traceRequestMessage(MessageLite message) {
-      logRequestMessage(message);
-      updateRequestCounter();
-    }
-
-    /**
-     * This helps in tracing actual message received over the stream by adding a hook in {@link
-     * ClientCall.Listener#onMessage(Object)} of ResponseListener. This hook helps in mapping the
-     * response message to StreamTracer.
-     *
-     * @param message Message which was received from server.
-     */
-    public void traceResponseMessage(MessageLite message) {
-      logResponseMessage(message);
-      updateResponseCounter();
-    }
-
-    public void logRequestMessage(MessageLite message) {}
-
-    public void logResponseMessage(MessageLite message) {}
-
-    public void statusOnClose(Status status) {
       logger.atInfo().log(
           "%s",
           toJson(
-              getRequestContext()
-                  .put(GoogleCloudStorageTracingFields.STATUS.name, status)
-                  .put(GoogleCloudStorageTracingFields.STREAM_OPERATION.name, "onClose")
+              getRequestTrackingInfo()
+                  .put(
+                      GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name,
+                      fmtProto(message))
                   .build()));
     }
 
-    /** The stream is being created on a ready transport. */
-    @Override
-    public void streamCreated(Attributes transportAttrs, Metadata headers) {
-      this.headers = headers;
-      super.streamCreated(transportAttrs, headers);
+    public void traceResponseMessage(MessageLite message) {
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getResponseTrackingInfo()
+                  .put(
+                      GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name,
+                      fmtProto(message))
+                  .build()));
     }
 
-    protected ImmutableMap.Builder<String, Object> getRequestTrackingInfo() {
-      return getRequestContext()
-          .put(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name, requestMessageCounter)
+    public void statusOnClose(Status status) {
+      long streamEndTimeMs = System.currentTimeMillis();
+      long duration = streamEndTimeMs - streamStartTimeMs;
+      logger.atInfo().log(
+          "%s",
+          toJson(
+              getCommonTraceFields()
+                  .put(GoogleCloudStorageTracingFields.STATUS.name, status.getCode())
+                  .put(GoogleCloudStorageTracingFields.STREAM_OPERATION.name, "onClose")
+                  .put(GoogleCloudStorageTracingFields.DURATION_MS.name, duration)
+                  .build()));
+    }
+
+    /**
+     * This will be very first interaction with StreamTracer. It updates the tracer with header of
+     * gRPC stream. It also updates the startTime of tracer
+     *
+     * @param headers grpc stream header
+     */
+    public void streamStarted(Metadata headers) {
+      this.headers = headers;
+      this.streamStartTimeMs = System.currentTimeMillis();
+    }
+
+    private ImmutableMap.Builder<String, Object> getRequestTrackingInfo() {
+      requestCounter++;
+      return getCommonTraceFields()
+          .put(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name, requestCounter)
           .put(GoogleCloudStorageTracingFields.STREAM_OPERATION.name, "request");
     }
 
-    protected ImmutableMap.Builder<String, Object> getResponseTrackingInfo() {
-      return getRequestContext()
-          .put(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name, responseMessageCounter)
+    private ImmutableMap.Builder<String, Object> getResponseTrackingInfo() {
+      responseCounter++;
+      return getCommonTraceFields()
+          .put(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name, responseCounter)
           .put(GoogleCloudStorageTracingFields.STREAM_OPERATION.name, "response");
     }
 
@@ -217,157 +210,19 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       return gson.toJson(eventDetails);
     }
 
-    protected String getInvocationId() {
-      return headers != null ? headers.get(idempotencyKey) : DEFAULT_INVOCATION_ID;
+    private String getInvocationId() {
+      return headers.get(idempotencyKey);
     }
 
-    private ImmutableMap.Builder<String, Object> getRequestContext() {
+    private ImmutableMap.Builder<String, Object> getStreamContext() {
       return new ImmutableMap.Builder<String, Object>()
           .put(GoogleCloudStorageTracingFields.RPC_METHOD.name, rpcMethod)
           .put(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name, getInvocationId());
     }
-  }
 
-  private class StartResumableUploadStreamTracer extends TrackingStreamTracer {
-    private StorageResourceId resourceId;
-
-    StartResumableUploadStreamTracer(String rpcMethod) {
-      super(rpcMethod);
-    }
-
-    @Override
-    public void logRequestMessage(MessageLite message) {
-      StartResumableWriteRequest request = (StartResumableWriteRequest) message;
-      this.resourceId =
-          new StorageResourceId(
-              request.getWriteObjectSpec().getResource().getBucket(),
-              request.getWriteObjectSpec().getResource().getName(),
-              request.getWriteObjectSpec().getIfGenerationMatch());
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
-                  .build()));
-    }
-
-    @Override
-    public void logResponseMessage(MessageLite message) {
-      StartResumableWriteResponse response = (StartResumableWriteResponse) message;
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, response.getUploadId())
-                  .build()));
-    }
-  }
-
-  private class WriteObjectStreamTracer extends TrackingStreamTracer {
-
-    private String streamUploadId = null;
-
-    WriteObjectStreamTracer(String rpcMethod) {
-      super(rpcMethod);
-    }
-
-    @Override
-    public void logRequestMessage(MessageLite message) {
-      WriteObjectRequest request = (WriteObjectRequest) message;
-      String uploadId = request.getUploadId();
-      if (!Strings.isNullOrEmpty(uploadId)) {
-        updateUploadId(request.getUploadId());
-      }
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, request.getUploadId())
-                  .put(GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
-                  .put(
-                      GoogleCloudStorageTracingFields.FINALIZE_WRITE.name, request.getFinishWrite())
-                  .put(
-                      GoogleCloudStorageTracingFields.CONTENT_LENGTH.name,
-                      request.getChecksummedData().getContent().size())
-                  .build()));
-    }
-
-    @Override
-    public void logResponseMessage(MessageLite message) {
-
-      WriteObjectResponse response = (WriteObjectResponse) message;
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, streamUploadId)
-                  .put(
-                      GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
-                      response.getPersistedSize())
-                  .build()));
-    }
-
-    private void updateUploadId(@Nonnull String uploadId) {
-      if (streamUploadId == null) {
-        this.streamUploadId = uploadId;
-      }
-      checkState(
-          uploadId.equals(streamUploadId),
-          String.format(
-              "Write stream should have unique uploadId associated with each chunk request. Expected was %s got %s",
-              streamUploadId, uploadId));
-    }
-  }
-
-  private class ReadObjectStreamTracer extends TrackingStreamTracer {
-
-    private StorageResourceId resourceId;
-    private long readOffset;
-    private long readLimit;
-    private long totalBytesRead = 0;
-
-    ReadObjectStreamTracer(String rpcMethod) {
-      super(rpcMethod);
-    }
-
-    private void updateReadRequestContext(ReadObjectRequest request) {
-      this.resourceId =
-          new StorageResourceId(request.getBucket(), request.getObject(), request.getGeneration());
-      this.readOffset = request.getReadOffset();
-      this.readLimit = request.getReadLimit();
-    }
-
-    @Override
-    public void logRequestMessage(MessageLite message) {
-      ReadObjectRequest request = (ReadObjectRequest) message;
-
-      updateReadRequestContext(request);
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
-                  .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
-                  .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
-                  .build()));
-    }
-
-    @Override
-    public void logResponseMessage(MessageLite message) {
-      ReadObjectResponse response = (ReadObjectResponse) message;
-      int bytesRead = response.getChecksummedData().getContent().size();
-      logger.atInfo().log(
-          "%s",
-          toJson(
-              getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
-                  .put(GoogleCloudStorageTracingFields.READ_OFFSET.name, readOffset)
-                  .put(GoogleCloudStorageTracingFields.READ_LIMIT.name, readLimit)
-                  .put(GoogleCloudStorageTracingFields.REQUEST_START_OFFSET.name, totalBytesRead)
-                  .put(GoogleCloudStorageTracingFields.BYTES_READ.name, bytesRead)
-                  .build()));
-      totalBytesRead += bytesRead;
+    private ImmutableMap.Builder<String, Object> getCommonTraceFields() {
+      return getStreamContext()
+          .put(GoogleCloudStorageTracingFields.CURRENT_TIME.name, dtf.format(LocalDateTime.now()));
     }
   }
 }
