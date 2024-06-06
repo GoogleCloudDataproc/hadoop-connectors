@@ -129,7 +129,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
             .build();
 
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
-    gcsImpl.create(resourceId).close();
+    int fileSize = uploadChunkSize - 1;
+    writeObject(gcsImpl, resourceId, fileSize, 1);
 
     assertingHandler.assertLogCount(2 * 3);
 
@@ -152,6 +153,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                 WriteObjectRequest.class);
     assertThat(request.getUploadId()).isNotNull();
     assertTrue(request.getFinishWrite());
+    assertThat(request.getChecksummedData().getContent().toStringUtf8())
+        .isEqualTo(String.format("<size (%d)>", fileSize));
 
     Map<String, Object> writeObjectResponseRecord = assertingHandler.getLogRecordAtIndex(4);
     WriteObjectResponse response =
@@ -162,6 +165,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                     .toString(),
                 WriteObjectResponse.class);
     assertThat(response.getResource().getName()).isEqualTo(resourceId.getObjectName());
+    assertThat(response.getResource().getSize()).isEqualTo(fileSize);
 
     Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(5);
     verifyCloseStatus(

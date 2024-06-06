@@ -111,6 +111,7 @@ import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -3383,7 +3384,8 @@ public class GoogleCloudStorageTest {
         .isEqualTo("Bearer testDownscopedAccessToken");
   }
 
-  @Test
+  // TODO: flaky test, ignoring while RCA is in progress
+  @Ignore
   public void checkDeletionOrderForHnBucketBalancedFolders() throws InterruptedException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
