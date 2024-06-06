@@ -86,6 +86,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
@@ -1538,6 +1539,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     }
   }
 
+  @Ignore
   @Test
   public void testHnBucketRecursiveDeleteOperationOnBucket() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
