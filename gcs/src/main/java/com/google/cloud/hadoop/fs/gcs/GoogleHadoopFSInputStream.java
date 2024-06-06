@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -26,17 +25,22 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
+import org.apache.hadoop.util.functional.CallableRaisingIOE;
 
 class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSource {
 
@@ -58,9 +62,17 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   private volatile boolean closed;
 
+  private final ITraceFactory traceFactory;
+
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes read.
   private final FileSystem.Statistics statistics;
+  // Statistic tracker of the Input stream
+  private final GhfsGlobalStorageStatistics storageStatistics;
+
+  private final GhfsStreamStats streamStats;
+  private final GhfsStreamStats seekStreamStats;
+
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
 
@@ -93,7 +105,16 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     this.gcsPath = gcsPath;
     this.channel = channel;
     this.statistics = statistics;
+    this.storageStatistics = ghfs.getGlobalGcsStorageStatistics();
+
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+
+    this.streamStats =
+        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
+    this.seekStreamStats =
+        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
+
+    this.traceFactory = ghfs.getTraceFactory();
   }
 
   @Override
@@ -111,10 +132,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+
     return trackDuration(
         streamStatistics,
         STREAM_READ_OPERATIONS.getSymbol(),
         () -> {
+          long startTimeNs = System.nanoTime();
           checkNotClosed();
           // streamStatistics.readOperationStarted(getPos(), length);
           checkNotNull(buf, "buf must not be null");
@@ -131,7 +154,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
               totalBytesRead += numRead;
               statistics.incrementBytesRead(numRead);
               statistics.incrementReadOps(1);
+              streamStats.updateReadStreamStats(numRead, startTimeNs);
             }
+
+            storageStatistics.streamReadOperationInComplete(length, Math.max(numRead, 0));
             response = numRead;
           } catch (IOException e) {
             streamStatistics.readException();
@@ -145,24 +171,31 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+
     trackDuration(
         streamStatistics,
         STREAM_READ_SEEK_OPERATIONS.getSymbol(),
         () -> {
+          long startTimeNs = System.nanoTime();
           checkNotClosed();
           logger.atFiner().log("seek(%d)", pos);
           long curPos = getPos();
           long diff = pos - curPos;
           if (diff > 0) {
             streamStatistics.seekForwards(diff);
+            storageStatistics.streamReadSeekForward(diff);
           } else {
             streamStatistics.seekBackwards(diff);
+            storageStatistics.streamReadSeekBackward(diff);
           }
           try {
             channel.position(pos);
           } catch (IllegalArgumentException e) {
+            GoogleCloudStorageEventBus.postOnException();
             throw new IOException(e);
           }
+
+          seekStreamStats.updateReadStreamSeekStats(startTimeNs);
           return null;
         });
   }
@@ -170,17 +203,25 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public synchronized void close() throws IOException {
     boolean isClosed = closed;
-    trackDuration(
+    trackDurationWithTracing(
         streamStatistics,
-        STREAM_READ_CLOSE_OPERATIONS.getSymbol(),
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS,
+        gcsPath,
+        traceFactory,
         () -> {
           if (!closed) {
             closed = true;
-            logger.atFiner().log("close(): %s", gcsPath);
-            if (channel != null) {
-              logger.atFiner().log(
-                  "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-              channel.close();
+            try {
+              logger.atFiner().log("close(): %s", gcsPath);
+              if (channel != null) {
+                logger.atFiner().log(
+                    "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+                channel.close();
+              }
+            } finally {
+              streamStats.close();
+              seekStreamStats.close();
             }
           }
           return null;
@@ -189,6 +230,23 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (!isClosed) {
       streamStatistics.close();
     }
+  }
+
+  /**
+   * Tracks the duration of the operation {@code operation}. Also setup operation tracking using
+   * {@code ThreadTrace}.
+   */
+  private <B> B trackDurationWithTracing(
+      DurationTrackerFactory durationTracker,
+      @Nonnull GhfsGlobalStorageStatistics stats,
+      GhfsStatistic statistic,
+      Object context,
+      ITraceFactory traceFactory,
+      CallableRaisingIOE<B> operation)
+      throws IOException {
+
+    return GhfsGlobalStorageStatistics.trackDuration(
+        durationTracker, stats, statistic, context, traceFactory, operation);
   }
 
   /**
@@ -218,9 +276,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public int available() throws IOException {
-    logger.atFiner().log("available()");
-    checkNotClosed();
-    return 0;
+    if (!channel.isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new ClosedChannelException();
+    }
+    return super.available();
   }
 
   /**
@@ -241,6 +301,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   private void checkNotClosed() throws IOException {
     if (closed) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(gcsPath + ": " + FSExceptionMessages.STREAM_IS_CLOSED);
     }
   }

@@ -31,6 +31,8 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStat
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
@@ -201,6 +203,19 @@ public class GhfsInstrumentation
   }
 
   /**
+   * Increments a mutable counter and the matching instance IOStatistics counter for metrics in
+   * GoogleCloudStorageStatusStatistics.
+   *
+   * @param op operation
+   */
+  private void incrementCounter(GoogleCloudStorageStatistics op) {
+
+    String name = op.getSymbol();
+    incrementMutableCounter(name, 1);
+    instanceIOStatistics.incrementCounter(name, 1);
+  }
+
+  /**
    * Get the metrics system.
    *
    * @return metricsSystem
@@ -227,12 +242,22 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Create a counter in the registry.
+   * Create a counter in the registry for metrics in GhfsStatistic.
    *
    * @param op statistic to count
    * @return a new counter
    */
   protected final MutableCounterLong counter(GhfsStatistic op) {
+    return counter(op.getSymbol(), op.getDescription());
+  }
+
+  /**
+   * Create a counter in the registry for metrics in GoogleCloudStorageStatusStatistics.
+   *
+   * @param op statistic to count
+   * @return a new counter
+   */
+  private final MutableCounterLong counter(GoogleCloudStorageStatistics op) {
     return counter(op.getSymbol(), op.getDescription());
   }
 
@@ -947,15 +972,15 @@ public class GhfsInstrumentation
         .forEach(
             stat -> {
               // declare all counter statistics
-              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+              if (stat.getType() == StatisticTypeEnum.TYPE_COUNTER) {
                 counter(stat);
                 storeBuilder.withCounters(stat.getSymbol());
                 // declare all gauge statistics
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_GAUGE) {
                 gauge(stat);
                 storeBuilder.withGauges(stat.getSymbol());
                 // and durations
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }
