@@ -72,6 +72,7 @@ public class VectoredIOImplTest {
   private VectoredIOImpl vectoredIO;
   // stores the path of default object
   private Path path;
+  private GhfsStreamStats vectoredReadStats;
 
   @Before
   public void before() throws Exception {
@@ -87,7 +88,9 @@ public class VectoredIOImplTest {
             ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
             : null;
     this.gcsFs = spy(ghfs.getGcsFs());
-    vectoredIO = new VectoredIOImpl(gcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions);
+    this.vectoredReadStats = new GhfsStreamStats(
+        ghfs.getGlobalGcsStorageStatistics(), GhfsStatistic.STREAM_RAED_VECTORED_OPERATIONS, ghfs.getUri().resolve(OBJECT_NAME));
+    vectoredIO = new VectoredIOImpl(gcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions, vectoredReadStats);
   }
 
   @After
@@ -161,7 +164,7 @@ public class VectoredIOImplTest {
     when(mockedGcsFs.open(fileInfoArgumentCaptor.capture(), readOptionsArgumentCaptor.capture()))
         .thenReturn(new MockedReadChannel(), new MockedReadChannel());
 
-    vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions);
+    vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions,vectoredReadStats);
     vectoredIO.readVectored(fileRanges, allocate);
     verifyRangeException(fileRanges);
 
@@ -190,7 +193,7 @@ public class VectoredIOImplTest {
     when(mockedGcsFs.open(fileInfoArgumentCaptor.capture(), readOptionsArgumentCaptor.capture()))
         .thenReturn(new MockedReadChannel());
 
-    vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions);
+    vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions, vectoredReadStats);
     vectoredIO.readVectored(fileRanges, allocate);
 
     verifyRangeException(fileRanges);
@@ -250,7 +253,7 @@ public class VectoredIOImplTest {
             mockedGcsFs,
             fileInfo.getPath(),
             fileInfo,
-            vectoredReadOptions.toBuilder().setReadThreads(1).build());
+            vectoredReadOptions.toBuilder().setReadThreads(1).build(), vectoredReadStats);
     vectoredIO.readVectored(fileRanges, allocate);
     verifyRangeException(fileRanges);
 

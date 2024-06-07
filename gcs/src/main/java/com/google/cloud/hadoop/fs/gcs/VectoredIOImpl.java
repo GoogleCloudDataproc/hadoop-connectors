@@ -150,83 +150,66 @@ public class VectoredIOImpl implements Closeable {
       CombinedFileRange combinedFileRange, IntFunction<ByteBuffer> allocate) {
     try (SeekableByteChannel channel = getReadChannel()) {
       channel.position(combinedFileRange.getOffset());
-      ByteBuffer dst = allocate.apply(combinedFileRange.getLength());
-      int numRead = channel.read(dst.duplicate());
+      ByteBuffer readContent = allocate.apply(combinedFileRange.getLength());
+
+      int numRead = channel.read(readContent);
+      // making it ready for reading
+      readContent.flip();
       logger.atFiner().log(
           "Read combinedFileRange completed from range: %s, path: %s, readBytes: %d",
           combinedFileRange, gcsPath, numRead);
-      populateChildBuffer(combinedFileRange, dst, numRead);
+      if (numRead < 0) {
+        throw new EOFException(
+            String.format(
+                "EOF reached while reading combinedFileRange, range: %s, path: %s, numRead: %d",
+                combinedFileRange, gcsPath, numRead));
+      }
+
+      // populate child ranges
+      long currentPosition = combinedFileRange.getOffset();
+      long totalBytesRead = 0;
+      for (FileRange child : combinedFileRange.getUnderlying()) {
+        int discardedBytes = (int) (currentPosition - child.getOffset());
+        currentPosition += child.getLength();
+        totalBytesRead += discardedBytes + child.getLength();
+
+        vectoredReadStats.incrementCounter(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED, discardedBytes);
+
+        //if(numRead > totalBytesRead) {
+          ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
+          child.getData().complete(childBuffer);
+        } else {
+          throw new EOFException(
+              String.format(
+                  "EOF reached before all child ranges can be populated, combinedFileRange: %s, expected length: %s, readBytes: %s, path: %s",
+                  combinedFileRange, combinedFileRange.getLength(), numRead, gcsPath));
+        }
+      }
+      combinedFileRange.getData().complete(readContent);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log(
           "Exception while reading combinedFileRange:%s for path: %s", combinedFileRange, gcsPath);
       combinedFileRange.getData().completeExceptionally(e);
       // complete exception all the underlying ranges which have not already
       // finished.
-      for (FileRange child : combinedFileRange.getUnderlying()) {
-        if (!child.getData().isDone()) {
-          child
-              .getData()
-              .completeExceptionally(
-                  new IOException(
-                      String.format(
-                          "Error while populating childRange: %s from combinedRange: %s for path: %s",
-                          child, combinedFileRange, gcsPath),
-                      e));
-        }
-      }
+      completeExceptionally(combinedFileRange, e);
     }
   }
 
-  /**
-   * Populate the child ranges from the ByteBuffer and update the combinedFileRange completion
-   * status. If readBytes < requested Populate the child ranges which can be served from
-   * partialContent and throw afterwards.
-   *
-   * @param combinedFileRange
-   * @param readContent
-   * @param numRead size of read content
-   * @throws EOFException in case partial content is read.
-   */
-  private void populateChildBuffer(
-      CombinedFileRange combinedFileRange, ByteBuffer readContent, int numRead)
-      throws EOFException {
-    if (numRead < 0) {
-      throw new EOFException(
-          String.format(
-              "EOF reached before whole combinedFileRange can be read, range: %s, path: %s",
-              combinedFileRange, gcsPath));
-    }
-    // content was read partially
-    // can happen when request range is beyond file size
-    if (numRead < combinedFileRange.getLength()) {
-      int readBytesCumulative = 0;
-      // populating all child ranges for which we have content
-      for (FileRange child : combinedFileRange.getUnderlying()) {
-        readBytesCumulative += child.getLength();
-        if (readBytesCumulative <= numRead) {
-          ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
-          child.getData().complete(childBuffer);
-        } else {
-          // remaining child ranges needs be marked appropriately in caller.
-          throw new EOFException(
-              String.format(
-                  "EOF reached before whole range can be read, combinedFileRange: %s, expected length: %s, readBytes: %s, path: %s",
-                  combinedFileRange, combinedFileRange.getLength(), numRead, gcsPath));
-        }
+  private void completeExceptionally(CombinedFileRange combinedFileRange, Throwable e) {
+    for (FileRange child : combinedFileRange.getUnderlying()) {
+      if (!child.getData().isDone()) {
+        child
+            .getData()
+            .completeExceptionally(
+                new IOException(
+                    String.format(
+                        "Error while populating childRange: %s from combinedRange: %s for path: %s",
+                        child, combinedFileRange, gcsPath),
+                    e));
       }
     }
-    long totalBytesRequested = 0;
-    for (FileRange child : combinedFileRange.getUnderlying()) {
-      totalBytesRequested += child.getLength();
-      ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
-      child.getData().complete(childBuffer);
-    }
-    long discardedBytes = combinedFileRange.getLength() - totalBytesRequested;
-    logger.atFiner().log(
-        "For combinedRange: %s, discarded: %d bytes", combinedFileRange, discardedBytes);
-    vectoredReadStats.incrementCounter(
-        GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED, discardedBytes);
-    combinedFileRange.getData().complete(readContent);
   }
 
   /**
