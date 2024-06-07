@@ -99,6 +99,7 @@ public class VectoredIOImplTest {
     if (vectoredIO != null) {
       vectoredIO.close();
     }
+    ghfsStorageStatistics.reset();
   }
 
   @Test

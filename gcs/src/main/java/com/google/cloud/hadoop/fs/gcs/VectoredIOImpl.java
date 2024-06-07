@@ -186,7 +186,7 @@ public class VectoredIOImpl implements Closeable {
       long totalBytesRead = 0;
       for (FileRange child : combinedFileRange.getUnderlying()) {
         int discardedBytes = (int) (child.getOffset() - currentPosition);
-        currentPosition += child.getLength();
+
         totalBytesRead += discardedBytes + child.getLength();
 
         storageStatistics.incrementCounter(
@@ -203,6 +203,7 @@ public class VectoredIOImpl implements Closeable {
                   numRead,
                   channelProvider.gcsPath));
         }
+        currentPosition = child.getOffset() + child.getLength();
       }
       combinedFileRange.getData().complete(readContent);
     } catch (Exception e) {
