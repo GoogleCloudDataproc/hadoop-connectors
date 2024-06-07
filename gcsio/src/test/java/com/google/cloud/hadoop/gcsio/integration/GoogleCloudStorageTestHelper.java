@@ -338,7 +338,9 @@ public class GoogleCloudStorageTestHelper {
       // Leaving room of 48 characters for bucketPrefix and suffix (excluding delimiters)
       int usernamePrefixLen = min(username.length(), 8);
       username = username.substring(0, usernamePrefixLen);
-      String uuidSuffix = UUID.randomUUID().toString().substring(0, 12 - usernamePrefixLen);
+      String uuid = UUID.randomUUID().toString();
+      String uuidSuffix = uuid.substring(0, 12 - usernamePrefixLen);
+      logger.atInfo().log("Random uuid used :%s in getting random suffix: %s", uuid, uuidSuffix);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }
 
