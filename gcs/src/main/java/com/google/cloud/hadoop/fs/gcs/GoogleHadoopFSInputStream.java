@@ -185,7 +185,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         streamStatistics,
         STREAM_RAED_VECTORED_OPERATIONS.getSymbol(),
         () -> {
-          streamStats.incrementCounter(STREAM_RAED_VECTORED_OPERATIONS);
           vectoredIO.readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath);
           return null;
         });

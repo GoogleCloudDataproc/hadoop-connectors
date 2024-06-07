@@ -66,19 +66,6 @@ class GhfsStreamStats {
     storageStatistics.streamReadBytes(len);
   }
 
-  void incrementCounter(GhfsStatistic statistic) {
-    storageStatistics.incrementCounter(statistic, 1L);
-  }
-
-  void incrementCounter(GhfsStatistic statistic, long value) {
-    storageStatistics.incrementCounter(statistic, value);
-  }
-
-  // TODO:should not have duration in function name
-  void incrementOpsAndUpdate(GhfsStatistic statistic, long value) {
-    storageStatistics.updateStats(statistic, value, context);
-  }
-
   private static long toMillis(long nano) {
     return nano / 1000_000;
   }
