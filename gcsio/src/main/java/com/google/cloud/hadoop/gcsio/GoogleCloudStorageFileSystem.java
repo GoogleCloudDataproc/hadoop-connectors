@@ -254,6 +254,16 @@ public interface GoogleCloudStorageFileSystem {
   List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException;
 
   /**
+   * Returns the list of folder resources in the prefix. It lists all the folder resources
+   *
+   * @param prefix the prefix to use to list all matching folder resources.
+   * @param pageToken the page token to list
+   * @param listFolderOptions the page token to list
+   */
+  ListPage<FolderInfo> listFoldersInfoForPrefixPage(
+      URI prefix, ListFolderOptions listFolderOptions, String pageToken) throws IOException;
+
+  /**
    * Gets information about the given path item.
    *
    * @param path The path we want information about.

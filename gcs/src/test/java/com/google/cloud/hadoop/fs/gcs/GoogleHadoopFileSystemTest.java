@@ -319,6 +319,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Override
   public void testInitializeCompatibleWithHadoopCredentialProvider() {}
 
+  @Override
+  public void testRenameHnBucket() {}
+
   /* Custom InMemoryGoogleCloudStorage object which throws exception when reading */
   private class CustomInMemoryGoogleCloudStorage extends InMemoryGoogleCloudStorage {
     private IOException exceptionThrown =
@@ -385,5 +388,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Override
-  public void testRenameHnBucket() {}
+  public void testHnBucketRecursiveDeleteOperationOnDirectory() {}
+
+  @Override
+  public void testHnBucketRecursiveDeleteOperationOnBucket() {}
+
+  @Override
+  public void testHnBucketNonRecursiveDeleteOperation() {}
+
+  @Override
+  public void testHnBucketDeleteOperationOnNonExistingFolder() {}
 }
