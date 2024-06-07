@@ -137,10 +137,6 @@ public class VectoredIOImpl implements Closeable {
             GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
             taskQueue.size(),
             channelProvider.gcsPath);
-        storageStatistics.updateStats(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE,
-            combinedFileRange.getLength(),
-            channelProvider.gcsPath);
 
         long startTimer = System.currentTimeMillis();
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
@@ -189,7 +185,7 @@ public class VectoredIOImpl implements Closeable {
       long currentPosition = combinedFileRange.getOffset();
       long totalBytesRead = 0;
       for (FileRange child : combinedFileRange.getUnderlying()) {
-        int discardedBytes = (int) (currentPosition - child.getOffset());
+        int discardedBytes = (int) (child.getOffset() - currentPosition);
         currentPosition += child.getLength();
         totalBytesRead += discardedBytes + child.getLength();
 

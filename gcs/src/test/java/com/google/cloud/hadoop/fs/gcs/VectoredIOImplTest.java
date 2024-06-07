@@ -73,6 +73,7 @@ public class VectoredIOImplTest {
   private VectoredIOImpl vectoredIO;
   // stores the path of default object
   private Path path;
+  private GhfsGlobalStorageStatistics ghfsStorageStatistics;
 
   @Before
   public void before() throws Exception {
@@ -89,8 +90,8 @@ public class VectoredIOImplTest {
             : null;
     this.gcsFs = spy(ghfs.getGcsFs());
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    this.vectoredIO =
-        new VectoredIOImpl(vectoredReadOptions, ghfs.getGlobalGcsStorageStatistics(), statistics);
+    this.ghfsStorageStatistics = ghfs.getGlobalGcsStorageStatistics();
+    this.vectoredIO = new VectoredIOImpl(vectoredReadOptions, ghfsStorageStatistics, statistics);
   }
 
   @After
@@ -131,19 +132,30 @@ public class VectoredIOImplTest {
     verifyRangeContent(fileRanges);
     // callCount is equal to disjointRangeRequests
     verifyGcsFsOpenCalls(/* callCount */ 2);
+    assertThat(
+            ghfsStorageStatistics
+                .getLong(GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.name())
+                .longValue())
+        .isEqualTo(0);
   }
 
   @Test
   public void testMergedRangeReads() throws Exception {
     List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(/* offset */ 0, /* length */ 10));
+    long offset = 0;
+    int rangeLength = 10;
+    fileRanges.add(FileRange.createFileRange(offset, rangeLength));
+    offset = vectoredReadOptions.getMinSeekVectoredReadSize();
     fileRanges.add(
-        FileRange.createFileRange(
-            /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() - 1, /* length */ 10));
+        FileRange.createFileRange(vectoredReadOptions.getMinSeekVectoredReadSize(), rangeLength));
     vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(fileRanges);
     // Ranges are merged, data is read from single channel
     verifyGcsFsOpenCalls(/* callCount */ 1);
+    assertThat(
+            ghfsStorageStatistics.getLong(
+                GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.getSymbol()))
+        .isEqualTo(vectoredReadOptions.getMinSeekVectoredReadSize() - rangeLength);
   }
 
   @Test
@@ -262,6 +274,10 @@ public class VectoredIOImplTest {
 
     assertThat(channel1.position()).isEqualTo(expectedCombinedRanges.get(0).getOffset());
     assertThat(channel2.position()).isEqualTo(expectedCombinedRanges.get(1).getOffset());
+    assertThat(
+            ghfsStorageStatistics.getLong(
+                GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.getSymbol()))
+        .isEqualTo(0);
   }
 
   @Test
@@ -293,17 +309,22 @@ public class VectoredIOImplTest {
     int offset = (int) fileInfo.getSize() - 1 - rangeLength;
     FileRange validRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(validRange);
-    offset += rangeLength;
+    int discardedBytes = 5;
+    offset += rangeLength + discardedBytes;
     FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(overFlowRange);
 
     vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(Arrays.asList(validRange));
     verifyRangeException(Arrays.asList(overFlowRange));
+    assertThat(
+            ghfsStorageStatistics.getLong(
+                GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.getSymbol()))
+        .isEqualTo(discardedBytes);
   }
 
   @Test
-  public void rangeOverFLowSingleRange() throws Exception {
+  public void rangeOverFlowSingleRange() throws Exception {
     List<FileRange> fileRanges = new ArrayList<>();
     int rangeLength = 5;
     int offset = (int) fileInfo.getSize() - 1;
