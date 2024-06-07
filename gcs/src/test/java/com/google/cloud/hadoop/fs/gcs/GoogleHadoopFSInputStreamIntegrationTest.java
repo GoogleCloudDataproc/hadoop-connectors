@@ -99,8 +99,11 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    VectoredIOImpl vectoredIO =
+        new VectoredIOImpl(
+            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
     try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(ghfs, path, VectoredReadOptions.DEFAULT, statistics)) {
+        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics)) {
       assertThat(in.read(value, 0, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(1);
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
@@ -127,9 +130,11 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     String testContent = "verify vectored read ranges are getting"; // length = 40
     gcsFsIHelper.writeTextFile(path, testContent);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    VectoredIOImpl vectoredIO =
+        new VectoredIOImpl(vectoredReadOptions, ghfs.getGlobalGcsStorageStatistics(), statistics);
     GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(
-            ghfs, path, vectoredReadOptions, new FileSystem.Statistics(ghfs.getScheme()));
+        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
 
     List<FileRange> fileRanges = new ArrayList<>();
     // below two ranges will be merged
@@ -153,18 +158,14 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
 
-    // overriding the default values with lower limit to test out on smaller content size.
-    VectoredReadOptions vectoredReadOptions =
-        VectoredReadOptions.DEFAULT.toBuilder()
-            .setMinSeekVectoredReadSize(2)
-            .setMergeRangeMaxSize(10)
-            .build();
-
     String testContent = "verify vectored read ranges are getting"; // length = 40
     gcsFsIHelper.writeTextFile(path, testContent);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    VectoredIOImpl vectoredIO =
+        new VectoredIOImpl(
+            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
     GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(
-            ghfs, path, vectoredReadOptions, new FileSystem.Statistics(ghfs.getScheme()));
+        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
 
     List<FileRange> fileRanges = new ArrayList<>();
     // range inside file size
@@ -222,8 +223,11 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     gcsFsIHelper.writeTextFile(path, testContent);
 
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    VectoredIOImpl vectoredIO =
+        new VectoredIOImpl(
+            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
     GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(ghfs, path, VectoredReadOptions.DEFAULT, statistics);
+        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
     in.close();
     assertThrows(IOException.class, in::read);
   }
@@ -324,7 +328,10 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
-    return GoogleHadoopFSInputStream.create(
-        ghfs, path, VectoredReadOptions.DEFAULT, new FileSystem.Statistics(ghfs.getScheme()));
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    VectoredIOImpl vectoredIO =
+        new VectoredIOImpl(
+            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
+    return GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
   }
 }

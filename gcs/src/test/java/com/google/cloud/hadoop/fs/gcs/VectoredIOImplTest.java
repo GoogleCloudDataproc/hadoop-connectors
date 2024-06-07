@@ -46,6 +46,7 @@ import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VectoredReadUtils;
 import org.apache.hadoop.fs.impl.CombinedFileRange;
@@ -72,7 +73,6 @@ public class VectoredIOImplTest {
   private VectoredIOImpl vectoredIO;
   // stores the path of default object
   private Path path;
-  private GhfsStreamStats vectoredReadStats;
 
   @Before
   public void before() throws Exception {
@@ -88,9 +88,9 @@ public class VectoredIOImplTest {
             ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
             : null;
     this.gcsFs = spy(ghfs.getGcsFs());
-    this.vectoredReadStats = new GhfsStreamStats(
-        ghfs.getGlobalGcsStorageStatistics(), GhfsStatistic.STREAM_RAED_VECTORED_OPERATIONS, ghfs.getUri().resolve(OBJECT_NAME));
-    vectoredIO = new VectoredIOImpl(gcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions, vectoredReadStats);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    this.vectoredIO =
+        new VectoredIOImpl(vectoredReadOptions, ghfs.getGlobalGcsStorageStatistics(), statistics);
   }
 
   @After
@@ -109,13 +109,14 @@ public class VectoredIOImplTest {
     fileRanges.add(FileRange.createFileRange(/* offset */ 11, /* length */ -50));
     assertThrows(
         IllegalArgumentException.class,
-        () -> vectoredIO.readVectored(fileRanges, ByteBuffer::allocate));
+        () -> vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath()));
     fileRanges.clear();
 
     // invalid offset
     fileRanges.add(FileRange.createFileRange(/* offset */ -1, /* length */ 50));
     assertThrows(
-        EOFException.class, () -> vectoredIO.readVectored(fileRanges, ByteBuffer::allocate));
+        EOFException.class,
+        () -> vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath()));
   }
 
   @Test
@@ -126,7 +127,7 @@ public class VectoredIOImplTest {
     fileRanges.add(
         FileRange.createFileRange(
             /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() + 10, /* length */ 10));
-    vectoredIO.readVectored(fileRanges, this.allocate);
+    vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(fileRanges);
     // callCount is equal to disjointRangeRequests
     verifyGcsFsOpenCalls(/* callCount */ 2);
@@ -139,7 +140,7 @@ public class VectoredIOImplTest {
     fileRanges.add(
         FileRange.createFileRange(
             /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() - 1, /* length */ 10));
-    vectoredIO.readVectored(fileRanges, this.allocate);
+    vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(fileRanges);
     // Ranges are merged, data is read from single channel
     verifyGcsFsOpenCalls(/* callCount */ 1);
@@ -164,8 +165,7 @@ public class VectoredIOImplTest {
     when(mockedGcsFs.open(fileInfoArgumentCaptor.capture(), readOptionsArgumentCaptor.capture()))
         .thenReturn(new MockedReadChannel(), new MockedReadChannel());
 
-    vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions,vectoredReadStats);
-    vectoredIO.readVectored(fileRanges, allocate);
+    vectoredIO.readVectored(fileRanges, allocate, mockedGcsFs, fileInfo, fileInfo.getPath());
     verifyRangeException(fileRanges);
 
     verify(mockedGcsFs, times(2)).open((FileInfo) any(), any());
@@ -193,8 +193,7 @@ public class VectoredIOImplTest {
     when(mockedGcsFs.open(fileInfoArgumentCaptor.capture(), readOptionsArgumentCaptor.capture()))
         .thenReturn(new MockedReadChannel());
 
-    vectoredIO = new VectoredIOImpl(mockedGcsFs, fileInfo.getPath(), fileInfo, vectoredReadOptions, vectoredReadStats);
-    vectoredIO.readVectored(fileRanges, allocate);
+    vectoredIO.readVectored(fileRanges, allocate, mockedGcsFs, fileInfo, fileInfo.getPath());
 
     verifyRangeException(fileRanges);
 
@@ -212,7 +211,9 @@ public class VectoredIOImplTest {
     fileRanges.add(FileRange.createFileRange(/* offset */ 5, /* length */ 10));
     Throwable e =
         assertThrows(
-            IllegalArgumentException.class, () -> vectoredIO.readVectored(fileRanges, allocate));
+            IllegalArgumentException.class,
+            () ->
+                vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath()));
     assertThat((e.getMessage())).contains("overlapping");
   }
 
@@ -248,13 +249,12 @@ public class VectoredIOImplTest {
 
     // Using just 1 thread will put ordering in execution of rangeRequest and make it easier to
     // verify mocks ( and also avoid flakiness of test)
-    vectoredIO =
+    VectoredIOImpl vectoredIO =
         new VectoredIOImpl(
-            mockedGcsFs,
-            fileInfo.getPath(),
-            fileInfo,
-            vectoredReadOptions.toBuilder().setReadThreads(1).build(), vectoredReadStats);
-    vectoredIO.readVectored(fileRanges, allocate);
+            vectoredReadOptions.toBuilder().setReadThreads(1).build(),
+            ghfs.getGlobalGcsStorageStatistics(),
+            null);
+    vectoredIO.readVectored(fileRanges, allocate, mockedGcsFs, fileInfo, fileInfo.getPath());
     verifyRangeException(fileRanges);
 
     // open is called only as per combinedRange and not as per request FileRange
@@ -297,7 +297,7 @@ public class VectoredIOImplTest {
     FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(overFlowRange);
 
-    vectoredIO.readVectored(fileRanges, allocate);
+    vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(Arrays.asList(validRange));
     verifyRangeException(Arrays.asList(overFlowRange));
   }
@@ -309,7 +309,7 @@ public class VectoredIOImplTest {
     int offset = (int) fileInfo.getSize() - 1;
     FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(overFlowRange);
-    vectoredIO.readVectored(fileRanges, allocate);
+    vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
 
     verifyRangeException(fileRanges);
   }

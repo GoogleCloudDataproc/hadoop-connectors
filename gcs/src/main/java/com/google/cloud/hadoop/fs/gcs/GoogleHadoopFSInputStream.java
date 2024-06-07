@@ -57,6 +57,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   // Path of the file to read.
   private final URI gcsPath;
+  // File Info of gcsPath, will be pre-populated in some cases.
+  private final FileInfo fileInfo;
   // All store IO access goes through this.
   private final SeekableByteChannel channel;
   // Number of bytes read through this channel.
@@ -83,11 +85,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
   private final VectoredIOImpl vectoredIO;
+  private final GoogleCloudStorageFileSystem gcsFs;
 
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs,
       URI gcsPath,
-      VectoredReadOptions vectoredReadOptions,
+      VectoredIOImpl vectoredIO,
       FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
@@ -105,8 +108,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       channel =
           gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     }
-    return new GoogleHadoopFSInputStream(
-        ghfs, gcsPath, fileInfo, channel, vectoredReadOptions, statistics);
+    return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, vectoredIO, statistics);
   }
 
   private static boolean shouldPreFetchFileInfo(GoogleCloudStorageFileSystemOptions gcsFSOptions) {
@@ -129,7 +131,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs,
       FileInfo fileInfo,
-      VectoredReadOptions vectoredReadOptions,
+      VectoredIOImpl vectoredIO,
       FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
@@ -137,7 +139,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     return new GoogleHadoopFSInputStream(
-        ghfs, fileInfo.getPath(), fileInfo, channel, vectoredReadOptions, statistics);
+        ghfs, fileInfo.getPath(), fileInfo, channel, vectoredIO, statistics);
   }
 
   private GoogleHadoopFSInputStream(
@@ -145,11 +147,13 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       URI gcsPath,
       FileInfo fileInfo,
       SeekableByteChannel channel,
-      VectoredReadOptions vectoredReadOptions,
+      VectoredIOImpl vectoredIO,
       FileSystem.Statistics statistics) {
     logger.atFiner().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
     this.gcsPath = gcsPath;
     this.channel = channel;
+    this.fileInfo = fileInfo;
+    this.gcsFs = ghfs.getGcsFs();
     this.statistics = statistics;
     this.storageStatistics = ghfs.getGlobalGcsStorageStatistics();
 
@@ -164,9 +168,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             storageStatistics, GhfsStatistic.STREAM_RAED_VECTORED_OPERATIONS, gcsPath);
 
     this.traceFactory = ghfs.getTraceFactory();
-    this.vectoredIO =
-        new VectoredIOImpl(
-            ghfs.getGcsFs(), gcsPath, fileInfo, vectoredReadOptions, vectoredReadStats);
+    this.vectoredIO = vectoredIO;
   }
 
   /**
@@ -184,7 +186,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         STREAM_RAED_VECTORED_OPERATIONS.getSymbol(),
         () -> {
           streamStats.incrementCounter(STREAM_RAED_VECTORED_OPERATIONS);
-          vectoredIO.readVectored(ranges, allocate);
+          vectoredIO.readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath);
           return null;
         });
   }

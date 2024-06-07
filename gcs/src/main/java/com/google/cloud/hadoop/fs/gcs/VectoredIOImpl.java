@@ -42,6 +42,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FileRange;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.VectoredReadUtils;
 import org.apache.hadoop.fs.impl.CombinedFileRange;
 
@@ -49,26 +50,16 @@ import org.apache.hadoop.fs.impl.CombinedFileRange;
 public class VectoredIOImpl implements Closeable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final BlockingQueue taskQueue = new LinkedBlockingQueue<Runnable>();
-  private final URI gcsPath;
-  private final FileInfo fileInfo;
-  private final GoogleCloudStorageReadOptions channelReadOptions;
   private final VectoredReadOptions vectoredReadOptions;
-  private final GoogleCloudStorageFileSystem gcsFs;
-  private final GhfsStreamStats vectoredReadStats;
+  private final GhfsGlobalStorageStatistics storageStatistics;
+  private final FileSystem.Statistics statistics;
   private ExecutorService boundedThreadPool;
 
   public VectoredIOImpl(
-      GoogleCloudStorageFileSystem gcsFs,
-      URI gcsPath,
-      FileInfo fileInfo,
       VectoredReadOptions vectoredReadOptions,
-      GhfsStreamStats readStats) {
-    this.gcsFs = gcsFs;
-    this.gcsPath = gcsPath;
-    this.fileInfo = fileInfo;
+      GhfsGlobalStorageStatistics storageStatistics,
+      FileSystem.Statistics statistics) {
     this.vectoredReadOptions = vectoredReadOptions;
-    this.channelReadOptions =
-        channelReadOptions(gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     // same fixedThreadPool executor, but provided a way to query task queue
     this.boundedThreadPool =
         new ThreadPoolExecutor(
@@ -77,7 +68,20 @@ public class VectoredIOImpl implements Closeable {
             0L,
             TimeUnit.MILLISECONDS,
             taskQueue);
-    this.vectoredReadStats = readStats;
+
+    this.statistics = statistics;
+    this.storageStatistics = storageStatistics;
+  }
+
+  public void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate,
+      GoogleCloudStorageFileSystem gcsFs,
+      FileInfo fileInfo,
+      URI gcsPath)
+      throws IOException {
+    ReadChannelProvider channelProvider = new ReadChannelProvider(gcsFs, fileInfo, gcsPath);
+    readVectored(ranges, allocate, channelProvider);
   }
 
   /**
@@ -87,28 +91,37 @@ public class VectoredIOImpl implements Closeable {
    * @param allocate Function to allocate ByteBuffer for reading.
    * @throws IOException if an I/O error occurs.
    */
-  public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
+  private void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate,
+      ReadChannelProvider channelProvider)
       throws IOException {
     List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
     for (FileRange range : ranges) {
       validateRangeRequest(range);
-      vectoredReadStats.incrementOpsAndUpdate(
-          GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE, range.getLength());
+      storageStatistics.updateStats(
+          GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE,
+          range.getLength(),
+          channelProvider.gcsPath);
       CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
       range.setData(result);
     }
     if (shouldMergeRanges(ranges)) {
       // case when ranges are not merged
       for (FileRange range : sortedRanges) {
-        vectoredReadStats.incrementOpsAndUpdate(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING, taskQueue.size());
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
+            taskQueue.size(),
+            channelProvider.gcsPath);
         long startTimer = System.currentTimeMillis();
         boundedThreadPool.submit(
             () -> {
-              readSingleRange(range, allocate);
+              readSingleRange(range, allocate, channelProvider);
               long endTimer = System.currentTimeMillis();
-              vectoredReadStats.incrementOpsAndUpdate(
-                  GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION, endTimer - startTimer);
+              storageStatistics.updateStats(
+                  GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                  endTimer - startTimer,
+                  channelProvider.gcsPath);
             });
       }
     } else {
@@ -120,10 +133,14 @@ public class VectoredIOImpl implements Closeable {
               vectoredReadOptions.getMinSeekVectoredReadSize(),
               vectoredReadOptions.getMergeRangeMaxSize());
       for (CombinedFileRange combinedFileRange : combinedFileRanges) {
-        vectoredReadStats.incrementOpsAndUpdate(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING, taskQueue.size());
-        vectoredReadStats.incrementOpsAndUpdate(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE, combinedFileRange.getLength());
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
+            taskQueue.size(),
+            channelProvider.gcsPath);
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE,
+            combinedFileRange.getLength(),
+            channelProvider.gcsPath);
 
         long startTimer = System.currentTimeMillis();
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
@@ -131,9 +148,11 @@ public class VectoredIOImpl implements Closeable {
         boundedThreadPool.submit(
             () -> {
               long endTimer = System.currentTimeMillis();
-              readCombinedRange(combinedFileRange, allocate);
-              vectoredReadStats.incrementOpsAndUpdate(
-                  GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION, endTimer - startTimer);
+              readCombinedRange(combinedFileRange, allocate, channelProvider);
+              storageStatistics.updateStats(
+                  GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                  endTimer - startTimer,
+                  channelProvider.gcsPath);
             });
       }
     }
@@ -147,22 +166,23 @@ public class VectoredIOImpl implements Closeable {
    * @param allocate Byte buffer allocator
    */
   private void readCombinedRange(
-      CombinedFileRange combinedFileRange, IntFunction<ByteBuffer> allocate) {
-    try (SeekableByteChannel channel = getReadChannel()) {
+      CombinedFileRange combinedFileRange,
+      IntFunction<ByteBuffer> allocate,
+      ReadChannelProvider channelProvider) {
+    try (SeekableByteChannel channel = channelProvider.getReadChannel()) {
       channel.position(combinedFileRange.getOffset());
       ByteBuffer readContent = allocate.apply(combinedFileRange.getLength());
-
       int numRead = channel.read(readContent);
       // making it ready for reading
       readContent.flip();
       logger.atFiner().log(
           "Read combinedFileRange completed from range: %s, path: %s, readBytes: %d",
-          combinedFileRange, gcsPath, numRead);
+          combinedFileRange, channelProvider.gcsPath, numRead);
       if (numRead < 0) {
         throw new EOFException(
             String.format(
                 "EOF reached while reading combinedFileRange, range: %s, path: %s, numRead: %d",
-                combinedFileRange, gcsPath, numRead));
+                combinedFileRange, channelProvider.gcsPath, numRead));
       }
 
       // populate child ranges
@@ -173,23 +193,26 @@ public class VectoredIOImpl implements Closeable {
         currentPosition += child.getLength();
         totalBytesRead += discardedBytes + child.getLength();
 
-        vectoredReadStats.incrementCounter(
+        storageStatistics.incrementCounter(
             GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED, discardedBytes);
-
-        //if(numRead > totalBytesRead) {
+        if (numRead >= totalBytesRead) {
           ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
           child.getData().complete(childBuffer);
         } else {
           throw new EOFException(
               String.format(
                   "EOF reached before all child ranges can be populated, combinedFileRange: %s, expected length: %s, readBytes: %s, path: %s",
-                  combinedFileRange, combinedFileRange.getLength(), numRead, gcsPath));
+                  combinedFileRange,
+                  combinedFileRange.getLength(),
+                  numRead,
+                  channelProvider.gcsPath));
         }
       }
       combinedFileRange.getData().complete(readContent);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log(
-          "Exception while reading combinedFileRange:%s for path: %s", combinedFileRange, gcsPath);
+          "Exception while reading combinedFileRange:%s for path: %s",
+          combinedFileRange, channelProvider.gcsPath);
       combinedFileRange.getData().completeExceptionally(e);
       // complete exception all the underlying ranges which have not already
       // finished.
@@ -205,29 +228,11 @@ public class VectoredIOImpl implements Closeable {
             .completeExceptionally(
                 new IOException(
                     String.format(
-                        "Error while populating childRange: %s from combinedRange: %s for path: %s",
-                        child, combinedFileRange, gcsPath),
+                        "Error while populating childRange: %s from combinedRange: %s",
+                        child, combinedFileRange),
                     e));
       }
     }
-  }
-
-  /**
-   * Returns Overriden GCS read options. These options will be used while creating channel per
-   * FileRange. By default, channel is optimized to perform multiple read request from same channel.
-   * Given in readVectored, only one read is performed per channel overriding some configuration to
-   * optimize it.
-   *
-   * @param readOptions original read options extracted from GCSFileSystem
-   * @return The modified read options.
-   */
-  private GoogleCloudStorageReadOptions channelReadOptions(
-      GoogleCloudStorageReadOptions readOptions) {
-    GoogleCloudStorageReadOptions.Builder builder = readOptions.toBuilder();
-    // For single range read we don't want Read channel to adjust around on channel boundaries as
-    // channel is used just for one read request.
-    builder.setFadvise(GoogleCloudStorageReadOptions.Fadvise.SEQUENTIAL);
-    return builder.build();
   }
 
   /**
@@ -236,21 +241,24 @@ public class VectoredIOImpl implements Closeable {
    * @param range range of data to read.
    * @param allocate lambda function to allocate byteBuffer.
    */
-  private void readSingleRange(FileRange range, IntFunction<ByteBuffer> allocate) {
-    try (SeekableByteChannel channel = getReadChannel()) {
+  private void readSingleRange(
+      FileRange range, IntFunction<ByteBuffer> allocate, ReadChannelProvider channelProvider) {
+    try (SeekableByteChannel channel = channelProvider.getReadChannel()) {
       channel.position(range.getOffset());
       ByteBuffer dst = allocate.apply(range.getLength());
       int numRead = channel.read(dst.duplicate());
       if (numRead < range.getLength()) {
         throw new EOFException(
             String.format(
-                "EOF reached before whole range can be read, range: %s, path: %s", range, gcsPath));
+                "EOF reached before whole range can be read, range: %s, path: %s",
+                range, channelProvider.gcsPath));
       }
       range.getData().complete(dst);
-      logger.atFiner().log("Read single range completed from range: %s, path: %s", range, gcsPath);
+      logger.atFiner().log(
+          "Read single range completed from range: %s, path: %s", range, channelProvider.gcsPath);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log(
-          "Exception while reading range:%s for path: %s", range, gcsPath);
+          "Exception while reading range:%s for path: %s", range, channelProvider.gcsPath);
       range.getData().completeExceptionally(e);
     }
   }
@@ -260,13 +268,6 @@ public class VectoredIOImpl implements Closeable {
       return true;
     }
     return false;
-  }
-
-  private SeekableByteChannel getReadChannel() throws IOException {
-    if (fileInfo != null) {
-      return gcsFs.open(fileInfo, channelReadOptions);
-    }
-    return gcsFs.open(gcsPath, channelReadOptions);
   }
 
   /**
@@ -308,6 +309,45 @@ public class VectoredIOImpl implements Closeable {
       }
     } finally {
       boundedThreadPool = null;
+    }
+  }
+
+  private class ReadChannelProvider {
+    private final GoogleCloudStorageFileSystem gcsFs;
+    private final FileInfo fileInfo;
+    private final URI gcsPath;
+
+    public ReadChannelProvider(GoogleCloudStorageFileSystem gcsFS, FileInfo fileInfo, URI gcsPath) {
+      this.gcsFs = gcsFS;
+      this.fileInfo = fileInfo;
+      this.gcsPath = gcsPath;
+    }
+
+    public SeekableByteChannel getReadChannel() throws IOException {
+      GoogleCloudStorageReadOptions options =
+          channelReadOptions(gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+      if (fileInfo != null) {
+        return gcsFs.open(fileInfo, options);
+      }
+      return gcsFs.open(gcsPath, options);
+    }
+
+    /**
+     * Returns Overriden GCS read options. These options will be used while creating channel per
+     * FileRange. By default, channel is optimized to perform multiple read request from same
+     * channel. Given in readVectored, only one read is performed per channel overriding some
+     * configuration to optimize it.
+     *
+     * @param readOptions original read options extracted from GCSFileSystem
+     * @return The modified read options.
+     */
+    private GoogleCloudStorageReadOptions channelReadOptions(
+        GoogleCloudStorageReadOptions readOptions) {
+      GoogleCloudStorageReadOptions.Builder builder = readOptions.toBuilder();
+      // For single range read we don't want Read channel to adjust around on channel boundaries as
+      // channel is used just for one read request.
+      builder.setFadvise(GoogleCloudStorageReadOptions.Fadvise.SEQUENTIAL);
+      return builder.build();
     }
   }
 }

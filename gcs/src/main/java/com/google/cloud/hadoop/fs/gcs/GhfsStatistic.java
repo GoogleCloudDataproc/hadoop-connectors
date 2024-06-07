@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_COUNTER;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_GAUGE;
 
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.common.collect.ImmutableMap;
@@ -122,15 +123,11 @@ public enum GhfsStatistic {
   STREAM_READ_VECTORED_READ_RANGE_DURATION(
       "stream_readVectored_range_duration", "Latency of individual FileRange", TYPE_DURATION),
 
-  // TODO: update it to be gauge type
   STREAM_READ_VECTORED_READ_RANGE_SIZE(
-      "stream_readVectored_range_size",
-      "Request content via FileRange i.e. getLength",
-      TYPE_DURATION),
+      "stream_readVectored_range_size", "Request content via FileRange i.e. getLength", TYPE_GAUGE),
 
-  // TODO: update it to be gauge type
   STREAM_READ_VECTORED_READ_RANGE_PENDING(
-      "stream_readVectored_range_pending", "Outstanding range request", TYPE_DURATION),
+      "stream_readVectored_range_pending", "Outstanding range request", TYPE_GAUGE),
 
   STREAM_READ_OPERATIONS_INCOMPLETE(
       StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
