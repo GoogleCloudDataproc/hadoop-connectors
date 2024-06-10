@@ -306,10 +306,7 @@ public class VectoredIOImpl implements Closeable {
   }
 
   private boolean shouldMergeRanges(List<? extends FileRange> ranges) {
-    if (isOrderedDisjoint(ranges, 1, vectoredReadOptions.getMinSeekVectoredReadSize())) {
-      return true;
-    }
-    return false;
+    return (isOrderedDisjoint(ranges, 1, vectoredReadOptions.getMinSeekVectoredReadSize()));
   }
 
   /**
