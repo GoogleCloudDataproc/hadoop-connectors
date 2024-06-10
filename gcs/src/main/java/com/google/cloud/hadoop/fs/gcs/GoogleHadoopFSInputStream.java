@@ -185,7 +185,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         streamStatistics,
         STREAM_RAED_VECTORED_OPERATIONS.getSymbol(),
         () -> {
+          long startTimeNs = System.nanoTime();
           vectoredIO.readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath);
+          statistics.incrementReadOps(1);
+          streamStats.updateVectoredReadStreamStats(startTimeNs);
           return null;
         });
   }
@@ -296,16 +299,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
               } catch (Exception e) {
                 logger.atWarning().withCause(e).log(
                     "Error while closing underneath read channel resources for path: %s", gcsPath);
-              }
-
-              try {
-                if (vectoredIO != null) {
-                  logger.atFiner().log("Closing vectored read for path:%s ", gcsPath);
-                  vectoredIO.close();
-                }
-              } catch (Exception e) {
-                logger.atWarning().withCause(e).log(
-                    "Error while closing vectoredRead resources for path: %s", gcsPath);
               }
             } finally {
               streamStats.close();

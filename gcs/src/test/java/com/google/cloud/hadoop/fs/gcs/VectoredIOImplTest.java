@@ -124,11 +124,12 @@ public class VectoredIOImplTest {
   @Test
   public void testDisjointRangeReads() throws Exception {
     List<FileRange> fileRanges = new ArrayList<>();
-    fileRanges.add(FileRange.createFileRange(/* offset */ 0, /* length */ 10));
+    int rangeLength = 10;
+    fileRanges.add(FileRange.createFileRange(/* offset */ 0, rangeLength));
     // offset > previous range endPosition + minSeek
     fileRanges.add(
         FileRange.createFileRange(
-            /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() + 10, /* length */ 10));
+            /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() + 10, rangeLength));
     vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(fileRanges);
     // callCount is equal to disjointRangeRequests
@@ -138,6 +139,10 @@ public class VectoredIOImplTest {
                 .getLong(GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.name())
                 .longValue())
         .isEqualTo(0);
+    // 2*rangeLength : actual data read
+    // 2*rangeLength: read during verification
+    assertThat(ghfsStorageStatistics.getLong(GhfsStatistic.STREAM_READ_BYTES.getSymbol()))
+        .isEqualTo(rangeLength * 2 + rangeLength * 2);
   }
 
   @Test
@@ -146,9 +151,10 @@ public class VectoredIOImplTest {
     long offset = 0;
     int rangeLength = 10;
     fileRanges.add(FileRange.createFileRange(offset, rangeLength));
-    offset = vectoredReadOptions.getMinSeekVectoredReadSize();
-    fileRanges.add(
-        FileRange.createFileRange(vectoredReadOptions.getMinSeekVectoredReadSize(), rangeLength));
+    offset += rangeLength;
+    int discardedBytes = vectoredReadOptions.getMinSeekVectoredReadSize() - 1;
+    offset += discardedBytes;
+    fileRanges.add(FileRange.createFileRange(offset, rangeLength));
     vectoredIO.readVectored(fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath());
     verifyRangeContent(fileRanges);
     // Ranges are merged, data is read from single channel
@@ -156,7 +162,12 @@ public class VectoredIOImplTest {
     assertThat(
             ghfsStorageStatistics.getLong(
                 GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.getSymbol()))
-        .isEqualTo(vectoredReadOptions.getMinSeekVectoredReadSize() - rangeLength);
+        .isEqualTo(discardedBytes);
+    // 2*rangeLength : actual data read
+    // discardedBytes: extra read because of range merging
+    // 2*rangeLength: read during verification
+    assertThat(ghfsStorageStatistics.getLong(GhfsStatistic.STREAM_READ_BYTES.getSymbol()))
+        .isEqualTo(rangeLength * 2 + discardedBytes + rangeLength * 2);
   }
 
   @Test

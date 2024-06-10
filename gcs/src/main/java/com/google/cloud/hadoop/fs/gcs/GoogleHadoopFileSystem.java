@@ -1654,6 +1654,17 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       }
     }
 
+    if (vectoredIO != null) {
+      try {
+        vectoredIO.close();
+      } catch (Exception e) {
+        logger.atWarning().withCause(e).log(
+            "Failed to close the underneath vectoredIO implementation");
+      } finally {
+        vectoredIO = null;
+      }
+    }
+
     backgroundTasksThreadPool.shutdown();
     backgroundTasksThreadPool = null;
   }

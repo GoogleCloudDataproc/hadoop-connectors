@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
@@ -41,6 +42,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.VectoredReadUtils;
@@ -67,21 +69,10 @@ public class VectoredIOImpl implements Closeable {
             vectoredReadOptions.getReadThreads(),
             0L,
             TimeUnit.MILLISECONDS,
-            taskQueue);
-
+            taskQueue,
+            new ThreadFactoryBuilder().setNameFormat("gcs-async-vectored-pool-%d").build());
     this.statistics = statistics;
     this.storageStatistics = storageStatistics;
-  }
-
-  public void readVectored(
-      List<? extends FileRange> ranges,
-      IntFunction<ByteBuffer> allocate,
-      GoogleCloudStorageFileSystem gcsFs,
-      FileInfo fileInfo,
-      URI gcsPath)
-      throws IOException {
-    ReadChannelProvider channelProvider = new ReadChannelProvider(gcsFs, fileInfo, gcsPath);
-    readVectored(ranges, allocate, channelProvider);
   }
 
   /**
@@ -91,6 +82,28 @@ public class VectoredIOImpl implements Closeable {
    * @param allocate Function to allocate ByteBuffer for reading.
    * @throws IOException if an I/O error occurs.
    */
+  /**
+   * Reads data from Google Cloud Storage using vectored I/O operations.
+   *
+   * @param ranges List of file ranges to read.
+   * @param allocate Function to allocate ByteBuffer for reading.
+   * @param gcsFs GCFS implementation to use while creating channel and reading content for ranges.
+   * @param fileInfo FileInfo of the gcs object agaisnt which range request are fired, this can be
+   *     null for some code path fall back to URI path provided.
+   * @param gcsPath URI of the gcs object for which the range requests are fired.
+   * @throws IOException If invalid range is requested, offset<0.
+   */
+  public void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate,
+      GoogleCloudStorageFileSystem gcsFs,
+      FileInfo fileInfo,
+      @Nonnull URI gcsPath)
+      throws IOException {
+    ReadChannelProvider channelProvider = new ReadChannelProvider(gcsFs, fileInfo, gcsPath);
+    readVectored(ranges, allocate, channelProvider);
+  }
+
   private void readVectored(
       List<? extends FileRange> ranges,
       IntFunction<ByteBuffer> allocate,
@@ -98,6 +111,7 @@ public class VectoredIOImpl implements Closeable {
       throws IOException {
     List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
     for (FileRange range : ranges) {
+      // TODO(user): upgrade to use validateAndSortRanges
       validateRangeRequest(range);
       storageStatistics.updateStats(
           GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE,
@@ -126,13 +140,7 @@ public class VectoredIOImpl implements Closeable {
       }
     } else {
       // case where ranges can be merged
-      List<CombinedFileRange> combinedFileRanges =
-          mergeSortedRanges(
-              sortedRanges,
-              1,
-              vectoredReadOptions.getMinSeekVectoredReadSize(),
-              vectoredReadOptions.getMergeRangeMaxSize());
-      for (CombinedFileRange combinedFileRange : combinedFileRanges) {
+      for (CombinedFileRange combinedFileRange : getCombinedFileRange(ranges)) {
         storageStatistics.updateStats(
             GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
             taskQueue.size(),
@@ -154,6 +162,14 @@ public class VectoredIOImpl implements Closeable {
     }
   }
 
+  private List<CombinedFileRange> getCombinedFileRange(List<? extends FileRange> sortedRanges) {
+    return mergeSortedRanges(
+        sortedRanges,
+        1,
+        vectoredReadOptions.getMinSeekVectoredReadSize(),
+        vectoredReadOptions.getMergeRangeMaxSize());
+  }
+
   /**
    * function for reading combined or merged FileRanges. It reads the range and update the child
    * fileRange's content.
@@ -169,6 +185,7 @@ public class VectoredIOImpl implements Closeable {
       channel.position(combinedFileRange.getOffset());
       ByteBuffer readContent = allocate.apply(combinedFileRange.getLength());
       int numRead = channel.read(readContent);
+
       // making it ready for reading
       readContent.flip();
       logger.atFiner().log(
@@ -180,6 +197,8 @@ public class VectoredIOImpl implements Closeable {
                 "EOF reached while reading combinedFileRange, range: %s, path: %s, numRead: %d",
                 combinedFileRange, channelProvider.gcsPath, numRead));
       }
+      statistics.incrementBytesRead(numRead);
+      storageStatistics.streamReadBytes(numRead);
 
       // populate child ranges
       long currentPosition = combinedFileRange.getOffset();
@@ -244,6 +263,8 @@ public class VectoredIOImpl implements Closeable {
       channel.position(range.getOffset());
       ByteBuffer dst = allocate.apply(range.getLength());
       int numRead = channel.read(dst.duplicate());
+      statistics.incrementBytesRead(numRead);
+      storageStatistics.streamReadBytes(numRead);
       if (numRead < range.getLength()) {
         throw new EOFException(
             String.format(
