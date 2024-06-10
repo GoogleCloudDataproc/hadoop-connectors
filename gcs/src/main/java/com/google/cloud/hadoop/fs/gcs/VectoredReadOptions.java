@@ -27,7 +27,7 @@ public abstract class VectoredReadOptions {
     return new AutoValue_VectoredReadOptions.Builder()
         .setMinSeekVectoredReadSize(4 * 1024) // 4KB
         .setMergeRangeMaxSize(8 * 1024 * 1024) // 8MB
-        .setReadThreads(8);
+        .setReadThreads(16);
   }
 
   public abstract int getMinSeekVectoredReadSize();

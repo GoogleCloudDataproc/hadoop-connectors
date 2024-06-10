@@ -51,7 +51,7 @@ import org.apache.hadoop.fs.impl.CombinedFileRange;
 @VisibleForTesting
 public class VectoredIOImpl implements Closeable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private static final BlockingQueue taskQueue = new LinkedBlockingQueue<Runnable>();
+  private final BlockingQueue taskQueue = new LinkedBlockingQueue<Runnable>();
   private final VectoredReadOptions vectoredReadOptions;
   private final GhfsGlobalStorageStatistics storageStatistics;
   private final FileSystem.Statistics statistics;
@@ -70,7 +70,10 @@ public class VectoredIOImpl implements Closeable {
             0L,
             TimeUnit.MILLISECONDS,
             taskQueue,
-            new ThreadFactoryBuilder().setNameFormat("gcs-async-vectored-pool-%d").build());
+            new ThreadFactoryBuilder()
+                .setNameFormat("vectoredRead-range-pool-%d")
+                .setDaemon(true)
+                .build());
     this.statistics = statistics;
     this.storageStatistics = storageStatistics;
   }
@@ -113,24 +116,23 @@ public class VectoredIOImpl implements Closeable {
     for (FileRange range : ranges) {
       // TODO(user): upgrade to use validateAndSortRanges
       validateRangeRequest(range);
-      storageStatistics.updateStats(
-          GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_SIZE,
-          range.getLength(),
-          channelProvider.gcsPath);
       CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
       range.setData(result);
     }
     if (shouldMergeRanges(ranges)) {
+      updateRangeSizeCounters(sortedRanges.size(), sortedRanges.size());
       // case when ranges are not merged
-      for (FileRange range : sortedRanges) {
+      for (FileRange sortedRange : sortedRanges) {
         storageStatistics.updateStats(
             GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
             taskQueue.size(),
             channelProvider.gcsPath);
+
         long startTimer = System.currentTimeMillis();
         boundedThreadPool.submit(
             () -> {
-              readSingleRange(range, allocate, channelProvider);
+              logger.atFiner().log("Submitting range %s for execution.", sortedRange);
+              readSingleRange(sortedRange, allocate, channelProvider);
               long endTimer = System.currentTimeMillis();
               storageStatistics.updateStats(
                   GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
@@ -139,20 +141,23 @@ public class VectoredIOImpl implements Closeable {
             });
       }
     } else {
+      List<CombinedFileRange> combinedFileRanges = getCombinedFileRange(sortedRanges);
+      updateRangeSizeCounters(sortedRanges.size(), combinedFileRanges.size());
       // case where ranges can be merged
-      for (CombinedFileRange combinedFileRange : getCombinedFileRange(ranges)) {
+      for (CombinedFileRange combinedFileRange : combinedFileRanges) {
         storageStatistics.updateStats(
             GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
             taskQueue.size(),
             channelProvider.gcsPath);
 
-        long startTimer = System.currentTimeMillis();
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         combinedFileRange.setData(result);
+        long startTimer = System.currentTimeMillis();
         boundedThreadPool.submit(
             () -> {
-              long endTimer = System.currentTimeMillis();
+              logger.atFiner().log("Submitting combinedRange %s for execution.", combinedFileRange);
               readCombinedRange(combinedFileRange, allocate, channelProvider);
+              long endTimer = System.currentTimeMillis();
               storageStatistics.updateStats(
                   GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
                   endTimer - startTimer,
@@ -160,6 +165,18 @@ public class VectoredIOImpl implements Closeable {
             });
       }
     }
+  }
+
+  private void updateRangeSizeCounters(int incomingRangeSize, int combinedRangeSize) {
+    storageStatistics.incrementCounter(
+        GhfsStatistic.STREAM_READ_VECTORED_READ_INCOMING_RANGES, incomingRangeSize);
+    storageStatistics.incrementCounter(
+        GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES, combinedRangeSize);
+  }
+
+  private void updateBytesRead(int readBytes) {
+    statistics.incrementBytesRead(readBytes);
+    storageStatistics.streamReadBytes(readBytes);
   }
 
   private List<CombinedFileRange> getCombinedFileRange(List<? extends FileRange> sortedRanges) {
@@ -197,14 +214,18 @@ public class VectoredIOImpl implements Closeable {
                 "EOF reached while reading combinedFileRange, range: %s, path: %s, numRead: %d",
                 combinedFileRange, channelProvider.gcsPath, numRead));
       }
-      statistics.incrementBytesRead(numRead);
-      storageStatistics.streamReadBytes(numRead);
 
       // populate child ranges
       long currentPosition = combinedFileRange.getOffset();
       long totalBytesRead = 0;
+      // Note: child ranges will be sorted as well, given Range merge was called on sortedList
       for (FileRange child : combinedFileRange.getUnderlying()) {
+        logger.atFiner().log(
+            "Populating childRange: %s from combinedRange:%s", child, combinedFileRange);
         int discardedBytes = (int) (child.getOffset() - currentPosition);
+        logger.atFiner().log(
+            "Discarding %d bytes at offset: %d from read combinedRange %s while updating childRange: %s",
+            discardedBytes, currentPosition, combinedFileRange, child);
         totalBytesRead += discardedBytes + child.getLength();
         currentPosition = child.getOffset() + child.getLength();
 
@@ -214,6 +235,7 @@ public class VectoredIOImpl implements Closeable {
         if (numRead >= totalBytesRead) {
           ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
           child.getData().complete(childBuffer);
+          updateBytesRead(child.getLength());
         } else {
           throw new EOFException(
               String.format(
@@ -239,6 +261,9 @@ public class VectoredIOImpl implements Closeable {
   private void completeExceptionally(CombinedFileRange combinedFileRange, Throwable e) {
     for (FileRange child : combinedFileRange.getUnderlying()) {
       if (!child.getData().isDone()) {
+        logger.atFiner().withCause(e).log(
+            "Marking child:%s as `completeExceptionally` of combinedRange:%s",
+            child, combinedFileRange);
         child
             .getData()
             .completeExceptionally(
@@ -263,8 +288,6 @@ public class VectoredIOImpl implements Closeable {
       channel.position(range.getOffset());
       ByteBuffer dst = allocate.apply(range.getLength());
       int numRead = channel.read(dst.duplicate());
-      statistics.incrementBytesRead(numRead);
-      storageStatistics.streamReadBytes(numRead);
       if (numRead < range.getLength()) {
         throw new EOFException(
             String.format(
@@ -272,6 +295,7 @@ public class VectoredIOImpl implements Closeable {
                 range, channelProvider.gcsPath));
       }
       range.getData().complete(dst);
+      updateBytesRead(range.getLength());
       logger.atFiner().log(
           "Read single range completed from range: %s, path: %s", range, channelProvider.gcsPath);
     } catch (Exception e) {
