@@ -66,6 +66,10 @@ class GhfsStreamStats {
     storageStatistics.streamReadBytes(len);
   }
 
+  void updateVectoredReadStreamStats(long start) {
+    updateStats(start);
+  }
+
   private static long toMillis(long nano) {
     return nano / 1000_000;
   }
