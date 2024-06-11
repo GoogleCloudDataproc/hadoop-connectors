@@ -109,6 +109,29 @@ public enum GhfsStatistic {
   STREAM_READ_OPERATIONS(
       StreamStatisticNames.STREAM_READ_OPERATIONS, "Calls of read()", TYPE_DURATION),
 
+  STREAM_READ_VECTORED_OPERATIONS(
+      StreamStatisticNames.STREAM_READ_VECTORED_OPERATIONS,
+      "Calls of readVectored()",
+      TYPE_DURATION),
+
+  STREAM_READ_VECTORED_EXTRA_READ_BYTES(
+      StreamStatisticNames.STREAM_READ_VECTORED_READ_BYTES_DISCARDED,
+      "Discarded read bytes during readVectored operation",
+      TYPE_COUNTER),
+
+  STREAM_READ_VECTORED_READ_RANGE_DURATION(
+      "stream_readVectored_range_duration", "Latency of individual FileRange", TYPE_DURATION),
+
+  STREAM_READ_VECTORED_READ_INCOMING_RANGES(
+      StreamStatisticNames.STREAM_READ_VECTORED_INCOMING_RANGES,
+      "size of fileRanges requested in readVectoredRequest",
+      TYPE_COUNTER),
+
+  STREAM_READ_VECTORED_READ_COMBINED_RANGES(
+      StreamStatisticNames.STREAM_READ_VECTORED_COMBINED_RANGES,
+      "size of combined fileRange requested per readVectoredRequest",
+      TYPE_COUNTER),
+
   STREAM_READ_OPERATIONS_INCOMPLETE(
       StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
       "Count of incomplete read() operations in an input stream",
