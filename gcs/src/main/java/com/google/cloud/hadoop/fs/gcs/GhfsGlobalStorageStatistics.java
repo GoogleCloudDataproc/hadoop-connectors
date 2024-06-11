@@ -22,7 +22,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLI
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQUEST_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
-import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_GAUGE;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -84,7 +83,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       String symbol = opType.getSymbol();
       opsCount.put(symbol, new AtomicLong(0));
 
-      if (opType.getType() == TYPE_DURATION || opType.getType() == TYPE_GAUGE) {
+      if (opType.getType() == TYPE_DURATION) {
         minimums.put(getMinKey(symbol), null);
         maximums.put(getMaxKey(symbol), new AtomicLong(0));
         means.put(getMeanKey(symbol), new MeanStatistic());
@@ -160,13 +159,13 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     }
   }
 
-  void updateStats(GhfsStatistic statistic, long datapoint, Object context) {
+  void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
     checkArgument(
-        statistic.getType() == TYPE_DURATION || statistic.getType() == TYPE_GAUGE,
+        statistic.getType() == TYPE_DURATION,
         String.format("Unexpected instrumentation type %s", statistic));
-    updateMinMaxStats(statistic, datapoint, datapoint, context);
+    updateMinMaxStats(statistic, durationMs, durationMs, context);
 
-    addMeanStatistic(statistic, datapoint, 1);
+    addMeanStatistic(statistic, durationMs, 1);
   }
 
   private void addMeanStatistic(GhfsStatistic statistic, long totalDurationMs, int count) {
@@ -190,34 +189,33 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   }
 
   private void updateMinMaxStats(
-      GhfsStatistic statistic, long minDataPoint, long maxDatapoint, Object context) {
+      GhfsStatistic statistic, long minDurationMs, long maxDurationMs, Object context) {
     String minKey = getMinKey(statistic.getSymbol());
 
     AtomicLong minVal = minimums.get(minKey);
     if (minVal == null) {
       // There can be race here. It is ok to have the last write win.
-      minimums.put(minKey, new AtomicLong(minDataPoint));
-    } else if (minDataPoint < minVal.get()) {
-      minVal.set(minDataPoint);
+      minimums.put(minKey, new AtomicLong(minDurationMs));
+    } else if (minDurationMs < minVal.get()) {
+      minVal.set(minDurationMs);
     }
 
     String maxKey = getMaxKey(statistic.getSymbol());
     AtomicLong maxVal = maximums.get(maxKey);
-    if (maxDatapoint > maxVal.get()) {
+    if (maxDurationMs > maxVal.get()) {
 
       // Log is avoided if the first request exceedes threshold
-      if (statistic.getType() == TYPE_DURATION
-          && maxDatapoint > LATENCY_LOGGING_THRESHOLD_MS
+      if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS
           && opsCount.get(statistic.getSymbol()).get() > 0) {
         logger.atInfo().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
-            statistic, maxDatapoint, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
+            statistic, maxDurationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
       }
 
       // There can be race here and can have some data points get missed. This is a corner case.
       // Since this function can be called quite frequently, opting for performance over consistency
       // here.
-      maxVal.set(maxDatapoint);
+      maxVal.set(maxDurationMs);
     }
   }
 

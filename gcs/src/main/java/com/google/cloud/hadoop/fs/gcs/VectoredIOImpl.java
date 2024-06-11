@@ -123,11 +123,6 @@ public class VectoredIOImpl implements Closeable {
       updateRangeSizeCounters(sortedRanges.size(), sortedRanges.size());
       // case when ranges are not merged
       for (FileRange sortedRange : sortedRanges) {
-        storageStatistics.updateStats(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
-            taskQueue.size(),
-            channelProvider.gcsPath);
-
         long startTimer = System.currentTimeMillis();
         boundedThreadPool.submit(
             () -> {
@@ -145,11 +140,6 @@ public class VectoredIOImpl implements Closeable {
       updateRangeSizeCounters(sortedRanges.size(), combinedFileRanges.size());
       // case where ranges can be merged
       for (CombinedFileRange combinedFileRange : combinedFileRanges) {
-        storageStatistics.updateStats(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_PENDING,
-            taskQueue.size(),
-            channelProvider.gcsPath);
-
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         combinedFileRange.setData(result);
         long startTimer = System.currentTimeMillis();
