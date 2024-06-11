@@ -254,6 +254,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                     new GoogleCloudStorageClientGrpcDownscopingInterceptor(
                         downscopedAccessTokenFn));
               }
+              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
 
               return ImmutableList.copyOf(list);
             })
