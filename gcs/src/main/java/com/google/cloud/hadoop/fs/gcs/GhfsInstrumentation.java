@@ -524,6 +524,7 @@ public class GhfsInstrumentation
                   StreamStatisticNames.STREAM_READ_TOTAL_BYTES)
               .withDurationTracking(
                   GhfsStatistic.STREAM_READ_SEEK_OPERATIONS.getSymbol(),
+                  GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
                   GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS.getSymbol(),
                   GhfsStatistic.STREAM_READ_OPERATIONS.getSymbol())
               .build();

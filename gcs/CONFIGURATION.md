@@ -348,6 +348,28 @@ default service account impersonation.
     be no-op if called more frequently than minimum sync interval and `hsync()`
     will block until an end of a min sync interval.
 
+#### Vectored Read configuration
+
+Knobs configure the vectoredRead API
+
+* `fs.gs.vectored.read.min.range.seek.size` (default: `4k`)
+
+   If next range (in sorted rangeRequest list) is in within these many bytes, it
+   will be combined with exiting rangeRequest while fetching data from
+   underneath channel. Result will again be decoupled once data is fetched for
+   combined range request.
+
+* `fs.gs.vectored.read.merged.range.max.size` (default: `8m`)
+   It controls the length of content requested via merged/combined range request.
+   If by merging ranges resulted content is greater than this value, ranges will
+   not be merged. Do, consider increasing this value if task queue of range
+   request is overloaded.
+
+* `fs.gs.vectored.read.threads` (default: `16`)
+   It controls the parallel processing of range request. These threads will be
+   shared across all readVectored invocation. If the task queue of range request
+   is overloaded do consider increasing this value.
+
 ### HTTP transport configuration
 
 *   `fs.gs.application.name.suffix` (not set by default)
