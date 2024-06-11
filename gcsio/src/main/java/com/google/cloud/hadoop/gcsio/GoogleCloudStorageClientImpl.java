@@ -27,6 +27,7 @@ import com.google.auto.value.AutoBuilder;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Storage;
@@ -37,6 +38,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -114,11 +116,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    GoogleCloudStorageClientWriteChannel channel =
-        new GoogleCloudStorageClientWriteChannel(
-            storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
-    channel.initialize();
-    return channel;
+    return new GoogleCloudStorageClientWriteChannel(
+        storage, storageOptions, resourceIdWithGeneration, options);
   }
 
   @Override
@@ -173,6 +172,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    super.renameHnFolder(src, dst);
+  }
+
   /**
    * Gets the object generation for a write operation
    *
@@ -195,6 +198,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       checkState(generation != 0, "Generation should not be 0 for an existing item");
       return generation;
     }
+    GoogleCloudStorageEventBus.postOnException();
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 

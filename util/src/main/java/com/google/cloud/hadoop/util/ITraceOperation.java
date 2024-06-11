@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,11 @@
 
 package com.google.cloud.hadoop.util;
 
-/** Translates exceptions from API calls into ErrorType */
-public interface ErrorTypeExtractor {
+public interface ITraceOperation extends AutoCloseable {
+  @Override
+  void close();
 
-  enum ErrorType {
-    NOT_FOUND,
-    OUT_OF_RANGE,
-    FAILED_PRECONDITION,
-    UNKNOWN
-  }
+  ThreadTrace getTrace();
 
-  ErrorType getErrorType(Exception exception);
+  void annotate(String resultSize, int size);
 }

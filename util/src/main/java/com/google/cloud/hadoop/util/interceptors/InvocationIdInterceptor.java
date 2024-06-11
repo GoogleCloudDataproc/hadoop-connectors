@@ -19,6 +19,9 @@ package com.google.cloud.hadoop.util.interceptors;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.ThreadTrace;
+import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.UUID;
@@ -66,7 +69,13 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
       } else {
         newValue = invocationEntry;
       }
+      GoogleCloudStorageEventBus.postOnHttpRequest(request);
       headers.set(GOOG_API_CLIENT, newValue);
+
+      ThreadTrace tt = TraceOperation.current();
+      if (tt != null) {
+        tt.annotate("invocationId", newValue);
+      }
     }
   }
 

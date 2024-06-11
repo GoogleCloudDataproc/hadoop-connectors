@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
@@ -126,6 +127,12 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public void deleteFolders(List<FolderInfo> folders) throws IOException {
+    logger.atFiner().log("%s.deleteFolders(%s)", delegateClassName, folders);
+    delegate.deleteFolders(folders);
+  }
+
+  @Override
   public void copy(
       String srcBucketName,
       List<String> srcObjectNames,
@@ -146,9 +153,19 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public boolean isHnBucket(URI src) throws IOException {
+    return delegate.isHnBucket(src);
+  }
+
+  @Override
   public List<String> listBucketNames() throws IOException {
     logger.atFiner().log("%s.listBucketNames()", delegateClassName);
     return delegate.listBucketNames();
+  }
+
+  @Override
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    delegate.renameHnFolder(src, dst);
   }
 
   @Override
@@ -175,6 +192,17 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
         "%s.listObjectInfoPage(%s, %s, %s, %s)",
         delegateClassName, bucketName, objectNamePrefix, listOptions, pageToken);
     return delegate.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
+  }
+
+  @Override
+  public ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String folderNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
+      throws IOException {
+    return delegate.listFolderInfoForPrefixPage(
+        bucketName, folderNamePrefix, listFolderOptions, pageToken);
   }
 
   @Override

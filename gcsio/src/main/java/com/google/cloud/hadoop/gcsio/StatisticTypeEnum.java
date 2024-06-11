@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.util;
+package com.google.cloud.hadoop.gcsio;
 
-/** Translates exceptions from API calls into ErrorType */
-public interface ErrorTypeExtractor {
+/** Enum of statistic types. */
+public enum StatisticTypeEnum {
 
-  enum ErrorType {
-    NOT_FOUND,
-    OUT_OF_RANGE,
-    FAILED_PRECONDITION,
-    UNKNOWN
-  }
+  /** Counter. Counts the number of occurrences of each operation */
+  TYPE_COUNTER,
 
-  ErrorType getErrorType(Exception exception);
+  /** Duration. Duration for the execution of opertaion */
+  TYPE_DURATION,
+
+  /** Gauge. */
+  TYPE_GAUGE
 }

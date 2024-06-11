@@ -18,7 +18,9 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.api.services.storage.model.Folder;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
@@ -211,6 +213,15 @@ public interface GoogleCloudStorage {
   void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException;
 
   /**
+   * Deletes the given folder resources. Does not throw any exception for "folders not found"
+   * errors.
+   *
+   * @param folders names of folder resources to delete
+   * @throws IOException if folder exists but cannot be deleted
+   */
+  void deleteFolders(List<FolderInfo> folders) throws IOException;
+
+  /**
    * Copies metadata of the given objects. After the copy is successfully complete, each object blob
    * is reachable by two different names. Copying between two different locations or between two
    * different storage classes is not allowed.
@@ -270,8 +281,28 @@ public interface GoogleCloudStorage {
     copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
   }
 
+  /**
+   * Checks if {@code resourceId} belongs to a Hierarchical namespace enabled bucket. This takes a
+   * path and not the bucket name since the caller may not have permission to query the bucket.
+   *
+   * @param path Path for which the check need to be performed
+   * @return
+   * @throws IOException
+   */
+  boolean isHnBucket(URI path) throws IOException;
+
   /** Gets a list of names of buckets in this project. */
   List<String> listBucketNames() throws IOException;
+
+  /**
+   * Renames {@code src} to {@code dst} using the rename LRO API. This should be called only on an
+   * Hierarchical namespace enabled bucket.
+   *
+   * @param src source path
+   * @param dst destination path
+   * @throws IOException
+   */
+  void renameHnFolder(URI src, URI dst) throws IOException;
 
   /**
    * Gets a list of GoogleCloudStorageItemInfo for all buckets of this project. This is no more
@@ -366,6 +397,23 @@ public interface GoogleCloudStorage {
    */
   ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
+      throws IOException;
+
+  /**
+   * Returns the list of folder resources. Applicable only for HN enabled bucket
+   *
+   * @param bucketName bucket name
+   * @param folderNamePrefix folder resource name prefix
+   * @param listFolderOptions options to use when listing folder resources
+   * @param pageToken the page token
+   * @return {@link ListPage} folder resources with listed {@link Folder}s
+   * @throws IOException on IO error
+   */
+  ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String folderNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
       throws IOException;
 
   /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2023 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,8 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.fs.gcs;
+package com.google.cloud.hadoop.util;
 
-/** Enum of statistic types. */
-public enum GhfsStatisticTypeEnum {
-
-  /** Counter. Counts the number of occurrences of each operation */
-  TYPE_COUNTER,
-
-  /** Duration. Duration for the execution of opertaion */
-  TYPE_DURATION,
-
-  /** Gauge. */
-  TYPE_GAUGE
+public interface ITraceFactory {
+  ITraceOperation createRootWithLogging(String name, Object context);
 }

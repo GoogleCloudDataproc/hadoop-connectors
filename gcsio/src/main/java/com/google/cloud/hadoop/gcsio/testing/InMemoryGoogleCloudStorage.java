@@ -23,6 +23,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.FolderInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -30,12 +31,14 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
+import com.google.cloud.hadoop.gcsio.ListFolderOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -319,6 +322,11 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public void deleteFolders(List<FolderInfo> folders) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
   public synchronized void copy(
       String srcBucketName,
       List<String> srcObjectNames,
@@ -405,6 +413,16 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String objectNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
+      throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
@@ -430,6 +448,15 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       }
     }
     return listedInfo;
+  }
+
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
+  public boolean isHnBucket(URI src) throws IOException {
+    return false;
   }
 
   @Override

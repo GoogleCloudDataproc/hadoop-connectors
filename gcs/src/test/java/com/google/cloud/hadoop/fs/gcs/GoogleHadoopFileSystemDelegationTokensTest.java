@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -132,6 +133,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
   @Test
   public void testDelegationTokenStatistics() throws IOException {
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    StorageStatistics stats = TestUtils.getStorageStatistics();
     fs.initialize(new Path("gs://test/").toUri(), loadConfig());
 
     Token<?> dt = fs.getDelegationToken("current-user");
@@ -140,6 +142,9 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
         .isEqualTo(1);
     assertThat(fs.getIOStatistics().counters().get(DELEGATION_TOKENS_ISSUED.getSymbol()))
         .isEqualTo(1);
+
+    TestUtils.verifyCounter(
+        (GhfsGlobalStorageStatistics) stats, INVOCATION_GET_DELEGATION_TOKEN, 1);
     fs.close();
   }
 
