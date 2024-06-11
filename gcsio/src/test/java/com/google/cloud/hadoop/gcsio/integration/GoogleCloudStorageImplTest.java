@@ -25,6 +25,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.auth.Credentials;
@@ -43,9 +44,17 @@ import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
+import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
+import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.BucketInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
@@ -71,6 +80,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private TestBucketHelper bucketHelper;
   private String testBucket;
 
@@ -202,6 +212,51 @@ public class GoogleCloudStorageImplTest {
 
     assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings().size()).isEqualTo(0);
     trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void requesterPays_autoMode() throws Exception {
+    String requesterPaysBucket = getRequesterPayEnabledBucket();
+    // GCS client with will require
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setRequesterPaysOptions(
+                    RequesterPaysOptions.DEFAULT
+                        .toBuilder()
+                        .setMode(RequesterPaysMode.AUTO)
+                        .setProjectId(TestConfiguration.getInstance().getProjectId())
+                        .build())
+                .setTraceLogEnabled(true)
+                .build());
+    try {
+      int expectedSize = 5 * 1024 * 1024;
+      StorageResourceId resourceId =
+          new StorageResourceId(requesterPaysBucket, name.getMethodName());
+      writeObject(
+          trackingGcs.delegate,
+          resourceId,
+          /* partitionSize= */ expectedSize,
+          /* partitionsCount= */ 1);
+
+      assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+          .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
+      assertThat(trackingGcs.getAllRequestStrings())
+          .contains(testIamPermissionRequestString(requesterPaysBucket, "storage.buckets.get"));
+
+      trackingGcs.requestsTracker.reset();
+      // any other request will not result in call to testIamPermissions API
+      // Also every other request will have "userProject" filed
+      trackingGcs.delegate.getItemInfo(resourceId);
+      verifyUserProject(
+          trackingGcs.requestsTracker.getAllRawRequestStrings(),
+          TestConfiguration.getInstance().getProjectId());
+
+    } catch (Exception e) {
+      logger.atInfo().withCause(e).log("Error while writing data to bucket");
+      throw e;
+    }
   }
 
   @Test
@@ -684,6 +739,36 @@ public class GoogleCloudStorageImplTest {
         .build();
   }
 
+  private void verifyUserProject(List<String> rawRequestString, String projectId) {
+    String userProjectFiled = "userProject=" + projectId;
+    for (String reqString : rawRequestString) {
+      assertTrue(reqString.contains(userProjectFiled));
+    }
+  }
+
+  private String getRequesterPayEnabledBucket() throws Exception {
+    String rpEnabledBucket = bucketHelper.getUniqueBucketName("rp_enabled");
+    // Initalizing a storage client as gcsio abstraction don't offer a way to ingested
+    // "requesterPays" filed while creating bucket.
+    // Doesn't matter which client library was enabled it always uses java-storage client to create
+    // bucket
+    Storage storage =
+        StorageOptions.grpc()
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build()
+            .getService();
+
+    try {
+      Bucket bucket =
+          storage.create(BucketInfo.newBuilder(rpEnabledBucket).setRequesterPays(true).build());
+      return bucket.getName();
+    } catch (Exception e) {
+      throw new IOException("Exception while creating requesterPay enabled bucket", e);
+    } finally {
+      storage.close();
+    }
+  }
+
   private String resumableUploadRequestString(
       String bucketName, String objectName, Integer generationId, boolean replaceGenrationId) {
     if (this.testStorageClientImpl) {
@@ -692,6 +777,14 @@ public class GoogleCloudStorageImplTest {
     }
     return TrackingHttpRequestInitializer.resumableUploadRequestString(
         bucketName, objectName, generationId, replaceGenrationId);
+  }
+
+  private String testIamPermissionRequestString(String bucketName, String permissions) {
+    if (this.testStorageClientImpl) {
+      return TrackingGrpcRequestInterceptor.getTestIamPermissionRequestFormat();
+    }
+    return TrackingHttpRequestInitializer.getTestIamPermissionRequestFormat(
+        bucketName, permissions);
   }
 
   private ImmutableList<String> resumableUploadChunkRequestString(

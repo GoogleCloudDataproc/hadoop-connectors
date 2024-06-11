@@ -40,6 +40,8 @@ import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
@@ -118,6 +120,12 @@ public class GoogleCloudStorageTestHelper {
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
         .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
         .setGrpcWriteEnabled(true)
+        .setRequesterPaysOptions(
+            RequesterPaysOptions.DEFAULT
+                .toBuilder()
+                .setMode(RequesterPaysMode.ENABLED)
+                .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()))
+                .build())
         .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
   }
 
@@ -244,7 +252,8 @@ public class GoogleCloudStorageTestHelper {
   public static byte[] writeObject(
       GoogleCloudStorage gcs, StorageResourceId resourceId, int partitionSize, int partitionsCount)
       throws IOException {
-    return writeObject(gcs.create(resourceId), partitionSize, partitionsCount);
+    WritableByteChannel channel = gcs.create(resourceId);
+    return writeObject(channel, partitionSize, partitionsCount);
   }
 
   public static byte[] writeObject(
@@ -365,11 +374,8 @@ public class GoogleCloudStorageTestHelper {
           "Cleaning up GCS buckets that start with %s prefix or leaked", uniqueBucketPrefix);
 
       List<String> bucketsToDelete = new ArrayList<>();
-      for (GoogleCloudStorageItemInfo bucketInfo : storage.listBucketInfo()) {
-        String bucketName = bucketInfo.getBucketName();
-        if (bucketName.startsWith(bucketPrefix)
-            && (bucketName.startsWith(uniqueBucketPrefix)
-                || bucketInfo.getCreationTime() < LEAKED_BUCKETS_CUTOFF_TIME)) {
+      for (String bucketName : storage.listBucketNames()) {
+        if (bucketName.startsWith(bucketPrefix) && (bucketName.startsWith(uniqueBucketPrefix))) {
           bucketsToDelete.add(bucketName);
         }
       }

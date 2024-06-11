@@ -45,8 +45,12 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
   private static final DateTimeFormatter dtf =
       DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS");
+  public static final String USER_PROJECT_HEADER = "x-goog-user-project";
+  private static final String DEFAULT_INVOCATION_ID = "NOT-FOUND";
   private static final Metadata.Key<String> idempotencyKey =
       Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
+  private static final Metadata.Key<String> userProjectKey =
+      Metadata.Key.of(USER_PROJECT_HEADER, Metadata.ASCII_STRING_MARSHALLER);
 
   @NonNull
   static String fmtProto(@NonNull Object obj) {
@@ -218,9 +222,17 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       return headers.get(idempotencyKey);
     }
 
+    protected String getRequesterPaysProject() {
+      String value = headers.get(userProjectKey);
+      return value == null ? DEFAULT_INVOCATION_ID : value;
+    }
+
     private ImmutableMap.Builder<String, Object> getStreamContext() {
       return new ImmutableMap.Builder<String, Object>()
           .put(GoogleCloudStorageTracingFields.RPC_METHOD.name, rpcMethod)
+          .put(
+              GoogleCloudStorageTracingFields.REQUESTER_PAYS_PROJECT.name,
+              getRequesterPaysProject())
           .put(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name, getInvocationId());
     }
 

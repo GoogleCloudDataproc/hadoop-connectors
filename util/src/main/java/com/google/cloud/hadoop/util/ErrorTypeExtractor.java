@@ -23,8 +23,11 @@ public interface ErrorTypeExtractor {
     NOT_FOUND,
     OUT_OF_RANGE,
     FAILED_PRECONDITION,
+    INVALID_ARGUMENT,
     UNKNOWN
   }
 
   ErrorType getErrorType(Exception exception);
+
+  boolean userProjectMissing(Exception exception);
 }

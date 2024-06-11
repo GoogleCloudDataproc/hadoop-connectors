@@ -135,7 +135,7 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
     protected String messageToString(MessageLite message) {
       StartResumableWriteRequest request = (StartResumableWriteRequest) message;
       return String.format(
-          "%s;%s", super.messageToString(message), resumableUploadRequestToString(request));
+          "%s;%s;%s", super.messageToString(message), resumableUploadRequestToString(request));
     }
   }
 
@@ -225,6 +225,10 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
             object,
             generationId);
     return requestString(requestPrefixString, requestString);
+  }
+
+  public static String getTestIamPermissionRequestFormat() {
+    return String.format(REQUEST_PREFIX_FORMAT, "testIamPermissions");
   }
 
   public static String resumableUploadChunkRequestString(
