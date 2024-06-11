@@ -38,6 +38,7 @@ import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -51,8 +52,10 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -68,6 +71,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Provides FS semantics over GCS based on Objects API */
@@ -326,6 +330,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
     }
 
+    boolean isHnBucket =
+        (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
+    List<FolderInfo> listOfFolders = new LinkedList<>();
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
     if (fileInfo.isDirectory()) {
@@ -337,6 +344,32 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               : listFileInfoForPrefixPage(
                       fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
                   .getItems();
+
+      /*TODO : making listing of folder and object resources in parallel*/
+      if (isHnBucket) {
+        /**
+         * Get list of folders if the bucket is HN enabled bucket For recursive delete, get all
+         * folder resources. For non-recursive delete, delete the folder directly if it is a
+         * directory and do not do anything if the path points to a bucket.
+         */
+        String bucketName = getBucketName(path);
+        String folderName = getFolderName(path);
+        listOfFolders =
+            recursive
+                ? listFoldersInfoForPrefixPage(
+                        fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
+                    .getItems()
+                // will not delete for a bucket
+                : (folderName.equals("")
+                    ? new LinkedList<>()
+                    : Arrays.asList(
+                        new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName))));
+
+        logger.atFiner().log(
+            "Encountered HN enabled bucket with %s number of folder in path : %s",
+            listOfFolders.size(), path);
+      }
+
       if (!itemsToDelete.isEmpty() && !recursive) {
         GoogleCloudStorageEventBus.postOnException();
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
@@ -348,21 +381,92 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     List<FileInfo> bucketsToDelete = new ArrayList<>();
     (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
 
-    deleteInternal(itemsToDelete, bucketsToDelete);
+    deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
     repairImplicitDirectory(parentInfoFuture);
   }
 
+  /**
+   * Return the bucket name if exists
+   *
+   * @param path
+   * @return bucket name
+   */
+  private String getBucketName(@Nonnull URI path) {
+    checkState(
+        !Strings.isNullOrEmpty(path.getAuthority()), "Bucket name cannot be null : %s", path);
+    return path.getAuthority();
+  }
+
+  /**
+   * Returns the folder name if exists else return empty string.
+   *
+   * @param path
+   * @return folder path
+   */
+  private String getFolderName(@Nonnull URI path) {
+    checkState(
+        path.getPath().startsWith(PATH_DELIMITER), "Invalid folder name: %s", path.getPath());
+    return path.getPath().substring(1);
+  }
+
+  /**
+   * Returns the list of folder resources in the prefix. It lists all the folder resources
+   *
+   * @param prefix the prefix to use to list all matching folder resources.
+   * @param pageToken the page token to list
+   * @param listFolderOptions the page token to list
+   */
+  public ListPage<FolderInfo> listFoldersInfoForPrefixPage(
+      URI prefix, ListFolderOptions listFolderOptions, String pageToken) throws IOException {
+    logger.atFiner().log(
+        "listFoldersInfoForPrefixPage(prefix: %s, pageToken:%s)", prefix, pageToken);
+    StorageResourceId prefixId = getPrefixId(prefix);
+    return gcs.listFolderInfoForPrefixPage(
+        prefixId.getBucketName(), prefixId.getObjectName(), listFolderOptions, pageToken);
+  }
+
+  /**
+   * Deletes the given folder resources
+   *
+   * @param listOfFolders to delete
+   * @throws IOException
+   */
+  private void deleteFolders(@Nonnull List<FolderInfo> listOfFolders) throws IOException {
+    if (listOfFolders.isEmpty()) return;
+    logger.atFiner().log(
+        "deleteFolder(listOfFolders: %s, size:%s)", listOfFolders, listOfFolders.size());
+    gcs.deleteFolders(listOfFolders);
+  }
+
+  /** Deletes all objects in the given path list followed by all bucket items. */
+
   /** Deletes all items in the given path list followed by all bucket items. */
   private void deleteInternal(List<FileInfo> itemsToDelete, List<FileInfo> bucketsToDelete)
       throws IOException {
+
+    deleteObjects(itemsToDelete);
+    deleteBucket(bucketsToDelete);
+  }
+
+  /** Deleted all objects, folders and buckets in the order mentioned */
+  private void deleteInternalWithFolders(
+      List<FileInfo> itemsToDelete, List<FolderInfo> listOfFolders, List<FileInfo> bucketsToDelete)
+      throws IOException {
+    deleteObjects(itemsToDelete);
+    deleteFolders(listOfFolders);
+    deleteBucket(bucketsToDelete);
+  }
+
+  /** Helper function to delete objects */
+  private void deleteObjects(List<FileInfo> itemsToDelete) throws IOException {
     // TODO(user): We might need to separate out children into separate batches from parents to
     // avoid deleting a parent before somehow failing to delete a child.
 
     // Delete children before their parents.
     //
     // Note: we modify the input list, which is ok for current usage.
-    // We should make a copy in case that changes in the future.
+    // We should make a copy in case that changes in future.
     itemsToDelete.sort(FILE_INFO_PATH_COMPARATOR.reversed());
 
     if (!itemsToDelete.isEmpty()) {
@@ -379,7 +483,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
       gcs.deleteObjects(objectsToDelete);
     }
+  }
 
+  /** Helper function to delete buckets */
+  private void deleteBucket(List<FileInfo> bucketsToDelete) throws IOException {
     if (!bucketsToDelete.isEmpty()) {
       List<String> bucketNames = new ArrayList<>(bucketsToDelete.size());
       for (FileInfo bucketInfo : bucketsToDelete) {

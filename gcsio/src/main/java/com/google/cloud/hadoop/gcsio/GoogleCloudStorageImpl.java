@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.FolderInfo.BUCKET_PREFIX;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
@@ -67,6 +68,7 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -78,6 +80,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.storage.control.v2.*;
+import com.google.storage.control.v2.StorageControlClient.ListFoldersPagedResponse;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -90,7 +93,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -777,6 +782,30 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         GoogleCloudStorageEventBus.postOnException();
         throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
       }
+    }
+  }
+
+  /** See {@link GoogleCloudStorage#deleteFolders(List)} for details about expected behavior. */
+  @Override
+  public void deleteFolders(List<FolderInfo> folders) throws IOException {
+    String traceContext = String.format("batchFolderDelete(size=%s)", folders.size());
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(folders, storageOptions, lazyGetStorageControlClient());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      deleteFolderOperation.performDeleteOperation();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          String.format(
+              "Recieved thread interruption exception while deletion of folder resource : %s",
+              e.getMessage()),
+          e);
+    }
+
+    if (!deleteFolderOperation.encounteredNoExceptions()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw GoogleCloudStorageExceptions.createCompositeException(
+          deleteFolderOperation.getAllExceptions());
     }
   }
 
@@ -1569,6 +1598,80 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         getGoogleCloudStorageItemInfos(
             bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
     return new ListPage<>(objectInfos, nextPageToken);
+  }
+
+  /**
+   * @see GoogleCloudStorage#listFolderInfoForPrefixPage(String, String, ListFolderOptions, String)
+   */
+  @Override
+  public ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String objectNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
+      throws IOException {
+    logger.atFiner().log(
+        "listFolderInfoForPrefixPage(%s, %s, %s, %s)",
+        bucketName, objectNamePrefix, listFolderOptions, pageToken);
+
+    ListFoldersRequest.Builder listFoldersRequest =
+        createFolderListRequest(bucketName, objectNamePrefix, listFolderOptions, pageToken);
+
+    if (!isNullOrEmpty(pageToken)) {
+      logger.atFiner().log("listFolderInfoForPrefixPage: next page %s", pageToken);
+      listFoldersRequest.setPageToken(pageToken);
+    }
+
+    List<FolderInfo> listedFolders = new LinkedList<>();
+    String nextPageToken =
+        listStorageFoldersAndPrefixesPage(listFoldersRequest.build(), listedFolders);
+    while (!isNullOrEmpty(nextPageToken)) {
+      nextPageToken =
+          listStorageFoldersAndPrefixesPage(
+              listFoldersRequest.setPageToken(nextPageToken).build(), listedFolders);
+    }
+
+    return new ListPage<>(listedFolders, nextPageToken);
+  }
+
+  private ListFoldersRequest.Builder createFolderListRequest(
+      String bucketName,
+      String objectNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken) {
+    logger.atFiner().log(
+        "createListFolderRequest(%s, %s, %s, %s)",
+        bucketName, objectNamePrefix, listFolderOptions, pageToken);
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+
+    ListFoldersRequest.Builder request =
+        ListFoldersRequest.newBuilder()
+            .setPageSize(listFolderOptions.getPageSize())
+            .setParent(BUCKET_PREFIX + bucketName);
+
+    if (!Strings.isNullOrEmpty(objectNamePrefix)) {
+      request.setPrefix(objectNamePrefix);
+    }
+    return request;
+  }
+
+  private String listStorageFoldersAndPrefixesPage(
+      ListFoldersRequest listFoldersRequest, List<FolderInfo> listedFolder) throws IOException {
+    checkNotNull(listedFolder, "Must provide a non-null container for listedFolder.");
+
+    ListFoldersPagedResponse listFolderRespose =
+        storageControlClient.listFolders(listFoldersRequest);
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.list")) {
+      Iterator<Folder> itemsIterator = listFolderRespose.getPage().getValues().iterator();
+      while (itemsIterator.hasNext()) {
+        listedFolder.add(new FolderInfo(itemsIterator.next()));
+      }
+      op.annotate("resultSize", itemsIterator == null ? 0 : listedFolder.size());
+    }
+
+    logger.atFiner().log(
+        "listFolders(%s): listed %d objects", listFoldersRequest, listedFolder.size());
+    return listFolderRespose.getNextPageToken();
   }
 
   private List<GoogleCloudStorageItemInfo> getGoogleCloudStorageItemInfos(
