@@ -76,18 +76,17 @@ public class DeleteFolderOperationTest {
 
   private void addFolders(List<FolderInfo> foldersToDelete, String curFolderName) {
     Random r = new Random();
-    String abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     Queue<String> q = new ArrayDeque<>();
     q.add(curFolderName);
 
     while (!q.isEmpty()) {
       String top = q.poll();
       foldersToDelete.add(new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, top)));
-      if (foldersToDelete.size() > 30) return;
+      if (foldersToDelete.size() > 2000) return;
 
       for (int i = 0; i < 3; i++) {
-        char letter = abc.charAt(r.nextInt(abc.length()));
-        q.add(top + letter + "/");
+        long nextFolderName = r.nextInt(100000);
+        q.add(top + nextFolderName + "/");
       }
     }
   }
