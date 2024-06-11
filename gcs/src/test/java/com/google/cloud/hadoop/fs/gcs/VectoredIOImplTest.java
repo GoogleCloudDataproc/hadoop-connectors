@@ -137,7 +137,7 @@ public class VectoredIOImplTest {
     verifyGcsFsOpenCalls(/* callCount */ 2);
     assertThat(
             ghfsStorageStatistics
-                .getLong(GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.name())
+                .getLong(GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES.name())
                 .longValue())
         .isEqualTo(0);
     assertThat(ghfsStorageStatistics.getLong(GhfsStatistic.STREAM_READ_BYTES.getSymbol()))
@@ -171,7 +171,7 @@ public class VectoredIOImplTest {
     verifyGcsFsOpenCalls(/* callCount */ 1);
     assertThat(
             ghfsStorageStatistics.getLong(
-                GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.getSymbol()))
+                GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES.getSymbol()))
         .isEqualTo(discardedBytes);
 
     assertThat(ghfsStorageStatistics.getLong(GhfsStatistic.STREAM_READ_BYTES.getSymbol()))
@@ -308,7 +308,7 @@ public class VectoredIOImplTest {
 
     assertThat(
             ghfsStorageStatistics
-                .getLong(GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.name())
+                .getLong(GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES.name())
                 .longValue())
         .isEqualTo(0);
   }
@@ -363,7 +363,7 @@ public class VectoredIOImplTest {
     verifyRangeException(Arrays.asList(overFlowRange));
     assertThat(
             ghfsStorageStatistics.getLong(
-                GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED.getSymbol()))
+                GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES.getSymbol()))
         .isEqualTo(discardedBytes);
 
     assertThat(ghfsStorageStatistics.getLong(GhfsStatistic.STREAM_READ_BYTES.getSymbol()))

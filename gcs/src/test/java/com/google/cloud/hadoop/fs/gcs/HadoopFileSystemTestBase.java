@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTE
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
@@ -914,6 +915,33 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   @Test
+  public void testInputStreamReadVectoredIOStatistics() throws Exception {
+
+    // Write an object.
+    URI path = getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1024, /* overwrite= */ false);
+
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+
+      List<FileRange> fileRanges = new ArrayList<>();
+      fileRanges.add(FileRange.createFileRange(0, 10));
+      readStream.readVectored(fileRanges, ByteBuffer::allocate);
+      validateVectoredReadResult(fileRanges, hadoopPath);
+
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_VECTORED_OPERATIONS.getSymbol()))
+          .isEqualTo(1);
+    } finally {
+      ghfs.delete(hadoopPath);
+    }
+  }
+
+  @Test
   public void testInputStreamSeekIOStatistics() throws IOException {
 
     // Write an object.
@@ -1006,6 +1034,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     }
 
     ghfsHelper.writeFile(hadoopPath, testBytes, 1, /* overwrite= */ false);
+
     List<FileRange> fileRanges = new ArrayList<>();
     fileRanges.add(FileRange.createFileRange(8 * 1024, 100));
     fileRanges.add(FileRange.createFileRange(14 * 1024, 100));

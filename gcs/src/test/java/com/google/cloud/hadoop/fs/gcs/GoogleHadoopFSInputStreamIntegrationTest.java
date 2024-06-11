@@ -25,6 +25,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTE
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.assertByteBuffers;
 import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
@@ -99,11 +100,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    VectoredIOImpl vectoredIO =
-        new VectoredIOImpl(
-            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics)) {
+    try (GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics)) {
       assertThat(in.read(value, 0, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(1);
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
@@ -131,10 +128,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     String testContent = "verify vectored read ranges are getting"; // length = 40
     gcsFsIHelper.writeTextFile(path, testContent);
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    VectoredIOImpl vectoredIO =
-        new VectoredIOImpl(vectoredReadOptions, ghfs.getGlobalGcsStorageStatistics(), statistics);
-    GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
 
     List<FileRange> fileRanges = new ArrayList<>();
     // below two ranges will be merged
@@ -161,11 +155,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     String testContent = "verify vectored read ranges are getting"; // length = 40
     gcsFsIHelper.writeTextFile(path, testContent);
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    VectoredIOImpl vectoredIO =
-        new VectoredIOImpl(
-            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
-    GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
 
     List<FileRange> fileRanges = new ArrayList<>();
     // range inside file size
@@ -223,11 +213,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     gcsFsIHelper.writeTextFile(path, testContent);
 
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    VectoredIOImpl vectoredIO =
-        new VectoredIOImpl(
-            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
-    GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
     in.close();
     assertThrows(IOException.class, in::read);
   }
@@ -326,12 +312,41 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS.getSymbol(), 2);
   }
 
+  @Test
+  public void readVectoredMetricsTest() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_mergedRange");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+    GhfsGlobalStorageStatistics stats = TestUtils.getStorageStatistics();
+
+    // overriding the default values with lower limit to test out on smaller content size.
+    VectoredReadOptions vectoredReadOptions =
+        VectoredReadOptions.DEFAULT.toBuilder()
+            .setMinSeekVectoredReadSize(2)
+            .setMergeRangeMaxSize(10)
+            .build();
+
+    String testContent = "verify vectored read ranges are getting"; // length = 40
+    gcsFsIHelper.writeTextFile(path, testContent);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(0, 5));
+
+    try (GoogleHadoopFSInputStream ignore = in) {
+      in.readVectored(fileRanges, ByteBuffer::allocate);
+      validateVectoredReadResult(fileRanges, path);
+    }
+    TestUtils.verifyCounter(stats, STREAM_READ_VECTORED_OPERATIONS, 1);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
+  }
+
   private static GoogleHadoopFSInputStream createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    VectoredIOImpl vectoredIO =
-        new VectoredIOImpl(
-            VectoredReadOptions.DEFAULT, ghfs.getGlobalGcsStorageStatistics(), statistics);
-    return GoogleHadoopFSInputStream.create(ghfs, path, vectoredIO, statistics);
+    return GoogleHadoopFSInputStream.create(ghfs, path, statistics);
   }
 }

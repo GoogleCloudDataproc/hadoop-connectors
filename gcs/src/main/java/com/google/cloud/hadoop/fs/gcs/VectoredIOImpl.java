@@ -220,7 +220,7 @@ public class VectoredIOImpl implements Closeable {
         currentPosition = child.getOffset() + child.getLength();
 
         storageStatistics.incrementCounter(
-            GhfsStatistic.STREAM_READ_VECTORED_READ_BYTES_DISCARDED, discardedBytes);
+            GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES, discardedBytes);
 
         if (numRead >= totalBytesRead) {
           ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);

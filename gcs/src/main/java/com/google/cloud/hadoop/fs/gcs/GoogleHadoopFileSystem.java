@@ -210,14 +210,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   /** Underlying GCS file system object. */
   private Supplier<GoogleCloudStorageFileSystem> gcsFsSupplier;
 
+  private Supplier<VectoredIOImpl> vectoredIOSupplier;
+
   private boolean gcsFsInitialized = false;
+  private boolean vectoredIOInitialized = false;
   /**
    * Current working directory; overridden in initialize() if {@link
    * GoogleHadoopFileSystemConfiguration#GCS_WORKING_DIRECTORY} is set.
    */
   private Path workingDirectory;
 
-  private VectoredIOImpl vectoredIO;
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
@@ -297,11 +299,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 GhfsStorageStatistics.NAME,
                 () -> new GhfsStorageStatistics(instrumentation.getIOStatistics()));
 
-    vectoredIO =
-        new VectoredIOImpl(
-            GoogleHadoopFileSystemConfiguration.getVectoredReadOptionBuilder(config).build(),
-            globalStorageStatistics,
-            statistics);
+    initializeVectoredIO(config, globalStorageStatistics, statistics);
 
     initializeGcsFs(config);
 
@@ -371,6 +369,31 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       } else {
         initializeGcsFs(createGcsFs(config));
       }
+    }
+  }
+
+  private synchronized void initializeVectoredIO(
+      Configuration config,
+      GhfsGlobalStorageStatistics globalStorageStatistics,
+      FileSystem.Statistics statistics)
+      throws IOException {
+    if (vectoredIOSupplier == null) {
+      vectoredIOSupplier =
+          Suppliers.memoize(
+              () -> {
+                try {
+                  VectoredIOImpl vectoredIO =
+                      new VectoredIOImpl(
+                          GoogleHadoopFileSystemConfiguration.getVectoredReadOptionBuilder(config)
+                              .build(),
+                          globalStorageStatistics,
+                          statistics);
+                  vectoredIOInitialized = true;
+                  return vectoredIO;
+                } catch (Exception e) {
+                  throw new RuntimeException("Failure initializing vectoredIO", e);
+                }
+              });
     }
   }
 
@@ -555,8 +578,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           logger.atFiner().log(
               "open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
           URI gcsPath = getGcsPath(hadoopPath);
-          return new FSDataInputStream(
-              GoogleHadoopFSInputStream.create(this, gcsPath, vectoredIO, statistics));
+          return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
         });
   }
 
@@ -1222,7 +1244,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 result,
                 () ->
                     new FSDataInputStream(
-                        GoogleHadoopFSInputStream.create(this, fileInfo, vectoredIO, statistics))));
+                        GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
     return result;
   }
 
@@ -1563,6 +1585,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return gcsFsSupplier.get();
   }
 
+  public Supplier<VectoredIOImpl> getVectoredIOSupplier() {
+    return vectoredIOSupplier;
+  }
+
   /**
    * Loads an {@link AccessTokenProvider} implementation retrieved from the provided {@code
    * AbstractDelegationTokenBinding} if configured, otherwise it's null.
@@ -1654,14 +1680,17 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       }
     }
 
-    if (vectoredIO != null) {
-      try {
-        vectoredIO.close();
-      } catch (Exception e) {
-        logger.atWarning().withCause(e).log(
-            "Failed to close the underneath vectoredIO implementation");
-      } finally {
-        vectoredIO = null;
+    if (vectoredIOSupplier != null) {
+      if (vectoredIOInitialized) {
+        try {
+          vectoredIOSupplier.get().close();
+        } catch (Exception e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to close the underneath vectoredIO implementation");
+        } finally {
+          vectoredIOSupplier = null;
+          vectoredIOInitialized = false;
+        }
       }
     }
 

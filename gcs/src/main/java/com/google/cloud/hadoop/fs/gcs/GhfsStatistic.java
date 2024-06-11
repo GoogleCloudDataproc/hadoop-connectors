@@ -109,12 +109,12 @@ public enum GhfsStatistic {
   STREAM_READ_OPERATIONS(
       StreamStatisticNames.STREAM_READ_OPERATIONS, "Calls of read()", TYPE_DURATION),
 
-  STREAM_RAED_VECTORED_OPERATIONS(
+  STREAM_READ_VECTORED_OPERATIONS(
       StreamStatisticNames.STREAM_READ_VECTORED_OPERATIONS,
       "Calls of readVectored()",
       TYPE_DURATION),
 
-  STREAM_READ_VECTORED_READ_BYTES_DISCARDED(
+  STREAM_READ_VECTORED_EXTRA_READ_BYTES(
       StreamStatisticNames.STREAM_READ_VECTORED_READ_BYTES_DISCARDED,
       "Discarded read bytes during readVectored operation",
       TYPE_COUNTER),

@@ -366,9 +366,9 @@ Knobs configure the vectoredRead API
    request is overloaded.
 
 * `fs.gs.vectored.read.threads` (default: `16`)
-   It controls the parallel processing of range request. Number of thread
-   configured here will be shared across FileSystem object. If the task queue of
-   range request is overloaded do consider increasing this value.
+   It controls the parallel processing of range request. These threads will be
+   shared across all readVectored invocation. If the task queue of range request
+   is overloaded do consider increasing this value.
 
 ### HTTP transport configuration
 
