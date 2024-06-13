@@ -1,6 +1,10 @@
 # Release Notes
 
 ## Next
+1.  Add readVectored API implementation.
+
+
+## 3.0.0 - 2023-12-03
 
 1.  Remove Hadoop 2.x support.
 
