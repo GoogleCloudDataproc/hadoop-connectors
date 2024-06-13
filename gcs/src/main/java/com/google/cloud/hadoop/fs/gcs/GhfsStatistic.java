@@ -32,9 +32,8 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 /**
  * Statistics which are collected in GCS Connetor layer. Exception as HTTP Statistics.
  *
- * Counter and duration statistics are published in {@link
- * GoogleHadoopFileSystem} and as metrics in {@link GhfsInstrumentation} & {@link GhfsStorageStatistics}.
- *
+ * <p>Counter and duration statistics are published in {@link GoogleHadoopFileSystem} and as metrics
+ * in {@link GhfsInstrumentation} & {@link GhfsStorageStatistics}.
  *
  * <p>Where possible, stream names come from {@link StreamStatisticNames} and {@link
  * StoreStatisticNames}
