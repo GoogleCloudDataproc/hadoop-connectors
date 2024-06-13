@@ -16,9 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
@@ -352,18 +349,6 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   void streamWriteBytes(int bytesWritten) {
     incrementCounter(GhfsStatistic.STREAM_WRITE_BYTES, bytesWritten);
-  }
-
-  void filesCreated() {
-    increment(FILES_CREATED);
-  }
-
-  public void fileDeleted(int count) {
-    incrementCounter(FILES_DELETED, count);
-  }
-
-  public void directoryCreated() {
-    incrementCounter(DIRECTORIES_CREATED, 1);
   }
 
   private class LongIterator implements Iterator<LongStatistic> {
