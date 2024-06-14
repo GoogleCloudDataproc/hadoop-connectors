@@ -1575,7 +1575,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         return null;
       }
       GoogleCloudStorageEventBus.postOnException();
-      throw new IOException("Error listing " + resource, e);
+      throw new IOException(
+          String.format("Error listing %s. reason=%s", resource, e.getMessage()), e);
     }
 
     // Add prefixes (if any).
@@ -2331,7 +2332,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         return null;
       }
       GoogleCloudStorageEventBus.postOnException();
-      throw new IOException("Error accessing " + resourceId, e);
+      throw new IOException(
+          String.format("Error accessing %s. reason=%s", resourceId, e.getMessage()), e);
     }
   }
 

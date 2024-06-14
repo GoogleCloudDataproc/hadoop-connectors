@@ -57,7 +57,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
   /** {@value} The key that stores all the registered metrics */
   public static final String NAME = "GhfsStorageStatistics";
 
-  public static final int LATENCY_LOGGING_THRESHOLD_MS = 150;
+  public static final int LATENCY_LOGGING_THRESHOLD_MS = 500;
 
   // Instance to be used if it encounters any error while registering to Global Statistics.
   // Error can happen for e.g. when different class loaders are used.
