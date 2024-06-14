@@ -78,6 +78,7 @@ class DeleteFolderOperation {
 
   /** Helper function that performs the deletion process for folder resources */
   public void performDeleteOperation() throws InterruptedException {
+
     int folderSize = folders.size();
     computeChildrenForFolderResource();
 
@@ -92,17 +93,6 @@ class DeleteFolderOperation {
     batchExecutorShutdown();
   }
 
-  /** Shutting down batch executor and flushing any remaining requests */
-  private void batchExecutorShutdown() {
-    try {
-      batchExecutor.shutdown();
-    } catch (IOException e) {
-      addException(
-          new IOException(
-              String.format("Error in shutting down batch executor : %s", e.getMessage())));
-    }
-  }
-
   public boolean encounteredNoExceptions() {
     return allExceptions.isEmpty();
   }
@@ -111,50 +101,25 @@ class DeleteFolderOperation {
     return allExceptions;
   }
 
-  /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
-    try {
-      return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
-    } catch (InterruptedException e) {
-      logger.atSevere().log(
-          "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
-      throw e;
-    }
-  }
-
   /** Adding to batch executor's queue */
-  public void addToToBatchExecutorQueue(
-      Callable callable, final FolderInfo folder, final int attempt) {
-    batchExecutor.queue(callable, getDeletionCallback(folder, allExceptions, attempt));
+  protected void addToToBatchExecutorQueue(Callable callable, FutureCallback callback) {
+    batchExecutor.queue(callable, callback);
   }
 
-  /** Computes the number of children for each folder resource */
-  public void computeChildrenForFolderResource() {
-    for (FolderInfo currentFolder : folders) {
-      if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
-        countOfChildren.put(currentFolder.getFolderName(), 0L);
-      }
+  /** Helper function to delete a single folder resource */
+  protected void queueSingleFolderDelete(@Nonnull final FolderInfo folder, final int attempt) {
+    final String bucketName = folder.getBucket();
+    final String folderName = folder.getFolderName();
+    checkArgument(
+        !Strings.isNullOrEmpty(bucketName),
+        String.format("No bucket for folder resource %s", bucketName));
+    checkArgument(
+        !Strings.isNullOrEmpty(folderName),
+        String.format("No folder path for folder resource %s", folderName));
 
-      String parentFolder = currentFolder.getParentFolderName();
-      if (!Strings.isNullOrEmpty(parentFolder)) {
-        countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue + newValue);
-      }
-    }
-    // Add leaf folders to blocking queue
-    for (FolderInfo currentFolder : folders) {
-      if (countOfChildren.get(currentFolder.getFolderName()) == 0L) {
-        addFolderResourceInBlockingQueue(currentFolder);
-      }
-    }
-  }
-
-  /**
-   * Helper function to add folderResource to blocking queue
-   *
-   * @param folderResource
-   */
-  private void addFolderResourceInBlockingQueue(FolderInfo folderResource) {
-    folderDeleteBlockingQueue.add(folderResource);
+    addToToBatchExecutorQueue(
+        new DeleteFolderRequestCallable(folder, storageControlClient),
+        getDeletionCallback(folder, allExceptions, attempt));
   }
 
   /**
@@ -163,7 +128,7 @@ class DeleteFolderOperation {
    *
    * @param folderResource of the folder that is now deleted
    */
-  private void successfullDeletionOfFolderResource(FolderInfo folderResource) {
+  protected void successfullDeletionOfFolderResource(FolderInfo folderResource) {
     // remove the folderResource from list of map
     countOfChildren.remove(folderResource.getFolderName());
 
@@ -182,19 +147,55 @@ class DeleteFolderOperation {
     }
   }
 
-  /** Helper function to delete a single folder resource */
-  private void queueSingleFolderDelete(@Nonnull final FolderInfo folder, final int attempt) {
-    final String bucketName = folder.getBucket();
-    final String folderName = folder.getFolderName();
-    checkArgument(
-        !Strings.isNullOrEmpty(bucketName),
-        String.format("No bucket for folder resource %s", bucketName));
-    checkArgument(
-        !Strings.isNullOrEmpty(folderName),
-        String.format("No folder path for folder resource %s", folderName));
+  /** Gets the head from the blocking queue */
+  private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
+    try {
+      return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+    } catch (InterruptedException e) {
+      logger.atSevere().log(
+          "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
+      throw e;
+    }
+  }
 
-    addToToBatchExecutorQueue(
-        new DeleteFolderRequestCallable(folder, storageControlClient), folder, attempt);
+  /** Computes the number of children for each folder resource */
+  private void computeChildrenForFolderResource() {
+    for (FolderInfo currentFolder : folders) {
+      if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
+        countOfChildren.put(currentFolder.getFolderName(), 0L);
+      }
+
+      String parentFolder = currentFolder.getParentFolderName();
+      if (!Strings.isNullOrEmpty(parentFolder)) {
+        countOfChildren.merge(parentFolder, 1L, (oldValue, newValue) -> oldValue + newValue);
+      }
+    }
+    // Add leaf folders to blocking queue
+    for (FolderInfo currentFolder : folders) {
+      if (countOfChildren.get(currentFolder.getFolderName()) == 0L) {
+        addFolderResourceInBlockingQueue(currentFolder);
+      }
+    }
+  }
+
+  /** Shutting down batch executor and flushing any remaining requests */
+  private void batchExecutorShutdown() {
+    try {
+      batchExecutor.shutdown();
+    } catch (IOException e) {
+      addException(
+          new IOException(
+              String.format("Error in shutting down batch executor : %s", e.getMessage())));
+    }
+  }
+
+  /**
+   * Helper function to add folderResource to blocking queue
+   *
+   * @param folderResource
+   */
+  private void addFolderResourceInBlockingQueue(FolderInfo folderResource) {
+    folderDeleteBlockingQueue.add(folderResource);
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
