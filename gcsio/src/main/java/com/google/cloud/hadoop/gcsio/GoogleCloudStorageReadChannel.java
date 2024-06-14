@@ -1015,8 +1015,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           break;
         } catch (IOException footerException) {
           logger.atInfo().withCause(footerException).log(
-              "Failed to prefetch footer (retry #%s/%s) for '%s'",
-              retriesCount + 1, maxRetries, resourceId);
+              "Failed to prefetch footer (retry #%s/%s) for '%s'. reason=%s",
+              retriesCount + 1, maxRetries, resourceId, footerException.getMessage());
           if (retriesCount == 0) {
             readBackOff.get().reset();
           }
