@@ -623,8 +623,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                           .build(),
                       statistics),
                   statistics);
-          globalStorageStatistics.filesCreated();
-          instrumentation.fileCreated();
+
+          incrementStatistic(GhfsStatistic.FILES_CREATED);
           return response;
         });
   }
@@ -756,8 +756,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                   "delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
             }
             response = result;
-            globalStorageStatistics.fileDeleted(1);
-            instrumentation.fileDeleted(1);
+
+            incrementStatistic(GhfsStatistic.FILES_DELETED);
           } catch (IOException e) {
             GoogleCloudStorageEventBus.postOnException();
             incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
@@ -769,79 +769,103 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS);
-    incrementStatistic(GhfsStatistic.INVOCATION_LIST_FILES);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_LIST_STATUS,
+        hadoopPath,
+        traceFactory,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkOpen();
+          checkOpen();
 
-    logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
+          logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    List<FileStatus> status;
+          URI gcsPath = getGcsPath(hadoopPath);
+          List<FileStatus> status;
 
-    try {
-      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
-      status = new ArrayList<>(fileInfos.size());
-      String userName = getUgiUserName();
-      for (FileInfo fileInfo : fileInfos) {
-        status.add(getGoogleHadoopFileStatus(fileInfo, userName));
-      }
-    } catch (FileNotFoundException fnfe) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw (FileNotFoundException)
-          new FileNotFoundException(
-                  String.format(
-                      "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
-              .initCause(fnfe);
-    }
-    return status.toArray(new FileStatus[0]);
+          try {
+            List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
+            status = new ArrayList<>(fileInfos.size());
+            String userName = getUgiUserName();
+            for (FileInfo fileInfo : fileInfos) {
+              status.add(getGoogleHadoopFileStatus(fileInfo, userName));
+            }
+          } catch (FileNotFoundException fnfe) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw (FileNotFoundException)
+                new FileNotFoundException(
+                        String.format(
+                            "listStatus(hadoopPath: %s): '%s' does not exist.",
+                            hadoopPath, gcsPath))
+                    .initCause(fnfe);
+          }
+
+          incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE, status.size());
+          return status.toArray(new FileStatus[0]);
+        });
   }
 
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_MKDIRS);
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_MKDIRS,
+        hadoopPath,
+        traceFactory,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
 
-    checkOpen();
+          URI gcsPath = getGcsPath(hadoopPath);
+          try {
+            getGcsFs().mkdirs(gcsPath);
+          } catch (java.nio.file.FileAlreadyExistsException faee) {
+            GoogleCloudStorageEventBus.postOnException();
+            // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
+            throw (FileAlreadyExistsException)
+                new FileAlreadyExistsException(
+                        String.format(
+                            "mkdirs(hadoopPath: %s, permission: %s): failed",
+                            hadoopPath, permission))
+                    .initCause(faee);
+          }
+          logger.atFiner().log(
+              "mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
+          boolean response = true;
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    try {
-      getGcsFs().mkdirs(gcsPath);
-    } catch (java.nio.file.FileAlreadyExistsException faee) {
-      GoogleCloudStorageEventBus.postOnException();
-      // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
-      throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException(
-                  String.format(
-                      "mkdirs(hadoopPath: %s, permission: %s): failed", hadoopPath, permission))
-              .initCause(faee);
-    }
-    logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
-    boolean response = true;
-    instrumentation.directoryCreated();
-    globalStorageStatistics.directoryCreated();
-    return response;
+          incrementStatistic(GhfsStatistic.DIRECTORIES_CREATED);
+          return response;
+        });
   }
 
   @Override
   public FileStatus getFileStatus(Path hadoopPath) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_GET_FILE_STATUS,
+        hadoopPath,
+        traceFactory,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkOpen();
+          checkOpen();
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
-    if (!fileInfo.exists()) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new FileNotFoundException(
-          String.format(
-              "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
-    }
-    String userName = getUgiUserName();
-    return getGoogleHadoopFileStatus(fileInfo, userName);
+          URI gcsPath = getGcsPath(hadoopPath);
+          FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+          if (!fileInfo.exists()) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new FileNotFoundException(
+                String.format(
+                    "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+          }
+          String userName = getUgiUserName();
+          return getGoogleHadoopFileStatus(fileInfo, userName);
+        });
   }
 
   @Override
@@ -1044,7 +1068,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   private void incrementStatistic(GhfsStatistic statistic) {
     incrementStatistic(statistic, 1);
-    globalStorageStatistics.incrementCounter(statistic, 1);
   }
 
   /**
@@ -1058,6 +1081,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       return;
     }
     instrumentation.incrementCounter(statistic, count);
+    globalStorageStatistics.incrementCounter(statistic, count);
   }
 
   /**
