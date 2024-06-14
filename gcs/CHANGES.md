@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 2.2.23 - 2024-06-14
 1. Delete HN folders as well when deleting a directory
 
 ## 2.2.22 - 2024-04-26
