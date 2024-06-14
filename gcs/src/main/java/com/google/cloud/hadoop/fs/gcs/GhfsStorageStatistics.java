@@ -100,4 +100,3 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   private Map<String, MeanStatistic> meanStatistics() {
     return ioStatistics.meanStatistics();
   }
-}
