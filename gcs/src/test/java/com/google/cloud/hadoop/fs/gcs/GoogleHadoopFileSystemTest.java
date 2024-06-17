@@ -15,9 +15,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS_TIME;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS_TIME;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -345,12 +343,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void testTotalTimeStatistics() throws IOException {
     GhfsStorageStatistics stats = new GhfsStorageStatistics();
     stats.updateStats(STREAM_READ_OPERATIONS, 10, 100, 200, 10, new Object());
-    stats.addTotalTimeStatistic("stream_read_operations_time");
-    assertThat(stats.getLong(STREAM_READ_OPERATIONS_TIME.getSymbol())).isGreaterThan(20);
+    stats.addTotalTimeStatistic(STREAM_READ_OPERATIONS.getSymbol());
+    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_time")).isGreaterThan(20);
 
     stats.updateStats(STREAM_WRITE_OPERATIONS, 10, 100, 200, 10, new Object());
-    stats.addTotalTimeStatistic("stream_write_operations_time");
-    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS_TIME.getSymbol())).isGreaterThan(20);
+    stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol());
+    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_time")).isGreaterThan(20);
   }
 
   // -----------------------------------------------------------------

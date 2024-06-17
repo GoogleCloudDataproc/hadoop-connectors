@@ -89,6 +89,13 @@ public class GhfsStorageStatistics extends StorageStatistics {
           total.put(getTimeKey(symbol), new AtomicDouble(0.0));
         }
       }
+
+      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+        minimums.put(getMinKey(symbol), null);
+        maximums.put(getMaxKey(symbol), new AtomicLong(0));
+        means.put(getMeanKey(symbol), new MeanStatistic());
+        total.put(getTimeKey(symbol), new AtomicDouble(0.0));
+      }
     }
   }
 
@@ -181,17 +188,15 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
 
   protected void addTotalTimeStatistic(String statistic) {
-    assert (statistic.contains("_time"));
-    String counterParentKey = statistic.replace("_time", "");
-    String meanParentKey = getMeanKey(counterParentKey);
+    String meanKey = getMeanKey(statistic);
 
     // assert that counter and mean key exists
-    assert (opsCount.containsKey(counterParentKey));
-    assert (means.containsKey(meanParentKey));
-    double meanValue = means.get(meanParentKey).getValue();
-    long operationValue = opsCount.get(counterParentKey).get();
+    assert (opsCount.containsKey(statistic));
+    assert (means.containsKey(meanKey));
+    double meanValue = means.get(meanKey).getValue();
+    long operationValue = opsCount.get(statistic).get();
 
-    total.get(statistic).set(1.0 * meanValue * operationValue);
+    total.get(getTimeKey(statistic)).set(1.0 * meanValue * operationValue);
   }
 
   void updateStats(
@@ -401,6 +406,10 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
   private String getTimeKey(String symbol) {
     return symbol + "_duration";
+  }
+
+  private String getTimeKey(String symbol) {
+    return symbol + "_time";
   }
 
   /**
