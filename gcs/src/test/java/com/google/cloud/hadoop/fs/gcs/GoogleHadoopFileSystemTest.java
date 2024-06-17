@@ -343,12 +343,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void testTotalTimeStatistics() throws IOException {
     GhfsStorageStatistics stats = new GhfsStorageStatistics();
     stats.updateStats(STREAM_READ_OPERATIONS, 10, 100, 200, 10, new Object());
-    stats.addTotalTimeStatistic(STREAM_READ_OPERATIONS.getSymbol());
-    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_duration")).isGreaterThan(20);
+    stats.addTotalTimeStatistic(STREAM_READ_OPERATIONS.getSymbol() + "_duration");
+    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
 
     stats.updateStats(STREAM_WRITE_OPERATIONS, 10, 100, 200, 10, new Object());
-    stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol());
-    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration")).isGreaterThan(20);
+    stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration");
+    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
   }
 
   // -----------------------------------------------------------------
