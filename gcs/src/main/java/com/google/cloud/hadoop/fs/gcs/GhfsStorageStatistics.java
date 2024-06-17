@@ -181,15 +181,15 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
 
   protected void addTotalTimeStatistic(String statistic) {
-    String meanKey = getMeanKey(statistic);
+    assert (statistic.contains("_duration"));
+    String parentCounterKey = statistic.replace("_duration", "");
+    String parentMeanKey = getMeanKey(parentCounterKey);
 
-    // assert that counter and mean key exists
-    assert (opsCount.containsKey(statistic));
-    assert (means.containsKey(meanKey));
-    double meanValue = means.get(meanKey).getValue();
-    long operationValue = opsCount.get(statistic).get();
+    assert (means.containsKey(parentMeanKey) && opsCount.containsKey(parentCounterKey));
+    double meanValue = means.get(parentMeanKey).getValue();
+    long operationValue = opsCount.get(parentCounterKey).get();
 
-    total.get(getTimeKey(statistic)).set(1.0 * meanValue * operationValue);
+    total.get(statistic).set(1.0 * meanValue * operationValue);
   }
 
   void updateStats(
