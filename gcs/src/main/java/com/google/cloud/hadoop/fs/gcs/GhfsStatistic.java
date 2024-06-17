@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_COUNTER;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTAL;
 
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.common.collect.ImmutableMap;
@@ -88,7 +89,8 @@ public enum GhfsStatistic {
       "Count of exceptions raised during input stream reads",
       TYPE_COUNTER),
   STREAM_READ_OPERATIONS("stream_read_operations", "Calls of read()", TYPE_DURATION),
-
+  STREAM_READ_OPERATIONS_TIME(
+      "stream_read_operations_time", "Total time spent for calls of read()", TYPE_DURATION_TOTAL),
   STREAM_READ_OPERATIONS_INCOMPLETE(
       "stream_read_operations_incomplete",
       "Count of incomplete read() operations in an input stream",
@@ -123,6 +125,8 @@ public enum GhfsStatistic {
   STREAM_WRITE_CLOSE_OPERATIONS(
       "stream_write_close_operations", "Calls of write stream close()", TYPE_DURATION),
   STREAM_WRITE_OPERATIONS("stream_write_operations", "Calls of write()", TYPE_DURATION),
+  STREAM_WRITE_OPERATIONS_TIME(
+      "stream_write_operations_time", "Total time spent for calls of write()", TYPE_DURATION_TOTAL),
 
   /** The XAttr API statistics */
   INVOCATION_XATTR_GET_MAP("op_xattr_get_map", "Calls of getXAttrs(Path path)", TYPE_DURATION),
