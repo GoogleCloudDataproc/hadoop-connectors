@@ -80,21 +80,13 @@ public class GhfsStorageStatistics extends StorageStatistics {
       String symbol = opType.getSymbol();
       opsCount.put(symbol, new AtomicLong(0));
 
-      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION
-          || opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION) {
         minimums.put(getMinKey(symbol), null);
         maximums.put(getMaxKey(symbol), new AtomicLong(0));
         means.put(getMeanKey(symbol), new MeanStatistic());
         if (opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
           total.put(getTimeKey(symbol), new AtomicDouble(0.0));
         }
-      }
-
-      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
-        minimums.put(getMinKey(symbol), null);
-        maximums.put(getMaxKey(symbol), new AtomicLong(0));
-        means.put(getMeanKey(symbol), new MeanStatistic());
-        total.put(getTimeKey(symbol), new AtomicDouble(0.0));
       }
     }
   }
@@ -408,9 +400,6 @@ public class GhfsStorageStatistics extends StorageStatistics {
     return symbol + "_duration";
   }
 
-  private String getTimeKey(String symbol) {
-    return symbol + "_time";
-  }
 
   /**
    * To get the maximum value which is stored with MAXIMUM extension
