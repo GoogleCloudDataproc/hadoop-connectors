@@ -180,7 +180,7 @@ public class GhfsStorageStatistics extends StorageStatistics {
     }
   }
 
-  private void addTotalTimeStatistic(String statistic) {
+  protected void addTotalTimeStatistic(String statistic) {
     assert (statistic.contains("_time"));
     String counterParentKey = statistic.replace("_time", "");
     String meanParentKey = getMeanKey(counterParentKey);
