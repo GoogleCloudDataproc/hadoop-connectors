@@ -80,7 +80,8 @@ public class GhfsStorageStatistics extends StorageStatistics {
       String symbol = opType.getSymbol();
       opsCount.put(symbol, new AtomicLong(0));
 
-      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION) {
+      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION
+          || opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
         minimums.put(getMinKey(symbol), null);
         maximums.put(getMaxKey(symbol), new AtomicLong(0));
         means.put(getMeanKey(symbol), new MeanStatistic());

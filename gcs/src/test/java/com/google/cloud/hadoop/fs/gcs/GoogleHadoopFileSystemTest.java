@@ -344,11 +344,11 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     GhfsStorageStatistics stats = new GhfsStorageStatistics();
     stats.updateStats(STREAM_READ_OPERATIONS, 10, 100, 200, 10, new Object());
     stats.addTotalTimeStatistic(STREAM_READ_OPERATIONS.getSymbol());
-    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_time")).isGreaterThan(20);
+    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_duration")).isGreaterThan(20);
 
     stats.updateStats(STREAM_WRITE_OPERATIONS, 10, 100, 200, 10, new Object());
     stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol());
-    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_time")).isGreaterThan(20);
+    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration")).isGreaterThan(20);
   }
 
   // -----------------------------------------------------------------
