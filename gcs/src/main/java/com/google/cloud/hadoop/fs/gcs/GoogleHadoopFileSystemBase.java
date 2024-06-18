@@ -944,31 +944,39 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    return GhfsStorageStatistics.trackDuration(
+        storageStatistics,
+        GhfsStatistic.INVOCATION_LIST_STATUS,
+        hadoopPath,
+        traceFactory,
+        () -> {
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    checkOpen();
+          checkOpen();
 
-    logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
+          logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    List<FileStatus> status;
+          URI gcsPath = getGcsPath(hadoopPath);
+          List<FileStatus> status;
 
-    try {
-      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
-      status = new ArrayList<>(fileInfos.size());
-      String userName = getUgiUserName();
-      for (FileInfo fileInfo : fileInfos) {
-        status.add(getFileStatus(fileInfo, userName));
-      }
-    } catch (FileNotFoundException fnfe) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw (FileNotFoundException)
-          new FileNotFoundException(
-                  String.format(
-                      "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
-              .initCause(fnfe);
-    }
-    return status.toArray(new FileStatus[0]);
+          try {
+            List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
+            status = new ArrayList<>(fileInfos.size());
+            String userName = getUgiUserName();
+            for (FileInfo fileInfo : fileInfos) {
+              status.add(getFileStatus(fileInfo, userName));
+            }
+          } catch (FileNotFoundException fnfe) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw (FileNotFoundException)
+                new FileNotFoundException(
+                        String.format(
+                            "listStatus(hadoopPath: %s): '%s' does not exist.",
+                            hadoopPath, gcsPath))
+                    .initCause(fnfe);
+          }
+          return status.toArray(new FileStatus[0]);
+        });
   }
 
   /**
