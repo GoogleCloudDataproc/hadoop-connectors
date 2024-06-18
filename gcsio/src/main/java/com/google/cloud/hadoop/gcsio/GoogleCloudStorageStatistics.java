@@ -23,18 +23,34 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 import java.util.EnumSet;
 
-/** Statistics which are collected in GCS Client Side. */
-public enum GoogleCloudStorageStatusStatistics {
+/** Statistics which are collected in GCS Connector */
+public enum GoogleCloudStorageStatistics {
 
-  /** Client-side Status Code statistics */
-  GCS_CLIENT_RATE_LIMIT_COUNT("gcs_client_rate_limit_count", "Detects 429 Error", TYPE_COUNTER);
+  /** GCS connector specific statistics */
+  GCS_REQUEST_COUNT(
+      "gcs_total_request_count", "Counts the total number of gcs requests made", TYPE_COUNTER),
 
-  public static final ImmutableSet<GoogleCloudStorageStatusStatistics> VALUES =
-      ImmutableSet.copyOf(EnumSet.allOf(GoogleCloudStorageStatusStatistics.class));
+  EXCEPTION_COUNT("exception_count", "Counts the number of exceptions encountered", TYPE_COUNTER),
+
+  GCS_CLIENT_SIDE_ERROR_COUNT(
+      "gcs_client_side_error_count",
+      "Counts the occurrence of client side error status code",
+      TYPE_COUNTER),
+
+  GCS_SERVER_SIDE_ERROR_COUNT(
+      "gcs_server_side_error_count",
+      "Counts the occurrence of server side error status code",
+      TYPE_COUNTER),
+
+  GCS_CLIENT_RATE_LIMIT_COUNT(
+      "gcs_client_rate_limit_error_count", "Counts the occurence of 429 status code", TYPE_COUNTER);
+
+  public static final ImmutableSet<GoogleCloudStorageStatistics> VALUES =
+      ImmutableSet.copyOf(EnumSet.allOf(GoogleCloudStorageStatistics.class));
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
-  private static final ImmutableMap<String, GoogleCloudStorageStatusStatistics> SYMBOL_MAP =
-      Maps.uniqueIndex(Iterators.forArray(values()), GoogleCloudStorageStatusStatistics::getSymbol);
+  private static final ImmutableMap<String, GoogleCloudStorageStatistics> SYMBOL_MAP =
+      Maps.uniqueIndex(Iterators.forArray(values()), GoogleCloudStorageStatistics::getSymbol);
 
   /**
    * Statistic definition.
@@ -43,7 +59,7 @@ public enum GoogleCloudStorageStatusStatistics {
    * @param description description.
    * @param type type
    */
-  GoogleCloudStorageStatusStatistics(String symbol, String description, StatisticTypeEnum type) {
+  GoogleCloudStorageStatistics(String symbol, String description, StatisticTypeEnum type) {
     this.symbol = symbol;
     this.description = description;
     this.type = type;
@@ -69,7 +85,7 @@ public enum GoogleCloudStorageStatusStatistics {
    * @param symbol statistic to look up
    * @return the value or null.
    */
-  public static GoogleCloudStorageStatusStatistics fromSymbol(String symbol) {
+  public static GoogleCloudStorageStatistics fromSymbol(String symbol) {
     return SYMBOL_MAP.get(symbol);
   }
 

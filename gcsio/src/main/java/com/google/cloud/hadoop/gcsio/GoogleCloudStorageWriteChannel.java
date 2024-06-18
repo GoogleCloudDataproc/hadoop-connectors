@@ -24,6 +24,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
 import java.io.IOException;
 import java.io.InputStream;
@@ -173,6 +174,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       try (InputStream ignore = pipeSource) {
         return uploadObject.execute();
       } catch (IOException e) {
+        GoogleCloudStorageEventBus.postOnException();
         StorageObject response = createResponseFromException(e);
         if (response == null) {
           throw e;

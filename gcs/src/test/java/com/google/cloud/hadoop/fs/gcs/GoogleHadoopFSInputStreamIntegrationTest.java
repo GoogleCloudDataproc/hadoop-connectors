@@ -16,9 +16,17 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS_INCOMPLETE;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.assertByteBuffers;
 import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.junit.Assert.assertThrows;
@@ -27,10 +35,17 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelp
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.util.functional.FutureIO;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -96,6 +111,79 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   }
 
   @Test
+  public void testMergedRangeRequest() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_mergedRange");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    // overriding the default values with lower limit to test out on smaller content size.
+    VectoredReadOptions vectoredReadOptions =
+        VectoredReadOptions.DEFAULT.toBuilder()
+            .setMinSeekVectoredReadSize(2)
+            .setMergeRangeMaxSize(10)
+            .build();
+
+    String testContent = "verify vectored read ranges are getting"; // length = 40
+    gcsFsIHelper.writeTextFile(path, testContent);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+
+    List<FileRange> fileRanges = new ArrayList<>();
+    // below two ranges will be merged
+    fileRanges.add(FileRange.createFileRange(0, 5));
+    fileRanges.add(FileRange.createFileRange(6, 2)); // read till 8
+
+    fileRanges.add(FileRange.createFileRange(11, 4)); // read till 15
+    fileRanges.add(FileRange.createFileRange(20, 15));
+
+    try (GoogleHadoopFSInputStream ignore = in) {
+      in.readVectored(fileRanges, ByteBuffer::allocate);
+      validateVectoredReadResult(fileRanges, path);
+    }
+  }
+
+  @Test
+  public void rangeRequestBeyondFileSize() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_rangeRequestBeyondFile");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "verify vectored read ranges are getting"; // length = 40
+    gcsFsIHelper.writeTextFile(path, testContent);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+
+    List<FileRange> fileRanges = new ArrayList<>();
+    // range inside file size
+    FileRange fileRange1 = FileRange.createFileRange(33, 2);
+    fileRanges.add(fileRange1);
+    // range going beyond filesize
+    FileRange fileRange2 = FileRange.createFileRange(35, 15);
+    fileRanges.add(fileRange2);
+
+    try (GoogleHadoopFSInputStream ignore = in) {
+      in.readVectored(fileRanges, ByteBuffer::allocate);
+    }
+    byte[] readBytes = gcsFsIHelper.readFile(path, fileRange1.getOffset(), fileRange1.getLength());
+    assertByteBuffers(fileRange1.getData().get(), ByteBuffer.wrap(readBytes));
+
+    Throwable e = assertThrows(ExecutionException.class, () -> fileRange2.getData().get());
+    assertThat(e.getCause()).isInstanceOf(IOException.class);
+  }
+
+  private void validateVectoredReadResult(List<FileRange> fileRanges, URI path) throws Exception {
+    for (FileRange range : fileRanges) {
+      ByteBuffer resBuffer = FutureIO.awaitFuture(range.getData(), 60, TimeUnit.SECONDS);
+      byte[] readBytes = gcsFsIHelper.readFile(path, range.getOffset(), range.getLength());
+      assertByteBuffers(resBuffer, ByteBuffer.wrap(readBytes));
+    }
+  }
+
+  @Test
   public void testAvailable() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testAvailable");
     GoogleHadoopFileSystem ghfs =
@@ -131,7 +219,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   }
 
   @Test
-  public void operation_durationMetric_tests() throws Exception {
+  public void fs_operation_durationMetric_tests() throws Exception {
+
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
 
     GoogleHadoopFileSystem ghfs =
@@ -175,9 +264,89 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
         ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_OPERATIONS.getSymbol(), 2);
   }
 
+  @Test
+  public void operation_durationMetric_tests() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+    GhfsGlobalStorageStatistics stats = TestUtils.getStorageStatistics();
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    byte[] value = new byte[2];
+    byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
+
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+
+    assertThat(in.read(value, 0, 1)).isEqualTo(1);
+    assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+    assertThat(value).isEqualTo(expected);
+
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_OPERATIONS, 0);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 2);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS.getSymbol(), 0);
+
+    in.seek(0);
+
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 0);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 0);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS.getSymbol(), 0);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 3);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_BACKWARDS, 2);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_FORWARD_OPERATIONS, 0);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_SKIPPED, 0);
+
+    int expectedSeek = 5;
+    in.seek(expectedSeek);
+    in.close();
+
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_FORWARD_OPERATIONS, 1);
+    TestUtils.verifyCounter(stats, STREAM_READ_SEEK_BYTES_SKIPPED, expectedSeek);
+    TestUtils.verifyCounter(stats, STREAM_READ_BYTES, 2);
+    TestUtils.verifyCounter(stats, STREAM_READ_OPERATIONS_INCOMPLETE, 0);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_CLOSE_OPERATIONS.getSymbol(), 1);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 4);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_OPERATIONS.getSymbol(), 2);
+  }
+
+  @Test
+  public void readVectoredMetricsTest() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_mergedRange");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+    GhfsGlobalStorageStatistics stats = TestUtils.getStorageStatistics();
+
+    // overriding the default values with lower limit to test out on smaller content size.
+    VectoredReadOptions vectoredReadOptions =
+        VectoredReadOptions.DEFAULT.toBuilder()
+            .setMinSeekVectoredReadSize(2)
+            .setMergeRangeMaxSize(10)
+            .build();
+
+    String testContent = "verify vectored read ranges are getting"; // length = 40
+    gcsFsIHelper.writeTextFile(path, testContent);
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(0, 5));
+
+    try (GoogleHadoopFSInputStream ignore = in) {
+      in.readVectored(fileRanges, ByteBuffer::allocate);
+      validateVectoredReadResult(fileRanges, path);
+    }
+    TestUtils.verifyCounter(stats, STREAM_READ_VECTORED_OPERATIONS, 1);
+    TestUtils.verifyDurationMetric(stats, STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
+  }
+
   private static GoogleHadoopFSInputStream createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
-    return GoogleHadoopFSInputStream.create(
-        ghfs, path, new FileSystem.Statistics(ghfs.getScheme()));
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    return GoogleHadoopFSInputStream.create(ghfs, path, statistics);
   }
 }

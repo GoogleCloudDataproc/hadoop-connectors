@@ -24,7 +24,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTE
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_TOTAL_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
@@ -37,9 +37,11 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest
 import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,12 +49,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.util.functional.FutureIO;
 import org.junit.Test;
 
 /**
@@ -70,6 +80,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   FileSystem ghfs;
 
   protected HadoopFileSystemIntegrationHelper ghfsHelper;
+  /** Timeout in seconds for vectored read operation in tests : {@value}. */
+  public static final int VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS = 5 * 60;
 
   @Override
   public void postCreateInit() throws IOException {
@@ -884,8 +896,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       readStream.read(readbuffer, 0, 1);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(2);
-      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
-          .isEqualTo(2);
+
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
           .isEqualTo(2);
 
@@ -894,13 +905,39 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       readStream.read(2, readbuffer1, 0, 2);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(3);
-      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
-          .isEqualTo(4);
+
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
           .isEqualTo(4);
 
       // Check the  statistics of read Exception
       readStream.close();
+    }
+  }
+
+  @Test
+  public void testInputStreamReadVectoredIOStatistics() throws Exception {
+
+    // Write an object.
+    URI path = getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1024, /* overwrite= */ false);
+
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+
+      List<FileRange> fileRanges = new ArrayList<>();
+      fileRanges.add(FileRange.createFileRange(0, 10));
+      readStream.readVectored(fileRanges, ByteBuffer::allocate);
+      validateVectoredReadResult(fileRanges, hadoopPath);
+
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_VECTORED_OPERATIONS.getSymbol()))
+          .isEqualTo(1);
+    } finally {
+      ghfs.delete(hadoopPath);
     }
   }
 
@@ -911,6 +948,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     String text = "Hello World!";
+    StorageStatistics stats = TestUtils.getStorageStatistics();
 
     int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
 
@@ -918,6 +956,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
       // Check the statistics related to Forward seek operations.
       readStream.seek(7);
+
       assertThat(
               readStream
                   .getIOStatistics()
@@ -930,6 +969,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
                   .counters()
                   .get(STREAM_READ_SEEK_BYTES_SKIPPED.getSymbol()))
           .isEqualTo(7);
+
+      TestUtils.verifyCounter(
+          (GhfsGlobalStorageStatistics) stats, STREAM_READ_SEEK_FORWARD_OPERATIONS, 1);
+      TestUtils.verifyCounter(
+          (GhfsGlobalStorageStatistics) stats, STREAM_READ_SEEK_BYTES_SKIPPED, 7);
 
       // Check the statistics related to Forward seek operations.
       readStream.seek(5);
@@ -946,15 +990,21 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
                   .get(STREAM_READ_SEEK_BYTES_BACKWARDS.getSymbol()))
           .isEqualTo(2);
 
+      TestUtils.verifyCounter(
+          (GhfsGlobalStorageStatistics) stats, STREAM_READ_SEEK_BACKWARD_OPERATIONS, 1);
+      TestUtils.verifyCounter(
+          (GhfsGlobalStorageStatistics) stats, STREAM_READ_SEEK_BYTES_BACKWARDS, 2);
+
       // Check the statistics related to seek operations.
       assertThat(
               readStream.getIOStatistics().counters().get(STREAM_READ_SEEK_OPERATIONS.getSymbol()))
           .isEqualTo(2);
       readStream.close();
-
       assertThat(
               readStream.getIOStatistics().counters().get(STREAM_READ_CLOSE_OPERATIONS.getSymbol()))
           .isEqualTo(1);
+
+      TestUtils.verifyCounter((GhfsGlobalStorageStatistics) stats, STREAM_READ_CLOSE_OPERATIONS, 1);
     }
   }
 
@@ -962,18 +1012,71 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testOutputStreamIOStatistics() throws IOException {
     URI path = getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-
+    StorageStatistics stats = TestUtils.getStorageStatistics();
     // Check the IOstatistics of write operation
     try (FSDataOutputStream fsos = ghfs.create(hadoopPath)) {
       fsos.write("Created a file to test statistics".getBytes(UTF_8));
       fsos.close();
       assertThat(fsos.getIOStatistics().counters().get(STREAM_WRITE_BYTES.getSymbol()))
           .isEqualTo(33);
+      TestUtils.verifyCounter((GhfsGlobalStorageStatistics) stats, STREAM_WRITE_BYTES, 33);
     }
 
     assertThat(ghfs.delete(hadoopPath)).isTrue();
   }
 
+  @Test
+  public void testSomeRangesMergedSomeUnmerged() throws Exception {
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    byte[] testBytes = new byte[8 * 8 * 1024];
+    for (int i = 0; i < testBytes.length; i++) {
+      testBytes[i] = (byte) (i * i);
+    }
+
+    ghfsHelper.writeFile(hadoopPath, testBytes, 1, /* overwrite= */ false);
+
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(8 * 1024, 100));
+    fileRanges.add(FileRange.createFileRange(14 * 1024, 100));
+    fileRanges.add(FileRange.createFileRange(10 * 1024, 100));
+    fileRanges.add(FileRange.createFileRange(2 * 1024 - 101, 100));
+    fileRanges.add(FileRange.createFileRange(40 * 1024, 1024));
+    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
+      input.readVectored(fileRanges, ByteBuffer::allocate);
+      validateVectoredReadResult(fileRanges, hadoopPath);
+    } finally {
+      ghfs.delete(hadoopPath);
+    }
+  }
+
+  @Test
+  public void testInvalidRangeRequest() throws Exception {
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    byte[] testBytes = new byte[8 * 8 * 1024];
+    for (int i = 0; i < testBytes.length; i++) {
+      testBytes[i] = (byte) (i * i);
+    }
+
+    ghfsHelper.writeFile(hadoopPath, testBytes, 1, /* overwrite= */ false);
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(-1, 10));
+    try (FSDataInputStream input = ghfs.open(hadoopPath)) {
+      assertThrows(EOFException.class, () -> input.readVectored(fileRanges, ByteBuffer::allocate));
+    } finally {
+      ghfs.delete(hadoopPath);
+    }
+  }
+
+  private void validateVectoredReadResult(List<FileRange> fileRanges, Path hadoopPath)
+      throws Exception {
+    for (FileRange range : fileRanges) {
+      ByteBuffer resBuffer =
+          FutureIO.awaitFuture(
+              range.getData(), VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      GoogleHadoopFileSystemTestHelper.assertObjectContent(
+          ghfs, hadoopPath, resBuffer.duplicate(), range.getOffset());
+    }
+  }
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because they do not make sense
   // in the context of this layer.
@@ -981,6 +1084,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
   @Override
   public void testGetFileInfos() {}
+
+  @Override
+  public void testGetFileInfoObject() {}
 
   @Override
   public void testFileCreationSetsAttributes() {}

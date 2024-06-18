@@ -67,6 +67,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.encryption.key", null);
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
+          put("fs.gs.vectored.read.threads", 16);
+          put("fs.gs.vectored.read.merged.range.max.size", 8 * 1024 * 1024);
+          put("fs.gs.vectored.read.min.range.seek.size", 4 * 1024);
           put("fs.gs.grpc.checkinterval.timeout", 1_000L);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.directpath.enable", true);

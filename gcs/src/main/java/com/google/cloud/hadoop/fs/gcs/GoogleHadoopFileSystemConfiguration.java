@@ -364,6 +364,23 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.inputstream.min.range.request.size",
           GoogleCloudStorageReadOptions.DEFAULT.getMinRangeRequestSize());
 
+  /** Minimum distance that will be seeked without merging the ranges together. */
+  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_RANGE_MIN_SEEK =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.vectored.read.min.range.seek.size",
+          VectoredReadOptions.DEFAULT.getMinSeekVectoredReadSize());
+
+  /** Maximum size allowed for a merged range request. */
+  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.vectored.read.merged.range.max.size",
+          VectoredReadOptions.DEFAULT.getMergeRangeMaxSize());
+
+  /** Maximum threads to process individual FileRange requests */
+  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_THREADS =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.vectored.read.threads", VectoredReadOptions.DEFAULT.getReadThreads());
+
   /** Configuration key for enabling use of the gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
       new HadoopConfigurationProperty<>(
@@ -541,6 +558,13 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
+  }
+
+  static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
+    return VectoredReadOptions.builder()
+        .setMinSeekVectoredReadSize(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getInt))
+        .setMergeRangeMaxSize(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getInt))
+        .setReadThreads(GCS_VECTORED_READ_THREADS.get(config, config::getInt));
   }
 
   @VisibleForTesting

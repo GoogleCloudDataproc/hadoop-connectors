@@ -16,9 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
@@ -26,17 +26,28 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.List;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
+import org.apache.hadoop.util.functional.CallableRaisingIOE;
 
 class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSource {
 
@@ -47,6 +58,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   // Path of the file to read.
   private final URI gcsPath;
+  // File Info of gcsPath, will be pre-populated in some cases i.e. when Json client is used and
+  // failFast is disabled.
+  private final FileInfo fileInfo;
   // All store IO access goes through this.
   private final SeekableByteChannel channel;
   // Number of bytes read through this channel.
@@ -58,20 +72,59 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   private volatile boolean closed;
 
+  private final ITraceFactory traceFactory;
+
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes read.
   private final FileSystem.Statistics statistics;
   // Statistic tracker of the Input stream
+  private final GhfsGlobalStorageStatistics storageStatistics;
+
+  private final GhfsStreamStats streamStats;
+  private final GhfsStreamStats seekStreamStats;
+  private final GhfsStreamStats vectoredReadStats;
+
+  // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
+  private final Supplier<VectoredIOImpl> vectoredIOSupplier;
+  private final GoogleCloudStorageFileSystem gcsFs;
 
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel =
-        gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-    return new GoogleHadoopFSInputStream(ghfs, gcsPath, channel, statistics);
+    FileInfo fileInfo = null;
+    SeekableByteChannel channel;
+    // Extract out the fileInfo call here and use it in readChannel as well as in vectoredRead API
+    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+      // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
+      fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      channel =
+          gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    } else {
+      // cases where fileInfo wouldn't have been requested in gcsio layer.
+      channel =
+          gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    }
+    return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
+  }
+
+  private static boolean shouldPreFetchFileInfo(GoogleCloudStorageFileSystemOptions gcsFSOptions) {
+    // FileInfo is requested while opening the channel in gcsio channel layer in following
+    // conditions
+    // 1. failFastOnNotFound is enabled
+    // 2. java-storage library is in use (failedFast in no-op for grpc flow).
+    // prefecthing the fileInfo in FsInputSteam. So, that it can be used across other read API i.e.
+    // vectoredRead
+    if (gcsFSOptions.getClientType() == ClientType.STORAGE_CLIENT
+        || gcsFSOptions
+            .getCloudStorageOptions()
+            .getReadChannelOptions()
+            .isFastFailOnNotFoundEnabled()) {
+      return true;
+    }
+    return false;
   }
 
   static GoogleHadoopFSInputStream create(
@@ -81,19 +134,57 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-    return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), channel, statistics);
+    return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
   }
 
   private GoogleHadoopFSInputStream(
       GoogleHadoopFileSystem ghfs,
       URI gcsPath,
+      FileInfo fileInfo,
       SeekableByteChannel channel,
       FileSystem.Statistics statistics) {
     logger.atFiner().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
     this.gcsPath = gcsPath;
     this.channel = channel;
+    this.fileInfo = fileInfo;
+    this.gcsFs = ghfs.getGcsFs();
     this.statistics = statistics;
+    this.storageStatistics = ghfs.getGlobalGcsStorageStatistics();
+
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+
+    this.streamStats =
+        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
+    this.seekStreamStats =
+        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
+    this.vectoredReadStats =
+        new GhfsStreamStats(
+            storageStatistics, GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS, gcsPath);
+
+    this.traceFactory = ghfs.getTraceFactory();
+    this.vectoredIOSupplier = ghfs.getVectoredIOSupplier();
+  }
+
+  /**
+   * {@inheritDoc} Vectored read implementation for GoogleHadoopFSInputStream.
+   *
+   * @param ranges the byte ranges to read.
+   * @param allocate the function to allocate ByteBuffer.
+   * @throws IOException IOE if any.
+   */
+  @Override
+  public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    trackDuration(
+        streamStatistics,
+        STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
+        () -> {
+          long startTimeNs = System.nanoTime();
+          vectoredIOSupplier.get().readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath);
+          statistics.incrementReadOps(1);
+          vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
+          return null;
+        });
   }
 
   @Override
@@ -111,10 +202,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+
     return trackDuration(
         streamStatistics,
         STREAM_READ_OPERATIONS.getSymbol(),
         () -> {
+          long startTimeNs = System.nanoTime();
           checkNotClosed();
           // streamStatistics.readOperationStarted(getPos(), length);
           checkNotNull(buf, "buf must not be null");
@@ -131,10 +224,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
               totalBytesRead += numRead;
               statistics.incrementBytesRead(numRead);
               statistics.incrementReadOps(1);
+              streamStats.updateReadStreamStats(numRead, startTimeNs);
             }
+
+            storageStatistics.streamReadOperationInComplete(length, Math.max(numRead, 0));
             response = numRead;
           } catch (IOException e) {
             streamStatistics.readException();
+            throw e;
           }
           streamStatistics.bytesRead(max(response, 0));
           streamStatistics.readOperationCompleted(length, max(response, 0));
@@ -144,24 +241,31 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+
     trackDuration(
         streamStatistics,
         STREAM_READ_SEEK_OPERATIONS.getSymbol(),
         () -> {
+          long startTimeNs = System.nanoTime();
           checkNotClosed();
           logger.atFiner().log("seek(%d)", pos);
           long curPos = getPos();
           long diff = pos - curPos;
           if (diff > 0) {
             streamStatistics.seekForwards(diff);
+            storageStatistics.streamReadSeekForward(diff);
           } else {
             streamStatistics.seekBackwards(diff);
+            storageStatistics.streamReadSeekBackward(diff);
           }
           try {
             channel.position(pos);
           } catch (IllegalArgumentException e) {
+            GoogleCloudStorageEventBus.postOnException();
             throw new IOException(e);
           }
+
+          seekStreamStats.updateReadStreamSeekStats(startTimeNs);
           return null;
         });
   }
@@ -169,17 +273,31 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public synchronized void close() throws IOException {
     boolean isClosed = closed;
-    trackDuration(
+    trackDurationWithTracing(
         streamStatistics,
-        STREAM_READ_CLOSE_OPERATIONS.getSymbol(),
+        storageStatistics,
+        GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS,
+        gcsPath,
+        traceFactory,
         () -> {
           if (!closed) {
             closed = true;
-            logger.atFiner().log("close(): %s", gcsPath);
-            if (channel != null) {
-              logger.atFiner().log(
-                  "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-              channel.close();
+            try {
+              logger.atFiner().log("close(): %s", gcsPath);
+              try {
+                if (channel != null) {
+                  logger.atFiner().log(
+                      "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+                  channel.close();
+                }
+              } catch (Exception e) {
+                logger.atWarning().withCause(e).log(
+                    "Error while closing underneath read channel resources for path: %s", gcsPath);
+              }
+            } finally {
+              streamStats.close();
+              seekStreamStats.close();
+              vectoredReadStats.close();
             }
           }
           return null;
@@ -188,6 +306,23 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (!isClosed) {
       streamStatistics.close();
     }
+  }
+
+  /**
+   * Tracks the duration of the operation {@code operation}. Also setup operation tracking using
+   * {@code ThreadTrace}.
+   */
+  private <B> B trackDurationWithTracing(
+      DurationTrackerFactory durationTracker,
+      @Nonnull GhfsGlobalStorageStatistics stats,
+      GhfsStatistic statistic,
+      Object context,
+      ITraceFactory traceFactory,
+      CallableRaisingIOE<B> operation)
+      throws IOException {
+
+    return GhfsGlobalStorageStatistics.trackDuration(
+        durationTracker, stats, statistic, context, traceFactory, operation);
   }
 
   /**
@@ -217,9 +352,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public int available() throws IOException {
-    logger.atFiner().log("available()");
-    checkNotClosed();
-    return 0;
+    if (!channel.isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new ClosedChannelException();
+    }
+    return super.available();
   }
 
   /**
@@ -240,6 +377,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   private void checkNotClosed() throws IOException {
     if (closed) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(gcsPath + ": " + FSExceptionMessages.STREAM_IS_CLOSED);
     }
   }
