@@ -478,6 +478,11 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.tracelog.enable", GoogleCloudStorageOptions.DEFAULT.isTraceLogEnabled());
 
+  /** Configuration key to enable operational level traces */
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_TRACE_LOG_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.tracelog.enable", GoogleCloudStorageOptions.DEFAULT.isTraceLogEnabled());
+
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
       new HadoopConfigurationProperty<>(
@@ -601,6 +606,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setStorageRootUrl(GCS_ROOT_URL.get(config, config::get))
         .setStorageServicePath(GCS_SERVICE_PATH.get(config, config::get))
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
+        .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config));
   }

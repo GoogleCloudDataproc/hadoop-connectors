@@ -94,7 +94,7 @@ public class ThreadTrace {
     return this.trackingId;
   }
 
-  ThreadTrace getSubTrace() {
+  synchronized ThreadTrace getSubTrace() {
     long threadId = Thread.currentThread().getId();
 
     subEvents.putIfAbsent(threadId, new ArrayList<>());
