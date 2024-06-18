@@ -47,6 +47,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   /**
    * To get the minimum value which is stored with MINIMUM extension
    *
+   * @param symbol
    * @return minimum statistic value
    */
   public Long getMin(String symbol) {
@@ -56,6 +57,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   /**
    * To get the maximum value which is stored with MAXIMUM extension
    *
+   * @param symbol
    * @return maximum statistic value
    */
   public Long getMax(String symbol) {
@@ -65,6 +67,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   /**
    * To get the mean value which is stored with MEAN extension
    *
+   * @param symbol
    * @return mean statistic value
    */
   public double getMean(String symbol) {
