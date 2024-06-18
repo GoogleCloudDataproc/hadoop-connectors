@@ -25,17 +25,13 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQ
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
-import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
-import com.google.common.eventbus.Subscribe;
 import com.google.common.flogger.GoogleLogger;
-import io.grpc.Status;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -211,104 +207,6 @@ public class GhfsStorageStatistics extends StorageStatistics {
     }
   }
 
-  /**
-   * Updating the required gcs specific statistics based on httpresponse.
-   *
-   * @param statusCode
-   */
-  private void updateGcsIOSpecificStatistics(int statusCode) {
-
-    if (statusCode >= 400 && statusCode < 500) {
-      incrementGcsClientSideCounter();
-
-      if (statusCode == 429) {
-        incrementRateLimitingCounter();
-      }
-    }
-
-    if (statusCode >= 500 && statusCode < 600) {
-      incrementGcsServerSideCounter();
-    }
-  }
-
-  private int grpcToHttpStatusCodeMapping(Status grpcStatusCode) {
-    // using code.proto as reference
-    // https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
-    switch (grpcStatusCode.getCode()) {
-      case OK:
-        return 200;
-      case CANCELLED:
-        return 499;
-      case INVALID_ARGUMENT:
-      case FAILED_PRECONDITION:
-      case OUT_OF_RANGE:
-        return 400;
-      case DEADLINE_EXCEEDED:
-        return 504;
-      case NOT_FOUND:
-        return 404;
-      case ALREADY_EXISTS:
-      case ABORTED:
-        return 409;
-      case PERMISSION_DENIED:
-        return 403;
-      case RESOURCE_EXHAUSTED:
-        return 429;
-      case UNIMPLEMENTED:
-        return 501;
-      case UNAVAILABLE:
-        return 503;
-      case UNAUTHENTICATED:
-        return 401;
-      case UNKNOWN:
-      case INTERNAL:
-      case DATA_LOSS:
-      default:
-        return 500;
-    }
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on GoogleJsonResponseException.
-   *
-   * @param responseException contains statusCode based on which metrics are updated
-   */
-  @Subscribe
-  private void subscriberOnGoogleJsonResponseException(
-      @Nonnull GoogleJsonResponseException responseException) {
-    updateGcsIOSpecificStatistics(responseException.getStatusCode());
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on HttpResponse.
-   *
-   * @param responseStatus status code from HTTP response
-   */
-  @Subscribe
-  private void subscriberOnHttpResponseStatus(@Nonnull Integer responseStatus) {
-    updateGcsIOSpecificStatistics(responseStatus);
-  }
-
-  @Subscribe
-  private void subscriberOnGcsRequest(@Nonnull GcsRequestExecutionEvent event) {
-    incrementGcsTotalRequestCount();
-  }
-
-  @Subscribe
-  private void subscriberOnGrpcStatus(@Nonnull Status status) {
-    updateGcsIOSpecificStatistics(grpcToHttpStatusCodeMapping(status));
-  }
-
-  /**
-   * Updating the EXCEPTION_COUNT
-   *
-   * @param exception
-   */
-  @Subscribe
-  private void subscriberOnException(IOException exception) {
-    incrementGcsExceptionCount();
-  }
-
   void streamReadBytes(int bytesRead) {
     incrementCounter(GhfsStatistic.STREAM_READ_BYTES, bytesRead);
   }
@@ -345,23 +243,23 @@ public class GhfsStorageStatistics extends StorageStatistics {
     increment(INVOCATION_GET_FILE_CHECKSUM);
   }
 
-  private void incrementGcsExceptionCount() {
+  void incrementGcsExceptionCount() {
     increment(EXCEPTION_COUNT);
   }
 
-  private void incrementGcsTotalRequestCount() {
+  void incrementGcsTotalRequestCount() {
     increment(GCS_REQUEST_COUNT);
   }
 
-  private void incrementRateLimitingCounter() {
+  void incrementRateLimitingCounter() {
     increment(GCS_CLIENT_RATE_LIMIT_COUNT);
   }
 
-  private void incrementGcsClientSideCounter() {
+  void incrementGcsClientSideCounter() {
     increment(GCS_CLIENT_SIDE_ERROR_COUNT);
   }
 
-  private void incrementGcsServerSideCounter() {
+  void incrementGcsServerSideCounter() {
     increment(GCS_SERVER_SIDE_ERROR_COUNT);
   }
 
