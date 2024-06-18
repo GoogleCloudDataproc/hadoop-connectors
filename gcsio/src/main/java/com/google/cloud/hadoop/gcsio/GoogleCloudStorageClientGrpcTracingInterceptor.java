@@ -71,7 +71,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     if (msg.hasChecksummedData()) {
       ByteString content = msg.getChecksummedData().getContent();
       WriteObjectRequest.Builder b = msg.toBuilder();
-      ByteString snip = ByteString.copyFromUtf8(String.format("<size (%d)>", content.size()));
+      ByteString snip = updatedContent(content.size());
       b.getChecksummedDataBuilder().setContent(snip);
       return b.build().toString();
     }
@@ -83,11 +83,15 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     if (msg.hasChecksummedData()) {
       ByteString content = msg.getChecksummedData().getContent();
       ReadObjectResponse.Builder b = msg.toBuilder();
-      ByteString snip = ByteString.copyFromUtf8(String.format("<size (%d)>", content.size()));
+      ByteString snip = updatedContent(content.size());
       b.getChecksummedDataBuilder().setContent(snip);
       return b.build().toString();
     }
     return msg.toString();
+  }
+
+  static ByteString updatedContent(int contentSize) {
+    return ByteString.copyFromUtf8(String.format("<size (%d)>", contentSize));
   }
 
   @Override
