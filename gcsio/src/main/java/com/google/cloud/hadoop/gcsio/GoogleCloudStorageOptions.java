@@ -236,7 +236,7 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setTraceLogEnabled(Boolean enable);
 
     public abstract Builder setHnBucketRenameEnabled(boolean enabled);
-    
+
     public abstract Builder setOperationTraceLogEnabled(Boolean enable);
 
     abstract GoogleCloudStorageOptions autoBuild();
