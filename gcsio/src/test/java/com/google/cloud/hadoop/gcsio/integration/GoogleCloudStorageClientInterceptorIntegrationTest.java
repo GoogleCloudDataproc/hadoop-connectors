@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -33,13 +34,23 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.gson.Gson;
+import com.google.protobuf.MessageLite;
+import com.google.protobuf.TextFormat;
+import com.google.protobuf.TextFormat.ParseException;
 import com.google.storage.v2.BucketName;
+import com.google.storage.v2.ReadObjectRequest;
+import com.google.storage.v2.ReadObjectResponse;
+import com.google.storage.v2.StartResumableWriteRequest;
+import com.google.storage.v2.StartResumableWriteResponse;
+import com.google.storage.v2.WriteObjectRequest;
+import com.google.storage.v2.WriteObjectResponse;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nonnull;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -118,7 +129,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
             .build();
 
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
-    gcsImpl.create(resourceId).close();
+    int fileSize = uploadChunkSize - 1;
+    writeObject(gcsImpl, resourceId, fileSize, 1);
 
     assertingHandler.assertLogCount(2 * 3);
 
@@ -126,26 +138,39 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
         assertingHandler.getSubListOfRecords(/* startIndex= */ 0, /* endIndex= */ 2), resourceId);
 
     Map<String, Object> writeObjectRequestRecord = assertingHandler.getLogRecordAtIndex(3);
+    String writeObjectInvocationId =
+        writeObjectRequestRecord
+            .get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)
+            .toString();
+    assertThat(writeObjectInvocationId).isNotNull();
 
-    assertThat(writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.WRITE_OFFSET.name))
-        .isEqualTo(0);
-    assertThat(writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.CONTENT_LENGTH.name))
-        .isEqualTo(0);
-    assertThat(writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isNotNull();
-    String uploadId =
-        (String) writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name);
-    assertThat(writeObjectRequestRecord.get(GoogleCloudStorageTracingFields.FINALIZE_WRITE.name))
-        .isEqualTo(true);
+    WriteObjectRequest request =
+        (WriteObjectRequest)
+            fromProtoToMsg(
+                writeObjectRequestRecord
+                    .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
+                    .toString(),
+                WriteObjectRequest.class);
+    assertThat(request.getUploadId()).isNotNull();
+    assertTrue(request.getFinishWrite());
+    assertThat(request.getChecksummedData().getContent().toStringUtf8())
+        .isEqualTo(String.format("<size (%d)>", fileSize));
 
     Map<String, Object> writeObjectResponseRecord = assertingHandler.getLogRecordAtIndex(4);
-    assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(uploadId);
-    assertThat(writeObjectResponseRecord.get(GoogleCloudStorageTracingFields.PERSISTED_SIZE.name))
-        .isEqualTo(0);
+    WriteObjectResponse response =
+        (WriteObjectResponse)
+            fromProtoToMsg(
+                writeObjectResponseRecord
+                    .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
+                    .toString(),
+                WriteObjectResponse.class);
+    assertThat(response.getResource().getName()).isEqualTo(resourceId.getObjectName());
+    assertThat(response.getResource().getSize()).isEqualTo(fileSize);
 
     Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(5);
-    verifyCloseStatus(writeObjectCloseStatusRecord, "WriteObject", Status.OK);
+    verifyCloseStatus(
+        writeObjectCloseStatusRecord, "WriteObject", writeObjectInvocationId, Status.OK);
+    gcsImpl.close();
   }
 
   @Test
@@ -180,27 +205,43 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
     Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(0);
+    String streamInvocationId =
+        readObjectRequestRecord
+            .get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)
+            .toString();
     assertThat(
-            readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
-        .contains(derivedResourceId.toString());
-    assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
-        .isEqualTo(0);
-    assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
-        .isEqualTo(partition.length);
+            readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RPC_METHOD.name).toString())
+        .isEqualTo("ReadObject");
+    ReadObjectRequest request =
+        (ReadObjectRequest)
+            fromProtoToMsg(
+                readObjectRequestRecord
+                    .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
+                    .toString(),
+                ReadObjectRequest.class);
+    assertThat(request.getBucket()).isEqualTo(derivedResourceId.getBucketName());
+    assertThat(request.getObject()).isEqualTo(derivedResourceId.getObjectName());
+    assertThat(request.getReadOffset()).isEqualTo(0);
+    assertThat(request.getReadLimit()).isEqualTo(partition.length);
 
     Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
-    assertThat(
-            readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
-        .contains(derivedResourceId.toString());
-    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
-        .isEqualTo(0);
-    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
-        .isEqualTo(partition.length);
-    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.BYTES_READ.name))
-        .isEqualTo(partition.length);
 
-    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(2);
-    verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
+    ReadObjectResponse response =
+        (ReadObjectResponse)
+            fromProtoToMsg(
+                readObjectResponseRecord
+                    .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
+                    .toString(),
+                ReadObjectResponse.class);
+    assertThat(response.getChecksummedData().getContent().toStringUtf8())
+        .isEqualTo(String.format("<size (%d)>", partition.length));
+    // asser both request-response have same invocationId
+    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name))
+        .isEqualTo(streamInvocationId);
+
+    Map<String, Object> readObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(2);
+    verifyCloseStatus(readObjectCloseStatusRecord, "ReadObject", streamInvocationId, Status.OK);
+    gcsImpl.close();
   }
 
   public static GoogleCloudStorage getGCSClientImpl(GoogleCloudStorageOptions options) {
@@ -217,13 +258,19 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
   private void verifyCommonFields(Map<String, Object> logRecord, String rpcMethod) {
     assertThat(logRecord.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)).isNotNull();
+
+    assertThat(logRecord.get(GoogleCloudStorageTracingFields.CURRENT_TIME.name)).isNotNull();
     assertThat(logRecord.get(GoogleCloudStorageTracingFields.RPC_METHOD.name)).isEqualTo(rpcMethod);
   }
 
-  private void verifyCloseStatus(Map<String, Object> logRecord, String rpcMethod, Status status) {
+  private void verifyCloseStatus(
+      Map<String, Object> logRecord, String rpcMethod, String streamInvocationId, Status status) {
     verifyCommonFields(logRecord, rpcMethod);
     assertThat(logRecord.get(GoogleCloudStorageTracingFields.STATUS.name).toString())
         .contains(status.getCode().toString());
+    assertThat(logRecord.get(GoogleCloudStorageTracingFields.DURATION_MS.name)).isNotNull();
+    assertThat(logRecord.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name))
+        .isEqualTo(streamInvocationId);
   }
 
   private StorageResourceId derivedResourceId(StorageResourceId resourceId) {
@@ -238,30 +285,58 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
   }
 
   private void verifyChannelCreation(
-      List<Map<String, Object>> logRecord, StorageResourceId resourceId) {
+      List<Map<String, Object>> logRecord, StorageResourceId resourceId) throws ParseException {
     assertThat(logRecord.size()).isEqualTo(3);
     String rpcMethod = "StartResumableWrite";
-
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
+    Map<String, Object> logRecordEntry = logRecord.get(0);
     // logging assertions for request
     verifyCommonFields(logRecord.get(0), rpcMethod);
 
-    assertThat((logRecord.get(0).get(GoogleCloudStorageTracingFields.RESOURCE.name)).toString())
-        .contains(derivedResourceId.toString());
-    assertThat(logRecord.get(0).get(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name))
-        .isEqualTo(0);
+    String streamInvocationId =
+        logRecordEntry.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name).toString();
+    assertThat(streamInvocationId).isNotNull();
+    StartResumableWriteRequest request =
+        (StartResumableWriteRequest)
+            fromProtoToMsg(
+                logRecordEntry
+                    .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
+                    .toString(),
+                StartResumableWriteRequest.class);
+    assertThat(request.getWriteObjectSpec().getResource().getName())
+        .isEqualTo(derivedResourceId.getObjectName());
+    assertThat(request.getWriteObjectSpec().getResource().getBucket())
+        .isEqualTo(derivedResourceId.getBucketName());
+    assertThat(logRecordEntry.get(GoogleCloudStorageTracingFields.REQUEST_COUNTER.name))
+        .isEqualTo(1);
 
+    logRecordEntry = logRecord.get(1);
     // logging assertions for response
-    verifyCommonFields(logRecord.get(1), rpcMethod);
+    verifyCommonFields(logRecordEntry, rpcMethod);
 
-    assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
-        .contains(derivedResourceId.toString());
-    assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name))
-        .isEqualTo(0);
-    assertThat(logRecord.get(1).get(GoogleCloudStorageTracingFields.UPLOAD_ID.name)).isNotNull();
+    StartResumableWriteResponse response =
+        (StartResumableWriteResponse)
+            fromProtoToMsg(
+                logRecord
+                    .get(1)
+                    .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
+                    .toString(),
+                StartResumableWriteResponse.class);
+    assertThat(response.getUploadId()).isNotNull();
+    assertThat(logRecordEntry.get(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name))
+        .isEqualTo(1);
+
+    assertThat(logRecordEntry.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name))
+        .isEqualTo(streamInvocationId);
 
     // logging assertions for statue
-    verifyCloseStatus(logRecord.get(2), rpcMethod, Status.OK);
+    verifyCloseStatus(logRecord.get(2), rpcMethod, streamInvocationId, Status.OK);
+  }
+
+  private MessageLite fromProtoToMsg(@Nonnull String protoMsgString, final Class protoClass)
+      throws ParseException {
+    MessageLite request = TextFormat.parse(protoMsgString.toString(), protoClass);
+    return request;
   }
 }
