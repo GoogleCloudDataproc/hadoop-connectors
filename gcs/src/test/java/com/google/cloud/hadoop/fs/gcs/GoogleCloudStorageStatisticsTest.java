@@ -37,8 +37,8 @@ import org.junit.runners.JUnit4;
 public class GoogleCloudStorageStatisticsTest {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private GhfsStorageStatistics storageStatistics = new GhfsStorageStatistics();
-  protected GoogleCloudStorageSubscriber subscriber =
-      new GoogleCloudStorageSubscriber(storageStatistics);
+  protected GoogleCloudStorageEventSubscriber subscriber =
+      new GoogleCloudStorageEventSubscriber(storageStatistics);
 
   @Before
   public void setUp() throws Exception {

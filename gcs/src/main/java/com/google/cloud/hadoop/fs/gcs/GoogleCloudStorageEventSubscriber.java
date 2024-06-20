@@ -24,10 +24,10 @@ import java.io.IOException;
 import javax.annotation.Nonnull;
 
 /* Stores the subscriber methods corresponding to GoogleCloudStorageEventBus */
-public class GoogleCloudStorageSubscriber {
+public class GoogleCloudStorageEventSubscriber {
   private static GhfsStorageStatistics storageStatistics;
 
-  public GoogleCloudStorageSubscriber(GhfsStorageStatistics storageStatistics) {
+  public GoogleCloudStorageEventSubscriber(GhfsStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
   }
 
