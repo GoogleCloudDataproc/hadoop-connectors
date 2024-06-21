@@ -36,7 +36,9 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageStatisticsTest {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private GhfsStorageStatistics subscriber = new GhfsStorageStatistics();
+  private GhfsStorageStatistics storageStatistics = new GhfsStorageStatistics();
+  protected GoogleCloudStorageEventSubscriber subscriber =
+      new GoogleCloudStorageEventSubscriber(storageStatistics);
 
   @Before
   public void setUp() throws Exception {
@@ -55,7 +57,7 @@ public class GoogleCloudStorageStatisticsTest {
     boolean metricsVerified = true;
     while (statsIterator.hasNext()) {
       LongStatistic stats = statsIterator.next();
-      Long value = subscriber.getLong(stats.getName());
+      Long value = storageStatistics.getLong(stats.getName());
       if (stats.getValue() != value) {
         logger.atWarning().log(
             "Metric values not matching. for: %s, expected: %d, got: %d",
@@ -84,7 +86,7 @@ public class GoogleCloudStorageStatisticsTest {
     verifyCounterStats.incrementCounter(GCS_CLIENT_SIDE_ERROR_COUNT, 1);
     verifyStatistics(verifyCounterStats);
 
-    subscriber.reset();
+    storageStatistics.reset();
 
     // verify for gRPC event i.e. via java-storage
     GoogleCloudStorageEventBus.onGrpcStatus(Status.RESOURCE_EXHAUSTED);
@@ -98,7 +100,7 @@ public class GoogleCloudStorageStatisticsTest {
     verifyCounterStats.incrementCounter(GCS_CLIENT_SIDE_ERROR_COUNT, 1);
     verifyStatistics(verifyCounterStats);
 
-    subscriber.reset();
+    storageStatistics.reset();
 
     // verify for gRPC event i.e. via java-storage
     GoogleCloudStorageEventBus.onGrpcStatus(Status.CANCELLED);
@@ -112,7 +114,7 @@ public class GoogleCloudStorageStatisticsTest {
     verifyCounterStats.incrementCounter(GCS_SERVER_SIDE_ERROR_COUNT, 1);
     verifyStatistics(verifyCounterStats);
 
-    subscriber.reset();
+    storageStatistics.reset();
 
     // verify for gRPC event i.e. via java-storage
     GoogleCloudStorageEventBus.onGrpcStatus(Status.INTERNAL);
