@@ -97,6 +97,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
+  /**
+   * Configuration key for enabling hierarchical namespace buckets.
+   *
+   * <p>If this is enabled, rename folder operation on a Hierarchical namespace enabled bucket will
+   * be performed by calling the rename API.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_HIERARCHICAL_NAMESPACE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", false);
+
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
@@ -581,6 +590,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKey(GCS_ENCRYPTION_KEY.getPassword(config))
         .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.getPassword(config))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
+        .setHnBucketRenameEnabled(GCS_HIERARCHICAL_NAMESPACE_ENABLE.get(config, config::getBoolean))
         .setGrpcMessageTimeoutCheckInterval(GCS_GRPC_CHECK_INTERVAL_TIMEOUT.getTimeDuration(config))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setHttpRequestConnectTimeout(GCS_HTTP_CONNECT_TIMEOUT.getTimeDuration(config))
