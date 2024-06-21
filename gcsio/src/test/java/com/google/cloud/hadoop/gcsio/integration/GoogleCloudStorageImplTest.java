@@ -153,11 +153,11 @@ public class GoogleCloudStorageImplTest {
 
   /**
    * Even when java-storage client in use, write path get short-circuited via {@link
-   * GoogleCloudStorageOptions.GrpcWriteEnabled} to use the http implementation.
+   * GoogleCloudStorageOptions} to use the http implementation.
    */
   @Test
   public void writeObject_withGrpcWriteDisabled() throws IOException {
-    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
     int uploadChunkSize = 2 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
