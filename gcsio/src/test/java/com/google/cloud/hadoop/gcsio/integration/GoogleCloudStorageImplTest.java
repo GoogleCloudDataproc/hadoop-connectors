@@ -153,7 +153,7 @@ public class GoogleCloudStorageImplTest {
   @Test
   public void open_withItemInfo() throws IOException {
     int expectedSize = 5 * 1024 * 1024;
-    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
 
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
@@ -201,7 +201,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void getStatistics_writeReadDeleteLargeObject() throws IOException {
-    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
     GoogleCloudStorage gcs = getStorageFromOptions(getOptionsWithUploadChunk(uploadChunkSize));
