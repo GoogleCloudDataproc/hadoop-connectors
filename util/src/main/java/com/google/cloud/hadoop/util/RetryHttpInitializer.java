@@ -198,7 +198,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
     private void logResponseCode(HttpRequest request, HttpResponse response) {
       // Incrementing GCS Static Statistics using status code of response.
-      GoogleCloudStorageEventBus.postOnHttpResponse(response);
+      GoogleCloudStorageEventBus.postOnHttpResponseStatus(response.getStatusCode());
 
       if (RESPONSE_CODES_TO_LOG.contains(response.getStatusCode())) {
         logger

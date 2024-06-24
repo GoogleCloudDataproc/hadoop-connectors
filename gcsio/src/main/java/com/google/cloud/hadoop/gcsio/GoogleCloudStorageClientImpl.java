@@ -1293,6 +1293,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                         downscopedAccessTokenFn));
               }
 
+              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
               return ImmutableList.copyOf(list);
             })
         .setCredentials(
