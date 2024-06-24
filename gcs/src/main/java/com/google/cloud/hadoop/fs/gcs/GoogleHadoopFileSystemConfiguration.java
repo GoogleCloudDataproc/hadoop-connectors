@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.GRPC_WRITE_DEFAULT;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
@@ -497,6 +498,10 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.client.type", GoogleCloudStorageFileSystemOptions.DEFAULT.getClientType());
 
+  /** Configuration key to configure client to use for GCS access. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_WRITE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.enable", GRPC_WRITE_DEFAULT);
+
   /**
    * Configuration key to configure the properties to optimize gcs-write. This config will be
    * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
@@ -581,6 +586,7 @@ public class GoogleHadoopFileSystemConfiguration {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     return GoogleCloudStorageOptions.builder()
         .setAppName(getApplicationName(config))
+        .setGrpcWriteEnabled(GCS_GRPC_WRITE_ENABLE.get(config, config::getBoolean))
         .setAutoRepairImplicitDirectoriesEnabled(
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setBatchThreads(GCS_BATCH_THREADS.get(config, config::getInt))
