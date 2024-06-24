@@ -219,6 +219,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               if (storageOptions.isTraceLogEnabled()) {
                 list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
               }
+              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
               return ImmutableList.copyOf(list);
             })
         .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
