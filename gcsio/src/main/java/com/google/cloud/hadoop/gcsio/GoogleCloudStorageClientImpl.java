@@ -23,8 +23,9 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auto.value.AutoBuilder;
-import com.google.cloud.NoCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
@@ -96,7 +97,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
-            ? createStorage(credentials, options, gRPCInterceptors)
+            ? createStorage(credentials, options, gRPCInterceptors, downscopedAccessTokenFn)
             : clientLibraryStorage;
   }
 
@@ -205,7 +206,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors) {
+      List<ClientInterceptor> interceptors,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> storageOptions.getHttpRequestHeaders())
@@ -219,15 +221,38 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               if (storageOptions.isTraceLogEnabled()) {
                 list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
               }
+
+              if (downscopedAccessTokenFn != null) {
+                // When downscoping is enabled, we need to set the downscoped token for each
+                // request. In the case of gRPC, the downscoped token will be set from the
+                // Interceptor.
+                list.add(
+                    new GoogleCloudStorageClientGrpcDownscopingInterceptor(
+                        downscopedAccessTokenFn));
+              }
+
               list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
+
               return ImmutableList.copyOf(list);
             })
-        .setCredentials(credentials != null ? credentials : NoCredentials.getInstance())
+        .setCredentials(
+            credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
         .setBlobWriteSessionConfig(
             BlobWriteSessionConfigs.getDefault()
                 .withChunkSize(storageOptions.getWriteChannelOptions().getUploadChunkSize()))
         .build()
         .getService();
+  }
+
+  private static Credentials getNoCredentials(
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+    if (downscopedAccessTokenFn == null) {
+      return null;
+    }
+
+    // Workaround for https://github.com/googleapis/sdk-platform-java/issues/2356. Once this is
+    // fixed, change this to return NoCredentials.getInstance();
+    return GoogleCredentials.create(new AccessToken("", null));
   }
 
   public static Builder builder() {
