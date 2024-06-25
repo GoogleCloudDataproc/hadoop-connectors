@@ -176,7 +176,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
-            ? createStorage(credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
+            ? createStorage(
+                credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
             : clientLibraryStorage;
   }
 
@@ -1261,7 +1262,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
-      ExecutorService pCUExecutorService, Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      ExecutorService pCUExecutorService,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     final ImmutableMap<String, String> headers = getUpdatedHeadersWithUserAgent(storageOptions);
     return StorageOptions.grpc()
@@ -1286,8 +1288,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                     new GoogleCloudStorageClientGrpcDownscopingInterceptor(
                         downscopedAccessTokenFn));
               }
-
-              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
 
               return ImmutableList.copyOf(list);
             })
@@ -1393,22 +1393,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     checkArgument(resourceId != null, "resourceId must not be null");
     checkArgument(blob != null, "object must not be null");
     checkArgument(
-            resourceId.isStorageObject(),
-            "resourceId must be a StorageObject. resourceId: %s",
-            resourceId);
+        resourceId.isStorageObject(),
+        "resourceId must be a StorageObject. resourceId: %s",
+        resourceId);
     checkArgument(
-            resourceId.getBucketName().equals(blob.getBucket()),
-            "resourceId.getBucketName() must equal object.getBucket(): '%s' vs '%s'",
-            resourceId.getBucketName(),
-            blob.getBucket());
+        resourceId.getBucketName().equals(blob.getBucket()),
+        "resourceId.getBucketName() must equal object.getBucket(): '%s' vs '%s'",
+        resourceId.getBucketName(),
+        blob.getBucket());
     checkArgument(
-            resourceId.getObjectName().equals(blob.getName()),
-            "resourceId.getObjectName() must equal object.getName(): '%s' vs '%s'",
-            resourceId.getObjectName(),
-            blob.getName());
+        resourceId.getObjectName().equals(blob.getName()),
+        "resourceId.getObjectName() must equal object.getName(): '%s' vs '%s'",
+        resourceId.getObjectName(),
+        blob.getName());
 
     Map<String, byte[]> decodedMetadata =
-            blob.getMetadata() == null ? null : decodeMetadata(blob.getMetadata());
+        blob.getMetadata() == null ? null : decodeMetadata(blob.getMetadata());
 
     byte[] md5Hash = null;
     byte[] crc32c = null;
@@ -1422,21 +1422,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     return GoogleCloudStorageItemInfo.createObject(
-            resourceId,
-            blob.getCreateTimeOffsetDateTime() == null
-                    ? 0
-                    : blob.getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
-            blob.getUpdateTimeOffsetDateTime() == null
-                    ? 0
-                    : blob.getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
-            blob.getSize() == null ? 0 : blob.getSize(),
-            blob.getContentType(),
-            blob.getContentEncoding(),
-            decodedMetadata,
-            blob.getGeneration() == null ? 0 : blob.getGeneration(),
-            blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
-            new VerificationAttributes(md5Hash, crc32c));
+        resourceId,
+        blob.getCreateTimeOffsetDateTime() == null
+            ? 0
+            : blob.getCreateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        blob.getUpdateTimeOffsetDateTime() == null
+            ? 0
+            : blob.getUpdateTimeOffsetDateTime().toInstant().toEpochMilli(),
+        blob.getSize() == null ? 0 : blob.getSize(),
+        blob.getContentType(),
+        blob.getContentEncoding(),
+        decodedMetadata,
+        blob.getGeneration() == null ? 0 : blob.getGeneration(),
+        blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
+        new VerificationAttributes(md5Hash, crc32c));
   }
+
   private static Credentials getNoCredentials(
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     if (downscopedAccessTokenFn == null) {
