@@ -33,7 +33,6 @@ import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.AtomicDouble;
-import io.grpc.Status;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -397,10 +396,10 @@ public class GhfsStorageStatistics extends StorageStatistics {
   private String getMeanKey(String symbol) {
     return symbol + "_mean";
   }
+
   private String getTimeKey(String symbol) {
     return symbol + "_duration";
   }
-
 
   /**
    * To get the maximum value which is stored with MAXIMUM extension
