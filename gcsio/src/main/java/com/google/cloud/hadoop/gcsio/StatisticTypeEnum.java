@@ -26,5 +26,8 @@ public enum StatisticTypeEnum {
   TYPE_DURATION,
 
   /** Gauge. */
-  TYPE_GAUGE
+  TYPE_GAUGE,
+
+  /* Duration. Total duration for the execution of operation */
+  TYPE_DURATION_TOTAL
 }
