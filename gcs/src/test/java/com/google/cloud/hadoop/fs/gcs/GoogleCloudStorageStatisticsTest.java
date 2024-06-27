@@ -15,10 +15,22 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQUEST_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_BAD_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_GONE_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_BAD_GATEWAY_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_INTERNAL_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
@@ -47,7 +59,6 @@ public class GoogleCloudStorageStatisticsTest {
 
   @After
   public void cleanup() throws Exception {
-
     GoogleCloudStorageEventBus.unregister(subscriber);
   }
 
@@ -72,7 +83,7 @@ public class GoogleCloudStorageStatisticsTest {
   public void gcs_requestCounter() throws Exception {
     GoogleCloudStorageEventBus.onGcsRequest(new GcsRequestExecutionEvent());
     GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
-    verifyCounterStats.incrementCounter(GCS_REQUEST_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_REQUEST_COUNT, 1);
     verifyStatistics(verifyCounterStats);
   }
 
@@ -81,8 +92,8 @@ public class GoogleCloudStorageStatisticsTest {
     // verify for http event i.e. via Apiary
     GoogleCloudStorageEventBus.postOnHttpResponseStatus(429);
     GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
-    verifyCounterStats.incrementCounter(GCS_CLIENT_RATE_LIMIT_COUNT, 1);
-    verifyCounterStats.incrementCounter(GCS_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_RATE_LIMIT_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
     verifyStatistics(verifyCounterStats);
 
     storageStatistics.reset();
@@ -96,13 +107,17 @@ public class GoogleCloudStorageStatisticsTest {
   public void gcs_clientSideErrorCounter() {
     GoogleCloudStorageEventBus.postOnHttpResponseStatus(404);
     GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
-    verifyCounterStats.incrementCounter(GCS_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT, 1);
     verifyStatistics(verifyCounterStats);
+  }
 
-    storageStatistics.reset();
-
-    // verify for gRPC event i.e. via java-storage
+  @Test
+  public void gcs_grpcCancelledStatusCounter() {
     GoogleCloudStorageEventBus.onGrpcStatus(Status.CANCELLED);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    // verify for gRPC event i.e. via java-storage
     verifyStatistics(verifyCounterStats);
   }
 
@@ -110,21 +125,133 @@ public class GoogleCloudStorageStatisticsTest {
   public void gcs_serverSideErrorCounter() {
     GoogleCloudStorageEventBus.postOnHttpResponseStatus(503);
     GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
-    verifyCounterStats.incrementCounter(GCS_SERVER_SIDE_ERROR_COUNT, 1);
-    verifyStatistics(verifyCounterStats);
-
-    storageStatistics.reset();
-
-    // verify for gRPC event i.e. via java-storage
-    GoogleCloudStorageEventBus.onGrpcStatus(Status.INTERNAL);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT, 1);
     verifyStatistics(verifyCounterStats);
   }
 
   @Test
-  public void gcs_ExceptionCounter() {
+  public void gcs_grpcInternalStatusCounter() {
+    // verify for gRPC event i.e. via java-storage
+    GoogleCloudStorageEventBus.onGrpcStatus(Status.INTERNAL);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_exceptionCounter() {
     GoogleCloudStorageEventBus.postOnException();
     GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
     verifyCounterStats.incrementCounter(EXCEPTION_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientBadRequestCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(400);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_BAD_REQUEST_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientUnauthorizedResponseCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(401);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientNotFoundResponseCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(404);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientRequestTimeoutCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(408);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientGoneResponseCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(410);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_GONE_RESPONSE_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientPreconditionFailedResponseCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(412);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_clientRequestedRangeNotSatisfiableCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(416);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_serverInternalErrorCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(500);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_INTERNAL_ERROR_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_serverNotImplementedErrorCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(501);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_serverBadGatewayCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(502);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_BAD_GATEWAY_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_serverServiceUnavailableCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(503);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_serverTimeoutCount() {
+    GoogleCloudStorageEventBus.postOnHttpResponseStatus(504);
+    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_TIMEOUT_COUNT, 1);
+    verifyCounterStats.incrementCounter(GCS_API_SERVER_SIDE_ERROR_COUNT, 1);
     verifyStatistics(verifyCounterStats);
   }
 }
