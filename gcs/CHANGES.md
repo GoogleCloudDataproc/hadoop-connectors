@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add gRPC configuration documentation
 
 1.  Remove Hadoop 2.x support.
 
