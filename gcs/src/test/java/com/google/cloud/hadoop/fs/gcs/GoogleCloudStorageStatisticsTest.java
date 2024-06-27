@@ -54,7 +54,6 @@ public class GoogleCloudStorageStatisticsTest {
 
   @Before
   public void setUp() throws Exception {
-
     GoogleCloudStorageEventBus.register(subscriber);
   }
 
