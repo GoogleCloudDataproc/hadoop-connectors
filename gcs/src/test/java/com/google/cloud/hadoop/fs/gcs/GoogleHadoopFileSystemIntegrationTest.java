@@ -1470,11 +1470,16 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       String metricName = ghfsStatistic.getSymbol();
 
       checkMetric(metricName, statistics, metricNames, statsString);
-      if (ghfsStatistic.getType() == StatisticTypeEnum.TYPE_DURATION) {
+      if (ghfsStatistic.getType() == StatisticTypeEnum.TYPE_DURATION
+          || ghfsStatistic.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
         expected += 3;
 
         for (String suffix : ImmutableList.of("_min", "_max", "_mean")) {
           checkMetric(metricName + suffix, statistics, metricNames, statsString);
+        }
+        if (ghfsStatistic.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+          expected++;
+          checkMetric(metricName + "_duration", statistics, metricNames, statsString);
         }
       }
     }
