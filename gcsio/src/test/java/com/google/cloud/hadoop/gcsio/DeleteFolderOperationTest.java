@@ -133,9 +133,9 @@ public class DeleteFolderOperationTest {
     private FutureCallback getDeletionCallback(final FolderInfo resourceId) {
       return new FutureCallback<Void>() {
         @Override
-        public void onSuccess(Void result) {
-          successfullDeletionOfFolderResource(resourceId);
+        public synchronized void onSuccess(Void result) {
           addToOrderOfDeletion(resourceId);
+          successfullDeletionOfFolderResource(resourceId);
         }
 
         @Override

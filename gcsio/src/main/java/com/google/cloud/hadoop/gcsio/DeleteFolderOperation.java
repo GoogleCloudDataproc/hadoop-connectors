@@ -128,7 +128,7 @@ class DeleteFolderOperation {
    *
    * @param folderResource of the folder that is now deleted
    */
-  protected void successfullDeletionOfFolderResource(FolderInfo folderResource) {
+  protected synchronized void successfullDeletionOfFolderResource(FolderInfo folderResource) {
     // remove the folderResource from list of map
     countOfChildren.remove(folderResource.getFolderName());
 
@@ -137,6 +137,7 @@ class DeleteFolderOperation {
 
       // update the parent's count of children
       countOfChildren.replace(parentFolder, countOfChildren.get(parentFolder) - 1);
+      assert (countOfChildren.get(parentFolder) >= 0);
 
       // if the parent folder is now empty, append in the queue
       if (countOfChildren.get(parentFolder) == 0) {
