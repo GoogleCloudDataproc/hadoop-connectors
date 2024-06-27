@@ -547,8 +547,8 @@ option yet as this feature is fairly new
       keep uploaded content in memory which is configurable via
 
       * `fs.gs.write.parallel.composite.upload.buffer.count` (default: `1`)
-         In alignment with java-storage client [configuration](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
-        ). More the number of buffer more will the memory footprint.
+         In alignment with java-storage client [configuration](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_).
+         More the number of buffer more will the memory footprint.
 
       * `fs.gs.write.parallel.composite.upload.buffer.capacity` (default: `33554432`)
         Capacity of each configured buffer. This maps to the size of part file
@@ -571,8 +571,6 @@ option yet as this feature is fairly new
         In alignment with [configuration](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_PartNamingStrategy_prefix_java_lang_String_)
         offered via java-storage client. By-default if no prefix(or empty string)
         is provided [object name](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_PartNamingStrategy_useObjectNameAsPrefix__) is used as prefix
-
-
 
 ### Performance cache configuration
 
