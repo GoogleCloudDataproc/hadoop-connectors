@@ -19,10 +19,22 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQUEST_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_BAD_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_GONE_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_BAD_GATEWAY_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_INTERNAL_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.InvocationRaisingIOE;
@@ -248,19 +260,67 @@ public class GhfsStorageStatistics extends StorageStatistics {
   }
 
   void incrementGcsTotalRequestCount() {
-    increment(GCS_REQUEST_COUNT);
+    increment(GCS_API_REQUEST_COUNT);
   }
 
   void incrementRateLimitingCounter() {
-    increment(GCS_CLIENT_RATE_LIMIT_COUNT);
+    increment(GCS_API_CLIENT_RATE_LIMIT_COUNT);
   }
 
   void incrementGcsClientSideCounter() {
-    increment(GCS_CLIENT_SIDE_ERROR_COUNT);
+    increment(GCS_API_CLIENT_SIDE_ERROR_COUNT);
   }
 
   void incrementGcsServerSideCounter() {
-    increment(GCS_SERVER_SIDE_ERROR_COUNT);
+    increment(GCS_API_SERVER_SIDE_ERROR_COUNT);
+  }
+
+   void incrementGcsClientBadRequestCount() {
+    increment(GCS_API_CLIENT_BAD_REQUEST_COUNT);
+  }
+
+   void incrementGcsClientUnauthorizedResponseCount() {
+    increment(GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT);
+  }
+
+   void incrementGcsClientNotFoundResponseCount() {
+    increment(GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT);
+  }
+
+   void incrementGcsClientRequestTimeoutCount() {
+    increment(GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT);
+  }
+
+   void incrementGcsClientGoneResponseCount() {
+    increment(GCS_API_CLIENT_GONE_RESPONSE_COUNT);
+  }
+
+   void incrementGcsClientPreconditionFailedResponseCount() {
+    increment(GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT);
+  }
+
+   void incrementGcsClientRequestedRangeNotSatisfiableCount() {
+    increment(GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT);
+  }
+
+   void incrementGcsServerInternalErrorCount() {
+    increment(GCS_API_SERVER_INTERNAL_ERROR_COUNT);
+  }
+
+   void incrementGcsServerNotImplementedErrorCount() {
+    increment(GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT);
+  }
+
+   void incrementGcsServerBadGatewayCount() {
+    increment(GCS_API_SERVER_BAD_GATEWAY_COUNT);
+  }
+
+   void incrementGcsServerServiceUnavailableCount() {
+    increment(GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT);
+  }
+
+   void incrementGcsServerTimeoutCount() {
+    increment(GCS_API_SERVER_TIMEOUT_COUNT);
   }
 
   private class LongIterator implements Iterator<LongStatistic> {
