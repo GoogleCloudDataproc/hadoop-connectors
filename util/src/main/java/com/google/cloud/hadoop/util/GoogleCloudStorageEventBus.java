@@ -17,10 +17,9 @@
 package com.google.cloud.hadoop.util;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
 import com.google.common.eventbus.EventBus;
+import io.grpc.Status;
 import java.io.IOException;
 
 /** Event Bus class */
@@ -46,6 +45,16 @@ public class GoogleCloudStorageEventBus {
   }
 
   /**
+   * Method to unregister an obj to event bus
+   *
+   * @param obj to unregister from event bus
+   * @throws IllegalArgumentException if the object was not previously registered.
+   */
+  public static void unregister(Object obj) {
+    eventBus.unregister(obj);
+  }
+
+  /**
    * Posting GoogleJsonResponseException to invoke corresponding Subscriber method.
    *
    * @param response contains statusCode based on which metrics are updated in Subscriber method
@@ -66,19 +75,19 @@ public class GoogleCloudStorageEventBus {
   /**
    * Posting HttpResponse to invoke corresponding Subscriber method.
    *
-   * @param response contains statusCode based on which metrics are updated in Subscriber method
+   * @param responseStatus response status code
    */
-  public static void postOnHttpResponse(HttpResponse response) {
-    eventBus.post(response);
+  public static void postOnHttpResponseStatus(int responseStatus) {
+    eventBus.post(responseStatus);
   }
 
   /**
-   * Posting HttpRequest to invoke corresponding Subscriber method.
+   * Posting Gcs request execution event i.e. request to gcs is being initiated.
    *
-   * @param request based on which metrics are updated in Subscriber method
+   * @param event dummy event to map to request execution type.
    */
-  public static void postOnHttpRequest(HttpRequest request) {
-    eventBus.post(request);
+  public static void onGcsRequest(GcsRequestExecutionEvent event) {
+    eventBus.post(event);
   }
 
   /**
@@ -95,5 +104,13 @@ public class GoogleCloudStorageEventBus {
    */
   public static void postOnStatisticsType() {
     eventBus.post(StatisticsType.DIRECTORIES_DELETED);
+  }
+  /**
+   * Posting grpc Status to invoke the corresponding Subscriber method.
+   *
+   * @param status status object of grpc response
+   */
+  public static void onGrpcStatus(Status status) {
+    eventBus.post(status);
   }
 }
