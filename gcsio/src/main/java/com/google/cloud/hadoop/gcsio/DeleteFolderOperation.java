@@ -78,6 +78,7 @@ class DeleteFolderOperation {
 
   /** Helper function that performs the deletion process for folder resources */
   public void performDeleteOperation() throws InterruptedException {
+
     int folderSize = folders.size();
     computeChildrenForFolderResource();
 
@@ -92,17 +93,6 @@ class DeleteFolderOperation {
     batchExecutorShutdown();
   }
 
-  /** Shutting down batch executor and flushing any remaining requests */
-  private void batchExecutorShutdown() {
-    try {
-      batchExecutor.shutdown();
-    } catch (IOException e) {
-      addException(
-          new IOException(
-              String.format("Error in shutting down batch executor : %s", e.getMessage())));
-    }
-  }
-
   public boolean encounteredNoExceptions() {
     return allExceptions.isEmpty();
   }
@@ -111,8 +101,55 @@ class DeleteFolderOperation {
     return allExceptions;
   }
 
+  /** Adding to batch executor's queue */
+  protected void addToToBatchExecutorQueue(Callable callable, FutureCallback callback) {
+    batchExecutor.queue(callable, callback);
+  }
+
+  /** Helper function to delete a single folder resource */
+  protected void queueSingleFolderDelete(@Nonnull final FolderInfo folder, final int attempt) {
+    final String bucketName = folder.getBucket();
+    final String folderName = folder.getFolderName();
+    checkArgument(
+        !Strings.isNullOrEmpty(bucketName),
+        String.format("No bucket for folder resource %s", bucketName));
+    checkArgument(
+        !Strings.isNullOrEmpty(folderName),
+        String.format("No folder path for folder resource %s", folderName));
+
+    addToToBatchExecutorQueue(
+        new DeleteFolderRequestCallable(folder, storageControlClient),
+        getDeletionCallback(folder, allExceptions, attempt));
+  }
+
+  /**
+   * Helper function to add the parent of successfully deleted folder resource into the blocking
+   * queue
+   *
+   * @param folderResource of the folder that is now deleted
+   */
+  protected synchronized void successfullDeletionOfFolderResource(FolderInfo folderResource) {
+    // remove the folderResource from list of map
+    countOfChildren.remove(folderResource.getFolderName());
+
+    String parentFolder = folderResource.getParentFolderName();
+    if (countOfChildren.containsKey(parentFolder)) {
+
+      // update the parent's count of children
+      countOfChildren.replace(parentFolder, countOfChildren.get(parentFolder) - 1);
+      assert (countOfChildren.get(parentFolder) >= 0);
+
+      // if the parent folder is now empty, append in the queue
+      if (countOfChildren.get(parentFolder) == 0) {
+        addFolderResourceInBlockingQueue(
+            new FolderInfo(
+                FolderInfo.createFolderInfoObject(folderResource.getBucket(), parentFolder)));
+      }
+    }
+  }
+
   /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
+  private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
       return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
     } catch (InterruptedException e) {
@@ -122,14 +159,8 @@ class DeleteFolderOperation {
     }
   }
 
-  /** Adding to batch executor's queue */
-  public void addToToBatchExecutorQueue(
-      Callable callable, final FolderInfo folder, final int attempt) {
-    batchExecutor.queue(callable, getDeletionCallback(folder, allExceptions, attempt));
-  }
-
   /** Computes the number of children for each folder resource */
-  public void computeChildrenForFolderResource() {
+  private void computeChildrenForFolderResource() {
     for (FolderInfo currentFolder : folders) {
       if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
         countOfChildren.put(currentFolder.getFolderName(), 0L);
@@ -148,6 +179,17 @@ class DeleteFolderOperation {
     }
   }
 
+  /** Shutting down batch executor and flushing any remaining requests */
+  private void batchExecutorShutdown() {
+    try {
+      batchExecutor.shutdown();
+    } catch (IOException e) {
+      addException(
+          new IOException(
+              String.format("Error in shutting down batch executor : %s", e.getMessage())));
+    }
+  }
+
   /**
    * Helper function to add folderResource to blocking queue
    *
@@ -155,46 +197,6 @@ class DeleteFolderOperation {
    */
   private void addFolderResourceInBlockingQueue(FolderInfo folderResource) {
     folderDeleteBlockingQueue.add(folderResource);
-  }
-
-  /**
-   * Helper function to add the parent of successfully deleted folder resource into the blocking
-   * queue
-   *
-   * @param folderResource of the folder that is now deleted
-   */
-  private void successfullDeletionOfFolderResource(FolderInfo folderResource) {
-    // remove the folderResource from list of map
-    countOfChildren.remove(folderResource.getFolderName());
-
-    String parentFolder = folderResource.getParentFolderName();
-    if (countOfChildren.containsKey(parentFolder)) {
-
-      // update the parent's count of children
-      countOfChildren.replace(parentFolder, countOfChildren.get(parentFolder) - 1);
-
-      // if the parent folder is now empty, append in the queue
-      if (countOfChildren.get(parentFolder) == 0) {
-        addFolderResourceInBlockingQueue(
-            new FolderInfo(
-                FolderInfo.createFolderInfoObject(folderResource.getBucket(), parentFolder)));
-      }
-    }
-  }
-
-  /** Helper function to delete a single folder resource */
-  private void queueSingleFolderDelete(@Nonnull final FolderInfo folder, final int attempt) {
-    final String bucketName = folder.getBucket();
-    final String folderName = folder.getFolderName();
-    checkArgument(
-        !Strings.isNullOrEmpty(bucketName),
-        String.format("No bucket for folder resource %s", bucketName));
-    checkArgument(
-        !Strings.isNullOrEmpty(folderName),
-        String.format("No folder path for folder resource %s", folderName));
-
-    addToToBatchExecutorQueue(
-        new DeleteFolderRequestCallable(folder, storageControlClient), folder, attempt);
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
