@@ -26,6 +26,9 @@ public enum GoogleCloudStorageTracingFields {
   IDEMPOTENCY_TOKEN("idempotency-token"),
   REQUEST_COUNTER("requestCounter"),
   RESPONSE_COUNTER("responseCounter"),
+  REQUEST_MESSAGE_AS_STRING("reqMessageAsString"),
+  RESPONSE_MESSAGE_AS_STRING("rspMessageAsString"),
+  CURRENT_TIME("currentTime"),
 
   // Common fields
   RESOURCE("resource"),
@@ -40,7 +43,8 @@ public enum GoogleCloudStorageTracingFields {
   REQUEST_START_OFFSET("requestStartOffset"),
   BYTES_READ("bytesRead"),
   STREAM_OPERATION("streamOperation"),
-  STATUS("status");
+  STATUS("status"),
+  DURATION_MS("durationMs");
 
   public final String name;
 
