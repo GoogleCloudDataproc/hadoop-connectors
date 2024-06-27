@@ -1515,7 +1515,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @Test
   public void testHnBucketNonRecursiveDeleteOperation() throws Exception {
-    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn-non-recursive-delete-operation");
     GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
     String bucketPath = "gs://" + bucketName;
     try {
@@ -1540,7 +1540,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @Test
   public void testHnBucketRecursiveDeleteOperationOnBucket() throws Exception {
-    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn-recursive-delete-on-bucket");
     String bucketPath = "gs://" + bucketName;
     GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
     createResources(googleHadoopFileSystem);
@@ -1568,7 +1568,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @Test
   public void testHnBucketRecursiveDeleteOperationOnDirectory() throws Exception {
-    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn-recursive-delete-on-directory");
     String bucketPath = "gs://" + bucketName;
     GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
     try {
@@ -1597,7 +1597,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @Test
   public void testHnBucketDeleteOperationOnNonExistingFolder() throws Exception {
-    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn-delete-on-non-existing-folder");
     String bucketPath = "gs://" + bucketName;
     GoogleHadoopFileSystem googleHadoopFileSystem = createHnEnabledBucket(bucketName);
 
