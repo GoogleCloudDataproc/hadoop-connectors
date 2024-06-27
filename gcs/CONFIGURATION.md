@@ -514,6 +514,66 @@ permissions (not authorized) to execute these requests.
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.
 
+### grpc-directpath configuration
+
+gRPC over directpath is an optimized configuration to connect with gcs backend.
+It offers better latency and increase bandwidth.
+GCS-connector enables this path for IO operations (for now). It's no a default
+option yet as this feature is fairly new
+
+* `fs.gs.client.type` (default: `HTTP_API_CLIENT`)
+
+    Valid values:
+
+    * `HTTP_API_CLIENT` uses Apairy client to connect to gcs backend. Uses http
+      over cloudpath.
+
+    * `STORAGE_CLIENT` uses Java-storage client to connect to gcs backend. Uses
+      grpc.
+
+*  `fs.gs.grpc.write.enable` (default: `false`)
+   Is effective only of if `STORAGE_CLIENT` is in use. Enables write to go over
+   grpc-Directpath.
+
+*  `fs.gs.client.upload.type` (default: `CHUNK_UPLOAD`)
+
+   Valid values:
+
+   * `CHUNK_UPLOAD` uploads file in chunks, size of chunks are configurable via
+     `fs.gs.outputstream.upload.chunk.size`
+
+   * `PARALLEL_COMPOSITE_UPLOAD` Writes buffers are stored in memory. These
+      buffers are uploaded as part file. Fixed buffer pool strategy to
+      keep uploaded content in memory which is configurable via
+
+      * `fs.gs.write.parallel.composite.upload.buffer.count` (default: `1`)
+         In alignment with java-storage client [configuration](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+        ). More the number of buffer more will the memory footprint.
+
+      * `fs.gs.write.parallel.composite.upload.buffer.capacity` (default: `33554432`)
+        Capacity of each configured buffer. This maps to the size of part file
+        which will be uploaded to gcs.
+
+      * `fs.gs.write.parallel.composite.upload.part.file.cleanup.type` (default: `ALWAYS`)
+        Strategy via which part file will be cleaned up once the upload is
+        complete.
+
+         Valid values:
+
+         * `ALWAYS`- Always cleanup even when upload failed.
+
+         * `NEVER` - Never cleanup. Causes lower latency as deletion is bypassed.
+         Although there will be increased storage cost.
+
+         * `ON_SUCCESS` - Cleanup only on success.
+
+      * `fs.gs.write.parallel.composite.upload.part.file.name.prefix`
+        In alignment with [configuration](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_PartNamingStrategy_prefix_java_lang_String_)
+        offered via java-storage client. By-default if no prefix(or empty string)
+        is provided [object name](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_PartNamingStrategy_useObjectNameAsPrefix__) is used as prefix
+
+
+
 ### Performance cache configuration
 
 *   `fs.gs.performance.cache.enable` (default: `false`)

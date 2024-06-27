@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add grpc configuration
 
 ## 2.2.23 - 2024-06-14
 1. Delete HN folders as well when deleting a directory
