@@ -224,7 +224,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             if (numRead > 0) {
               // -1 means we actually read 0 bytes, but requested at least one byte.
               totalBytesRead += numRead;
-              // statistics.incrementBytesRead(numRead);
               statistics.incrementReadOps(1);
               streamStats.updateReadStreamStats(numRead, startTimeNs);
             }
