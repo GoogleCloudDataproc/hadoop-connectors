@@ -30,9 +30,9 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class RequesterPaysManagerTest {
-  private final String requesterPayBucket = "RequesterPays-enabled";
-  private final List<String> requesterPaysBuckets = Arrays.asList(requesterPayBucket);
-  private final String payDisabledBucket = "RequesterPays-disabled";
+  private final String requesterPaysBucket = "RequesterPays-enabled";
+  private final List<String> requesterPaysBuckets = Arrays.asList(requesterPaysBucket);
+  private final String requesterPayDisabledBucket = "RequesterPays-disabled";
 
   private int shouldRequesterPayCallCountCounter = 0;
 
@@ -42,17 +42,20 @@ public class RequesterPaysManagerTest {
         RequesterPaysOptions.DEFAULT.toBuilder().setMode(RequesterPaysMode.AUTO).build();
     RequesterPaysManager manager = new RequesterPaysManager(options, this::shouldRequesterPays);
 
+    // cache lookup will not be done if mode is `Auto`
+
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
-    assertTrue(manager.requesterShouldPay(requesterPayBucket));
+    assertTrue(manager.requesterShouldPay(requesterPaysBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(1);
     // any other call should be served from cache
-    assertTrue(manager.requesterShouldPay(requesterPayBucket));
+    assertTrue(manager.requesterShouldPay(requesterPaysBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(1);
 
-    assertFalse(manager.requesterShouldPay(payDisabledBucket));
+    // user-project header is only set for requests belonging to requesterPays enabled buckets
+    assertFalse(manager.requesterShouldPay(requesterPayDisabledBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(2);
     // any other call should be served from cache
-    assertFalse(manager.requesterShouldPay(payDisabledBucket));
+    assertFalse(manager.requesterShouldPay(requesterPayDisabledBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(2);
   }
 
@@ -66,12 +69,12 @@ public class RequesterPaysManagerTest {
             .build();
     RequesterPaysManager manager = new RequesterPaysManager(options, this::shouldRequesterPays);
 
-    assertTrue(manager.requesterShouldPay(requesterPayBucket));
-    // shouldRequesterPay is not called for custom mode
+    // cache lookup will not be done if mode is `Custom`
+    // user-project header is only set for requests belonging to allowlisted buckets
+    assertTrue(manager.requesterShouldPay(requesterPaysBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
 
-    assertFalse(manager.requesterShouldPay(payDisabledBucket));
-    // shouldRequesterPay is not called for custom mode
+    assertFalse(manager.requesterShouldPay(requesterPayDisabledBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
   }
 
@@ -80,13 +83,11 @@ public class RequesterPaysManagerTest {
     RequesterPaysOptions options =
         RequesterPaysOptions.DEFAULT.toBuilder().setMode(RequesterPaysMode.ENABLED).build();
     RequesterPaysManager manager = new RequesterPaysManager(options, this::shouldRequesterPays);
-
-    assertTrue(manager.requesterShouldPay(requesterPayBucket));
-    // shouldRequesterPay is not called for custom mode
+    // cache lookup not done if mode is `Enabled`
+    // user-project header is set for all requests
+    assertTrue(manager.requesterShouldPay(requesterPaysBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
-
-    assertTrue(manager.requesterShouldPay(payDisabledBucket));
-    // shouldRequesterPay is not called for custom mode
+    assertTrue(manager.requesterShouldPay(requesterPayDisabledBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
   }
 
@@ -96,12 +97,11 @@ public class RequesterPaysManagerTest {
         RequesterPaysOptions.DEFAULT.toBuilder().setMode(RequesterPaysMode.DISABLED).build();
     RequesterPaysManager manager = new RequesterPaysManager(options, this::shouldRequesterPays);
 
-    assertFalse(manager.requesterShouldPay(requesterPayBucket));
-    // shouldRequesterPay is not called for custom mode
+    // cache lookup is not done if mode is `Disabled`
+    // user-project header is not set for any request
+    assertFalse(manager.requesterShouldPay(requesterPaysBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
-
-    assertFalse(manager.requesterShouldPay(payDisabledBucket));
-    // shouldRequesterPay is not called for custom mode
+    assertFalse(manager.requesterShouldPay(requesterPayDisabledBucket));
     assertThat(shouldRequesterPayCallCountCounter).isEqualTo(0);
   }
 

@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
@@ -43,10 +44,10 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
+  public static final String USER_PROJECT_HEADER = "x-goog-user-project";
   private static final DateTimeFormatter dtf =
       DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS");
-  public static final String USER_PROJECT_HEADER = "x-goog-user-project";
-  private static final String DEFAULT_INVOCATION_ID = "NOT-FOUND";
+  private static final String DEFAULT_HEADER_VALUE = "NOT-FOUND";
   private static final Metadata.Key<String> idempotencyKey =
       Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
   private static final Metadata.Key<String> userProjectKey =
@@ -219,21 +220,31 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     private String getInvocationId() {
-      return headers.get(idempotencyKey);
+      String value = headers.get(idempotencyKey);
+      if (Strings.isNullOrEmpty(value)) {
+        logger.atWarning().log(
+            "Received a null or empty value for invocation Id: %s for rpc method: %s",
+            value, rpcMethod);
+        value = DEFAULT_HEADER_VALUE;
+      }
+      return value;
     }
 
     protected String getRequesterPaysProject() {
       String value = headers.get(userProjectKey);
-      return value == null ? DEFAULT_INVOCATION_ID : value;
+      return value == null ? DEFAULT_HEADER_VALUE : value;
     }
 
-    private ImmutableMap.Builder<String, Object> getStreamContext() {
+    private ImmutableMap.Builder<String, Object> getHeaderValues() {
       return new ImmutableMap.Builder<String, Object>()
-          .put(GoogleCloudStorageTracingFields.RPC_METHOD.name, rpcMethod)
           .put(
               GoogleCloudStorageTracingFields.REQUESTER_PAYS_PROJECT.name,
               getRequesterPaysProject())
           .put(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name, getInvocationId());
+    }
+
+    private ImmutableMap.Builder<String, Object> getStreamContext() {
+      return getHeaderValues().put(GoogleCloudStorageTracingFields.RPC_METHOD.name, rpcMethod);
     }
 
     private ImmutableMap.Builder<String, Object> getCommonTraceFields() {

@@ -54,7 +54,6 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
@@ -80,7 +79,6 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private TestBucketHelper bucketHelper;
   private String testBucket;
 
@@ -217,7 +215,6 @@ public class GoogleCloudStorageImplTest {
   @Test
   public void requesterPays_autoMode() throws Exception {
     String requesterPaysBucket = getRequesterPayEnabledBucket();
-    // GCS client with will require
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(
             GoogleCloudStorageTestHelper.getStandardOptionBuilder()
@@ -229,34 +226,27 @@ public class GoogleCloudStorageImplTest {
                         .build())
                 .setTraceLogEnabled(true)
                 .build());
-    try {
-      int expectedSize = 5 * 1024 * 1024;
-      StorageResourceId resourceId =
-          new StorageResourceId(requesterPaysBucket, name.getMethodName());
-      writeObject(
-          trackingGcs.delegate,
-          resourceId,
-          /* partitionSize= */ expectedSize,
-          /* partitionsCount= */ 1);
+    int expectedSize = 5 * 1024 * 1024;
+    StorageResourceId resourceId = new StorageResourceId(requesterPaysBucket, name.getMethodName());
+    writeObject(
+        trackingGcs.delegate,
+        resourceId,
+        /* partitionSize= */ expectedSize,
+        /* partitionsCount= */ 1);
 
-      assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
-          .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
-      assertThat(trackingGcs.getAllRequestStrings())
-          .contains(testIamPermissionRequestString(requesterPaysBucket, "storage.buckets.get"));
+    assertThat(trackingGcs.getAllRequestStrings())
+        .contains(testIamPermissionRequestString(requesterPaysBucket, "storage.buckets.get"));
 
-      trackingGcs.requestsTracker.reset();
-      // any other request will not result in call to testIamPermissions API
-      // Also every other request will have "userProject" filed
-      trackingGcs.delegate.getItemInfo(resourceId);
-      verifyUserProject(
-          trackingGcs.requestsTracker.getAllRawRequestStrings(),
-          TestConfiguration.getInstance().getProjectId());
-
-    } catch (Exception e) {
-      logger.atInfo().withCause(e).log("Error while writing data to bucket");
-      throw e;
-    }
+    trackingGcs.requestsTracker.reset();
+    // any other request will not result in call to testIamPermissions API
+    // Also every other request will have "userProject" header
+    trackingGcs.delegate.getItemInfo(resourceId);
+    verifyUserProject(
+        trackingGcs.requestsTracker.getAllRawRequestStrings(),
+        TestConfiguration.getInstance().getProjectId());
   }
 
   @Test
