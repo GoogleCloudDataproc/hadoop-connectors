@@ -61,6 +61,7 @@ public class GoogleCloudStorageEventSubscriber {
   @Subscribe
   private void subscriberOnHttpResponseStatus(@Nonnull Integer responseStatus) {
     updateGcsIOSpecificStatistics(responseStatus);
+    incrementStatusCode(responseStatus);
   }
 
   @Subscribe
@@ -136,6 +137,47 @@ public class GoogleCloudStorageEventSubscriber {
       case DATA_LOSS:
       default:
         return 500;
+    }
+  }
+
+  private void incrementStatusCode(int statusCode) {
+    switch (statusCode) {
+      case 400:
+        storageStatistics.incrementGcsClientBadRequestCount();
+        break;
+      case 401:
+        storageStatistics.incrementGcsClientUnauthorizedResponseCount();
+        break;
+      case 404:
+        storageStatistics.incrementGcsClientNotFoundResponseCount();
+        break;
+      case 408:
+        storageStatistics.incrementGcsClientRequestTimeoutCount();
+        break;
+      case 410:
+        storageStatistics.incrementGcsClientGoneResponseCount();
+        break;
+      case 412:
+        storageStatistics.incrementGcsClientPreconditionFailedResponseCount();
+        break;
+      case 416:
+        storageStatistics.incrementGcsClientRequestedRangeNotSatisfiableCount();
+        break;
+      case 500:
+        storageStatistics.incrementGcsServerInternalErrorCount();
+        break;
+      case 501:
+        storageStatistics.incrementGcsServerNotImplementedErrorCount();
+        break;
+      case 502:
+        storageStatistics.incrementGcsServerBadGatewayCount();
+        break;
+      case 503:
+        storageStatistics.incrementGcsServerServiceUnavailableCount();
+        break;
+      case 504:
+        storageStatistics.incrementGcsServerTimeoutCount();
+        break;
     }
   }
 }
