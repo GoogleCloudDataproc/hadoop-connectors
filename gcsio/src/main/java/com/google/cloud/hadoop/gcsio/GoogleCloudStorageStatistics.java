@@ -23,27 +23,86 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 import java.util.EnumSet;
 
-/** Statistics which are collected in GCS Connector */
+/** Statistics which are collected in GCS Connector. */
 public enum GoogleCloudStorageStatistics {
-
-  /** GCS connector specific statistics */
-  GCS_REQUEST_COUNT(
-      "gcs_total_request_count", "Counts the total number of gcs requests made", TYPE_COUNTER),
-
   EXCEPTION_COUNT("exception_count", "Counts the number of exceptions encountered", TYPE_COUNTER),
 
-  GCS_CLIENT_SIDE_ERROR_COUNT(
-      "gcs_client_side_error_count",
+  /** Status Code Counters for JSON Path */
+  GCS_API_REQUEST_COUNT(
+      "gcs_api_total_request_count", "Counts the total number of gcs requests made", TYPE_COUNTER),
+
+  GCS_API_CLIENT_SIDE_ERROR_COUNT(
+      "gcs_api_client_side_error_count",
       "Counts the occurrence of client side error status code",
       TYPE_COUNTER),
 
-  GCS_SERVER_SIDE_ERROR_COUNT(
-      "gcs_server_side_error_count",
+  GCS_API_SERVER_SIDE_ERROR_COUNT(
+      "gcs_api_server_side_error_count",
       "Counts the occurrence of server side error status code",
       TYPE_COUNTER),
 
-  GCS_CLIENT_RATE_LIMIT_COUNT(
-      "gcs_client_rate_limit_error_count", "Counts the occurence of 429 status code", TYPE_COUNTER);
+  GCS_API_CLIENT_RATE_LIMIT_COUNT(
+      "gcs_api_client_rate_limit_error_count",
+      "Counts the occurence of 429 status code",
+      TYPE_COUNTER),
+
+  GCS_API_CLIENT_BAD_REQUEST_COUNT(
+      "gcs_api_client_bad_request_count", "Counts the occurence of 400 status code", TYPE_COUNTER),
+
+  GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT(
+      "gcs_api_client_unauthorized_response_count",
+      "Counts the occurence of 401 status code",
+      TYPE_COUNTER),
+
+  GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT(
+      "gcs_api_client_non_found_response_count",
+      "Counts the occurence of 404 status code",
+      TYPE_COUNTER),
+
+  GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT(
+      "gcs_api_client_request_timeout_count",
+      "Counts the occurence of 408 status code",
+      TYPE_COUNTER),
+
+  GCS_API_CLIENT_GONE_RESPONSE_COUNT(
+      "gcs_api_client_gone_response_count",
+      "Counts the occurence of 410 status code",
+      TYPE_COUNTER),
+
+  GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT(
+      "gcs_api_client_precondition_failed_response_count",
+      "Counts the occurence of 412 status code",
+      TYPE_COUNTER),
+
+  GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT(
+      "gcs_api_client_requested_range_not_statisfiable_count",
+      "Counts the occurence of 416 status code",
+      TYPE_COUNTER),
+
+  GCS_API_SERVER_INTERNAL_ERROR_COUNT(
+      "gcs_api_server_internal_error_count",
+      "Counts the occurrence of server side 500 error status code",
+      TYPE_COUNTER),
+
+  GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT(
+      "gcs_api_server_not_implemented_error_count",
+      "Counts the occurrence of server side 501 error status code",
+      TYPE_COUNTER),
+
+  GCS_API_SERVER_BAD_GATEWAY_COUNT(
+      "gcs_api_server_bad_gateway_count",
+      "Counts the occurrence of server side 502 error status code",
+      TYPE_COUNTER),
+
+  GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT(
+      "gcs_api_server_unavailable_count",
+      "Counts the occurrence of server side 503 error status code",
+      TYPE_COUNTER),
+
+  GCS_API_SERVER_TIMEOUT_COUNT(
+      "gcs_api_server_timeout_count",
+      "Counts the occurrence of server side 504 error status code",
+      TYPE_COUNTER);
 
   public static final ImmutableSet<GoogleCloudStorageStatistics> VALUES =
       ImmutableSet.copyOf(EnumSet.allOf(GoogleCloudStorageStatistics.class));
