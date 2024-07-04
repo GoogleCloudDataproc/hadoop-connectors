@@ -46,6 +46,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 
 /** Provides seekable read access to GCS via java-storage library. */
@@ -64,6 +65,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private long objectSize;
   private final ErrorTypeExtractor errorExtractor;
   private ContentReadChannel contentReadChannel;
+  private Function<String, Boolean> requesterShouldPay;
   private boolean gzipEncoded = false;
   private boolean open = true;
 
@@ -76,7 +78,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions,
       ErrorTypeExtractor errorExtractor,
-      GoogleCloudStorageOptions storageOptions)
+      GoogleCloudStorageOptions storageOptions,
+      Function<String, Boolean> requesterShouldPay)
       throws IOException {
     validate(itemInfo);
     this.storage = storage;
@@ -87,6 +90,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     this.readOptions = readOptions;
     this.storageOptions = storageOptions;
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
+    this.requesterShouldPay = requesterShouldPay;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
   }
 
@@ -581,6 +585,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (storageOptions.getEncryptionKey() != null) {
         blobReadOptions.add(
             BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      }
+      if (requesterShouldPay.apply((blobId.getBucket()))) {
+        blobReadOptions.add(
+            BlobSourceOption.userProject(storageOptions.getRequesterPaysOptions().getProjectId()));
       }
       return blobReadOptions.toArray(new BlobSourceOption[blobReadOptions.size()]);
     }

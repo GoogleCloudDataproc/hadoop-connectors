@@ -42,6 +42,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding"
           + ",md5Hash,crc32c,metadata";
 
+  private static final String TEST_IAM_PERMISSION_REQUEST_FORMAT =
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/iam/testPermissions?permissions=%s";
   private static final String GET_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s%s";
 
@@ -180,6 +182,13 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .collect(toImmutableList());
   }
 
+  public ImmutableList<String> getAllRequestUserProject() {
+    return requests.stream()
+        .map(r -> getUserProject(GoogleCloudStorageIntegrationHelper.requestToString(r)))
+        .filter(((Predicate<String>) Strings::isNullOrEmpty).negate())
+        .collect(toImmutableList());
+  }
+
   public ImmutableList<String> getAllRawRequestStrings() {
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
@@ -199,6 +208,17 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
               apiClientHeader.indexOf(" ", beginIndex), apiClientHeader.indexOf(",", beginIndex));
       endIndex = endIndex == -1 ? apiClientHeader.length() : endIndex;
       return apiClientHeader.substring(beginIndex, endIndex);
+    }
+    return null;
+  }
+
+  private String getUserProject(String requestString) {
+    String userProject = "userProject=";
+    int beginIndex = requestString.indexOf(userProject);
+    if (beginIndex >= 0) {
+      beginIndex += userProject.length();
+      int endIndex = Math.max(requestString.length(), requestString.indexOf('&', beginIndex));
+      return requestString.substring(beginIndex, endIndex);
     }
     return null;
   }
@@ -242,6 +262,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String getRequestString(String bucketName, String object) {
     return getRequestString(bucketName, object, OBJECT_FIELDS);
+  }
+
+  public static String getTestIamPermissionRequestFormat(String bucketName, String permissions) {
+    return String.format(TEST_IAM_PERMISSION_REQUEST_FORMAT, bucketName, permissions);
   }
 
   public static String getRequestString(String bucketName, String object, String fields) {
