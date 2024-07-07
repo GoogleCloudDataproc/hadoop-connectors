@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.cloud.hadoop.util.TestRequestTracker.ExpectedEventDetails;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -37,6 +38,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -47,6 +50,14 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class RetryHttpInitializerTest {
+  public static final String URL = "http://fake-url.com";
+  private TestRequestTracker requestTracker;
+
+  @Before
+  public void beforeTest() {
+    this.requestTracker = new TestRequestTracker();
+  }
+
   @Test
   public void testConstructorNullCredentials() {
     createRetryHttpInitializer(/* credentials= */ null);
@@ -59,7 +70,7 @@ public class RetryHttpInitializerTest {
         mockTransport(emptyResponse(200))
             .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
 
-    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(URL));
 
     assertThat(req.getHeaders())
         .containsAtLeast(
@@ -73,6 +84,9 @@ public class RetryHttpInitializerTest {
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
+
+    requestTracker.verifyEvents(
+        List.of(ExpectedEventDetails.getStarted(URL), ExpectedEventDetails.getResponse(URL, 200)));
   }
 
   @Test
@@ -82,7 +96,7 @@ public class RetryHttpInitializerTest {
         mockTransport(emptyResponse(403))
             .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
 
-    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(URL));
 
     assertThat(req.getHeaders())
         .containsAtLeast(
@@ -94,6 +108,11 @@ public class RetryHttpInitializerTest {
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_FORBIDDEN);
+
+    requestTracker.verifyEvents(
+        List.of(
+            TestRequestTracker.ExpectedEventDetails.getStarted(URL),
+            ExpectedEventDetails.getResponse(URL, 403)));
   }
 
   @Test
@@ -113,7 +132,7 @@ public class RetryHttpInitializerTest {
         mockTransport(emptyResponse(statusCode), emptyResponse(statusCode), emptyResponse(200))
             .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
 
-    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(URL));
 
     assertThat(req.getHeaders())
         .containsAtLeast(
@@ -126,6 +145,62 @@ public class RetryHttpInitializerTest {
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
+
+    System.out.println(requestTracker.getEvents());
+
+    requestTracker.verifyEvents(
+        List.of(
+            ExpectedEventDetails.getStarted(URL),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 0),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 1),
+            ExpectedEventDetails.getResponse(URL, 200)));
+  }
+
+  @Test
+  public void errorCodeResponse_failsAfterMaxRetries() throws Exception {
+    int statusCode = 429;
+    String authHeaderValue = "Bearer: y2.WAKiHahzxGS_a1bd40RjNUF";
+    HttpRequestFactory requestFactory =
+        mockTransport(
+                emptyResponse(statusCode),
+                emptyResponse(statusCode),
+                emptyResponse(statusCode),
+                emptyResponse(statusCode),
+                emptyResponse(statusCode),
+                emptyResponse(statusCode),
+                emptyResponse(statusCode))
+            .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
+
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(URL));
+
+    assertThat(req.getHeaders())
+        .containsAtLeast(
+            "user-agent", ImmutableList.of("foo-user-agent"),
+            "header-key", "header-value",
+            "authorization", ImmutableList.of(authHeaderValue));
+
+    try {
+      HttpResponse res = req.execute();
+    } catch (HttpResponseException exception) {
+      // Ignore. Expected.
+    }
+
+    requestTracker.verifyEvents(
+        List.of(
+            ExpectedEventDetails.getStarted(URL),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 0),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 1),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 2),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 3),
+            ExpectedEventDetails.getResponse(URL, statusCode),
+            ExpectedEventDetails.getBackoff(URL, 4),
+            ExpectedEventDetails.getResponse(URL, statusCode)));
   }
 
   @Test
@@ -140,7 +215,7 @@ public class RetryHttpInitializerTest {
                 emptyResponse(200))
             .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
 
-    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(URL));
 
     assertThat(req.getHeaders())
         .containsAtLeast(
@@ -153,10 +228,17 @@ public class RetryHttpInitializerTest {
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
+
+    // TODO: For some reason the IOException handler is not getting called. Check why that is the
+    // case.
+    requestTracker.verifyEvents(
+        List.of(
+            TestRequestTracker.ExpectedEventDetails.getStarted(URL),
+            TestRequestTracker.ExpectedEventDetails.getResponse(URL, 200)));
   }
 
-  private static RetryHttpInitializer createRetryHttpInitializer(Credentials credentials) {
-    return new RetryHttpInitializer(
+  private TestRetryHttpInitializer createRetryHttpInitializer(Credentials credentials) {
+    return new TestRetryHttpInitializer(
         credentials,
         RetryHttpInitializerOptions.builder()
             .setDefaultUserAgent("foo-user-agent")
@@ -165,5 +247,23 @@ public class RetryHttpInitializerTest {
             .setConnectTimeout(Duration.ofSeconds(5))
             .setReadTimeout(Duration.ofSeconds(5))
             .build());
+  }
+
+  private class TestRetryHttpInitializer extends RetryHttpInitializer {
+    private boolean init;
+
+    public TestRetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions build) {
+      super(credentials, build);
+    }
+
+    @Override
+    protected RequestTracker getRequestTracker(HttpRequest request) {
+      if (!this.init) {
+        requestTracker.init(request);
+        this.init = true;
+      }
+
+      return requestTracker;
+    }
   }
 }

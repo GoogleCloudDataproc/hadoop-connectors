@@ -25,6 +25,10 @@ import java.io.IOException;
 /** Event Bus class */
 public class GoogleCloudStorageEventBus {
 
+  public static void postGcsJsonApiEvent(GcsJsonApiEvent gcsJsonApiEvent) {
+    eventBus.post(gcsJsonApiEvent);
+  }
+
   /** Translates increment of statistics from API calls into StatisticsType */
   public enum StatisticsType {
     DIRECTORIES_DELETED
