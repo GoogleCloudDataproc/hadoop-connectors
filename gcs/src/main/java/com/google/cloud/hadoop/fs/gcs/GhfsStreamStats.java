@@ -71,8 +71,6 @@ class GhfsStreamStats {
     updateStats(start);
   }
 
-  void updateVectoredBytesRead(int len) {}
-
   private static long toMillis(long nano) {
     return nano / 1000_000;
   }
