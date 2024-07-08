@@ -33,9 +33,11 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -116,6 +118,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.operation.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
+          put("fs.gs.client.upload.type", UploadType.DEFAULT);
+          put("fs.gs.write.temporary.dirs", ImmutableSet.of());
         }
       };
 
