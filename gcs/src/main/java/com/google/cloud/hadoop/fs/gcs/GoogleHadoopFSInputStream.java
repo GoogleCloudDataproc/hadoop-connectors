@@ -207,7 +207,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       throws IOException {
     long startTimeNs = System.nanoTime();
 
-    // Note: don't update byteReadMetric here as it will be reported by super.read
+    // Note: don't update byteRead Metric here. As, it will be reported by super.read
     int result = super.read(position, buf, offset, length);
     readAPITrace(POSITIONAL_READ_METHOD, startTimeNs, position, offset, length, result, Level.FINE);
 
