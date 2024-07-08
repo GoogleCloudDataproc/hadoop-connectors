@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.24 - 2024-06-28
 1. Add gRPC configuration documentation
 
