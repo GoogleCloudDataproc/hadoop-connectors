@@ -514,6 +514,33 @@ permissions (not authorized) to execute these requests.
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.
 
+### grpc configuration
+
+gRPC is an optimized way to connect with gcs backend. It offers
+better latency and increased bandwidth. Currently supported only for read/write operations.
+
+* `fs.gs.client.type` (default: `HTTP_API_CLIENT`)
+
+    Valid values:
+
+    * `HTTP_API_CLIENT` uses json api to connect to gcs backend. Uses http
+      over cloudpath.
+
+    * `STORAGE_CLIENT` uses Java-storage client to connect to gcs backend. Uses
+      gRPC.
+
+*  `fs.gs.grpc.write.enable` (default: `false`)
+   Is effective only of if `STORAGE_CLIENT` is selected. Enables write to go over
+   grpc.
+
+*  `fs.gs.client.upload.type` (default: `CHUNK_UPLOAD`)
+   This is only effective if `STORAGE_CLIENT` is selected.
+
+   Valid values:
+
+   * `CHUNK_UPLOAD` uploads file in chunks, size of chunks are configurable via
+     `fs.gs.outputstream.upload.chunk.size`
+
 ### Performance cache configuration
 
 *   `fs.gs.performance.cache.enable` (default: `false`)

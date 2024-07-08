@@ -119,6 +119,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
+    if (!storageOptions.isGrpcWriteEnabled()) {
+      return super.create(resourceId, options);
+    }
+
     logger.atFiner().log("create(%s)", resourceId);
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
@@ -254,6 +258,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                     new GoogleCloudStorageClientGrpcDownscopingInterceptor(
                         downscopedAccessTokenFn));
               }
+              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
 
               return ImmutableList.copyOf(list);
             })

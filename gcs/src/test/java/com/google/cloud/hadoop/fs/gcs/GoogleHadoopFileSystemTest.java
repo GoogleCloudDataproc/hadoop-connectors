@@ -14,6 +14,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -337,6 +339,18 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     ghfs.initialize(gsUri, config);
   }
 
+  @Test
+  public void testTotalTimeStatistics() throws IOException {
+    GhfsStorageStatistics stats = new GhfsStorageStatistics();
+    stats.updateStats(STREAM_READ_OPERATIONS, 10, 100, 200, 10, new Object());
+    stats.addTotalTimeStatistic(STREAM_READ_OPERATIONS.getSymbol() + "_duration");
+    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
+
+    stats.updateStats(STREAM_WRITE_OPERATIONS, 10, 100, 200, 10, new Object());
+    stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration");
+    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
+  }
+
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.
@@ -378,4 +392,16 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testRenameHnBucket() {}
+
+  @Override
+  public void testHnBucketRecursiveDeleteOperationOnDirectory() {}
+
+  @Override
+  public void testHnBucketRecursiveDeleteOperationOnBucket() {}
+
+  @Override
+  public void testHnBucketNonRecursiveDeleteOperation() {}
+
+  @Override
+  public void testHnBucketDeleteOperationOnNonExistingFolder() {}
 }

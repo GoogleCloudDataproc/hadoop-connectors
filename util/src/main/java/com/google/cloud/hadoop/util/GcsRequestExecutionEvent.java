@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google Inc. All Rights Reserved.
+ * Copyright 2024 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,10 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio;
+package com.google.cloud.hadoop.util;
 
-/** Enum of statistic types. */
-public enum StatisticTypeEnum {
+import com.google.common.annotations.VisibleForTesting;
 
-  /** Counter. Counts the number of occurrences of each operation */
-  TYPE_COUNTER,
-
-  /** Duration. Duration for the execution of opertaion */
-  TYPE_DURATION,
-
-  /** Gauge. */
-  TYPE_GAUGE,
-
-  /* Duration. Total duration for the execution of operation */
-  TYPE_DURATION_TOTAL
-}
+/** This an Event which is published in EvenBus queue whenever a gcs request is created/executed. */
+@VisibleForTesting
+public class GcsRequestExecutionEvent {}

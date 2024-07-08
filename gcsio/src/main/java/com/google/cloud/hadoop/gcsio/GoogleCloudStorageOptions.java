@@ -90,6 +90,8 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for whether or not to use rewrite request for copy operation. */
   public static final boolean COPY_WITH_REWRITE_DEFAULT = false;
 
+  public static final boolean GRPC_WRITE_DEFAULT = false;
+
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
   public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
 
@@ -148,7 +150,8 @@ public abstract class GoogleCloudStorageOptions {
         .setOperationTraceLogEnabled(false)
         .setTraceLogTimeThreshold(0)
         .setTraceLogExcludeProperties(ImmutableSet.of())
-        .setHnBucketRenameEnabled(SET_HN_BUCKET_CREATE_ENABLED_DEFAULT);
+        .setHnBucketRenameEnabled(SET_HN_BUCKET_CREATE_ENABLED_DEFAULT)
+        .setGrpcWriteEnabled(GRPC_WRITE_DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -166,6 +169,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getStorageRootUrl();
 
   public abstract String getStorageServicePath();
+
+  public abstract boolean isGrpcWriteEnabled();
 
   @Nullable
   public abstract String getProjectId();
@@ -340,6 +345,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setHnBucketRenameEnabled(boolean enabled);
 
     public abstract Builder setTraceLogExcludeProperties(ImmutableSet<String> properties);
+
+    public abstract Builder setGrpcWriteEnabled(boolean grpcWriteEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
