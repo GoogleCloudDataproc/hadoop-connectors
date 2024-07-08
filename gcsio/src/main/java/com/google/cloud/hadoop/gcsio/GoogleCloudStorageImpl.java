@@ -625,7 +625,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       GoogleCloudStorageEventBus.postOnException();
-      throw new IOException("Failed to create bucket", e);
+      throw new IOException(String.format("Failed to create bucket. cause=%s", e.getMessage()), e);
     } catch (IOException e) {
       if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
         GoogleCloudStorageEventBus.postOnException();
@@ -746,7 +746,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 // Preconditions
                 // checks which get enforced at various layers in the library stack.
                 innerExceptions.add(
-                    new IOException("Error re-fetching after rate-limit error: " + resourceId, e));
+                    new IOException(
+                        String.format(
+                            "Error re-fetching after rate-limit error: %s. cause=%s",
+                            resourceId, e.getMessage()),
+                        e));
               }
               if (canIgnoreException) {
                 logger.atInfo().log(
@@ -755,10 +759,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                     ioe.getClass().getSimpleName());
                 logger.atFine().withCause(ioe).log("Ignored exception while creating empty object");
               } else {
-                innerExceptions.add(new IOException("Error inserting " + resourceId, ioe));
+                innerExceptions.add(
+                    new IOException(
+                        String.format("Error inserting %s. cause=%s", resourceId, ioe.getMessage()),
+                        ioe));
               }
             } catch (Exception e) {
-              innerExceptions.add(new IOException("Error inserting " + resourceId, e));
+              innerExceptions.add(
+                  new IOException(
+                      String.format("Error inserting %s. cause=%s", resourceId, e.getMessage()),
+                      e));
             } finally {
               latch.countDown();
             }
@@ -770,7 +780,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       GoogleCloudStorageEventBus.postOnException();
-      throw new IOException("Failed to create empty objects", ie);
+      throw new IOException(
+          String.format("Failed to create empty objects. reason=%s", ie.getMessage()), ie);
     }
 
     if (!innerExceptions.isEmpty()) {
@@ -863,11 +874,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         innerExceptions.add(
             errorExtractor.itemNotFound(e)
                 ? createFileNotFoundException(bucketName, null, e)
-                : new IOException(String.format("Error deleting '%s' bucket", bucketName), e));
+                : new IOException(
+                    String.format(
+                        "Error deleting '%s' bucket. cause=%s", bucketName, e.getMessage()),
+                    e));
       } catch (InterruptedException e) {
         GoogleCloudStorageEventBus.postOnException();
         Thread.currentThread().interrupt();
-        throw new IOException("Failed to delete buckets", e);
+        throw new IOException(
+            String.format("Failed to delete buckets. cause=%s", e.getMessage()), e);
       }
     }
     if (!innerExceptions.isEmpty()) {
@@ -2277,7 +2292,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         logger.atFiner().withCause(e).log("getBucket(%s): not found", bucketName);
         return null;
       }
-      throw new IOException("Error accessing Bucket " + bucketName, e);
+      throw new IOException(
+          String.format("Error accessing Bucket %s. cause=%s", bucketName, e.getMessage()), e);
     }
   }
 

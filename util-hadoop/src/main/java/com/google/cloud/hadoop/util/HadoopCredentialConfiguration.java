@@ -239,7 +239,8 @@ public class HadoopCredentialConfiguration {
     try {
       return clazz.getDeclaredConstructor().newInstance();
     } catch (ReflectiveOperationException ex) {
-      throw new IOException("Can't instantiate " + clazz.getName(), ex);
+      throw new IOException(
+          String.format("Can't instantiate '%s'. cause=%s", clazz.getName(), ex.getMessage()), ex);
     }
   }
 
