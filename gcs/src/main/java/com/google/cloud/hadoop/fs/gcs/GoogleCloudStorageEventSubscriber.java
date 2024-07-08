@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.common.eventbus.Subscribe;
 import io.grpc.Status;
@@ -25,10 +26,20 @@ import javax.annotation.Nonnull;
 
 /* Stores the subscriber methods corresponding to GoogleCloudStorageEventBus */
 public class GoogleCloudStorageEventSubscriber {
-  private static GhfsStorageStatistics storageStatistics;
+  private static GhfsGlobalStorageStatistics storageStatistics;
 
-  public GoogleCloudStorageEventSubscriber(GhfsStorageStatistics storageStatistics) {
+  public GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
+  }
+
+  /**
+   * Updating the required gcs specific statistics based on HttpResponseException.
+   *
+   * @param responseException contains statusCode based on which metrics are updated
+   */
+  @Subscribe
+  private void subscriberOnHttpResponseException(@Nonnull HttpResponseException responseException) {
+    updateGcsIOSpecificStatistics(responseException.getStatusCode());
   }
 
   /**

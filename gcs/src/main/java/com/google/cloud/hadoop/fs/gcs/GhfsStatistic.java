@@ -54,11 +54,6 @@ public enum GhfsStatistic {
       "Total number of directories created through the object store.",
       TYPE_COUNTER),
 
-  DIRECTORIES_DELETED(
-      "directories_deleted",
-      "Total number of directories deleted through the object store.",
-      TYPE_COUNTER),
-
   FILES_CREATED(
       "files_created", "Total number of files created through the object store.", TYPE_COUNTER),
   FILES_DELETED(
