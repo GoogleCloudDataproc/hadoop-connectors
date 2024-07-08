@@ -123,9 +123,8 @@ class DeleteFolderOperation {
   }
 
   /** Adding to batch executor's queue */
-  public void addToToBatchExecutorQueue(
-      Callable callable, final FolderInfo folder, final int attempt) {
-    batchExecutor.queue(callable, getDeletionCallback(folder, allExceptions, attempt));
+  public void addToToBatchExecutorQueue(Callable callable, FutureCallback callback) {
+    batchExecutor.queue(callable, callback);
   }
 
   /** Computes the number of children for each folder resource */
@@ -149,21 +148,12 @@ class DeleteFolderOperation {
   }
 
   /**
-   * Helper function to add folderResource to blocking queue
-   *
-   * @param folderResource
-   */
-  private void addFolderResourceInBlockingQueue(FolderInfo folderResource) {
-    folderDeleteBlockingQueue.add(folderResource);
-  }
-
-  /**
    * Helper function to add the parent of successfully deleted folder resource into the blocking
    * queue
    *
    * @param folderResource of the folder that is now deleted
    */
-  private void successfullDeletionOfFolderResource(FolderInfo folderResource) {
+  protected synchronized void successfullDeletionOfFolderResource(FolderInfo folderResource) {
     // remove the folderResource from list of map
     countOfChildren.remove(folderResource.getFolderName());
 
@@ -183,7 +173,7 @@ class DeleteFolderOperation {
   }
 
   /** Helper function to delete a single folder resource */
-  private void queueSingleFolderDelete(@Nonnull final FolderInfo folder, final int attempt) {
+  protected void queueSingleFolderDelete(@Nonnull final FolderInfo folder, final int attempt) {
     final String bucketName = folder.getBucket();
     final String folderName = folder.getFolderName();
     checkArgument(
@@ -194,7 +184,17 @@ class DeleteFolderOperation {
         String.format("No folder path for folder resource %s", folderName));
 
     addToToBatchExecutorQueue(
-        new DeleteFolderRequestCallable(folder, storageControlClient), folder, attempt);
+        new DeleteFolderRequestCallable(folder, storageControlClient),
+        getDeletionCallback(folder, allExceptions, attempt));
+  }
+
+  /**
+   * Helper function to add folderResource to blocking queue
+   *
+   * @param folderResource
+   */
+  private void addFolderResourceInBlockingQueue(FolderInfo folderResource) {
+    folderDeleteBlockingQueue.add(folderResource);
   }
 
   /** Helper to create a callback for a particular deletion request for folder. */
