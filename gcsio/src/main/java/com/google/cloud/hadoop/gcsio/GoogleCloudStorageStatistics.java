@@ -42,9 +42,7 @@ public enum GoogleCloudStorageStatistics {
       TYPE_COUNTER),
 
   GCS_API_CLIENT_RATE_LIMIT_COUNT(
-      "gcs_api_client_rate_limit_error_count",
-      "Counts the occurence of 429 status code",
-      TYPE_COUNTER),
+      "gcs_api_client_rate_limit_error_count", "Counts the occurence of rate limit", TYPE_COUNTER),
 
   GCS_API_CLIENT_BAD_REQUEST_COUNT(
       "gcs_api_client_bad_request_count", "Counts the occurence of 400 status code", TYPE_COUNTER),

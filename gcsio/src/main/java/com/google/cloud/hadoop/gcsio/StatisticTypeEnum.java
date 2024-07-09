@@ -28,6 +28,8 @@ public enum StatisticTypeEnum {
   /** Gauge. */
   TYPE_GAUGE,
 
-  /* Duration. Total duration for the execution of operation */
+  /* Duration. Stores everything stored by TYPE_DURATION and total time taken.
+   * This is to avoid storing and computing total duration of an operation repeatedly. Instread this can be done at the time of querying metric by multipying mean and count
+   * */
   TYPE_DURATION_TOTAL
 }
