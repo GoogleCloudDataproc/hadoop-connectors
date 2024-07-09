@@ -28,7 +28,7 @@ public abstract class CreateBucketOptions {
   public static final CreateBucketOptions DEFAULT = builder().build();
 
   public static Builder builder() {
-    return new AutoValue_CreateBucketOptions.Builder();
+    return new AutoValue_CreateBucketOptions.Builder().setHierarchicalNamespaceEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -41,6 +41,8 @@ public abstract class CreateBucketOptions {
   @Nullable
   public abstract String getStorageClass();
 
+  public abstract boolean getHierarchicalNamespaceEnabled();
+
   /** Returns the bucket retention period. */
   @Nullable
   public abstract Duration getTtl();
@@ -48,6 +50,8 @@ public abstract class CreateBucketOptions {
   /** Builder for {@link CreateBucketOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
+    public abstract Builder setHierarchicalNamespaceEnabled(boolean enabled);
+
     public abstract Builder setLocation(String location);
 
     public abstract Builder setStorageClass(String storageClass);

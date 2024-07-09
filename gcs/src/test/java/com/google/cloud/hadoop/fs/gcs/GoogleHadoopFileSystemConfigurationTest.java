@@ -81,6 +81,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.trafficdirector.enable", true);
           put("fs.gs.grpc.write.buffered.requests", 20);
           put("fs.gs.grpc.write.message.timeout", 3_000L);
+          put("fs.gs.hierarchical.namespace.folders.enable", false);
           put("fs.gs.grpc.write.timeout", 600_000L);
           put("fs.gs.http.connect-timeout", 5_000L);
           put("fs.gs.http.max.retry", 10);
@@ -116,6 +117,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
+          put("fs.gs.operation.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
           put("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
           put("fs.gs.write.temporary.dirs", ImmutableSet.of());

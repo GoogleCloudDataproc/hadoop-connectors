@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -430,6 +431,15 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       }
     }
     return listedInfo;
+  }
+
+  public void renameHnFolder(URI src, URI dst) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
+  public boolean isHnBucket(URI src) throws IOException {
+    return false;
   }
 
   @Override

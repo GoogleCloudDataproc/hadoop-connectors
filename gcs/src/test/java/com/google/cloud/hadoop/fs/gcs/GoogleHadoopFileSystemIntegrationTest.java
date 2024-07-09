@@ -63,12 +63,8 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -160,6 +156,43 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
           }
         });
+  }
+
+  @Test
+  public void testRenameHnBucket() throws Exception {
+    String bucketName = this.gcsiHelper.getUniqueBucketName("hn");
+    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
+
+    URI initUri = new URI("gs://" + bucketName);
+    Configuration config = loadConfig();
+    config.setBoolean("fs.gs.hierarchical.namespace.folders.enable", true);
+    googleHadoopFileSystem.initialize(initUri, config);
+
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(
+        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    try {
+      GoogleCloudStorageFileSystemIntegrationHelper helper =
+          new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem);
+
+      renameHelper(
+          new HdfsBehavior() {
+            /**
+             * Returns the MethodOutcome of trying to rename an existing file into the root
+             * directory.
+             */
+            @Override
+            public MethodOutcome renameFileIntoRootOutcome() {
+              return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+            }
+          },
+          bucketName,
+          bucketName,
+          helper);
+    } finally {
+      googleHadoopFileSystem.delete(new Path(initUri));
+    }
   }
 
   @Test
@@ -2269,7 +2302,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   @Test
   public void testThreadTraceEnabledRename() throws Exception {
     Configuration config = ghfs.getConf();
-    config.set("fs.gs.tracelog.enable", "true");
+    config.set("fs.gs.application.tracelog.enable", "true");
     ghfs.initialize(ghfs.getUri(), config);
 
     Path testRoot = new Path(sharedBucketName1, "/directory1/");
