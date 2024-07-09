@@ -499,7 +499,8 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_WRITE_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.write.enable", GRPC_WRITE_DEFAULT);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.write.enable", GoogleCloudStorageOptions.DEFAULT.isGrpcWriteEnabled());
 
   /**
    * Configuration key to configure the properties to optimize gcs-write. This config will be
