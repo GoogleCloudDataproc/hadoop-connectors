@@ -32,7 +32,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_BAD_GATEWAY_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_INTERNAL_ERROR_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
@@ -301,10 +300,6 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   void incrementGcsServerInternalErrorCount() {
     increment(GCS_API_SERVER_INTERNAL_ERROR_COUNT);
-  }
-
-  void incrementGcsServerNotImplementedErrorCount() {
-    increment(GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT);
   }
 
   void incrementGcsServerBadGatewayCount() {

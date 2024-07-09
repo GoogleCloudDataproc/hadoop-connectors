@@ -166,9 +166,6 @@ public class GoogleCloudStorageEventSubscriber {
       case 500:
         storageStatistics.incrementGcsServerInternalErrorCount();
         break;
-      case 501:
-        storageStatistics.incrementGcsServerNotImplementedErrorCount();
-        break;
       case 502:
         storageStatistics.incrementGcsServerBadGatewayCount();
         break;

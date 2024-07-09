@@ -84,11 +84,6 @@ public enum GoogleCloudStorageStatistics {
       "Counts the occurrence of server side 500 error status code",
       TYPE_COUNTER),
 
-  GCS_API_SERVER_NOT_IMPLEMENTED_ERROR_COUNT(
-      "gcs_api_server_not_implemented_error_count",
-      "Counts the occurrence of server side 501 error status code",
-      TYPE_COUNTER),
-
   GCS_API_SERVER_BAD_GATEWAY_COUNT(
       "gcs_api_server_bad_gateway_count",
       "Counts the occurrence of server side 502 error status code",
