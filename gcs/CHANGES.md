@@ -3,6 +3,8 @@
 ## Next
 1.  Add readVectored API implementation.
 
+1. Add gRPC configuration documentation.
+
 
 ## 3.0.0 - 2023-12-03
 
