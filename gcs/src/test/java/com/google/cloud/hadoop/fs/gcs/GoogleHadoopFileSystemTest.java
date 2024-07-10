@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
@@ -253,6 +255,18 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     ghfs.initialize(gsUri, config);
 
     assertThat(ghfs.getDefaultPort()).isEqualTo(-1);
+  }
+
+  @Test
+  public void testTotalTimeStatistics() throws IOException {
+    GhfsGlobalStorageStatistics stats = new GhfsGlobalStorageStatistics();
+    stats.updateStats(STREAM_READ_OPERATIONS, 10, 100, 200, 10, new Object());
+    stats.addTotalTimeStatistic(STREAM_READ_OPERATIONS.getSymbol() + "_duration");
+    assertThat(stats.getLong(STREAM_READ_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
+
+    stats.updateStats(STREAM_WRITE_OPERATIONS, 10, 100, 200, 10, new Object());
+    stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration");
+    assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
   }
 
   // -----------------------------------------------------------------
