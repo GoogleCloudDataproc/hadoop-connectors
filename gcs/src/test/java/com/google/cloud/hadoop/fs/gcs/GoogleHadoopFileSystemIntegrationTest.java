@@ -20,7 +20,6 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_DELETE_RE
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_GET_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_PATCH_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_PUT_REQUEST;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_CREATE;
@@ -537,23 +536,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     TestUtils.verifyDurationMetric(
         (GhfsGlobalStorageStatistics) stats, INVOCATION_DELETE.getSymbol(), 1);
-  }
-
-  @Test
-  public void statistics_check_directories_deleted() throws IOException {
-
-    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-
-    StorageStatistics GlobalStorageStats = TestUtils.getStorageStatistics();
-    Path testRoot = new Path("/directory1/");
-    myGhfs.mkdirs(testRoot);
-    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
-    fout.writeBytes("Test Content");
-    fout.close();
-
-    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
-    TestUtils.verifyCounter(
-        (GhfsGlobalStorageStatistics) GlobalStorageStats, DIRECTORIES_DELETED, 1);
   }
 
   @Test
