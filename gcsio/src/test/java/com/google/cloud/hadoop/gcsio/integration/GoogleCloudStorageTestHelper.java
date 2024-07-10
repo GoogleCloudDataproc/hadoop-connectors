@@ -112,6 +112,7 @@ public class GoogleCloudStorageTestHelper {
     return GoogleCloudStorageOptions.builder()
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
         .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
+        .setGrpcWriteEnabled(true)
         .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
   }
 
