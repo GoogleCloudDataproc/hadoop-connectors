@@ -45,7 +45,7 @@ public class GcsJsonApiEventTest {
 
   @Test
   public void testGetExceptionEvent() throws IOException {
-    GcsJsonApiEvent event = GcsJsonApiEvent.getExceptionEveent(getResponse().getRequest());
+    GcsJsonApiEvent event = GcsJsonApiEvent.getExceptionEvent(getResponse().getRequest());
 
     assertThat(event.getContext().toString()).isEqualTo(URL);
     assertThat(event.getMethod()).isEqualTo("GET");

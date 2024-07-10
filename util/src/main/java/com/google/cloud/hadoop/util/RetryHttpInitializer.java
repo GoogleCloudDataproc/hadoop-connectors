@@ -182,7 +182,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
       long backOffStartTime = System.currentTimeMillis();
       if (delegate.handleResponse(request, response, supportsRetry)) {
-        tracker.trackBackOffCompleted(backOffStartTime, request);
+        tracker.trackBackOffCompleted(backOffStartTime);
         // Otherwise, we defer to the judgement of our internal backoff handler.
         tracker.trackRetryStarted();
         return true;
@@ -253,12 +253,12 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       // We sadly don't get anything helpful to see if this is something we want to log.
       // As a result we'll turn down the logging level to debug.
       logger.atFine().log("Encountered an IOException when accessing URL %s", httpRequest.getUrl());
-      tracker.trackIOException(httpRequest);
+      tracker.trackIOException();
 
       long backoffStartTime = System.currentTimeMillis();
       boolean result = delegate.handleIOException(httpRequest, supportsRetry);
 
-      tracker.trackBackOffCompleted(backoffStartTime, httpRequest);
+      tracker.trackBackOffCompleted(backoffStartTime);
 
       if (result) {
         tracker.trackRetryStarted();

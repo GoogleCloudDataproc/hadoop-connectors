@@ -60,7 +60,7 @@ public class RequestTrackerTest extends TestCase {
 
   @Test
   public void testOnIOException() throws IOException {
-    tracker.trackIOException(request);
+    tracker.trackIOException();
     tracker.verifyEvents(
         List.of(ExpectedEventDetails.getStarted(URL), ExpectedEventDetails.getException(URL)));
   }
@@ -95,7 +95,7 @@ public class RequestTrackerTest extends TestCase {
 
   private int doBackOffRandom() {
     int backoffTime = ThreadLocalRandom.current().nextInt(1, 20000);
-    tracker.trackBackOffCompleted(System.currentTimeMillis() - backoffTime, request);
+    tracker.trackBackOffCompleted(System.currentTimeMillis() - backoffTime);
     return backoffTime;
   }
 

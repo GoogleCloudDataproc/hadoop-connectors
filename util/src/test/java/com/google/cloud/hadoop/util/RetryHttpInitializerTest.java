@@ -146,8 +146,6 @@ public class RetryHttpInitializerTest {
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
 
-    System.out.println(requestTracker.getEvents());
-
     requestTracker.verifyEvents(
         List.of(
             ExpectedEventDetails.getStarted(URL),
@@ -250,7 +248,7 @@ public class RetryHttpInitializerTest {
   }
 
   private class TestRetryHttpInitializer extends RetryHttpInitializer {
-    private boolean init;
+    private boolean isInitialized;
 
     public TestRetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions build) {
       super(credentials, build);
@@ -258,9 +256,9 @@ public class RetryHttpInitializerTest {
 
     @Override
     protected RequestTracker getRequestTracker(HttpRequest request) {
-      if (!this.init) {
+      if (!this.isInitialized) {
         requestTracker.init(request);
-        this.init = true;
+        this.isInitialized = true;
       }
 
       return requestTracker;

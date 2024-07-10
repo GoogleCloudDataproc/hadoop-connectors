@@ -30,6 +30,7 @@ class RequestTracker {
   private Object context;
   private int retryCount;
   private long backOffTime;
+  private HttpRequest request;
 
   protected RequestTracker() {}
 
@@ -43,7 +44,7 @@ class RequestTracker {
     // will also get called.
     if (stopWatch.isRunning()) {
       postToEventQueue(GcsJsonApiEvent.getResponseEvent(response, stopWatch.elapsed().toMillis()));
-      stopTracking(response.getRequest());
+      stopTracking();
     }
 
     if (retryCount != 0) {
@@ -53,17 +54,17 @@ class RequestTracker {
     }
   }
 
-  void trackIOException(HttpRequest httpRequest) {
-    stopTracking(httpRequest);
-    postToEventQueue(GcsJsonApiEvent.getExceptionEveent(httpRequest));
+  void trackIOException() {
+    stopTracking();
+    postToEventQueue(GcsJsonApiEvent.getExceptionEvent(request));
   }
 
   void trackUnsuccessfulResponseHandler(HttpResponse response) {
-    stopTracking(response.getRequest());
+    stopTracking();
     postToEventQueue(GcsJsonApiEvent.getResponseEvent(response, stopWatch.elapsed().toMillis()));
   }
 
-  void trackBackOffCompleted(long backOffStartTime, HttpRequest request) {
+  void trackBackOffCompleted(long backOffStartTime) {
     long diff = System.currentTimeMillis() - backOffStartTime;
     postToEventQueue(GcsJsonApiEvent.getBackoffEvent(request, diff, retryCount));
     backOffTime += diff;
@@ -89,22 +90,24 @@ class RequestTracker {
   protected RequestTracker init(HttpRequest request) {
     stopWatch = Stopwatch.createStarted();
     context = request.getUrl();
+    this.request = request;
 
     postToEventQueue(GcsJsonApiEvent.getRequestStartedEvent(request));
 
     return this;
   }
 
-  private void stopTracking(HttpRequest httpRequest) {
+  private void stopTracking() {
     if (stopWatch.isRunning()) {
       stopWatch.stop();
 
       if (stopWatch.elapsed().toMillis() > LOGGING_THRESHOLD) {
         logger.atInfo().atMostEvery(10, TimeUnit.SECONDS).log(
             "Detected high latency for %s. duration=%s",
-            httpRequest.getUrl(), stopWatch.elapsed().toMillis());
+            request.getUrl(), stopWatch.elapsed().toMillis());
       }
     } else {
+      // Control can reach here only in case of a bug. Did not want to add an assert due to huge blast radius.
       logger.atWarning().atMostEvery(1, TimeUnit.MINUTES).log(
           "Can stop only an already executing request. details=%s", this);
     }
