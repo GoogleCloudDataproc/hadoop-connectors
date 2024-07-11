@@ -107,7 +107,8 @@ class RequestTracker {
             request.getUrl(), stopWatch.elapsed().toMillis());
       }
     } else {
-      // Control can reach here only in case of a bug. Did not want to add an assert due to huge blast radius.
+      // Control can reach here only in case of a bug. Did not want to add an assert due to huge
+      // blast radius.
       logger.atWarning().atMostEvery(1, TimeUnit.MINUTES).log(
           "Can stop only an already executing request. details=%s", this);
     }
