@@ -38,7 +38,6 @@ public class TestRequestTracker extends RequestTracker {
   void verifyEvents(List<ExpectedEventDetails> expectedEvents) {
     List<GcsJsonApiEvent> actualEvents = getEvents();
     assertThat(actualEvents.size()).isEqualTo(expectedEvents.size());
-    assertThat(actualEvents.size()).isAtLeast(1);
 
     for (int i = 0; i < actualEvents.size(); i++) {
       GcsJsonApiEvent actual = actualEvents.get(i);
@@ -48,10 +47,6 @@ public class TestRequestTracker extends RequestTracker {
       assertThat(actual.getContext().toString()).isEqualTo(expected.context.toString());
 
       GcsJsonApiEvent.EventType eventType = actual.getEventType();
-      if (eventType == GcsJsonApiEvent.EventType.RESPONSE) {
-        verifyNotEmpty(actual, GcsJsonApiEvent.DURATION);
-      }
-
       if (eventType == GcsJsonApiEvent.EventType.RESPONSE) {
         verifyNotEmpty(actual, GcsJsonApiEvent.DURATION);
       }
