@@ -97,7 +97,7 @@ class GcsJsonApiEvent {
 
   private GcsJsonApiEvent(HttpRequest request, EventType eventType, int capacity) {
     this(request, eventType);
-    this.properties = new HashMap<>(capacity);
+    this.properties = new HashMap<>(capacity, 1);
   }
 
   @Override

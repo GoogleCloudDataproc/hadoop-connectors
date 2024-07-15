@@ -247,6 +247,7 @@ public class RetryHttpInitializerTest {
             .build());
   }
 
+  // Helper class which help provide a custom test implementation of RequestTracker
   private class TestRetryHttpInitializer extends RetryHttpInitializer {
     private boolean isInitialized;
 
