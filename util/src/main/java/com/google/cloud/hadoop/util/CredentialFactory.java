@@ -173,7 +173,8 @@ public class CredentialFactory {
         request.put("assertion", assertion);
         return request.execute();
       } catch (GeneralSecurityException e) {
-        throw new IOException("Failed to refresh token", e);
+        throw new IOException(
+            String.format("Failed to refresh token. cause=%s", e.getMessage()), e);
       }
     }
   }
@@ -251,7 +252,9 @@ public class CredentialFactory {
       cred.refreshToken();
     } catch (IOException e) {
       throw new IOException(
-          "Error getting access token from metadata server at: " + cred.getTokenServerEncodedUrl(),
+          String.format(
+              "Error getting access token from metadata server at: '%s'. cause='%s'",
+              cred.getTokenServerEncodedUrl(), e.getMessage()),
           e);
     }
     return cred;
@@ -368,7 +371,9 @@ public class CredentialFactory {
       KeyFactory keyFactory = SecurityUtils.getRsaKeyFactory();
       return keyFactory.generatePrivate(keySpec);
     } catch (NoSuchAlgorithmException | InvalidKeySpecException exception) {
-      throw new IOException("Unexpected exception reading PKCS data", exception);
+      throw new IOException(
+          String.format("Unexpected exception reading PKCS data. cause=%s", exception.getMessage()),
+          exception);
     }
   }
 

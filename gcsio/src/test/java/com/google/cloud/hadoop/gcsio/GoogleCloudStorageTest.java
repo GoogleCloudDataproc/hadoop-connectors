@@ -1808,7 +1808,7 @@ public class GoogleCloudStorageTest {
         assertThrows(
             IOException.class,
             () -> gcs.copy(BUCKET_NAME, srcObjectNames, dstBucketName, dstObjectNames));
-    assertThat(srcIOException).hasMessageThat().isEqualTo("Error accessing Bucket " + BUCKET_NAME);
+    assertThat(srcIOException).hasMessageThat().startsWith("Error accessing Bucket " + BUCKET_NAME);
 
     // 3. Dst 404
     FileNotFoundException dstFileNotFoundException =
@@ -1824,7 +1824,7 @@ public class GoogleCloudStorageTest {
             () -> gcs.copy(BUCKET_NAME, srcObjectNames, dstBucketName, dstObjectNames));
     assertThat(dstIOException)
         .hasMessageThat()
-        .isEqualTo("Error accessing Bucket " + dstBucketName);
+        .startsWith("Error accessing Bucket " + dstBucketName);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(

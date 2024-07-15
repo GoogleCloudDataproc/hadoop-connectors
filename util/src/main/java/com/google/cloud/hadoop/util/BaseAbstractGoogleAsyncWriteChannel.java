@@ -134,7 +134,8 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     } catch (IOException e) {
       throw new IOException(
           String.format(
-              "Failed to write %d bytes in '%s'", buffer.remaining(), getResourceString()),
+              "Failed to write %d bytes in '%s'. cause=%s",
+              buffer.remaining(), getResourceString(), e.getMessage()),
           e);
     }
   }

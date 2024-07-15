@@ -178,7 +178,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
-            String.format("Exception occurred while closing channel '%s'", resourceId), e);
+            String.format(
+                "Exception occurred while closing channel '%s'. cause=%s",
+                resourceId, e.getMessage()),
+            e);
       } finally {
         contentReadChannel = null;
         open = false;
@@ -564,8 +567,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
             String.format(
-                "Unable to update the boundaries/Range of contentChannel %s",
-                resourceId.toString()),
+                "Unable to update the boundaries/Range of contentChannel %s. cause=%s",
+                resourceId, e),
             e);
       }
     }
@@ -607,7 +610,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   }
 
   private IOException convertError(Exception error) {
-    String msg = String.format("Error reading '%s'", resourceId);
+    String msg =
+        String.format(
+            "Error reading '%s'. cause='%s'", resourceId, error == null ? "" : error.getMessage());
     switch (errorExtractor.getErrorType(error)) {
       case NOT_FOUND:
         return createFileNotFoundException(

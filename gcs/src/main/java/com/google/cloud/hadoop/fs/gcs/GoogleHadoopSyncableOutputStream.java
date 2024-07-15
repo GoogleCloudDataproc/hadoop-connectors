@@ -235,7 +235,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
           Thread.currentThread().interrupt();
         }
         GoogleCloudStorageEventBus.postOnException();
-        throw new IOException("Failed to delete files while closing stream", e);
+        throw new IOException(
+            String.format("Failed to delete files while closing stream. cause=%s", e.getMessage()),
+            e);
       }
     }
   }
