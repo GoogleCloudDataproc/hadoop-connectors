@@ -32,10 +32,13 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,6 +81,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.trafficdirector.enable", true);
           put("fs.gs.grpc.write.buffered.requests", 20);
           put("fs.gs.grpc.write.message.timeout", 3_000L);
+          put("fs.gs.grpc.write.enable", false);
           put("fs.gs.hierarchical.namespace.folders.enable", false);
           put("fs.gs.grpc.write.timeout", 600_000L);
           put("fs.gs.http.connect-timeout", 5_000L);
@@ -116,6 +120,14 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.operation.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
+          put("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
+          put("fs.gs.write.temporary.dirs", ImmutableSet.of());
+          put("fs.gs.write.parallel.composite.upload.buffer.count", 1);
+          put("fs.gs.write.parallel.composite.upload.buffer.capacity", 32 * 1024 * 1024L);
+          put(
+              "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
+              PartFileCleanupType.ALWAYS);
+          put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
         }
       };
 

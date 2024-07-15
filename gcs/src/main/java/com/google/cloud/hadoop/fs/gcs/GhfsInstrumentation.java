@@ -575,6 +575,11 @@ public class GhfsInstrumentation
       }
     }
 
+    @Override
+    public long getBytesRead() {
+      return bytesRead.get();
+    }
+
     /**
      * {@code close()} merges the stream statistics into the filesystem's instrumentation instance.
      * The filesystem statistics of {@link #filesystemStatistics} updated with the bytes read
@@ -764,6 +769,9 @@ public class GhfsInstrumentation
                 storeBuilder.withGauges(stat.getSymbol());
                 // and durations
               } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
+                duration(stat);
+                storeBuilder.withDurationTracking(stat.getSymbol());
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }

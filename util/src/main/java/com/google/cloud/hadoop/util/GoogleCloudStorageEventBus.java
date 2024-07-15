@@ -29,11 +29,6 @@ public class GoogleCloudStorageEventBus {
     eventBus.post(gcsJsonApiEvent);
   }
 
-  /** Translates increment of statistics from API calls into StatisticsType */
-  public enum StatisticsType {
-    DIRECTORIES_DELETED
-  }
-
   /** Hold the instance of the event bus here */
   private static EventBus eventBus = new EventBus();
 
@@ -102,13 +97,6 @@ public class GoogleCloudStorageEventBus {
     eventBus.post(exception);
   }
 
-  /**
-   * Posting StatisticsType to invoke corresponding Subscriber method. Passing an Object as EventBus
-   * has @ElementTypesAreNonnullByDefault annotation.
-   */
-  public static void postOnStatisticsType() {
-    eventBus.post(StatisticsType.DIRECTORIES_DELETED);
-  }
   /**
    * Posting grpc Status to invoke the corresponding Subscriber method.
    *
