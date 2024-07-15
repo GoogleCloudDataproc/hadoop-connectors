@@ -31,6 +31,7 @@ class RequestTracker {
   private int retryCount;
   private long backOffTime;
   private HttpRequest request;
+  private final long startTime = System.currentTimeMillis();
 
   protected RequestTracker() {}
 
@@ -120,6 +121,7 @@ class RequestTracker {
         .add("retryCount", retryCount)
         .add("totalBackoffTime", backOffTime)
         .add("context", context)
+        .add("elapsed", System.currentTimeMillis() - startTime)
         .toString();
   }
 }
