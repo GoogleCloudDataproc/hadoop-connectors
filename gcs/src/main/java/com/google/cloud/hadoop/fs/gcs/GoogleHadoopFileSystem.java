@@ -249,7 +249,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       globalStorageStatistics = GhfsGlobalStorageStatistics.DUMMY_INSTANCE;
     }
 
-    GoogleCloudStorageEventBus.register(globalStorageStatistics);
+    GoogleCloudStorageEventBus.register(
+        new GoogleCloudStorageEventSubscriber(globalStorageStatistics));
   }
 
   /**
@@ -387,8 +388,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                       new VectoredIOImpl(
                           GoogleHadoopFileSystemConfiguration.getVectoredReadOptionBuilder(config)
                               .build(),
-                          globalStorageStatistics,
-                          statistics);
+                          globalStorageStatistics);
                   vectoredIOInitialized = true;
                   return vectoredIO;
                 } catch (Exception e) {

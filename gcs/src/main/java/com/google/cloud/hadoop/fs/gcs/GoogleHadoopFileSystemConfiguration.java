@@ -35,12 +35,15 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.util.Collection;
 import java.util.List;
@@ -494,6 +497,70 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.client.type", GoogleCloudStorageFileSystemOptions.DEFAULT.getClientType());
 
+  /** Configuration key to configure client to use for GCS access. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_WRITE_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.write.enable", GoogleCloudStorageOptions.DEFAULT.isGrpcWriteEnabled());
+
+  /**
+   * Configuration key to configure the properties to optimize gcs-write. This config will be
+   * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
+   */
+  public static final HadoopConfigurationProperty<UploadType> GCS_CLIENT_UPLOAD_TYPE =
+      new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
+
+  /**
+   * Configuration key to configure the Path where uploads will be parked on disk. If not set then
+   * uploads will be parked at default location pointed by java-storage client. This will only be
+   * effective if fs.gs.client.upload.type is set to non-default value.
+   */
+  public static final HadoopConfigurationProperty<Collection<String>>
+      GCS_WRITE_TEMPORARY_FILES_PATH =
+          new HadoopConfigurationProperty<>("fs.gs.write.temporary.dirs", ImmutableSet.of());
+
+  /**
+   * Configuration key to configure the Buffers for UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in
+   * alignment with configuration of java-storage client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_PCU_BUFFER_COUNT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.buffer.count",
+          AsyncWriteChannelOptions.DEFAULT.getPCUBufferCount());
+
+  /**
+   * Configuration key to configure the buffer capacity for UploadType.PARALLEL_COMPOSITE_UPLOAD. It
+   * is in alignment with configuration of java-storage client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy#com_google_cloud_storage_ParallelCompositeUploadBlobWriteSessionConfig_BufferAllocationStrategy_fixedPool_int_int_
+   */
+  public static final HadoopConfigurationProperty<Long> GCS_PCU_BUFFER_CAPACITY =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.buffer.capacity",
+          (long) AsyncWriteChannelOptions.DEFAULT.getPCUBufferCapacity());
+
+  /**
+   * Configuration key to clean up strategy of part files created via
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
+   * client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy
+   */
+  public static final HadoopConfigurationProperty<PartFileCleanupType>
+      GCS_PCU_PART_FILE_CLEANUP_TYPE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
+              AsyncWriteChannelOptions.DEFAULT.getPartFileCleanupType());
+
+  /**
+   * Configuration key to set up the naming strategy of part files created via
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
+   * client
+   * https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy
+   */
+  public static final HadoopConfigurationProperty<String> GCS_PCU_PART_FILE_NAME_PREFIX =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
+          AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -519,6 +586,7 @@ public class GoogleHadoopFileSystemConfiguration {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     return GoogleCloudStorageOptions.builder()
         .setAppName(getApplicationName(config))
+        .setGrpcWriteEnabled(GCS_GRPC_WRITE_ENABLE.get(config, config::getBoolean))
         .setAutoRepairImplicitDirectoriesEnabled(
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setBatchThreads(GCS_BATCH_THREADS.get(config, config::getInt))
@@ -607,6 +675,13 @@ public class GoogleHadoopFileSystemConfiguration {
             toIntExact(GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE.get(config, config::getLongBytes)))
         .setUploadChunkSize(
             toIntExact(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.get(config, config::getLongBytes)))
+        .setUploadType(GCS_CLIENT_UPLOAD_TYPE.get(config, config::getEnum))
+        .setTemporaryPaths(
+            ImmutableSet.copyOf(GCS_WRITE_TEMPORARY_FILES_PATH.getStringCollection(config)))
+        .setPCUBufferCount(GCS_PCU_BUFFER_COUNT.get(config, config::getInt))
+        .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
+        .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
+        .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
         .build();
   }
 

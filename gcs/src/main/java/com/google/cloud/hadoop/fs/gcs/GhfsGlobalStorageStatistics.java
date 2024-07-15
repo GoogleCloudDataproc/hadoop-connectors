@@ -20,24 +20,31 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.EXCEPTION_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_RATE_LIMIT_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_CLIENT_SIDE_ERROR_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_REQUEST_COUNT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_SERVER_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_BAD_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_GONE_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_RATE_LIMIT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_BAD_GATEWAY_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_INTERNAL_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
-import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
-import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus.StatisticsType;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
-import com.google.common.eventbus.Subscribe;
 import com.google.common.flogger.GoogleLogger;
-import io.grpc.Status;
+import com.google.common.util.concurrent.AtomicDouble;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -73,6 +80,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   private final Map<String, AtomicLong> minimums = new HashMap<>();
   private final Map<String, AtomicLong> maximums = new HashMap<>();
   private final Map<String, MeanStatistic> means = new HashMap<>();
+  private final Map<String, AtomicDouble> total = new HashMap<>();
 
   public GhfsGlobalStorageStatistics() {
     super(NAME);
@@ -86,10 +94,14 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       String symbol = opType.getSymbol();
       opsCount.put(symbol, new AtomicLong(0));
 
-      if (opType.getType() == TYPE_DURATION) {
+      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION
+          || opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
         minimums.put(getMinKey(symbol), null);
         maximums.put(getMaxKey(symbol), new AtomicLong(0));
         means.put(getMeanKey(symbol), new MeanStatistic());
+        if (opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+          total.put(getTimeKey(symbol), new AtomicDouble(0.0));
+        }
       }
     }
   }
@@ -144,8 +156,9 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   @Override
   public void reset() {
-    resetMetrics(opsCount);
-    resetMetrics(maximums);
+    resetLongMetrics(opsCount);
+    resetLongMetrics(maximums);
+    resetDoubleMetrics(total);
 
     for (String ms : means.keySet()) {
       means.get(ms).reset();
@@ -156,9 +169,15 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     }
   }
 
-  private void resetMetrics(Map<String, AtomicLong> metrics) {
+  private void resetLongMetrics(Map<String, AtomicLong> metrics) {
     for (AtomicLong value : metrics.values()) {
       value.set(0);
+    }
+  }
+
+  private void resetDoubleMetrics(Map<String, AtomicDouble> metrics) {
+    for (AtomicDouble value : metrics.values()) {
+      value.set(0.0);
     }
   }
 
@@ -176,6 +195,18 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     if (means.containsKey(meanKey)) {
       means.get(meanKey).addSample(totalDurationMs, count);
     }
+  }
+
+  protected void addTotalTimeStatistic(String statistic) {
+    assert (statistic.contains("_duration"));
+    String parentCounterKey = statistic.replace("_duration", "");
+    String parentMeanKey = getMeanKey(parentCounterKey);
+
+    assert (means.containsKey(parentMeanKey) && opsCount.containsKey(parentCounterKey));
+    double meanValue = means.get(parentMeanKey).getValue();
+    long operationValue = opsCount.get(parentCounterKey).get();
+
+    total.get(statistic).set(1.0 * meanValue * operationValue);
   }
 
   void updateStats(
@@ -219,148 +250,68 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     }
   }
 
-  /**
-   * Updating the required gcs specific statistics based on httpresponse.
-   *
-   * @param statusCode
-   */
-  private void updateGcsIOSpecificStatistics(int statusCode) {
-
-    if (statusCode >= 400 && statusCode < 500) {
-      incrementGcsClientSideCounter();
-
-      if (statusCode == 429) {
-        incrementRateLimitingCounter();
-      }
-    }
-
-    if (statusCode >= 500 && statusCode < 600) {
-      incrementGcsServerSideCounter();
-    }
-  }
-
-  private int grpcToHttpStatusCodeMapping(Status grpcStatusCode) {
-    // using code.proto as reference
-    // https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
-    switch (grpcStatusCode.getCode()) {
-      case OK:
-        return 200;
-      case CANCELLED:
-        return 499;
-      case INVALID_ARGUMENT:
-      case FAILED_PRECONDITION:
-      case OUT_OF_RANGE:
-        return 400;
-      case DEADLINE_EXCEEDED:
-        return 504;
-      case NOT_FOUND:
-        return 404;
-      case ALREADY_EXISTS:
-      case ABORTED:
-        return 409;
-      case PERMISSION_DENIED:
-        return 403;
-      case RESOURCE_EXHAUSTED:
-        return 429;
-      case UNIMPLEMENTED:
-        return 501;
-      case UNAVAILABLE:
-        return 503;
-      case UNAUTHENTICATED:
-        return 401;
-      case UNKNOWN:
-      case INTERNAL:
-      case DATA_LOSS:
-      default:
-        return 500;
-    }
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on HttpResponseException.
-   *
-   * @param responseException contains statusCode based on which metrics are updated
-   */
-  @Subscribe
-  private void subscriberOnHttpResponseException(@Nonnull HttpResponseException responseException) {
-    updateGcsIOSpecificStatistics(responseException.getStatusCode());
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on GoogleJsonResponseException.
-   *
-   * @param responseException contains statusCode based on which metrics are updated
-   */
-  @Subscribe
-  private void subscriberOnGoogleJsonResponseException(
-      @Nonnull GoogleJsonResponseException responseException) {
-    updateGcsIOSpecificStatistics(responseException.getStatusCode());
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on HttpResponse.
-   *
-   * @param responseStatus responseStatus status code from HTTP response
-   */
-  @Subscribe
-  private void subscriberOnHttpResponseStatus(@Nonnull Integer responseStatus) {
-    updateGcsIOSpecificStatistics(responseStatus);
-  }
-
-  @Subscribe
-  private void subscriberOnGcsRequest(@Nonnull GcsRequestExecutionEvent event) {
-    incrementGcsTotalRequestCount();
-  }
-
-  @Subscribe
-  private void subscriberOnGrpcStatus(@Nonnull Status status) {
-    updateGcsIOSpecificStatistics(grpcToHttpStatusCodeMapping(status));
-  }
-
-  /**
-   * Updating the EXCEPTION_COUNT
-   *
-   * @param exception
-   */
-  @Subscribe
-  private void subscriberOnException(IOException exception) {
-    incrementGcsExceptionCount();
-  }
-
-  /**
-   * Updating the corresponding statistics
-   *
-   * @param strType
-   */
-  @Subscribe
-  private void subscriberOnStatisticsType(StatisticsType strType) {
-    if (strType == StatisticsType.DIRECTORIES_DELETED) {
-      incrementDirectoriesDeleted();
-    }
-  }
-
-  private void incrementDirectoriesDeleted() {
-    increment(GhfsStatistic.DIRECTORIES_DELETED);
-  }
-
-  private void incrementGcsExceptionCount() {
+  void incrementGcsExceptionCount() {
     increment(EXCEPTION_COUNT);
   }
 
-  private void incrementGcsTotalRequestCount() {
-    increment(GCS_REQUEST_COUNT);
+  void incrementGcsTotalRequestCount() {
+    increment(GCS_API_REQUEST_COUNT);
   }
 
-  private void incrementRateLimitingCounter() {
-    increment(GCS_CLIENT_RATE_LIMIT_COUNT);
+  void incrementRateLimitingCounter() {
+    increment(GCS_API_CLIENT_RATE_LIMIT_COUNT);
   }
 
-  private void incrementGcsClientSideCounter() {
-    increment(GCS_CLIENT_SIDE_ERROR_COUNT);
+  void incrementGcsClientSideCounter() {
+    increment(GCS_API_CLIENT_SIDE_ERROR_COUNT);
   }
 
-  private void incrementGcsServerSideCounter() {
-    increment(GCS_SERVER_SIDE_ERROR_COUNT);
+  void incrementGcsServerSideCounter() {
+    increment(GCS_API_SERVER_SIDE_ERROR_COUNT);
+  }
+
+  void incrementGcsClientBadRequestCount() {
+    increment(GCS_API_CLIENT_BAD_REQUEST_COUNT);
+  }
+
+  void incrementGcsClientUnauthorizedResponseCount() {
+    increment(GCS_API_CLIENT_UNAUTHORIZED_RESPONSE_COUNT);
+  }
+
+  void incrementGcsClientNotFoundResponseCount() {
+    increment(GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT);
+  }
+
+  void incrementGcsClientRequestTimeoutCount() {
+    increment(GCS_API_CLIENT_REQUEST_TIMEOUT_COUNT);
+  }
+
+  void incrementGcsClientGoneResponseCount() {
+    increment(GCS_API_CLIENT_GONE_RESPONSE_COUNT);
+  }
+
+  void incrementGcsClientPreconditionFailedResponseCount() {
+    increment(GCS_API_CLIENT_PRECONDITION_FAILED_RESPONSE_COUNT);
+  }
+
+  void incrementGcsClientRequestedRangeNotSatisfiableCount() {
+    increment(GCS_API_CLIENT_REQUESTED_RANGE_NOT_SATISFIABLE_COUNT);
+  }
+
+  void incrementGcsServerInternalErrorCount() {
+    increment(GCS_API_SERVER_INTERNAL_ERROR_COUNT);
+  }
+
+  void incrementGcsServerBadGatewayCount() {
+    increment(GCS_API_SERVER_BAD_GATEWAY_COUNT);
+  }
+
+  void incrementGcsServerServiceUnavailableCount() {
+    increment(GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT);
+  }
+
+  void incrementGcsServerTimeoutCount() {
+    increment(GCS_API_SERVER_TIMEOUT_COUNT);
   }
 
   void streamReadBytes(int bytesRead) {
@@ -413,6 +364,11 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       metrics.addAll(minimums.keySet());
       metrics.addAll(maximums.keySet());
       metrics.addAll(means.keySet());
+      for (String statistic : total.keySet()) {
+        addTotalTimeStatistic(statistic);
+      }
+
+      metrics.addAll(total.keySet());
 
       return metrics.iterator();
     }
@@ -455,6 +411,10 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       return Math.round(means.get(key).getValue());
     }
 
+    if (total.containsKey(key)) {
+      return total.get(key).longValue();
+    }
+
     return 0L;
   }
 
@@ -473,7 +433,8 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     return opsCount.containsKey(key)
         || maximums.containsKey(key)
         || minimums.containsKey(key)
-        || means.containsKey(key);
+        || means.containsKey(key)
+        || total.containsKey(key);
   }
 
   /**
@@ -501,6 +462,10 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   private String getMeanKey(String symbol) {
     return symbol + "_mean";
+  }
+
+  private String getTimeKey(String symbol) {
+    return symbol + "_duration";
   }
 
   /**

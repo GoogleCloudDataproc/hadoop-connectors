@@ -1,7 +1,11 @@
 # Release Notes
 
 ## Next
+
+## 3.0.1 - 2024-07-10
 1.  Add readVectored API implementation.
+
+1. Add gRPC configuration documentation.
 
 
 ## 3.0.0 - 2023-12-03
