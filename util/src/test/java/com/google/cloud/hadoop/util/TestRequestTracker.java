@@ -60,6 +60,7 @@ public class TestRequestTracker extends RequestTracker {
           long backOffTime = (long) actual.getProperty(key);
           int expectedBackoffTime = (int) expected.properties.get(GcsJsonApiEvent.BACKOFFTIME);
           assertThat(backOffTime).isAtLeast(expectedBackoffTime);
+          // Adding a buffer of 10 seconds. If this is not sufficient increase the threshold or remove this check.
           assertThat(backOffTime).isLessThan(expectedBackoffTime + 10);
         } else {
           assertThat(actual.getProperty(key)).isEqualTo(expected.properties.get(key));
