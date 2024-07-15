@@ -31,6 +31,10 @@ public class GoogleCloudStorageEventBus {
     DIRECTORIES_DELETED
   }
 
+  public static void postGcsJsonApiEvent(GcsJsonApiEvent gcsJsonApiEvent) {
+    eventBus.post(gcsJsonApiEvent);
+  }
+
   /** Hold the instance of the event bus here */
   private static EventBus eventBus = new EventBus();
 
