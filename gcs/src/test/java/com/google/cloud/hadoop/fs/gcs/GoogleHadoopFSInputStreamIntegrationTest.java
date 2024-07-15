@@ -215,6 +215,55 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   }
 
   @Test
+  public void testBytesRead() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "verify bytesRead");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+    GhfsStorageStatistics stats = TestUtils.getStorageStatistics();
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setTraceLogEnabled(true).build();
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    // verify it for single byte read
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    try (GoogleHadoopFSInputStream in =
+        new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
+      int position = 1;
+      in.seek(position);
+      assertThat(in.read()).isEqualTo(testContent.charAt(position));
+    }
+    assertThat(statistics.getBytesRead()).isEqualTo(1);
+    statistics.reset();
+
+    int length = 5;
+    try (GoogleHadoopFSInputStream in =
+        new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
+      byte[] value = new byte[length];
+      byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), length);
+      in.read(0, value, 0, length);
+      assertThat(value).isEqualTo(expected);
+    }
+    assertThat(statistics.getBytesRead()).isEqualTo(length);
+    statistics.reset();
+
+    try (GoogleHadoopFSInputStream in =
+        new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
+      byte[] value = new byte[length];
+      byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), length);
+      in.seek(0);
+      in.read(value, 0, length);
+      assertThat(value).isEqualTo(expected);
+    }
+    assertThat(statistics.getBytesRead()).isEqualTo(length);
+    statistics.reset();
+  }
+
+  @Test
   public void testTracingLogPropertyFiltering() throws Exception {
     URI path = createFileWithTestContentAndGetPath("read_singleBytes");
     GoogleHadoopFileSystem ghfs =
