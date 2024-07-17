@@ -80,14 +80,17 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       credentials.initialize(request);
     }
 
+    RequestTracker tracker = getRequestTracker(request);
+
     request
         // Request will be retried if server errors (5XX) or I/O errors are encountered.
         .setNumberOfRetries(options.getMaxRequestRetries())
         // Set the timeout configurations.
         .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
         .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
-        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials))
-        .setIOExceptionHandler(new IoExceptionHandler());
+        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials, tracker))
+        .setIOExceptionHandler(new IoExceptionHandler(tracker))
+        .setResponseInterceptor(tracker::trackResponse);
 
     HttpHeaders headers = request.getHeaders();
     if (isNullOrEmpty(headers.getUserAgent()) && !isNullOrEmpty(options.getDefaultUserAgent())) {
@@ -98,6 +101,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
     headers.putAll(options.getHttpHeaders());
     request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor()));
+  }
+
+  protected RequestTracker getRequestTracker(HttpRequest request) {
+    return RequestTracker.create(request);
   }
 
   public Credentials getCredentials() {
@@ -151,12 +158,14 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
     private final HttpCredentialsAdapter credentials;
     private final HttpBackOffUnsuccessfulResponseHandler delegate;
+    private final RequestTracker tracker;
 
-    public UnsuccessfulResponseHandler(HttpCredentialsAdapter credentials) {
+    public UnsuccessfulResponseHandler(HttpCredentialsAdapter credentials, RequestTracker tracker) {
       this.credentials = credentials;
       this.delegate =
           new HttpBackOffUnsuccessfulResponseHandler(BACKOFF_BUILDER.build())
               .setBackOffRequired(BACK_OFF_REQUIRED);
+      this.tracker = tracker;
     }
 
     @Override
@@ -164,6 +173,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         throws IOException {
 
       logResponseCode(request, response);
+      tracker.trackUnsuccessfulResponseHandler(response);
 
       if (credentials != null && credentials.handleResponse(request, response, supportsRetry)) {
         // If credentials decides it can handle it, the return code or message indicated something
@@ -171,10 +181,15 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         return true;
       }
 
+      long backOffStartTime = System.currentTimeMillis();
       if (delegate.handleResponse(request, response, supportsRetry)) {
+        tracker.trackBackOffCompleted(backOffStartTime);
         // Otherwise, we defer to the judgement of our internal backoff handler.
+        tracker.trackRetryStarted();
         return true;
       }
+
+      tracker.trackRetrySkipped(true);
 
       escapeRedirectPath(request, response);
 
@@ -225,10 +240,12 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   private static class IoExceptionHandler implements HttpIOExceptionHandler {
 
     private final HttpIOExceptionHandler delegate;
+    private final RequestTracker tracker;
 
-    public IoExceptionHandler() {
+    public IoExceptionHandler(RequestTracker tracker) {
       // Retry IOExceptions such as "socket timed out" of "insufficient bytes written" with backoff.
       this.delegate = new HttpBackOffIOExceptionHandler(BACKOFF_BUILDER.build());
+      this.tracker = tracker;
     }
 
     @Override
@@ -237,7 +254,20 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       // We sadly don't get anything helpful to see if this is something we want to log.
       // As a result we'll turn down the logging level to debug.
       logger.atFine().log("Encountered an IOException when accessing URL %s", httpRequest.getUrl());
-      return delegate.handleIOException(httpRequest, supportsRetry);
+      tracker.trackIOException();
+
+      long backoffStartTime = System.currentTimeMillis();
+      boolean result = delegate.handleIOException(httpRequest, supportsRetry);
+
+      tracker.trackBackOffCompleted(backoffStartTime);
+
+      if (result) {
+        tracker.trackRetryStarted();
+      } else {
+        tracker.trackRetrySkipped(false);
+      }
+
+      return result;
     }
   }
 }
