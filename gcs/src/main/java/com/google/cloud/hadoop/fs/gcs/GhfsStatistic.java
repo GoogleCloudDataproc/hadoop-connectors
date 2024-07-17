@@ -75,6 +75,8 @@ public enum GhfsStatistic {
   INVOCATION_HSYNC("op_hsync", "Calls of hsync()", TYPE_DURATION),
   INVOCATION_LIST_FILES("op_list_files", "Calls of listFiles()", TYPE_COUNTER),
   INVOCATION_LIST_STATUS("op_list_status", "Calls of listStatus()", TYPE_DURATION),
+  INVOCATION_LIST_STATUS_RESULT_SIZE(
+      "op_get_list_status_result_size", "Number of files returned from list call", TYPE_COUNTER),
   INVOCATION_MKDIRS("op_mkdirs", "Calls of mkdirs()", TYPE_DURATION),
   INVOCATION_OPEN("op_open", "Calls of open()", TYPE_DURATION),
   INVOCATION_RENAME("op_rename", "Calls of rename()", TYPE_DURATION),
