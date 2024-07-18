@@ -975,6 +975,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                             hadoopPath, gcsPath))
                     .initCause(fnfe);
           }
+          storageStatistics.incrementCounter(
+              GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE, status.size());
           return status.toArray(new FileStatus[0]);
         });
   }
