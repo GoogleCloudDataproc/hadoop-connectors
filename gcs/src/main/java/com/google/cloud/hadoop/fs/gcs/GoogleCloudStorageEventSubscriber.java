@@ -26,9 +26,16 @@ import javax.annotation.Nonnull;
 /* Stores the subscriber methods corresponding to GoogleCloudStorageEventBus */
 public class GoogleCloudStorageEventSubscriber {
   private static GhfsStorageStatistics storageStatistics;
+  private static GoogleCloudStorageEventSubscriber INSTANCE = null;
 
-  public GoogleCloudStorageEventSubscriber(GhfsStorageStatistics storageStatistics) {
+  public GoogleCloudStorageEventSubscriber(@Nonnull GhfsStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
+  }
+
+  public static GoogleCloudStorageEventSubscriber getInstance(
+      @Nonnull GhfsStorageStatistics storageStatistics) {
+    if (INSTANCE == null) INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);
+    return INSTANCE;
   }
 
   /**

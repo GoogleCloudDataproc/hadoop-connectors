@@ -361,7 +361,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       storageStatistics = GhfsStorageStatistics.DUMMY_INSTANCE;
     }
 
-    GoogleCloudStorageEventBus.register(new GoogleCloudStorageEventSubscriber(storageStatistics));
+    GoogleCloudStorageEventBus.register(
+        GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
   }
 
   /**
