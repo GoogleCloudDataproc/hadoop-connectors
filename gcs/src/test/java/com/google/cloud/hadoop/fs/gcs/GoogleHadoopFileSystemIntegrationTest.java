@@ -58,6 +58,7 @@ import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
@@ -1268,6 +1269,30 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     FileSystem.get(new URI(PUBLIC_BUCKET), config);
     // Initialization successful with no exception thrown.
+  }
+
+  @Test
+  public void register_subscriber_multiple_time() throws Exception {
+    GoogleHadoopFileSystem myGhfs =
+        createInMemoryGoogleHadoopFileSystem(); // registers the subscriber class first time in
+    // myGhfs1
+    StorageStatistics stats = TestUtils.getStorageStatistics();
+
+    GoogleCloudStorageEventBus.register(
+        GoogleCloudStorageEventSubscriber.getInstance(
+            (GhfsStorageStatistics) stats)); // registers the same subscriber class second time
+
+    assertThat(getMetricValue(stats, INVOCATION_CREATE)).isEqualTo(0);
+    assertThat(getMetricValue(stats, FILES_CREATED)).isEqualTo(0);
+
+    try (FSDataOutputStream fout = myGhfs.create(new Path("/file1"))) {
+      fout.writeBytes("Test Content");
+    }
+    assertThat(getMetricValue(stats, INVOCATION_CREATE)).isEqualTo(1);
+    assertThat(getMetricValue(stats, FILES_CREATED)).isEqualTo(1);
+    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
+
+    TestUtils.verifyDurationMetric((GhfsStorageStatistics) stats, INVOCATION_CREATE, 1);
   }
 
   @Test
