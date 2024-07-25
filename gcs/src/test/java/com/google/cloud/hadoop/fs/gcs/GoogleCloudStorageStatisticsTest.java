@@ -50,18 +50,17 @@ public class GoogleCloudStorageStatisticsTest {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private GhfsStorageStatistics storageStatistics = new GhfsStorageStatistics();
   protected GoogleCloudStorageEventSubscriber subscriber =
-      new GoogleCloudStorageEventSubscriber(storageStatistics);
+      GoogleCloudStorageEventSubscriber.getInstance(storageStatistics);
 
   @Before
   public void setUp() throws Exception {
-    GoogleCloudStorageEventBus.register(
-        GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
+    GoogleCloudStorageEventBus.register(subscriber);
   }
 
   @After
   public void cleanup() throws Exception {
-    GoogleCloudStorageEventBus.unregister(
-        GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
+    GoogleCloudStorageEventBus.unregister(subscriber);
+    GoogleCloudStorageEventSubscriber.reset();
   }
 
   private void verifyStatistics(GhfsStorageStatistics expectedStats) {
@@ -83,10 +82,8 @@ public class GoogleCloudStorageStatisticsTest {
 
   @Test
   public void test_multiple_register_of_statistics() throws Exception {
-    GoogleCloudStorageEventBus.register(
-        GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
-    GoogleCloudStorageEventBus.register(
-        GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
+    GoogleCloudStorageEventBus.register(subscriber);
+    GoogleCloudStorageEventBus.register(subscriber);
     GoogleCloudStorageEventBus.register(
         GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
     GoogleCloudStorageEventBus.register(
