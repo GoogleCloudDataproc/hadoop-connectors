@@ -44,13 +44,11 @@ import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LazyArgs;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -81,28 +79,18 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   private final Map<String, AtomicLong> maximums = new HashMap<>();
   private final Map<String, MeanStatistic> means = new HashMap<>();
   private final Map<String, AtomicDouble> total = new HashMap<>();
+  private final Stopwatch stopwatch = Stopwatch.createStarted();
 
   public GhfsGlobalStorageStatistics() {
+
     super(NAME);
 
     for (GoogleCloudStorageStatistics opType : GoogleCloudStorageStatistics.values()) {
-      String symbol = opType.getSymbol();
-      opsCount.put(symbol, new AtomicLong(0));
+      addStatistic(opType.getSymbol(), opType.getType());
     }
 
     for (GhfsStatistic opType : GhfsStatistic.values()) {
-      String symbol = opType.getSymbol();
-      opsCount.put(symbol, new AtomicLong(0));
-
-      if (opType.getType() == StatisticTypeEnum.TYPE_DURATION
-          || opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
-        minimums.put(getMinKey(symbol), null);
-        maximums.put(getMaxKey(symbol), new AtomicLong(0));
-        means.put(getMeanKey(symbol), new MeanStatistic());
-        if (opType.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
-          total.put(getTimeKey(symbol), new AtomicDouble(0.0));
-        }
-      }
+      addStatistic(opType.getSymbol(), opType.getType());
     }
   }
 
@@ -121,15 +109,41 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       stats.increment(statistic);
       return IOStatisticsBinding.trackDuration(factory, statistic.getSymbol(), operation);
     } finally {
-      stats.updateStats(statistic, stopwatch.elapsed().toMillis(), context);
+      long elapsedMs = stopwatch.elapsed().toMillis();
+      stats.updateStats(statistic, elapsedMs, context);
+      stats.updateConnectorHadoopApiTime(elapsedMs);
+      logger.atFine().log("%s(%s)", statistic.getSymbol(), context);
+
+      // Periodically log the metrics. Once every 5 minutes.
+      logger.atInfo().atMostEvery(5, TimeUnit.MINUTES).log(
+          "periodic connector metrics: %s", LazyArgs.lazy(() -> stats.getNonZeroMetrics()));
     }
+  }
+
+  private String getNonZeroMetrics() {
+    // TreeMap to keep the result sorted.
+    TreeMap<String, Long> result = new TreeMap<>();
+    for (Iterator<LongStatistic> it = this.getLongStatistics(); it.hasNext(); ) {
+      LongStatistic metric = it.next();
+      if (metric.getValue() != 0) {
+        result.put(metric.getName(), metric.getValue());
+      }
+    }
+
+    result.put("uptimeSeconds", stopwatch.elapsed().toSeconds());
+
+    return result.toString();
+  }
+
+  private void updateConnectorHadoopApiTime(long elapsedMs) {
+    incrementCounter(GoogleCloudStorageStatistics.GCS_CONNECTOR_TIME, elapsedMs);
   }
 
   private long increment(GhfsStatistic statistic) {
     return incrementCounter(statistic, 1);
   }
 
-  private void increment(GoogleCloudStorageStatistics statistic) {
+  void increment(GoogleCloudStorageStatistics statistic) {
     incrementCounter(statistic, 1);
   }
 
@@ -182,16 +196,24 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   }
 
   void updateStats(GhfsStatistic statistic, long durationMs, Object context) {
-    checkArgument(
-        statistic.getType() == TYPE_DURATION,
-        String.format("Unexpected instrumentation type %s", statistic));
-    updateMinMaxStats(statistic, durationMs, durationMs, context);
-
-    addMeanStatistic(statistic, durationMs, 1);
+    updateStats(statistic.getSymbol(), statistic.getType(), durationMs, context);
   }
 
-  private void addMeanStatistic(GhfsStatistic statistic, long totalDurationMs, int count) {
-    String meanKey = getMeanKey(statistic.getSymbol());
+  public void updateStats(GoogleCloudStorageStatistics statistic, long duration, Object context) {
+    updateStats(statistic.getSymbol(), statistic.getType(), duration, context);
+  }
+
+  private void updateStats(
+      String symbol, StatisticTypeEnum statType, long durationMs, Object context) {
+    checkArgument(
+        statType == TYPE_DURATION, String.format("Unexpected instrumentation type %s", statType));
+
+    updateMinMaxStats(durationMs, durationMs, context, symbol);
+    addMeanStatistic(symbol, durationMs, 1);
+  }
+
+  private void addMeanStatistic(String symbol, long totalDurationMs, int count) {
+    String meanKey = getMeanKey(symbol);
     if (means.containsKey(meanKey)) {
       means.get(meanKey).addSample(totalDurationMs, count);
     }
@@ -217,14 +239,17 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       int count,
       Object context) {
 
-    updateMinMaxStats(statistic, minLatency, maxLatency, context);
-    addMeanStatistic(statistic, totalDuration, count);
-    opsCount.get(statistic.getSymbol()).addAndGet(count);
+    String symbol = statistic.getSymbol();
+    updateMinMaxStats(minLatency, maxLatency, context, symbol);
+    addMeanStatistic(statistic.getSymbol(), totalDuration, count);
+    opsCount.get(symbol).addAndGet(count);
+
+    updateConnectorHadoopApiTime(totalDuration);
   }
 
   private void updateMinMaxStats(
-      GhfsStatistic statistic, long minDurationMs, long maxDurationMs, Object context) {
-    String minKey = getMinKey(statistic.getSymbol());
+      long minDurationMs, long maxDurationMs, Object context, String symbol) {
+    String minKey = getMinKey(symbol);
 
     AtomicLong minVal = minimums.get(minKey);
     if (minVal == null) {
@@ -234,13 +259,13 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       minVal.set(minDurationMs);
     }
 
-    String maxKey = getMaxKey(statistic.getSymbol());
+    String maxKey = getMaxKey(symbol);
     AtomicLong maxVal = maximums.get(maxKey);
     if (maxDurationMs > maxVal.get()) {
       if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS) {
         logger.atInfo().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
-            statistic, maxDurationMs, maxVal.get(), opsCount.get(statistic.getSymbol()), context);
+            symbol, maxDurationMs, maxVal.get(), opsCount.get(symbol), context);
       }
 
       // There can be race here and can have some data points get missed. This is a corner case.
@@ -452,6 +477,19 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     return minValue.longValue();
   }
 
+  private void addStatistic(String symbol, StatisticTypeEnum type) {
+    opsCount.put(symbol, new AtomicLong(0));
+
+    if (type == StatisticTypeEnum.TYPE_DURATION || type == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+      minimums.put(getMinKey(symbol), null);
+      maximums.put(getMaxKey(symbol), new AtomicLong(0));
+      means.put(getMeanKey(symbol), new MeanStatistic());
+      if (type == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+        total.put(getTimeKey(symbol), new AtomicDouble(0.0));
+      }
+    }
+  }
+
   private String getMinKey(String symbol) {
     return symbol + "_min";
   }
@@ -532,10 +570,10 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     StringBuilder sb = new StringBuilder();
     for (Iterator<LongStatistic> it = this.getLongStatistics(); it.hasNext(); ) {
       LongStatistic statistic = it.next();
+
       if (sb.length() != 0) {
         sb.append(", ");
       }
-
       sb.append(String.format("%s=%s", statistic.getName(), statistic.getValue()));
     }
 

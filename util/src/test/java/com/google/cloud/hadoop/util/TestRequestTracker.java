@@ -44,7 +44,7 @@ public class TestRequestTracker extends RequestTracker {
       ExpectedEventDetails expected = expectedEvents.get(i);
 
       assertThat(actual.getEventType()).isEqualTo(expected.eventType);
-      assertThat(actual.getContext().toString()).isEqualTo(expected.context.toString());
+      assertThat(actual.getContext().toString()).contains(expected.context.toString());
 
       GcsJsonApiEvent.EventType eventType = actual.getEventType();
       if (eventType == GcsJsonApiEvent.EventType.RESPONSE) {

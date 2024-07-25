@@ -16,52 +16,35 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpResponseException;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
+import com.google.cloud.hadoop.util.GcsJsonApiEvent;
+import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
+import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
+import com.google.cloud.hadoop.util.IGcsJsonApiEvent;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.flogger.GoogleLogger;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 
 /* Stores the subscriber methods corresponding to GoogleCloudStorageEventBus */
 public class GoogleCloudStorageEventSubscriber {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final Map<RequestType, GhfsStatistic> requestToGhfsStatMap =
+      getHadoopFileSystemMap();
+  private static final Map<RequestType, GoogleCloudStorageStatistics> requestToGcsStatMap =
+      getGcsStatMap();
+
   private static GhfsGlobalStorageStatistics storageStatistics;
 
   public GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on HttpResponseException.
-   *
-   * @param responseException contains statusCode based on which metrics are updated
-   */
-  @Subscribe
-  private void subscriberOnHttpResponseException(@Nonnull HttpResponseException responseException) {
-    updateGcsIOSpecificStatistics(responseException.getStatusCode());
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on GoogleJsonResponseException.
-   *
-   * @param responseException contains statusCode based on which metrics are updated
-   */
-  @Subscribe
-  private void subscriberOnGoogleJsonResponseException(
-      @Nonnull GoogleJsonResponseException responseException) {
-    updateGcsIOSpecificStatistics(responseException.getStatusCode());
-  }
-
-  /**
-   * Updating the required gcs specific statistics based on HttpResponse.
-   *
-   * @param responseStatus status code from HTTP response
-   */
-  @Subscribe
-  private void subscriberOnHttpResponseStatus(@Nonnull Integer responseStatus) {
-    updateGcsIOSpecificStatistics(responseStatus);
-    incrementStatusCode(responseStatus);
   }
 
   @Subscribe
@@ -72,6 +55,57 @@ public class GoogleCloudStorageEventSubscriber {
   @Subscribe
   private void subscriberOnGrpcStatus(@Nonnull Status status) {
     updateGcsIOSpecificStatistics(grpcToHttpStatusCodeMapping(status));
+  }
+
+  @Subscribe
+  private void subscriberOnGcsRequestExecutionEvent(IGcsJsonApiEvent event) {
+    EventType eventType = event.getEventType();
+    Object eventContext = event.getContext();
+    if (eventType == EventType.STARTED) {
+      storageStatistics.incrementGcsTotalRequestCount();
+    } else if (eventType == EventType.RESPONSE) {
+      long duration = (long) event.getProperty(GcsJsonApiEvent.DURATION);
+      int statusCode = (int) event.getProperty(GcsJsonApiEvent.STATUS_CODE);
+
+      incrementStatusCode(statusCode);
+      updateGcsIOSpecificStatistics(statusCode);
+
+      storageStatistics.incrementCounter(GoogleCloudStorageStatistics.GCS_API_TIME, duration);
+
+      RequestType requestType = (RequestType) event.getProperty(GcsJsonApiEvent.REQUESTTYPE);
+      if (requestToGcsStatMap.containsKey(requestType)) {
+        updateMetric(requestToGcsStatMap.get(requestType), duration, eventContext);
+      } else if (requestToGhfsStatMap.containsKey(requestType)) {
+        updateMetric(requestToGhfsStatMap.get(requestType), duration, eventContext);
+      } else {
+        // Not expected. If this happens some of the requests may not be tracked.
+        logger.atSevere().atMostEvery(1, TimeUnit.MINUTES).log(
+            "Unexpected error type %s. context=%s", requestType, eventContext);
+      }
+    } else if (eventType == EventType.BACKOFF) {
+      long backOffTime = (long) event.getProperty(GcsJsonApiEvent.BACKOFFTIME);
+      storageStatistics.increment(GoogleCloudStorageStatistics.GCS_BACKOFF_COUNT);
+      storageStatistics.incrementCounter(
+          GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, backOffTime);
+    } else if (eventType == EventType.EXCEPTION) {
+      storageStatistics.incrementGcsExceptionCount();
+    }
+  }
+
+  private void updateMetric(GhfsStatistic stat, long duration, Object eventContext) {
+    storageStatistics.incrementCounter(stat, 1);
+
+    if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
+      storageStatistics.updateStats(stat, duration, eventContext);
+    }
+  }
+
+  private void updateMetric(GoogleCloudStorageStatistics stat, long duration, Object eventContext) {
+    storageStatistics.incrementCounter(stat, 1);
+
+    if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
+      storageStatistics.updateStats(stat, duration, eventContext);
+    }
   }
 
   /**
@@ -176,5 +210,26 @@ public class GoogleCloudStorageEventSubscriber {
         storageStatistics.incrementGcsServerTimeoutCount();
         break;
     }
+  }
+
+  private static Map<RequestType, GhfsStatistic> getHadoopFileSystemMap() {
+    EnumMap<RequestType, GhfsStatistic> result = new EnumMap<>(RequestType.class);
+    result.put(RequestType.DELETE, GhfsStatistic.ACTION_HTTP_DELETE_REQUEST);
+    result.put(RequestType.PATCH, GhfsStatistic.ACTION_HTTP_PATCH_REQUEST);
+    result.put(RequestType.POST, GhfsStatistic.ACTION_HTTP_POST_REQUEST);
+    result.put(RequestType.PUT, GhfsStatistic.ACTION_HTTP_PUT_REQUEST);
+
+    return result;
+  }
+
+  private static Map<RequestType, GoogleCloudStorageStatistics> getGcsStatMap() {
+    EnumMap<RequestType, GoogleCloudStorageStatistics> result = new EnumMap<>(RequestType.class);
+    result.put(RequestType.GET_MEDIA, GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST);
+    result.put(RequestType.GET_METADATA, GoogleCloudStorageStatistics.GCS_METADATA_REQUEST);
+    result.put(RequestType.GET_OTHER, GoogleCloudStorageStatistics.GCS_GET_OTHER_REQUEST);
+    result.put(RequestType.LIST_DIR, GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST);
+    result.put(RequestType.LIST_FILE, GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST);
+
+    return result;
   }
 }

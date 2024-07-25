@@ -2118,7 +2118,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.buckets.get")) {
       return getBucket.execute();
     } catch (IOException e) {
-      GoogleCloudStorageEventBus.postOnException();
       if (errorExtractor.itemNotFound(e)) {
         logger.atFiner().withCause(e).log("getBucket(%s): not found", bucketName);
         return null;
@@ -2147,7 +2146,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       checkState(generation != 0, "Generation should not be 0 for an existing item");
       return generation;
     }
-    GoogleCloudStorageEventBus.postOnException();
+
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
@@ -2175,7 +2174,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return getObject.execute();
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
-        GoogleCloudStorageEventBus.postOnException();
         logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
         return null;
       }

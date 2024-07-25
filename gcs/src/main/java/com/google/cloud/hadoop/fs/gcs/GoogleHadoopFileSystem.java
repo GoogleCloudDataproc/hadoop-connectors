@@ -44,6 +44,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -237,7 +238,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public GoogleHadoopFileSystem() {
     StorageStatistics globalStats =
         GlobalStorageStatistics.INSTANCE.put(
-            GhfsGlobalStorageStatistics.NAME, () -> new GhfsGlobalStorageStatistics());
+            GhfsGlobalStorageStatistics.NAME, () -> createGlobalStatisticsSingleton());
 
     if (GhfsGlobalStorageStatistics.class.isAssignableFrom(globalStats.getClass())) {
       globalStorageStatistics = (GhfsGlobalStorageStatistics) globalStats;
@@ -249,8 +250,14 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       globalStorageStatistics = GhfsGlobalStorageStatistics.DUMMY_INSTANCE;
     }
 
-    GoogleCloudStorageEventBus.register(
-        new GoogleCloudStorageEventSubscriber(globalStorageStatistics));
+    globalStorageStatistics.incrementCounter(GoogleCloudStorageStatistics.GS_FILESYSTEM_CREATE, 1);
+  }
+
+  private static GhfsGlobalStorageStatistics createGlobalStatisticsSingleton() {
+    GhfsGlobalStorageStatistics stat = new GhfsGlobalStorageStatistics();
+    GoogleCloudStorageEventBus.register(new GoogleCloudStorageEventSubscriber(stat));
+
+    return stat;
   }
 
   /**
@@ -306,6 +313,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     this.traceFactory =
         TraceFactory.get(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+
+    globalStorageStatistics.incrementCounter(
+        GoogleCloudStorageStatistics.GS_FILESYSTEM_INITIALIZE, 1);
   }
 
   private void initializeFsRoot() {
