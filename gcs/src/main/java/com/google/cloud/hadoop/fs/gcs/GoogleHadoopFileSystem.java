@@ -250,7 +250,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     }
 
     GoogleCloudStorageEventBus.register(
-        new GoogleCloudStorageEventSubscriber(globalStorageStatistics));
+        GoogleCloudStorageEventSubscriber.getInstance(globalStorageStatistics));
   }
 
   /**
