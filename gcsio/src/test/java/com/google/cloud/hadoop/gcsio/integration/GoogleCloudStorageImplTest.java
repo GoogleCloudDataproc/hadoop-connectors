@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio.integration;
 
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.OBJECT_FIELDS;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.rewriteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertObjectContent;
@@ -146,6 +147,58 @@ public class GoogleCloudStorageImplTest {
 
     assertThat(trackingGcs.getAllRequestStrings())
         .containsExactly(getObjectRequestString(resourceId, filelds, testStorageClientImpl));
+    trackingGcs.delegate.close();
+  }
+
+  /**
+   * Even when java-storage client in use, write path get short-circuited via {@link
+   * GoogleCloudStorageOptions} to use the http implementation.
+   */
+  @Test
+  public void writeObject_withGrpcWriteDisabled() throws IOException {
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
+
+    int uploadChunkSize = 2 * 1024 * 1024;
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(
+            getOptionsWithUploadChunk(uploadChunkSize).toBuilder()
+                .setGrpcWriteEnabled(false)
+                .build());
+
+    int partitionsCount = 1;
+    byte[] partition =
+        writeObject(
+            trackingGcs.delegate,
+            resourceId,
+            /* partitionSize= */ uploadChunkSize,
+            partitionsCount);
+
+    assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
+    assertThat(trackingGcs.getAllRequestStrings())
+        .containsExactlyElementsIn(
+            ImmutableList.builder()
+                .add(getRequestString(resourceId.getBucketName(), resourceId.getObjectName()))
+                .add(
+                    TrackingHttpRequestInitializer.resumableUploadRequestString(
+                        resourceId.getBucketName(),
+                        resourceId.getObjectName(),
+                        /* generationId= */ 1,
+                        /* replaceGenerationId= */ true))
+                .addAll(
+                    ImmutableList.of(
+                        TrackingHttpRequestInitializer.resumableUploadChunkRequestString(
+                            resourceId.getBucketName(),
+                            resourceId.getObjectName(),
+                            /* generationId= */ 2,
+                            /* uploadId= */ 1)))
+                .build()
+                .toArray())
+        .inOrder();
+
+    assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings().size()).isEqualTo(0);
     trackingGcs.delegate.close();
   }
 
