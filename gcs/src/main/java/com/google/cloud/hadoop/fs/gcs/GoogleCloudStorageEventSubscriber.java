@@ -19,17 +19,38 @@ package com.google.cloud.hadoop.fs.gcs;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.flogger.GoogleLogger;
 import io.grpc.Status;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
 /* Stores the subscriber methods corresponding to GoogleCloudStorageEventBus */
 public class GoogleCloudStorageEventSubscriber {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static GhfsGlobalStorageStatistics storageStatistics;
+  private static GoogleCloudStorageEventSubscriber INSTANCE = null;
 
-  public GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
+  private GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
+  }
+
+  /*
+   * Singleton class such that registration of subscriber methods is only once.
+   * */
+  public static synchronized GoogleCloudStorageEventSubscriber getInstance(
+      @Nonnull GhfsGlobalStorageStatistics storageStatistics) {
+    if (INSTANCE == null) {
+      logger.atFiner().log("Subscriber class invoked for first time");
+      INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);
+    }
+    return INSTANCE;
+  }
+
+  @VisibleForTesting
+  protected static void reset() {
+    INSTANCE = null;
   }
 
   /**
