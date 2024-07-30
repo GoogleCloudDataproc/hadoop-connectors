@@ -30,11 +30,11 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 
 public class GcsJsonApiEvent implements IGcsJsonApiEvent {
-  public static final String BACKOFFTIME = "BACKOFFTIME";
-  public static final String RETRYCOUNT = "RETRYCOUNT";
+  public static final String BACKOFF_TIME = "BACKOFF_TIME";
+  public static final String RETRY_COUNT = "RETRY_COUNT";
   public static final String STATUS_CODE = "STATUS_CODE";
   public static final String DURATION = "DURATION";
-  public static final String REQUESTTYPE = "REQUESTTYPE";
+  public static final String REQUEST_TYPE = "REQUEST_TYPE";
   private final EventType eventType;
 
   // Having this as Object type so that we do not have to create the URL string.
@@ -61,7 +61,7 @@ public class GcsJsonApiEvent implements IGcsJsonApiEvent {
         new GcsJsonApiEvent(httpResponse.getRequest(), EventType.RESPONSE, 2, context);
     result.set(STATUS_CODE, httpResponse.getStatusCode());
     result.set(DURATION, duration);
-    result.set(REQUESTTYPE, getRequestType(httpResponse));
+    result.set(REQUEST_TYPE, getRequestType(httpResponse));
 
     return result;
   }
@@ -80,8 +80,8 @@ public class GcsJsonApiEvent implements IGcsJsonApiEvent {
       @Nonnegative int retryCount,
       Object context) {
     return new GcsJsonApiEvent(request, EventType.BACKOFF, 2, context)
-        .set(BACKOFFTIME, backOffTime)
-        .set(RETRYCOUNT, retryCount);
+        .set(BACKOFF_TIME, backOffTime)
+        .set(RETRY_COUNT, retryCount);
   }
 
   public EventType getEventType() {
@@ -163,7 +163,7 @@ public class GcsJsonApiEvent implements IGcsJsonApiEvent {
     BACKOFF,
     EXCEPTION,
     RESPONSE,
-    RETRYSKIPPED,
+    RETRY_SKIPPED,
     STARTED,
   }
 

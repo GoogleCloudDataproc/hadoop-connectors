@@ -136,7 +136,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   }
 
   private void updateConnectorHadoopApiTime(long elapsedMs) {
-    incrementCounter(GoogleCloudStorageStatistics.GCS_CONNECTOR_TIME, elapsedMs);
+    incrementCounter(GhfsStatistic.GCS_CONNECTOR_TIME, elapsedMs);
   }
 
   private long increment(GhfsStatistic statistic) {

@@ -122,10 +122,6 @@ public enum GoogleCloudStorageStatistics {
       "gcs_list_file_request",
       "Tracks GCS GET list file API calls. This is usually called with '/' as delimiter with some prefix and maxResults as 1",
       TYPE_DURATION),
-  GCS_CONNECTOR_TIME(
-      "gcs_connector_time",
-      "Wall clock time in milliseconds spend on HDFS API calls. Note that sometimes this might be less than GCS_API_TIME since some of the operations are done concurrently",
-      TYPE_COUNTER),
   GS_FILESYSTEM_CREATE(
       "gs_filesystem_create", "Number of FileSystem objects created for 'gs' scheme", TYPE_COUNTER),
   GCS_GET_OTHER_REQUEST(

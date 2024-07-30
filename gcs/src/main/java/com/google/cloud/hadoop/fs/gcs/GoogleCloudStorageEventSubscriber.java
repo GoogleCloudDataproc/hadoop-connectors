@@ -72,7 +72,7 @@ public class GoogleCloudStorageEventSubscriber {
 
       storageStatistics.incrementCounter(GoogleCloudStorageStatistics.GCS_API_TIME, duration);
 
-      RequestType requestType = (RequestType) event.getProperty(GcsJsonApiEvent.REQUESTTYPE);
+      RequestType requestType = (RequestType) event.getProperty(GcsJsonApiEvent.REQUEST_TYPE);
       if (requestToGcsStatMap.containsKey(requestType)) {
         updateMetric(requestToGcsStatMap.get(requestType), duration, eventContext);
       } else if (requestToGhfsStatMap.containsKey(requestType)) {
@@ -83,7 +83,7 @@ public class GoogleCloudStorageEventSubscriber {
             "Unexpected error type %s. context=%s", requestType, eventContext);
       }
     } else if (eventType == EventType.BACKOFF) {
-      long backOffTime = (long) event.getProperty(GcsJsonApiEvent.BACKOFFTIME);
+      long backOffTime = (long) event.getProperty(GcsJsonApiEvent.BACKOFF_TIME);
       storageStatistics.increment(GoogleCloudStorageStatistics.GCS_BACKOFF_COUNT);
       storageStatistics.incrementCounter(
           GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, backOffTime);

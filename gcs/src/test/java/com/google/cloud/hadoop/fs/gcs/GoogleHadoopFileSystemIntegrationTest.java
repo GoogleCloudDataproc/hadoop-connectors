@@ -2650,8 +2650,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       }
     }
 
-    assertThat(stats.getLong(GoogleCloudStorageStatistics.GCS_CONNECTOR_TIME.getSymbol()))
-        .isLessThan(elapsed + 1);
+    assertThat(stats.getLong(GhfsStatistic.GCS_CONNECTOR_TIME.getSymbol())).isLessThan(elapsed + 1);
   }
 
   private void verifyDurationMetricValues(String minMetricName, GhfsGlobalStorageStatistics stats) {

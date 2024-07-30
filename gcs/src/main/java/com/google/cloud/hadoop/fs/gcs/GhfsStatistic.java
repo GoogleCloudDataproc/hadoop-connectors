@@ -175,7 +175,11 @@ public enum GhfsStatistic {
   DELEGATION_TOKENS_ISSUED(
       StoreStatisticNames.DELEGATION_TOKENS_ISSUED,
       "Count of delegation tokens issued",
-      TYPE_DURATION);
+      TYPE_DURATION),
+  GCS_CONNECTOR_TIME(
+      "gcs_connector_time",
+      "Time in milliseconds spend on HDFS API calls. Note that sometimes this might be less than GCS_API_TIME since some of the operations are done concurrently",
+      TYPE_COUNTER);
 
   public static final ImmutableSet<GhfsStatistic> VALUES =
       ImmutableSet.copyOf(EnumSet.allOf(GhfsStatistic.class));

@@ -256,7 +256,7 @@ public class GoogleCloudStorageTestHelper {
       }
     }
     long endTime = System.currentTimeMillis();
-    logger.atInfo().log(
+    logger.atFine().log(
         "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
   }

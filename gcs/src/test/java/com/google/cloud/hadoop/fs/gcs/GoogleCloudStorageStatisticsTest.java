@@ -77,7 +77,7 @@ public class GoogleCloudStorageStatisticsTest {
             "Metric values not matching. for: %s, expected: %d, got: %d",
             stats.getName(), stats.getValue(), value);
         metricsVerified = false;
-        //        break;
+        break;
       }
     }
 
@@ -200,7 +200,7 @@ public class GoogleCloudStorageStatisticsTest {
         return this.statusCode;
       }
 
-      if (key.equals(GcsJsonApiEvent.REQUESTTYPE)) {
+      if (key.equals(GcsJsonApiEvent.REQUEST_TYPE)) {
         return GcsJsonApiEvent.RequestType.GET_METADATA;
       }
 
