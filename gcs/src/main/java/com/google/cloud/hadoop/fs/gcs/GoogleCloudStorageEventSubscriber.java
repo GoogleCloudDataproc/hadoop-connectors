@@ -28,9 +28,11 @@ import javax.annotation.Nonnull;
 
 /* Stores the subscriber methods corresponding to GoogleCloudStorageEventBus */
 public class GoogleCloudStorageEventSubscriber {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static GhfsGlobalStorageStatistics storageStatistics;
+  private static GoogleCloudStorageEventSubscriber INSTANCE = null;
 
-  public GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
+  private GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
   }
 
@@ -38,7 +40,7 @@ public class GoogleCloudStorageEventSubscriber {
    * Singleton class such that registration of subscriber methods is only once.
    * */
   public static synchronized GoogleCloudStorageEventSubscriber getInstance(
-      @Nonnull GhfsStorageStatistics storageStatistics) {
+      @Nonnull GhfsGlobalStorageStatistics storageStatistics) {
     if (INSTANCE == null) {
       logger.atFiner().log("Subscriber class invoked for first time");
       INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);

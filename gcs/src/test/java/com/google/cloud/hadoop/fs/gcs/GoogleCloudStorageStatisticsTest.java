@@ -89,7 +89,7 @@ public class GoogleCloudStorageStatisticsTest {
         GoogleCloudStorageEventSubscriber.getInstance(storageStatistics));
 
     GoogleCloudStorageEventBus.onGcsRequest(new GcsRequestExecutionEvent());
-    GhfsStorageStatistics verifyCounterStats = new GhfsStorageStatistics();
+    GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
     verifyCounterStats.incrementCounter(GCS_API_REQUEST_COUNT, 1);
     verifyStatistics(verifyCounterStats);
   }
