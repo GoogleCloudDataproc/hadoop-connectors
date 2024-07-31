@@ -74,6 +74,9 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   // If this instance is used, the metrics will not be reported to metrics sinks.
   static final GhfsGlobalStorageStatistics DUMMY_INSTANCE = new GhfsGlobalStorageStatistics();
 
+  // Initial requests are expected to take time due to warmup.
+  private static final int WARMUP_THRESHOLD_SEC = 30;
+
   private final Map<String, AtomicLong> opsCount = new HashMap<>();
   private final Map<String, AtomicLong> minimums = new HashMap<>();
   private final Map<String, AtomicLong> maximums = new HashMap<>();
@@ -262,7 +265,8 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     String maxKey = getMaxKey(symbol);
     AtomicLong maxVal = maximums.get(maxKey);
     if (maxDurationMs > maxVal.get()) {
-      if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS) {
+      if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS
+          && stopwatch.elapsed().getSeconds() > WARMUP_THRESHOLD_SEC) {
         logger.atInfo().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
             symbol, maxDurationMs, maxVal.get(), opsCount.get(symbol), context);

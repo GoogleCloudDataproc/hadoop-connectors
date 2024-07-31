@@ -2473,7 +2473,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     expected =
         ImmutableMap.<String, Long>builder()
             // create resumable upload
-            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L)
+            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // create resumable upload
             .put(GhfsStatistic.ACTION_HTTP_PUT_REQUEST.getSymbol(), 1L) // complete resumable upload
             .put(GhfsStatistic.FILES_CREATED.getSymbol(), 1L)
             // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2484,7 +2484,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             .put(GoogleCloudStorageStatistics.GCS_API_CLIENT_SIDE_ERROR_COUNT.getSymbol(), 4L)
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                7L) // 3 metadata + 1 POST
+                7L) // 4 metadata + 1 POST + 1 PUT + 1 LIST_FILE
             // check if director with filename exists
             .put(GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST.getSymbol(), 1L)
             .put(
@@ -2507,13 +2507,11 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     expected =
         ImmutableMap.<String, Long>builder()
-            .put(
-                GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                1L) // 3 metadata + 1 POST
-            .put(GhfsStatistic.INVOCATION_GET_FILE_STATUS.getSymbol(), 1L) // 3 metadata + 1 POST
+            .put(GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(), 1L) // 1 metadata
+            .put(GhfsStatistic.INVOCATION_GET_FILE_STATUS.getSymbol(), 1L) //
             .put(
                 GoogleCloudStorageStatistics.GCS_METADATA_REQUEST.getSymbol(),
-                1L) // Check for each parent dirs
+                1L) // GET for file metadata
             .build();
 
     verifyMetrics(stats, expected, stopwatch.elapsed().toMillis());
@@ -2554,7 +2552,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             .put(
                 GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(),
                 2L) // 1 for file; 1 for directory.
-            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // 1 for file;
+            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // copy file;
             .put(
                 GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT.getSymbol(),
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2564,11 +2562,12 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
                 9L) // 2 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
-            .put(GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(), 1L)
-            .put(GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST.getSymbol(), 3L)
             .put(
-                GoogleCloudStorageStatistics.GCS_METADATA_REQUEST.getSymbol(),
-                2L) // 1 parent; 1 dst; 1 src;
+                GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(),
+                1L) // list src files to copy/delete
+            // One for src and dst. One due Auto repair checking grandparent.
+            .put(GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST.getSymbol(), 3L)
+            .put(GoogleCloudStorageStatistics.GCS_METADATA_REQUEST.getSymbol(), 2L) // 1 dst; 1 src;
             .put(GhfsStatistic.INVOCATION_RENAME.getSymbol(), 1L)
             .build();
 
@@ -2580,10 +2579,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     expected =
         ImmutableMap.<String, Long>builder()
-            .put(
-                GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(),
-                1L) // 1 for file; 1 for directory.
-            .put(GhfsStatistic.FILES_DELETED.getSymbol(), 1L) // 1 for file; 1 for directory.
+            .put(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(), 1L) // delete src file
+            .put(GhfsStatistic.FILES_DELETED.getSymbol(), 1L)
             .put(
                 GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT.getSymbol(),
                 1L) // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2592,12 +2589,16 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 1L) // Check for each parent dirs fails due to NOT FOUND - expected
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                4L) // 2 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
-            .put(GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(), 1L)
-            .put(GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST.getSymbol(), 1L)
+                4L) // 1 delete + 1 metadata + 1 listDir + 1 listFile
+            .put(
+                GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(),
+                1L) // to find src files to delete
+            .put(
+                GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST.getSymbol(),
+                1L) // check if file exist for path
             .put(
                 GoogleCloudStorageStatistics.GCS_METADATA_REQUEST.getSymbol(),
-                1L) // 1 parent; 1 dst; 1 src;
+                1L) // check if directory exists for path
             .put(GhfsStatistic.INVOCATION_DELETE.getSymbol(), 1L)
             .build();
 
