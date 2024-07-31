@@ -44,11 +44,11 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -310,7 +310,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     this.traceFactory =
         TraceFactory.get(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean));
 
-    globalStorageStatistics.incrementCounter(GoogleCloudStorageStatistics.GS_FILESYSTEM_INITIALIZE, 1);
+    globalStorageStatistics.incrementCounter(
+        GoogleCloudStorageStatistics.GS_FILESYSTEM_INITIALIZE, 1);
   }
 
   private void initializeFsRoot() {

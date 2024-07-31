@@ -23,6 +23,7 @@ import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.IGcsJsonApiEvent;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.flogger.GoogleLogger;
 import io.grpc.Status;
@@ -42,9 +43,27 @@ public class GoogleCloudStorageEventSubscriber {
       getGcsStatMap();
 
   private static GhfsGlobalStorageStatistics storageStatistics;
+  private static GoogleCloudStorageEventSubscriber INSTANCE = null;
 
-  public GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
+  private GoogleCloudStorageEventSubscriber(GhfsGlobalStorageStatistics storageStatistics) {
     this.storageStatistics = storageStatistics;
+  }
+
+  /*
+   * Singleton class such that registration of subscriber methods is only once.
+   * */
+  public static synchronized GoogleCloudStorageEventSubscriber getInstance(
+      @Nonnull GhfsGlobalStorageStatistics storageStatistics) {
+    if (INSTANCE == null) {
+      logger.atFiner().log("Subscriber class invoked for first time");
+      INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);
+    }
+    return INSTANCE;
+  }
+
+  @VisibleForTesting
+  protected static void reset() {
+    INSTANCE = null;
   }
 
   @Subscribe
