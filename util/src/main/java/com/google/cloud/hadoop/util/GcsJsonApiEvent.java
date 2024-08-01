@@ -58,7 +58,7 @@ public class GcsJsonApiEvent implements IGcsJsonApiEvent {
   public static GcsJsonApiEvent getResponseEvent(
       HttpResponse httpResponse, @Nonnegative long duration, Object context) {
     GcsJsonApiEvent result =
-        new GcsJsonApiEvent(httpResponse.getRequest(), EventType.RESPONSE, 2, context);
+        new GcsJsonApiEvent(httpResponse.getRequest(), EventType.RESPONSE, 3, context);
     result.set(STATUS_CODE, httpResponse.getStatusCode());
     result.set(DURATION, duration);
     result.set(REQUEST_TYPE, getRequestType(httpResponse));
