@@ -256,7 +256,7 @@ public class GoogleCloudStorageTestHelper {
       }
     }
     long endTime = System.currentTimeMillis();
-    logger.atInfo().log(
+    logger.atFine().log(
         "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
   }
@@ -375,7 +375,7 @@ public class GoogleCloudStorageTestHelper {
             "GCS has %s buckets to cleanup. It's too many, will cleanup only %s buckets: %s",
             bucketsToDelete.size(), MAX_CLEANUP_BUCKETS, bucketsToDelete);
         bucketsToDelete = bucketsToDelete.subList(0, MAX_CLEANUP_BUCKETS);
-      } else {
+      } else if (bucketsToDelete.size() > 0) {
         logger.atInfo().log(
             "GCS has %s buckets to cleanup: %s", bucketsToDelete.size(), bucketsToDelete);
       }

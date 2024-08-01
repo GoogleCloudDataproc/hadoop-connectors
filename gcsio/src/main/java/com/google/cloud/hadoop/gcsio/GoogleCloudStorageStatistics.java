@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_COUNTER;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -95,7 +96,38 @@ public enum GoogleCloudStorageStatistics {
   GCS_API_SERVER_TIMEOUT_COUNT(
       "gcs_api_server_timeout_count",
       "Counts the occurrence of server side 504 error status code",
-      TYPE_COUNTER);
+      TYPE_COUNTER),
+
+  GCS_BACKOFF_TIME("gcs_backoff_time", "Total back off time in milliseconds", TYPE_COUNTER),
+
+  GCS_BACKOFF_COUNT(
+      "gcs_backoff_count",
+      "Counts the number of times a request was retried after backing off due to some retriable response",
+      TYPE_COUNTER),
+
+  GCS_EXCEPTION_COUNT(
+      "gcs_exception_count", "Counts the occurence of exception from GCS APIs", TYPE_COUNTER),
+
+  GCS_API_TIME(
+      "gcs_api_time", "Tracks the amount of time spend while calling GCS APIs.", TYPE_COUNTER),
+
+  GCS_METADATA_REQUEST("gcs_metadata_request", "Tracks GCS GET metadata API calls.", TYPE_DURATION),
+
+  GCS_GET_MEDIA_REQUEST("gcs_get_media_request", "Tracks GCS GET data API calls", TYPE_DURATION),
+
+  GCS_LIST_DIR_REQUEST(
+      "gcs_list_dir_request", "Tracks GCS GET list prefix API calls", TYPE_DURATION),
+
+  GCS_LIST_FILE_REQUEST(
+      "gcs_list_file_request",
+      "Tracks GCS GET list file API calls. This is usually called with '/' as delimiter with some prefix and maxResults as 1",
+      TYPE_DURATION),
+  GS_FILESYSTEM_CREATE(
+      "gs_filesystem_create", "Number of FileSystem objects created for 'gs' scheme", TYPE_COUNTER),
+  GCS_GET_OTHER_REQUEST(
+      "gcs_get_other_request", "Catch all metric of GCS GET API calls.", TYPE_COUNTER),
+  GS_FILESYSTEM_INITIALIZE(
+      "gs_filesystem_initialize", "Counts the filesystem initialize()", TYPE_COUNTER);
 
   public static final ImmutableSet<GoogleCloudStorageStatistics> VALUES =
       ImmutableSet.copyOf(EnumSet.allOf(GoogleCloudStorageStatistics.class));
