@@ -1,6 +1,9 @@
 # Release Notes
 
 ## Next
+1. PR #1230 - Avoid registering subscriber class multiple times
+
+1. PR #1228 - Add backoff, retry and other metrics for GCS JSON API
 
 ## 3.0.1 - 2024-07-10
 1.  Add readVectored API implementation.
