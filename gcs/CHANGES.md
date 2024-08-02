@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1227 - Avoid registering subscriber class multiple times
 
 ## 2.2.24 - 2024-06-28
 1. Add gRPC configuration documentation
