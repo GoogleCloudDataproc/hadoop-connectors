@@ -259,8 +259,7 @@
                     <exclude>google/**</exclude>
                     <exclude>grpc/**</exclude>
                   </excludes>
-                </filter>
-                
+                </filter>                
                 <filter>
                   <artifact>com.fasterxml.jackson.core:jackson-core</artifact>
                   <excludes>
@@ -269,8 +268,7 @@
                     <exclude>META-INF/versions/19/com/fasterxml/jackson/core/io/doubleparser/FastDoubleSwar.class</exclude>
                     <exclude>META-INF/versions/19/com/fasterxml/jackson/core/io/doubleparser/FastIntegerMath*.class</exclude>
                   </excludes>
-                </filter>
-                
+                </filter>                
               </filters>
               <artifactSet>
                 <includes>
