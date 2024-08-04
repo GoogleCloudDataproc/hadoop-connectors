@@ -38,6 +38,7 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
@@ -74,6 +75,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
+  private final RequesterPaysManager requesterPaysManager;
 
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
@@ -114,6 +116,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             ? createStorage(
                 credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
             : clientLibraryStorage;
+    this.requesterPaysManager =
+        new RequesterPaysManager(options.getRequesterPaysOptions(), this::shouldRequesterPay);
   }
 
   @Override
@@ -137,7 +141,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     return new GoogleCloudStorageClientWriteChannel(
-        storage, storageOptions, resourceIdWithGeneration, options);
+        storage,
+        storageOptions,
+        resourceIdWithGeneration,
+        options,
+        requesterPaysManager::requesterShouldPay);
   }
 
   @Override
@@ -157,7 +165,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         itemInfo == null ? getItemInfo(resourceId) : itemInfo,
         readOptions,
         errorExtractor,
-        storageOptions);
+        storageOptions,
+        requesterPaysManager::requesterShouldPay);
   }
 
   @Override
@@ -268,6 +277,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
         .build()
         .getService();
+  }
+
+  private Boolean shouldRequesterPay(String bucketName) {
+    try {
+      storage.testIamPermissions(bucketName, ImmutableList.of("storage.buckets.get"));
+    } catch (StorageException e) {
+      return errorExtractor.userProjectMissing(e);
+    }
+    return false;
   }
 
   private static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(

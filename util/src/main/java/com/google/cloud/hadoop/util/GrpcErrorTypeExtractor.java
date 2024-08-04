@@ -24,6 +24,8 @@ import io.grpc.Status;
 public class GrpcErrorTypeExtractor implements ErrorTypeExtractor {
 
   public static final GrpcErrorTypeExtractor INSTANCE = new GrpcErrorTypeExtractor();
+  public static final String USER_PROJECT_MISSING_MESSAGE =
+      "Bucket is a requester pays bucket but no user project provided.";
 
   private GrpcErrorTypeExtractor() {}
 
@@ -34,8 +36,16 @@ public class GrpcErrorTypeExtractor implements ErrorTypeExtractor {
         return ErrorType.NOT_FOUND;
       case OUT_OF_RANGE:
         return ErrorType.OUT_OF_RANGE;
+      case INVALID_ARGUMENT:
+        return ErrorType.INVALID_ARGUMENT;
       default:
         return ErrorType.UNKNOWN;
     }
+  }
+
+  @Override
+  public boolean userProjectMissing(Exception error) {
+    return getErrorType(error) == ErrorType.INVALID_ARGUMENT
+        && error.getMessage().contains(USER_PROJECT_MISSING_MESSAGE);
   }
 }

@@ -552,6 +552,7 @@ public class GoogleCloudStorageClientReadChannelTest {
         objectInfo,
         readOptions,
         GrpcErrorTypeExtractor.INSTANCE,
-        GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+        GoogleCloudStorageOptions.DEFAULT.toBuilder().build(),
+        (bucketName) -> false);
   }
 }

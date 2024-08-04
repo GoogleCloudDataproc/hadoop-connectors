@@ -129,7 +129,8 @@ public class GoogleCloudStorageClientWriteChannelTest {
             .setContentEncoding(CONTENT_ENCODING)
             .setMetadata(GoogleCloudStorageTestHelper.getDecodedMetadata(metadata))
             .setKmsKeyName(KMS_KEY)
-            .build());
+            .build(),
+        (bucketName) -> false);
   }
 
   private static void verifyBlobInfoProperties(

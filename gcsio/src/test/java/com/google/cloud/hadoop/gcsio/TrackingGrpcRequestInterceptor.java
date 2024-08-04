@@ -227,6 +227,10 @@ public class TrackingGrpcRequestInterceptor implements ClientInterceptor {
     return requestString(requestPrefixString, requestString);
   }
 
+  public static String getTestIamPermissionRequestFormat() {
+    return String.format(REQUEST_PREFIX_FORMAT, "TestIamPermissions");
+  }
+
   public static String resumableUploadChunkRequestString(
       Integer generationId,
       Integer uploadId,
