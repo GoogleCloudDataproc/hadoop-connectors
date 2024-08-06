@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.2 - 2024-08-06
 1. PR #1230 - Avoid registering subscriber class multiple times
 
 1. PR #1228 - Add backoff, retry and other metrics for GCS JSON API
