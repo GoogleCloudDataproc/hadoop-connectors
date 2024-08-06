@@ -500,7 +500,7 @@
       <plugins>
         <plugin>
           <artifactId>maven-gpg-plugin</artifactId>
-          <version>3.0.2-SNAPSHOT</version>
+          <version>3.0.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-source-plugin</artifactId>
