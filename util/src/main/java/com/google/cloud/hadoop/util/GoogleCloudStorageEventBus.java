@@ -25,8 +25,6 @@ import java.io.IOException;
 /** Event Bus class */
 public class GoogleCloudStorageEventBus {
 
-
-
   /** Hold the instance of the event bus here */
   private static EventBus eventBus = new EventBus();
 
@@ -50,7 +48,6 @@ public class GoogleCloudStorageEventBus {
   public static void unregister(Object obj) {
     eventBus.unregister(obj);
   }
-
 
   public static void postGcsJsonApiEvent(GcsJsonApiEvent gcsJsonApiEvent) {
     eventBus.post(gcsJsonApiEvent);
