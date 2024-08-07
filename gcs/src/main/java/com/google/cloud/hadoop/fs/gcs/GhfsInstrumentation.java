@@ -777,6 +777,9 @@ public class GhfsInstrumentation
               } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
+              } else if (stat.getType() == StatisticTypeEnum.TYPE_DURATION_TOTAL) {
+                duration(stat);
+                storeBuilder.withDurationTracking(stat.getSymbol());
               }
             });
 
