@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.api.services.storage.model.Folder;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
@@ -212,6 +213,15 @@ public interface GoogleCloudStorage {
   void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException;
 
   /**
+   * Deletes the given folder resources. Does not throw any exception for "folders not found"
+   * errors.
+   *
+   * @param folders names of folder resources to delete
+   * @throws IOException if folder exists but cannot be deleted
+   */
+  void deleteFolders(List<FolderInfo> folders) throws IOException;
+
+  /**
    * Copies metadata of the given objects. After the copy is successfully complete, each object blob
    * is reachable by two different names. Copying between two different locations or between two
    * different storage classes is not allowed.
@@ -387,6 +397,23 @@ public interface GoogleCloudStorage {
    */
   ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
+      throws IOException;
+
+  /**
+   * Returns the list of folder resources. Applicable only for HN enabled bucket
+   *
+   * @param bucketName bucket name
+   * @param folderNamePrefix folder resource name prefix
+   * @param listFolderOptions options to use when listing folder resources
+   * @param pageToken the page token
+   * @return {@link ListPage} folder resources with listed {@link Folder}s
+   * @throws IOException on IO error
+   */
+  ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String folderNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
       throws IOException;
 
   /**

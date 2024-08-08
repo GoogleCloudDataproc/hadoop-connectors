@@ -23,6 +23,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.FolderInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -30,6 +31,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
+import com.google.cloud.hadoop.gcsio.ListFolderOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -320,6 +322,11 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public void deleteFolders(List<FolderInfo> folders) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
   public synchronized void copy(
       String srcBucketName,
       List<String> srcObjectNames,
@@ -403,6 +410,16 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     // TODO: implement pagination
     return new ListPage<>(
         listObjectInfo(bucketName, objectNamePrefix, listOptions), /* nextPageToken= */ null);
+  }
+
+  @Override
+  public ListPage<FolderInfo> listFolderInfoForPrefixPage(
+      String bucketName,
+      String objectNamePrefix,
+      ListFolderOptions listFolderOptions,
+      String pageToken)
+      throws IOException {
+    throw new IOException("Not implemented");
   }
 
   @Override
