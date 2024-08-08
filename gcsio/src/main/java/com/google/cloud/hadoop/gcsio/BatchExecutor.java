@@ -123,11 +123,7 @@ class BatchExecutor {
     }
   }
 
-<<<<<<< HEAD
   /** Awaits until all sent requests are completed. Should be serialized */
-=======
-  /** Awaits until all sent requeests are completed */
->>>>>>> 88b6543c (Hns 3.x (#1169))
   private void awaitRequestsCompletion() throws IOException {
     while (!responseFutures.isEmpty()) {
       getFromFuture(responseFutures.remove());
