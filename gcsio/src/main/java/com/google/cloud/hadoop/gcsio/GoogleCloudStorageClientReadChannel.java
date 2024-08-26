@@ -45,7 +45,9 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import javax.annotation.Nullable;
 
 /** Provides seekable read access to GCS via java-storage library. */
@@ -210,14 +212,41 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     // in-place seeks.
     private byte[] skipBuffer = null;
     private ReadableByteChannel byteChannel = null;
+    // Keeps track of distance between last 2 consecutive request.
+    private LimitedFifoQueue<Long> requestDistance = new LimitedFifoQueue<Long>(2);
+    // Keeps track of last index of last served Request.
+    private long servedRequestLastIndex = -1;
     private boolean randomAccess;
+    private boolean sequentialAccess;
+
+    /* A FIFO queue.*/
+    public class LimitedFifoQueue<E> extends LinkedList<E> {
+      private int limit;
+
+      public LimitedFifoQueue(int limit) {
+        this.limit = limit;
+      }
+
+      @Override
+      public boolean add(E o) {
+        super.add(o);
+        while (size() > limit) {
+          // removed the head of linkedList.
+          super.remove();
+        }
+        return true;
+      }
+    }
 
     public ContentReadChannel(
         GoogleCloudStorageReadOptions readOptions, StorageResourceId resourceId) {
       this.blobId =
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-      this.randomAccess = readOptions.getFadvise() == Fadvise.RANDOM;
+      this.randomAccess =
+          readOptions.getFadvise() == Fadvise.RANDOM
+              || readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
+      this.sequentialAccess = !this.randomAccess;
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
@@ -304,6 +333,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           int partialBytes = partiallyReadBytes(remainingBeforeRead, dst);
           totalBytesRead += partialBytes;
           currentPosition += partialBytes;
+          contentChannelCurrentPosition += partialBytes;
           logger.atFine().log(
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
@@ -321,12 +351,22 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       return partialReadBytes;
     }
 
+    private boolean shouldDetectSequentialAccess() {
+      return !gzipEncoded && !sequentialAccess && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
+    }
+
     private boolean shouldDetectRandomAccess() {
       return !gzipEncoded && !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
     }
 
     private void setRandomAccess() {
       randomAccess = true;
+      sequentialAccess = false;
+    }
+
+    private void setSequentialAccess() {
+      sequentialAccess = true;
+      randomAccess = false;
     }
 
     private ReadableByteChannel openByteChannel(long bytesToRead) throws IOException {
@@ -340,6 +380,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (footerContent != null && currentPosition >= objectSize - footerContent.length) {
         return serveFooterContent();
       }
+
+      // Should be updated only if content is not served from cached footer
+      updateAccessPattern();
 
       setChannelBoundaries(bytesToRead);
 
@@ -426,8 +469,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (gzipEncoded) {
         return objectSize;
       }
-
       long endPosition = objectSize;
+
+      if (sequentialAccess) {
+        endPosition = objectSize;
+        if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
+          endPosition = min(startPosition + readOptions.getBlockSize(), objectSize);
+        }
+      }
       if (randomAccess) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
@@ -451,6 +500,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
         } finally {
           byteChannel = null;
+          servedRequestLastIndex = contentChannelCurrentPosition;
           reset();
         }
       }
@@ -521,34 +571,70 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (isInRangeSeek()) {
         skipInPlace();
       } else {
-        if (isRandomAccessPattern()) {
-          setRandomAccess();
-        }
         // close existing contentChannel as requested bytes can't be served from current
         // contentChannel;
         closeContentChannel();
       }
     }
 
+    private void updateAccessPattern() {
+      if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
+        if (isSequentialAccessPattern()) {
+          setSequentialAccess();
+        }
+      } else if (readOptions.getFadvise() == Fadvise.AUTO) {
+        if (isRandomAccessPattern()) {
+          setRandomAccess();
+        }
+      }
+    }
+
+    private boolean isSequentialAccessPattern() {
+      if (servedRequestLastIndex != -1) {
+        requestDistance.add(currentPosition - servedRequestLastIndex);
+      }
+
+      if (!shouldDetectSequentialAccess()) {
+        return false;
+      }
+
+      if (requestDistance.size() < 2) {
+        return false;
+      }
+
+      boolean sequentialRead = true;
+      // if more than two reads qualifies for sequential access pattern
+      ListIterator<Long> iterator = requestDistance.listIterator();
+      while (iterator.hasNext()) {
+        Long distance = iterator.next();
+        if (distance < 0 || distance > readOptions.DEFAULT_INPLACE_SEEK_LIMIT) {
+          sequentialRead = false;
+          break;
+        }
+      }
+      return sequentialRead;
+    }
+
     private boolean isRandomAccessPattern() {
       if (!shouldDetectRandomAccess()) {
         return false;
       }
-      if (currentPosition < contentChannelCurrentPosition) {
+      if (servedRequestLastIndex == -1) {
+        return false;
+      }
+
+      if (currentPosition < servedRequestLastIndex) {
         logger.atFine().log(
             "Detected backward read from %s to %s position, switching to random IO for '%s'",
-            contentChannelCurrentPosition, currentPosition, resourceId);
+            servedRequestLastIndex, currentPosition, resourceId);
         return true;
       }
-      if (contentChannelCurrentPosition >= 0
-          && contentChannelCurrentPosition + readOptions.getInplaceSeekLimit() < currentPosition) {
+      if (servedRequestLastIndex >= 0
+          && servedRequestLastIndex + readOptions.getInplaceSeekLimit() < currentPosition) {
         logger.atFine().log(
             "Detected forward read from %s to %s position over %s threshold,"
                 + " switching to random IO for '%s'",
-            contentChannelCurrentPosition,
-            currentPosition,
-            readOptions.getInplaceSeekLimit(),
-            resourceId);
+            servedRequestLastIndex, currentPosition, readOptions.getInplaceSeekLimit(), resourceId);
         return true;
       }
       return false;
