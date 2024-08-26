@@ -684,6 +684,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
         .setTraceLogExcludeProperties(
             ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
         .build();
   }
 

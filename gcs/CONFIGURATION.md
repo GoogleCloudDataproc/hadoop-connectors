@@ -503,6 +503,12 @@ permissions (not authorized) to execute these requests.
         streaming requests as soon as first backward read or forward read for
         more than `fs.gs.inputstream.inplace.seek.limit` bytes was detected.
 
+    *   `AUTO_RANDOM` - in this mode connector starts with bounded range
+        requests when reading non gzip-encoded object and switches to streaming
+        request, bounded by `fs.gs.block.size`, if previous two requests follows
+        sequential read pattern i.e. forward seeks which are within
+        `fs.gs.inputstream.inplace.seek.limit`.
+
 *   `fs.gs.inputstream.inplace.seek.limit` (default: `8388608`)
 
     If forward seeks are within this many bytes of the current position, seeks
