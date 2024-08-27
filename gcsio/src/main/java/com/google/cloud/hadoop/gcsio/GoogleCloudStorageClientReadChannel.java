@@ -212,18 +212,16 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     // in-place seeks.
     private byte[] skipBuffer = null;
     private ReadableByteChannel byteChannel = null;
-    // Keeps track of distance between last 2 consecutive request.
-    private LimitedFifoQueue<Long> requestDistance = new LimitedFifoQueue<Long>(2);
+    // Keeps track of distance between consecutive requests
+    private BoundedList<Long> consecutiveRequestsDistances;
     // Keeps track of last index of last served Request.
     private long servedRequestLastIndex = -1;
     private boolean randomAccess;
-    private boolean sequentialAccess;
 
-    /* A FIFO queue.*/
-    public class LimitedFifoQueue<E> extends LinkedList<E> {
+    private class BoundedList<E> extends LinkedList<E> {
       private int limit;
 
-      public LimitedFifoQueue(int limit) {
+      public BoundedList(int limit) {
         this.limit = limit;
       }
 
@@ -231,8 +229,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       public boolean add(E o) {
         super.add(o);
         while (size() > limit) {
-          // removed the head of linkedList.
-          super.remove();
+          super.removeFirst();
         }
         return true;
       }
@@ -246,7 +243,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       this.randomAccess =
           readOptions.getFadvise() == Fadvise.RANDOM
               || readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
-      this.sequentialAccess = !this.randomAccess;
+      if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
+        consecutiveRequestsDistances = new BoundedList<>(readOptions.getFadviseRequestTrackCount());
+      }
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
@@ -352,7 +351,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private boolean shouldDetectSequentialAccess() {
-      return !gzipEncoded && !sequentialAccess && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
+      return !gzipEncoded && randomAccess && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
     }
 
     private boolean shouldDetectRandomAccess() {
@@ -361,11 +360,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private void setRandomAccess() {
       randomAccess = true;
-      sequentialAccess = false;
     }
 
-    private void setSequentialAccess() {
-      sequentialAccess = true;
+    private void unsetRandomAccess() {
       randomAccess = false;
     }
 
@@ -471,16 +468,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
       long endPosition = objectSize;
 
-      if (sequentialAccess) {
-        endPosition = objectSize;
-        if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
-          endPosition = min(startPosition + readOptions.getBlockSize(), objectSize);
-        }
-      }
       if (randomAccess) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
+      } else {
+        if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
+          endPosition = min(startPosition + readOptions.getBlockSize(), objectSize);
+        }
       }
       if (footerContent != null) {
         // If footer is cached open just till footerStart.
@@ -580,7 +575,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private void updateAccessPattern() {
       if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
         if (isSequentialAccessPattern()) {
-          setSequentialAccess();
+          unsetRandomAccess();
         }
       } else if (readOptions.getFadvise() == Fadvise.AUTO) {
         if (isRandomAccessPattern()) {
@@ -590,21 +585,21 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private boolean isSequentialAccessPattern() {
-      if (servedRequestLastIndex != -1) {
-        requestDistance.add(currentPosition - servedRequestLastIndex);
+      if (servedRequestLastIndex != -1 && consecutiveRequestsDistances != null) {
+        consecutiveRequestsDistances.add(currentPosition - servedRequestLastIndex);
       }
 
       if (!shouldDetectSequentialAccess()) {
         return false;
       }
 
-      if (requestDistance.size() < 2) {
+      if (consecutiveRequestsDistances.size() < 2) {
         return false;
       }
 
       boolean sequentialRead = true;
       // if more than two reads qualifies for sequential access pattern
-      ListIterator<Long> iterator = requestDistance.listIterator();
+      ListIterator<Long> iterator = consecutiveRequestsDistances.listIterator();
       while (iterator.hasNext()) {
         Long distance = iterator.next();
         if (distance < 0 || distance > readOptions.DEFAULT_INPLACE_SEEK_LIMIT) {

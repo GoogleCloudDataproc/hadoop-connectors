@@ -503,11 +503,15 @@ permissions (not authorized) to execute these requests.
         streaming requests as soon as first backward read or forward read for
         more than `fs.gs.inputstream.inplace.seek.limit` bytes was detected.
 
-    *   `AUTO_RANDOM` - in this mode connector starts with bounded range
-        requests when reading non gzip-encoded object and switches to streaming
-        request, bounded by `fs.gs.block.size`, if previous two requests follows
-        sequential read pattern i.e. forward seeks which are within
-        `fs.gs.inputstream.inplace.seek.limit`.
+    *   `AUTO_RANDOM` - It is complementing `AUTO` mode which uses sequential
+        mode to start with and adapts to bounded range requests. `AUTO_RANDOM`
+        mode uses bounded channel initially and adapts to sequential requests if
+        consecutive requests are within `fs.gs.inputstream.min.range.request.size`.
+        gzip-encode object will bypass this adoption, it will always be a
+        streaming(unbounded) channel. This helps in cases where egress limits is
+        getting breached for customer because `AUTO` mode will always lead to
+        one unbounded channel for a file. `AUTO_RANDOM` will avoid such unwanted
+        unbounded channels.
 
 *   `fs.gs.inputstream.inplace.seek.limit` (default: `8388608`)
 

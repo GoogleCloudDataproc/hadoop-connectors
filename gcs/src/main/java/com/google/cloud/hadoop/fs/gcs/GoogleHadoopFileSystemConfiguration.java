@@ -214,6 +214,13 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.batch.threads", 15);
 
   /**
+   * Configuration key for number of request to track for adapting the access pattern i.e. fadvise:
+   * AUTO & AUTO_RANDOM.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_FADVISE_REQUEST_TRACK_COUNT =
+      new HadoopConfigurationProperty<>("fs.gs.fadvise.request.track.count", 3);
+
+  /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
    * has the same effect as Copy request, but it can handle moving large objects that may
    * potentially timeout a Copy request.
@@ -685,6 +692,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogExcludeProperties(
             ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)))
         .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .build();
   }
 

@@ -155,6 +155,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
           put("fs.gs.client.caching.experiment.enabled", false);
+          put("fs.gs.fadvise.request.track.count", 3);
         }
       };
 

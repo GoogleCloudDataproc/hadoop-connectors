@@ -78,6 +78,7 @@ public abstract class GoogleCloudStorageReadOptions {
         .setTraceLogEnabled(TRACE_LOGGING_ENABLED_DEFAULT)
         .setTraceLogTimeThreshold(0L)
         .setBlockSize(BLOCK_SIZE)
+        .setFadviseRequestTrackCount(3)
         .setTraceLogExcludeProperties(ImmutableSet.of());
   }
 
@@ -137,6 +138,8 @@ public abstract class GoogleCloudStorageReadOptions {
   public abstract long getTraceLogTimeThreshold();
 
   public abstract long getBlockSize();
+
+  public abstract int getFadviseRequestTrackCount();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -251,6 +254,8 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setGrpcReadMessageTimeoutMillis(long grpcMessageTimeout);
 
     public abstract Builder setBlockSize(long blockSize);
+
+    public abstract Builder setFadviseRequestTrackCount(int requestTrackCount);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
