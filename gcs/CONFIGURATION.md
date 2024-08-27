@@ -513,6 +513,12 @@ permissions (not authorized) to execute these requests.
         one unbounded channel for a file. `AUTO_RANDOM` will avoid such unwanted
         unbounded channels.
 
+*   `fs.gs.fadvise.request.track.count` (default: `3`)
+
+    Self adaptive fadvise mode uses distance between the served requests to
+    decide the access pattern. This property controls how many such requests
+    need to be tracked.
+
 *   `fs.gs.inputstream.inplace.seek.limit` (default: `8388608`)
 
     If forward seeks are within this many bytes of the current position, seeks
