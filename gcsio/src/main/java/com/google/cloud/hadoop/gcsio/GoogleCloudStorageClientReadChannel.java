@@ -35,6 +35,7 @@ import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -174,7 +175,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     if (open) {
       try {
         logger.atFiner().log("Closing channel for '%s'", resourceId);
-        contentReadChannel.closeContentChannel();
+        contentReadChannel.close();
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
@@ -194,7 +195,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
    * which helps in deciding the boundaries of content channel being opened and also caching the
    * footer of an object.
    */
-  private class ContentReadChannel {
+  private class ContentReadChannel implements Closeable {
 
     // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
     private static final int SKIP_BUFFER_SIZE = 8192;
@@ -210,14 +211,17 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     // in-place seeks.
     private byte[] skipBuffer = null;
     private ReadableByteChannel byteChannel = null;
-    private boolean randomAccess;
+    private AdaptiveFileAccessPattern fileAccessPattern;
 
     public ContentReadChannel(
         GoogleCloudStorageReadOptions readOptions, StorageResourceId resourceId) {
       this.blobId =
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-      this.randomAccess = readOptions.getFadvise() == Fadvise.RANDOM;
+      this.fileAccessPattern = new AdaptiveFileAccessPattern(resourceId, readOptions);
+      if (gzipEncoded) {
+        fileAccessPattern.overrideAccessPattern(false);
+      }
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
@@ -304,6 +308,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           int partialBytes = partiallyReadBytes(remainingBeforeRead, dst);
           totalBytesRead += partialBytes;
           currentPosition += partialBytes;
+          contentChannelCurrentPosition += partialBytes;
           logger.atFine().log(
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
@@ -321,14 +326,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       return partialReadBytes;
     }
 
-    private boolean shouldDetectRandomAccess() {
-      return !gzipEncoded && !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
-    }
-
-    private void setRandomAccess() {
-      randomAccess = true;
-    }
-
     private ReadableByteChannel openByteChannel(long bytesToRead) throws IOException {
       checkArgument(
           bytesToRead > 0, "bytesToRead should be greater than 0, but was %s", bytesToRead);
@@ -340,6 +337,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (footerContent != null && currentPosition >= objectSize - footerContent.length) {
         return serveFooterContent();
       }
+
+      // Should be updated only if content is not served from cached footer
+      fileAccessPattern.updateAccessPattern(currentPosition);
 
       setChannelBoundaries(bytesToRead);
 
@@ -426,12 +426,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (gzipEncoded) {
         return objectSize;
       }
-
       long endPosition = objectSize;
-      if (randomAccess) {
+      if (fileAccessPattern.isRandomAccessPattern()) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
+      } else {
+        if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
+          endPosition = min(startPosition + readOptions.getBlockSize(), objectSize);
+        }
       }
       if (footerContent != null) {
         // If footer is cached open just till footerStart.
@@ -451,6 +454,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
         } finally {
           byteChannel = null;
+          fileAccessPattern.updateLastServedIndex(contentChannelCurrentPosition);
           reset();
         }
       }
@@ -521,37 +525,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (isInRangeSeek()) {
         skipInPlace();
       } else {
-        if (isRandomAccessPattern()) {
-          setRandomAccess();
-        }
         // close existing contentChannel as requested bytes can't be served from current
         // contentChannel;
         closeContentChannel();
       }
-    }
-
-    private boolean isRandomAccessPattern() {
-      if (!shouldDetectRandomAccess()) {
-        return false;
-      }
-      if (currentPosition < contentChannelCurrentPosition) {
-        logger.atFine().log(
-            "Detected backward read from %s to %s position, switching to random IO for '%s'",
-            contentChannelCurrentPosition, currentPosition, resourceId);
-        return true;
-      }
-      if (contentChannelCurrentPosition >= 0
-          && contentChannelCurrentPosition + readOptions.getInplaceSeekLimit() < currentPosition) {
-        logger.atFine().log(
-            "Detected forward read from %s to %s position over %s threshold,"
-                + " switching to random IO for '%s'",
-            contentChannelCurrentPosition,
-            currentPosition,
-            readOptions.getInplaceSeekLimit(),
-            resourceId);
-        return true;
-      }
-      return false;
     }
 
     private ReadableByteChannel getStorageReadChannel(long seek, long limit) throws IOException {
@@ -591,11 +568,21 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private boolean isFooterRead() {
       return objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
     }
+
+    @Override
+    public void close() throws IOException {
+      try {
+        fileAccessPattern.close();
+        closeContentChannel();
+      } finally {
+        fileAccessPattern = null;
+      }
+    }
   }
 
   @VisibleForTesting
   boolean randomAccessStatus() {
-    return contentReadChannel.randomAccess;
+    return contentReadChannel.fileAccessPattern.isRandomAccessPattern();
   }
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
