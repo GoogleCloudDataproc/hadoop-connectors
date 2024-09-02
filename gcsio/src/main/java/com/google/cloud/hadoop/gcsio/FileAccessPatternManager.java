@@ -19,59 +19,31 @@ package com.google.cloud.hadoop.gcsio;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.LinkedList;
 
 /**
  * Manages the access pattern of object being read from cloud storage. For adaptive fadvise
  * configurations it computes the access pattern based on previous requests.
  */
 @VisibleForTesting
-class FileAccessPatternManager implements Closeable {
+class FileAccessPatternManager {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
-  private boolean isPatternOverriden = false;
+  private boolean isPatternOverriden;
   private boolean randomAccess;
   private long lastServedIndex = -1;
   // Keeps track of distance between consecutive requests
-  private BoundedList<Long> consecutiveRequestsDistances;
-
-  @Override
-  public void close() throws IOException {
-    consecutiveRequestsDistances = null;
-  }
-
-  class BoundedList<E> extends LinkedList<E> {
-    private int limit;
-
-    public BoundedList(int limit) {
-      this.limit = limit;
-    }
-
-    @Override
-    public boolean add(E o) {
-      super.add(o);
-      while (size() > limit) {
-        super.removeFirst();
-      }
-      return true;
-    }
-  }
+  private int consecutiveSequentialCount = 0;
 
   public FileAccessPatternManager(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) {
+    this.isPatternOverriden = false;
     this.resourceId = resourceId;
     this.readOptions = readOptions;
     this.randomAccess =
         readOptions.getFadvise() == Fadvise.AUTO_RANDOM
             || readOptions.getFadvise() == Fadvise.RANDOM;
-    if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
-      consecutiveRequestsDistances = new BoundedList(readOptions.getFadviseRequestTrackCount());
-    }
   }
 
   public void updateLastServedIndex(long position) {
@@ -100,42 +72,39 @@ class FileAccessPatternManager implements Closeable {
   }
 
   /**
-   * This provides a way to override the access pattern, once overridden it will not be recomputed
-   * for adaptive fadvise types.
+   * This provides a way to override the access isRandomPattern, once overridden it will not be
+   * recomputed for adaptive fadvise types.
    *
-   * @param pattern, true, to override with random access else false
+   * @param isRandomPattern, true, to override with random access else false
    */
-  public void overrideAccessPattern(boolean pattern) {
+  public void overrideAccessPattern(boolean isRandomPattern) {
     this.isPatternOverriden = true;
-    this.randomAccess = pattern;
+    this.randomAccess = isRandomPattern;
     logger.atInfo().log(
         "Overriding the random access pattern to %s for fadvise:%s for resource: %s ",
-        pattern, readOptions.getFadvise(), resourceId);
+        isRandomPattern, readOptions.getFadvise(), resourceId);
   }
 
   private boolean isSequentialAccessPattern(long currentPosition) {
-    if (lastServedIndex != -1 && consecutiveRequestsDistances != null) {
-      consecutiveRequestsDistances.add(currentPosition - lastServedIndex);
+    if (lastServedIndex != -1) {
+      long distance = currentPosition - lastServedIndex;
+      if (distance < 0 || distance > readOptions.getInplaceSeekLimit()) {
+        consecutiveSequentialCount = 0;
+      } else {
+        consecutiveSequentialCount++;
+      }
     }
 
     if (!shouldDetectSequentialAccess()) {
       return false;
     }
 
-    if (consecutiveRequestsDistances.size() < readOptions.getFadviseRequestTrackCount()) {
+    if (consecutiveSequentialCount < readOptions.getFadviseRequestTrackCount()) {
       return false;
-    }
-
-    Iterator<Long> iterator = consecutiveRequestsDistances.iterator();
-    while (iterator.hasNext()) {
-      Long distance = iterator.next();
-      if (distance < 0 || distance > readOptions.DEFAULT_INPLACE_SEEK_LIMIT) {
-        return false;
-      }
     }
     logger.atInfo().log(
         "Detected %d consecutive read request within distance threshold %d with fadvise: %s switching to sequential IO for '%s'",
-        consecutiveRequestsDistances.size(),
+        consecutiveSequentialCount,
         readOptions.getInplaceSeekLimit(),
         readOptions.getFadvise(),
         resourceId);

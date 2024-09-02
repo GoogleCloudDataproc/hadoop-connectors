@@ -35,7 +35,6 @@ import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
-import java.io.Closeable;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -175,7 +174,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     if (open) {
       try {
         logger.atFiner().log("Closing channel for '%s'", resourceId);
-        contentReadChannel.close();
+        contentReadChannel.closeContentChannel();
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
@@ -195,7 +194,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
    * which helps in deciding the boundaries of content channel being opened and also caching the
    * footer of an object.
    */
-  private class ContentReadChannel implements Closeable {
+  private class ContentReadChannel {
 
     // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
     private static final int SKIP_BUFFER_SIZE = 8192;
@@ -211,16 +210,16 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     // in-place seeks.
     private byte[] skipBuffer = null;
     private ReadableByteChannel byteChannel = null;
-    private FileAccessPatternManager fileAccessPattern;
+    private final FileAccessPatternManager fileAccessManager;
 
     public ContentReadChannel(
         GoogleCloudStorageReadOptions readOptions, StorageResourceId resourceId) {
       this.blobId =
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-      this.fileAccessPattern = new FileAccessPatternManager(resourceId, readOptions);
+      this.fileAccessManager = new FileAccessPatternManager(resourceId, readOptions);
       if (gzipEncoded) {
-        fileAccessPattern.overrideAccessPattern(false);
+        fileAccessManager.overrideAccessPattern(false);
       }
     }
 
@@ -339,7 +338,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
 
       // Should be updated only if content is not served from cached footer
-      fileAccessPattern.updateAccessPattern(currentPosition);
+      fileAccessManager.updateAccessPattern(currentPosition);
 
       setChannelBoundaries(bytesToRead);
 
@@ -427,7 +426,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return objectSize;
       }
       long endPosition = objectSize;
-      if (fileAccessPattern.isRandomAccessPattern()) {
+      if (fileAccessManager.isRandomAccessPattern()) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
@@ -454,7 +453,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
         } finally {
           byteChannel = null;
-          fileAccessPattern.updateLastServedIndex(contentChannelCurrentPosition);
+          fileAccessManager.updateLastServedIndex(contentChannelCurrentPosition);
           reset();
         }
       }
@@ -568,21 +567,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private boolean isFooterRead() {
       return objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
     }
-
-    @Override
-    public void close() throws IOException {
-      try {
-        fileAccessPattern.close();
-        closeContentChannel();
-      } finally {
-        fileAccessPattern = null;
-      }
-    }
   }
 
   @VisibleForTesting
   boolean randomAccessStatus() {
-    return contentReadChannel.fileAccessPattern.isRandomAccessPattern();
+    return contentReadChannel.fileAccessManager.isRandomAccessPattern();
   }
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
