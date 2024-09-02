@@ -17,13 +17,19 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.ListIterator;
 
-class AdaptiveFileAccessPattern implements Closeable {
+/**
+ * Manages the access pattern of object being read from cloud storage. For adaptive fadvise
+ * configurations it computes the access pattern based on previous requests.
+ */
+@VisibleForTesting
+class FileAccessPatternManager implements Closeable {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final StorageResourceId resourceId;
@@ -36,9 +42,7 @@ class AdaptiveFileAccessPattern implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if (consecutiveRequestsDistances != null) {
-      consecutiveRequestsDistances = null;
-    }
+    consecutiveRequestsDistances = null;
   }
 
   class BoundedList<E> extends LinkedList<E> {
@@ -58,7 +62,7 @@ class AdaptiveFileAccessPattern implements Closeable {
     }
   }
 
-  public AdaptiveFileAccessPattern(
+  public FileAccessPatternManager(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) {
     this.resourceId = resourceId;
     this.readOptions = readOptions;
@@ -66,7 +70,7 @@ class AdaptiveFileAccessPattern implements Closeable {
         readOptions.getFadvise() == Fadvise.AUTO_RANDOM
             || readOptions.getFadvise() == Fadvise.RANDOM;
     if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
-      consecutiveRequestsDistances = new BoundedList<>(readOptions.getFadviseRequestTrackCount());
+      consecutiveRequestsDistances = new BoundedList(readOptions.getFadviseRequestTrackCount());
     }
   }
 
@@ -122,7 +126,7 @@ class AdaptiveFileAccessPattern implements Closeable {
       return false;
     }
 
-    ListIterator<Long> iterator = consecutiveRequestsDistances.listIterator();
+    Iterator<Long> iterator = consecutiveRequestsDistances.iterator();
     while (iterator.hasNext()) {
       Long distance = iterator.next();
       if (distance < 0 || distance > readOptions.DEFAULT_INPLACE_SEEK_LIMIT) {

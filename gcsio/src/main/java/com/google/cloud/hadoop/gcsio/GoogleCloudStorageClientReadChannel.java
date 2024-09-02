@@ -211,14 +211,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     // in-place seeks.
     private byte[] skipBuffer = null;
     private ReadableByteChannel byteChannel = null;
-    private AdaptiveFileAccessPattern fileAccessPattern;
+    private FileAccessPatternManager fileAccessPattern;
 
     public ContentReadChannel(
         GoogleCloudStorageReadOptions readOptions, StorageResourceId resourceId) {
       this.blobId =
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-      this.fileAccessPattern = new AdaptiveFileAccessPattern(resourceId, readOptions);
+      this.fileAccessPattern = new FileAccessPatternManager(resourceId, readOptions);
       if (gzipEncoded) {
         fileAccessPattern.overrideAccessPattern(false);
       }

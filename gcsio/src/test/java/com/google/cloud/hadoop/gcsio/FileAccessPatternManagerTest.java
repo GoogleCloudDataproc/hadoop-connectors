@@ -24,7 +24,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class AdaptiveFileAccessPatternTest {
+public class FileAccessPatternManagerTest {
 
   private static final String BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
@@ -36,24 +36,24 @@ public class AdaptiveFileAccessPatternTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.SEQUENTIAL).build();
 
-    AdaptiveFileAccessPattern fileAccessPattern =
-        new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    FileAccessPatternManager fileAccessPattern =
+        new FileAccessPatternManager(RESOURCE_ID, readOptions);
 
     assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
 
     readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.RANDOM).build();
-    fileAccessPattern = new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
 
     readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.AUTO).build();
-    fileAccessPattern = new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
 
     readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.AUTO_RANDOM).build();
-    fileAccessPattern = new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
   }
 
@@ -64,8 +64,8 @@ public class AdaptiveFileAccessPatternTest {
     long lastServedIndex = 10;
     long currentPosition = 0;
     // AUTO Adaptive access pattern type
-    AdaptiveFileAccessPattern fileAccessPattern =
-        new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    FileAccessPatternManager fileAccessPattern =
+        new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
     // backward seek would result into adapting random pattern
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
@@ -73,7 +73,7 @@ public class AdaptiveFileAccessPatternTest {
     assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
 
     // overriding access pattern
-    fileAccessPattern = new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     // override to use sequential pattern
     fileAccessPattern.overrideAccessPattern(false);
     // even with backward seek, pattern remains to be sequential
@@ -91,7 +91,7 @@ public class AdaptiveFileAccessPatternTest {
             .setFadvise(Fadvise.AUTO_RANDOM)
             .setFadviseRequestTrackCount(1)
             .build();
-    fileAccessPattern = new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
     // sequential read request will result in flipping to use sequential read pattern
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
@@ -99,7 +99,7 @@ public class AdaptiveFileAccessPatternTest {
     assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
 
     // overriding access pattern
-    fileAccessPattern = new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     // override to use random pattern
     fileAccessPattern.overrideAccessPattern(true);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
@@ -116,8 +116,8 @@ public class AdaptiveFileAccessPatternTest {
     long lastServedIndex = 10;
     long currentPosition = 0;
     // AUTO Adaptive access pattern type
-    AdaptiveFileAccessPattern fileAccessPattern =
-        new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    FileAccessPatternManager fileAccessPattern =
+        new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
     // backward seek would result into adapting random pattern
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
@@ -132,8 +132,8 @@ public class AdaptiveFileAccessPatternTest {
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.AUTO_RANDOM).build();
     int readLength = 10;
     long lastServedIndex = 1;
-    AdaptiveFileAccessPattern fileAccessPattern =
-        new AdaptiveFileAccessPattern(RESOURCE_ID, readOptions);
+    FileAccessPatternManager fileAccessPattern =
+        new FileAccessPatternManager(RESOURCE_ID, readOptions);
     assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
     for (int i = 0; i < readOptions.getFadviseRequestTrackCount(); i++) {

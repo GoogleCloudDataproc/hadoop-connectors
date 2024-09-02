@@ -517,7 +517,7 @@ permissions (not authorized) to execute these requests.
 
     Self adaptive fadvise mode uses distance between the served requests to
     decide the access pattern. This property controls how many such requests
-    need to be tracked.
+    need to be tracked. It is used when `AUTO_RANDOM` is selected.
 
 *   `fs.gs.inputstream.inplace.seek.limit` (default: `8388608`)
 

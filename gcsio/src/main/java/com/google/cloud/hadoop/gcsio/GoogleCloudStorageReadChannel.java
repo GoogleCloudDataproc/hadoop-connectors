@@ -119,7 +119,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   // Fine-grained options.
   private final GoogleCloudStorageReadOptions readOptions;
-  private final AdaptiveFileAccessPattern fileAccessPattern;
+  private final FileAccessPatternManager fileAccessPattern;
 
   // Sleeper used for waiting between retries.
   private Sleeper sleeper = Sleeper.DEFAULT;
@@ -170,7 +170,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     this.errorExtractor = errorExtractor;
     this.readOptions = readOptions;
     this.resourceId = resourceId;
-    this.fileAccessPattern = new AdaptiveFileAccessPattern(resourceId, readOptions);
+    this.fileAccessPattern = new FileAccessPatternManager(resourceId, readOptions);
 
     // Initialize metadata if available.
     GoogleCloudStorageItemInfo info = getInitialMetadata();
@@ -790,8 +790,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     metadataInitialized = true;
 
     logger.atFiner().log(
-        "Initialized metadata (gzipEncoded=%s, size=%s, generation=%s) for '%s'",
-        gzipEncoded, size, resourceId.getGenerationId(), resourceId);
+        "Initialized metadata (gzipEncoded=%s, size=%s, randomAccess=%s, generation=%s) for '%s'",
+        gzipEncoded,
+        size,
+        fileAccessPattern.isRandomAccessPattern(),
+        resourceId.getGenerationId(),
+        resourceId);
   }
 
   private void cacheFooter(HttpResponse response) throws IOException {
