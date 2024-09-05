@@ -589,6 +589,24 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         });
   }
 
+  public FSDataInputStream open(FileStatus status) throws IOException {
+    logger.atFine().log("openWithStatus(%s)", status);
+
+    GoogleHadoopFileStatus fileStatus = (GoogleHadoopFileStatus) status;
+
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_OPEN,
+        status.getPath(),
+        this.traceFactory,
+        () -> {
+          checkOpen();
+          return new FSDataInputStream(
+              GoogleHadoopFSInputStream.create(this, fileStatus.getFileInfo(), statistics));
+        });
+  }
+
   @Override
   public FSDataOutputStream create(
       Path hadoopPath,
