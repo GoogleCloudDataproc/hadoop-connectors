@@ -32,6 +32,10 @@ class FileAccessPatternManager {
   private final GoogleCloudStorageReadOptions readOptions;
   private boolean isPatternOverriden;
   private boolean randomAccess;
+  // keeps track of any backward seek requested in lifecycle of InputStream
+  private boolean isBackwardSeekRequested = false;
+  // keeps track of any backward seek requested in lifecycle of InputStream
+  private boolean isForwardSeekRequested = false;
   private long lastServedIndex = -1;
   // Keeps track of distance between consecutive requests
   private int consecutiveSequentialCount = 0;
@@ -61,8 +65,14 @@ class FileAccessPatternManager {
       return;
     }
     if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
-      if (isSequentialAccessPattern(currentPosition)) {
-        unsetRandomAccess();
+      if (randomAccess) {
+        if (isSequentialAccessPattern(currentPosition)) {
+          unsetRandomAccess();
+        }
+      } else {
+        if (isRandomAccessPattern(currentPosition)) {
+          setRandomAccess();
+        }
       }
     } else if (readOptions.getFadvise() == Fadvise.AUTO) {
       if (isRandomAccessPattern(currentPosition)) {
@@ -123,6 +133,9 @@ class FileAccessPatternManager {
       logger.atFine().log(
           "Detected backward read from %s to %s position, switching to random IO for '%s'",
           lastServedIndex, currentPosition, resourceId);
+
+      isBackwardSeekRequested = true;
+      consecutiveSequentialCount = 0;
       return true;
     }
     if (lastServedIndex >= 0
@@ -131,17 +144,25 @@ class FileAccessPatternManager {
           "Detected forward read from %s to %s position over %s threshold,"
               + " switching to random IO for '%s'",
           lastServedIndex, currentPosition, readOptions.getInplaceSeekLimit(), resourceId);
+      isForwardSeekRequested = true;
+      consecutiveSequentialCount = 0;
       return true;
     }
     return false;
   }
 
   private boolean shouldDetectSequentialAccess() {
-    return randomAccess && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
+    return randomAccess
+        && !isBackwardSeekRequested
+        && !isForwardSeekRequested
+        && consecutiveSequentialCount >= readOptions.getFadviseRequestTrackCount()
+        && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
   }
 
   private boolean shouldDetectRandomAccess() {
-    return !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
+    return !randomAccess
+        && (readOptions.getFadvise() == Fadvise.AUTO
+            || readOptions.getFadvise() == Fadvise.AUTO_RANDOM);
   }
 
   private void setRandomAccess() {
