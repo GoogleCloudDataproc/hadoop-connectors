@@ -129,24 +129,45 @@ public class FileAccessPatternManagerTest {
   public void testAutoRandomMode() {
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.AUTO_RANDOM).build();
-    int readLength = 10;
-    long lastServedIndex = 1;
+        GoogleCloudStorageReadOptions.DEFAULT
+            .toBuilder()
+            .setFadvise(Fadvise.AUTO_RANDOM)
+            .setFadviseRequestTrackCount(3)
+            .setInplaceSeekLimit(10)
+            .build();
     FileAccessPatternManager fileAccessPattern =
         new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
-    fileAccessPattern.updateLastServedIndex(lastServedIndex);
-    for (int i = 0; i < readOptions.getFadviseRequestTrackCount(); i++) {
-      // sequential read
-      long currentPosition = lastServedIndex + readOptions.getInplaceSeekLimit();
-      lastServedIndex = currentPosition + readLength;
+    // R-->S-->R backward seek
+    // sequential read resulted in flipping of pattern
+    // 4th request will result in sequential pattern
+    // 5th request is a backward seek, resulting in random read
+    // even any further sequential read will not result in sequential pattern
+    long readIndexes[] = new long[] {0, 1, 2, 3, 4, 0, 1, 2, 3, 4};
+    boolean expectedRandomAccess[] =
+        new boolean[] {true, true, true, false, false, true, true, true, true, true};
+
+    for (int i = 0; i < readIndexes.length; i++) {
+      long currentPosition = readIndexes[i];
       fileAccessPattern.updateAccessPattern(currentPosition);
-      if (i == readOptions.getFadviseRequestTrackCount() - 1) {
-        assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
-      } else {
-        assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
-      }
-      fileAccessPattern.updateLastServedIndex(lastServedIndex);
+      assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
+      fileAccessPattern.updateLastServedIndex(currentPosition);
+    }
+
+    // R-->S-->R forward seek
+    // sequential read resulted in flipping of pattern
+    // 4th request will result in sequential pattern
+    // 5th request is a forward seek, resulting in random read
+    // even any further sequential read will not result in sequential pattern
+    readIndexes = new long[] {0, 1, 2, 3, 4, 15, 16, 17, 18, 19};
+    expectedRandomAccess =
+        new boolean[] {true, true, true, false, false, true, true, true, true, true};
+
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
+    for (int i = 0; i < readIndexes.length; i++) {
+      long currentPosition = readIndexes[i];
+      fileAccessPattern.updateAccessPattern(currentPosition);
+      assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
+      fileAccessPattern.updateLastServedIndex(currentPosition);
     }
   }
 }
