@@ -223,7 +223,7 @@ public class VectoredIOImplTest {
 
     verify(mockedGcsFs, times(2)).open((FileInfo) any(), any());
 
-    assertThat(readOptionsArgumentCaptor.getValue().getFadvise()).isEqualTo(Fadvise.SEQUENTIAL);
+    assertThat(readOptionsArgumentCaptor.getValue().getFadvise()).isEqualTo(Fadvise.RANDOM);
     assertThat(fileInfoArgumentCaptor.getValue().getPath()).isEqualTo(fileInfo.getPath());
   }
 
@@ -253,7 +253,7 @@ public class VectoredIOImplTest {
 
     verify(mockedGcsFs, times(1)).open((FileInfo) any(), any());
 
-    assertThat(readOptionsArgumentCaptor.getValue().getFadvise()).isEqualTo(Fadvise.SEQUENTIAL);
+    assertThat(readOptionsArgumentCaptor.getValue().getFadvise()).isEqualTo(Fadvise.RANDOM);
     assertThat(fileInfoArgumentCaptor.getValue().getPath()).isEqualTo(fileInfo.getPath());
   }
 
