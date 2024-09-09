@@ -274,8 +274,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  @SuppressWarnings("CheckReturnValue")
-  public void testStatus() throws Exception {
+  public void testFileOpenWithStatus() throws Exception {
     URI bucketName = new URI("gs://read-test-bucket/");
     URI failureBucketName = new URI("gs://read-test-bucket-other/");
 
@@ -296,19 +295,31 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     GoogleHadoopFileStatus fileStatus =
         new GoogleHadoopFileStatus(
             fileInfo, new Path(fileInfo.getPath()), 1, 2, FsPermission.getFileDefault(), "foo");
-    new GoogleHadoopFileSystem();
-    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
-    fs.initialize(bucketName, new Configuration());
-    fs.open(fileStatus);
+    try (GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem()) {
+      fs.initialize(bucketName, new Configuration());
+      fs.open(fileStatus);
 
-    fs.initialize(failureBucketName, new Configuration());
+      fs.initialize(failureBucketName, new Configuration());
 
-    IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> fs.open(fileStatus));
-    assertThat(exception.getMessage())
-        .isEqualTo(
-            "Wrong bucket: read-test-bucket, in path: gs://read-test-bucket/bar/test/object, expected bucket: read-test-bucket-other");
-    fs.close();
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> fs.open(fileStatus));
+      assertThat(exception.getMessage())
+          .isEqualTo(
+              "Wrong bucket: read-test-bucket, in path: gs://read-test-bucket/bar/test/object, expected bucket: read-test-bucket-other");
+    }
+  }
+
+  @Test
+  public void testFileOpenWithStatusInvalidType() throws Exception {
+    try (GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem()) {
+      fs.initialize(new URI("gs://read-test-bucket/"), new Configuration());
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> fs.open(new FileStatus()));
+      assertThat(exception.getMessage())
+          .isEqualTo(
+              "Expected status to be of type GoogleHadoopFileStatus, but found class org.apache.hadoop.fs.FileStatus");
+    }
   }
 
   // -----------------------------------------------------------------

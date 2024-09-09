@@ -592,6 +592,13 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public FSDataInputStream open(FileStatus status) throws IOException {
     logger.atFine().log("openWithStatus(%s)", status);
 
+    if (!GoogleHadoopFileStatus.class.isAssignableFrom(status.getClass())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Expected status to be of type GoogleHadoopFileStatus, but found %s",
+              status.getClass()));
+    }
+
     GoogleHadoopFileStatus fileStatus = (GoogleHadoopFileStatus) status;
 
     checkPath(status.getPath());
