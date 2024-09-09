@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.g
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
@@ -31,10 +32,12 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
+import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -49,6 +52,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -267,6 +271,55 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     stats.updateStats(STREAM_WRITE_OPERATIONS, 10, 100, 200, 10, new Object());
     stats.addTotalTimeStatistic(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration");
     assertThat(stats.getLong(STREAM_WRITE_OPERATIONS.getSymbol() + "_duration")).isEqualTo(200);
+  }
+
+  @Test
+  public void testFileOpenWithStatus() throws Exception {
+    URI bucketName = new URI("gs://read-test-bucket/");
+    URI failureBucketName = new URI("gs://read-test-bucket-other/");
+
+    FileInfo fileInfo =
+        FileInfo.fromItemInfo(
+            GoogleCloudStorageItemInfo.createObject(
+                new StorageResourceId(bucketName.getAuthority(), "bar/test/object"),
+                /* creationTime= */ 10L,
+                /* modificationTime= */ 15L,
+                /* size= */ 200L,
+                "text/plain",
+                /* contentEncoding= */ "lzma",
+                /* metadata= */ ImmutableMap.of("foo-meta", new byte[] {5, 66, 56}),
+                /* contentGeneration= */ 312432L,
+                /* metaGeneration= */ 2L,
+                /* verificationAttributes= */ null));
+
+    GoogleHadoopFileStatus fileStatus =
+        new GoogleHadoopFileStatus(
+            fileInfo, new Path(fileInfo.getPath()), 1, 2, FsPermission.getFileDefault(), "foo");
+    try (GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem()) {
+      fs.initialize(bucketName, new Configuration());
+      fs.open(fileStatus);
+
+      fs.initialize(failureBucketName, new Configuration());
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> fs.open(fileStatus));
+      assertThat(exception.getMessage())
+          .isEqualTo(
+              "Wrong bucket: read-test-bucket, in path: gs://read-test-bucket/bar/test/object, expected bucket: read-test-bucket-other");
+    }
+  }
+
+  @Test
+  public void testFileOpenWithStatusInvalidType() throws Exception {
+    try (GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem()) {
+      fs.initialize(new URI("gs://read-test-bucket/"), new Configuration());
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> fs.open(new FileStatus()));
+      assertThat(exception.getMessage())
+          .isEqualTo(
+              "Expected status to be of type GoogleHadoopFileStatus, but found class org.apache.hadoop.fs.FileStatus");
+    }
   }
 
   // -----------------------------------------------------------------

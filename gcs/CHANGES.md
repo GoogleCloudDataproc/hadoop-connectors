@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1244 - Add open() API which takes FileStatus as parameter
 
 ## 3.0.2 - 2024-08-06
 1. PR #1230 - Avoid registering subscriber class multiple times
