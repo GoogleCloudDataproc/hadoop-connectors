@@ -594,6 +594,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     GoogleHadoopFileStatus fileStatus = (GoogleHadoopFileStatus) status;
 
+    checkPath(status.getPath());
+
     return trackDurationWithTracing(
         instrumentation,
         globalStorageStatistics,
