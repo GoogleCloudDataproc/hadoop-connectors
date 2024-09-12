@@ -36,6 +36,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTAL;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
@@ -209,7 +210,8 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   private void updateStats(
       String symbol, StatisticTypeEnum statType, long durationMs, Object context) {
     checkArgument(
-        statType == TYPE_DURATION, String.format("Unexpected instrumentation type %s", statType));
+        statType == TYPE_DURATION || statType == TYPE_DURATION_TOTAL,
+        String.format("Unexpected instrumentation type %s", statType));
 
     updateMinMaxStats(durationMs, durationMs, context, symbol);
     addMeanStatistic(symbol, durationMs, 1);
@@ -228,10 +230,8 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     String parentMeanKey = getMeanKey(parentCounterKey);
 
     assert (means.containsKey(parentMeanKey) && opsCount.containsKey(parentCounterKey));
-    double meanValue = means.get(parentMeanKey).getValue();
-    long operationValue = opsCount.get(parentCounterKey).get();
 
-    total.get(statistic).set(1.0 * meanValue * operationValue);
+    total.get(statistic).set(means.get(parentMeanKey).sum);
   }
 
   void updateStats(

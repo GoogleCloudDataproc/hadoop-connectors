@@ -16,6 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTAL;
+
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
@@ -114,7 +117,7 @@ public class GoogleCloudStorageEventSubscriber {
   private void updateMetric(GhfsStatistic stat, long duration, Object eventContext) {
     storageStatistics.incrementCounter(stat, 1);
 
-    if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
+    if (stat.getType() == TYPE_DURATION || stat.getType() == TYPE_DURATION_TOTAL) {
       storageStatistics.updateStats(stat, duration, eventContext);
     }
   }
@@ -122,7 +125,8 @@ public class GoogleCloudStorageEventSubscriber {
   private void updateMetric(GoogleCloudStorageStatistics stat, long duration, Object eventContext) {
     storageStatistics.incrementCounter(stat, 1);
 
-    if (stat.getType() == StatisticTypeEnum.TYPE_DURATION) {
+    if (stat.getType() == StatisticTypeEnum.TYPE_DURATION
+        || stat.getType() == TYPE_DURATION_TOTAL) {
       storageStatistics.updateStats(stat, duration, eventContext);
     }
   }
