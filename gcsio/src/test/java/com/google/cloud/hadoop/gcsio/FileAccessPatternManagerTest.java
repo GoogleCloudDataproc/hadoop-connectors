@@ -169,5 +169,28 @@ public class FileAccessPatternManagerTest {
       assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
       fileAccessPattern.updateLastServedIndex(currentPosition);
     }
+
+    // R --> R backward seek
+    // a backward seek should lock the random pattern
+    readIndexes = new long[] {4, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4};
+    expectedRandomAccess =
+        new boolean[] {true, true, true, true, true, true, true, true, true, true, true};
+    for (int i = 0; i < readIndexes.length; i++) {
+      long currentPosition = readIndexes[i];
+      fileAccessPattern.updateAccessPattern(currentPosition);
+      assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
+      fileAccessPattern.updateLastServedIndex(currentPosition);
+    }
+
+    // R --> R forward seek
+    // a forward seek should lock the random pattern
+    readIndexes = new long[] {0, 11, 12, 13, 14, 15};
+    expectedRandomAccess = new boolean[] {true, true, true, true, true, true};
+    for (int i = 0; i < readIndexes.length; i++) {
+      long currentPosition = readIndexes[i];
+      fileAccessPattern.updateAccessPattern(currentPosition);
+      assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
+      fileAccessPattern.updateLastServedIndex(currentPosition);
+    }
   }
 }
