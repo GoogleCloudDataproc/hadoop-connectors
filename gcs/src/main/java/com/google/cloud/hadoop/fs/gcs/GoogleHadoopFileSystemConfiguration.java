@@ -510,6 +510,15 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
 
   /**
+   * Configuration key to enable JAVA_STORAGE client caching across FS objects. This config will be
+   * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_STORAGE_CLIENT_CACHING_EXPERIMENT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.client.caching.experiment.enabled",
+          GoogleCloudStorageOptions.DEFAULT.isStorageClientCachingExperimentEnabled());
+
+  /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
    * uploads will be parked at default location pointed by java-storage client. This will only be
    * effective if fs.gs.client.upload.type is set to non-default value.
@@ -624,7 +633,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
-        .setWriteChannelOptions(getWriteChannelOptions(config));
+        .setWriteChannelOptions(getWriteChannelOptions(config))
+        .setStorageClientCachingExperimentEnabled(
+            GCS_STORAGE_CLIENT_CACHING_EXPERIMENT.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
