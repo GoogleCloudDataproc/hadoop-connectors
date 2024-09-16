@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_DELETE_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_GET_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_PATCH_REQUEST;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_POST_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_PUT_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
@@ -29,6 +30,8 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_EXISTS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_FILE_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GLOB_STATUS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE;
@@ -46,6 +49,10 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIO
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_METADATA_REQUEST;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -115,6 +122,8 @@ import org.junit.Test;
 public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
 
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
+
+  private static HashSet<String> EXPECTED_DURATION_METRICS = getExpectedDurationMetrics();
 
   @Before
   public void before() throws Exception {
@@ -2675,6 +2684,15 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       assertWithMessage(metricName).that(maxValue).isGreaterThan(minValue - 1);
       assertWithMessage(metricName).that(meanValue).isGreaterThan(minValue - 1);
       assertWithMessage(metricName).that(maxValue).isGreaterThan(meanValue - 1);
+
+      if (EXPECTED_DURATION_METRICS.contains(metricName)) {
+        long durationValue = stats.getLong(metricName + "_duration");
+        assertWithMessage(metricName).that(durationValue).isGreaterThan(0);
+        assertWithMessage(metricName).that(durationValue).isGreaterThan(meanValue * count - 1);
+        if (meanValue > 0.0) {
+          assertWithMessage(metricName).that(durationValue).isLessThan(meanValue * (count + 1));
+        }
+      }
     }
   }
 
@@ -2686,7 +2704,10 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       return true;
     }
 
-    return name.endsWith("_min") || name.endsWith("_mean") || name.endsWith("_max");
+    return name.endsWith("_min")
+        || name.endsWith("_mean")
+        || name.endsWith("_max")
+        || name.endsWith("_duration");
   }
 
   @Test
@@ -2713,6 +2734,41 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     TestUtils.verifyDurationMetric(
         (GhfsGlobalStorageStatistics) stats, INVOCATION_CREATE.getSymbol(), 1);
+  }
+
+  @Test
+  public void durationMetrics() throws Exception {
+    Path parentPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+
+    GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem();
+    myghfs.initialize(parentPath.toUri(), new Configuration());
+
+    GhfsGlobalStorageStatistics stats = myghfs.getGlobalGcsStorageStatistics();
+
+    Set<String> metrics = getDurationConnectorMetrics(stats);
+
+    assertEquals(EXPECTED_DURATION_METRICS, metrics);
+  }
+
+  private Set<String> getDurationConnectorMetrics(GhfsGlobalStorageStatistics stats) {
+    HashSet<String> metrics = new HashSet<>();
+    for (Iterator<StorageStatistics.LongStatistic> it = stats.getLongStatistics(); it.hasNext(); ) {
+      metrics.add(it.next().getName());
+    }
+
+    HashSet<String> result = new HashSet<>();
+    for (String metric : metrics) {
+      if (metric.endsWith("_mean")) {
+        String metricName = metric.substring(0, metric.length() - "_mean".length());
+        String durationMetricName = metricName + "_duration";
+
+        if (metrics.contains(durationMetricName)) {
+          result.add(metricName);
+        }
+      }
+    }
+
+    return result;
   }
 
   private void createFile(GoogleHadoopFileSystem googleHadoopFileSystem, Path path)
@@ -2804,5 +2860,29 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
         }
       } while (bytesRead >= 0);
     }
+  }
+
+  private static HashSet<String> getExpectedDurationMetrics() {
+    return new HashSet<String>(
+        List.of(
+            ACTION_HTTP_DELETE_REQUEST.getSymbol(),
+            ACTION_HTTP_POST_REQUEST.getSymbol(),
+            ACTION_HTTP_PUT_REQUEST.getSymbol(),
+            GCS_GET_MEDIA_REQUEST.getSymbol(),
+            GCS_LIST_DIR_REQUEST.getSymbol(),
+            GCS_LIST_FILE_REQUEST.getSymbol(),
+            GCS_METADATA_REQUEST.getSymbol(),
+            INVOCATION_CREATE.getSymbol(),
+            INVOCATION_DELETE.getSymbol(),
+            INVOCATION_GET_FILE_STATUS.getSymbol(),
+            INVOCATION_GLOB_STATUS.getSymbol(),
+            INVOCATION_HFLUSH.getSymbol(),
+            INVOCATION_HSYNC.getSymbol(),
+            INVOCATION_LIST_STATUS.getSymbol(),
+            INVOCATION_MKDIRS.getSymbol(),
+            INVOCATION_OPEN.getSymbol(),
+            INVOCATION_RENAME.getSymbol(),
+            STREAM_READ_OPERATIONS.getSymbol(),
+            STREAM_WRITE_OPERATIONS.getSymbol()));
   }
 }
