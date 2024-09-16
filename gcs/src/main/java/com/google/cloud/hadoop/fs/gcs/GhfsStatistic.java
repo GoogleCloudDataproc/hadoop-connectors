@@ -43,14 +43,14 @@ public enum GhfsStatistic {
   ACTION_HTTP_GET_REQUEST(
       StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_COUNTER),
   ACTION_HTTP_PUT_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_DURATION_TOTAL),
   ACTION_HTTP_PATCH_REQUEST(
       StoreStatisticNames.ACTION_HTTP_PATCH_REQUEST, "PATCH request.", TYPE_DURATION),
   ACTION_HTTP_DELETE_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_DURATION_TOTAL),
 
   ACTION_HTTP_POST_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "POST request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "POST request.", TYPE_DURATION_TOTAL),
 
   /** FileSystem-level statistics */
   DIRECTORIES_CREATED(
@@ -66,25 +66,25 @@ public enum GhfsStatistic {
       "files_delete_rejected",
       "Total number of files whose delete request was rejected",
       TYPE_COUNTER),
-  INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_DURATION),
-  INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION),
+  INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_DURATION_TOTAL),
+  INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION_TOTAL),
   INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER),
   INVOCATION_GET_FILE_STATUS(
-      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_DURATION),
+      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_DURATION_TOTAL),
   INVOCATION_GET_FILE_CHECKSUM(
       StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
 
   INVOCATION_LIST_STATUS_RESULT_SIZE(
       "op_get_list_status_result_size", "Number of files returned from list call", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(
-      StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_DURATION),
-  INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION),
-  INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION),
+      StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_DURATION_TOTAL),
+  INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION_TOTAL),
+  INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION_TOTAL),
   INVOCATION_LIST_STATUS(
-      StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_DURATION),
-  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION),
-  INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION),
-  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION),
+      StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_DURATION_TOTAL),
+  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION_TOTAL),
+  INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION_TOTAL),
+  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION_TOTAL),
   INVOCATION_COPY_FROM_LOCAL_FILE(
       StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
   INVOCATION_CREATE_NON_RECURSIVE(
