@@ -628,7 +628,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   private void checkEncodingAndAccess() {
     checkState(
-        !(gzipEncoded && fileAccessManager.isRandomAccessPattern()),
+        !(gzipEncoded && fileAccessManager.shouldAdaptToRandomAccess()),
         "gzipEncoded and randomAccess should not be true at the same time for '%s'",
         resourceId);
   }
@@ -793,7 +793,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "Initialized metadata (gzipEncoded=%s, size=%s, randomAccess=%s, generation=%s) for '%s'",
         gzipEncoded,
         size,
-        fileAccessManager.isRandomAccessPattern(),
+        fileAccessManager.shouldAdaptToRandomAccess(),
         resourceId.getGenerationId(),
         resourceId);
   }
@@ -889,7 +889,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
       // Set rangeSize to the size of the file reminder from currentPosition.
       long rangeSize = size - contentChannelPosition;
-      if (fileAccessManager.isRandomAccessPattern()) {
+      if (fileAccessManager.shouldAdaptToRandomAccess()) {
         long randomRangeSize = Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
         // Limit rangeSize to the randomRangeSize.
         rangeSize = Math.min(randomRangeSize, rangeSize);
@@ -919,8 +919,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           resourceId);
 
       rangeHeader = "bytes=" + contentChannelPosition + "-";
-      if (fileAccessManager.isRandomAccessPattern()
-          || (!fileAccessManager.isRandomAccessPattern()
+      if (fileAccessManager.shouldAdaptToRandomAccess()
+          || (!fileAccessManager.shouldAdaptToRandomAccess()
               && readOptions.getFadvise() == Fadvise.AUTO_RANDOM)
           || contentChannelEnd != size) {
         rangeHeader += (contentChannelEnd - 1);
@@ -1179,6 +1179,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   @VisibleForTesting
   boolean randomAccessStatus() {
-    return fileAccessManager.isRandomAccessPattern();
+    return fileAccessManager.shouldAdaptToRandomAccess();
   }
 }

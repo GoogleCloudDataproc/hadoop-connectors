@@ -54,7 +54,7 @@ class FileAccessPatternManager {
     this.lastServedIndex = position;
   }
 
-  public boolean isRandomAccessPattern() {
+  public boolean shouldAdaptToRandomAccess() {
     return randomAccess;
   }
 
@@ -64,18 +64,19 @@ class FileAccessPatternManager {
           "Will bypass computing access pattern as it's overriden for resource :%s", resourceId);
       return;
     }
+    updateSeekFlags(currentPosition);
     if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
       if (randomAccess) {
-        if (isSequentialAccessPattern(currentPosition)) {
+        if (shouldAdaptToSequential(currentPosition)) {
           unsetRandomAccess();
         }
       } else {
-        if (isRandomAccessPattern(currentPosition)) {
+        if (shouldAdaptToRandomAccess(currentPosition)) {
           setRandomAccess();
         }
       }
     } else if (readOptions.getFadvise() == Fadvise.AUTO) {
-      if (isRandomAccessPattern(currentPosition)) {
+      if (shouldAdaptToRandomAccess(currentPosition)) {
         setRandomAccess();
       }
     }
@@ -95,7 +96,7 @@ class FileAccessPatternManager {
         isRandomPattern, readOptions.getFadvise(), resourceId);
   }
 
-  private boolean isSequentialAccessPattern(long currentPosition) {
+  private boolean shouldAdaptToSequential(long currentPosition) {
     if (lastServedIndex != -1) {
       long distance = currentPosition - lastServedIndex;
       if (distance < 0 || distance > readOptions.getInplaceSeekLimit()) {
@@ -121,7 +122,7 @@ class FileAccessPatternManager {
     return true;
   }
 
-  private boolean isRandomAccessPattern(long currentPosition) {
+  private boolean shouldAdaptToRandomAccess(long currentPosition) {
     if (!shouldDetectRandomAccess()) {
       return false;
     }
@@ -129,23 +130,10 @@ class FileAccessPatternManager {
       return false;
     }
 
-    if (currentPosition < lastServedIndex) {
+    if (isBackwardOrForwardSeekRequested()) {
       logger.atFine().log(
-          "Detected backward read from %s to %s position, switching to random IO for '%s'",
-          lastServedIndex, currentPosition, resourceId);
-
-      isBackwardSeekRequested = true;
-      consecutiveSequentialCount = 0;
-      return true;
-    }
-    if (lastServedIndex >= 0
-        && lastServedIndex + readOptions.getInplaceSeekLimit() < currentPosition) {
-      logger.atFine().log(
-          "Detected forward read from %s to %s position over %s threshold,"
-              + " switching to random IO for '%s'",
-          lastServedIndex, currentPosition, readOptions.getInplaceSeekLimit(), resourceId);
-      isForwardSeekRequested = true;
-      consecutiveSequentialCount = 0;
+          "Backward or forward seek requested, isBackwardSeek: %s, isForwardSeek:%s for '%s'",
+          isBackwardSeekRequested, isForwardSeekRequested, resourceId);
       return true;
     }
     return false;
@@ -153,8 +141,7 @@ class FileAccessPatternManager {
 
   private boolean shouldDetectSequentialAccess() {
     return randomAccess
-        && !isBackwardSeekRequested
-        && !isForwardSeekRequested
+        && !isBackwardOrForwardSeekRequested()
         && consecutiveSequentialCount >= readOptions.getFadviseRequestTrackCount()
         && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
   }
@@ -171,5 +158,29 @@ class FileAccessPatternManager {
 
   private void unsetRandomAccess() {
     randomAccess = false;
+  }
+
+  private boolean isBackwardOrForwardSeekRequested() {
+    return isBackwardSeekRequested || isForwardSeekRequested;
+  }
+
+  private void updateSeekFlags(long currentPosition) {
+    if (lastServedIndex == -1) {
+      return;
+    }
+
+    if (currentPosition < lastServedIndex) {
+      isBackwardSeekRequested = true;
+      logger.atFine().log(
+          "Detected backward read from %s to %s position, updating to backwardSeek for '%s'",
+          lastServedIndex, currentPosition, resourceId);
+
+    } else if (lastServedIndex + readOptions.getInplaceSeekLimit() < currentPosition) {
+      isForwardSeekRequested = true;
+      logger.atFine().log(
+          "Detected forward read from %s to %s position over %s threshold,"
+              + " updated to forwardSeek for '%s'",
+          lastServedIndex, currentPosition, readOptions.getInplaceSeekLimit(), resourceId);
+    }
   }
 }

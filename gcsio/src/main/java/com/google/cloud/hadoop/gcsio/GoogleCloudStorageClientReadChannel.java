@@ -426,7 +426,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return objectSize;
       }
       long endPosition = objectSize;
-      if (fileAccessManager.isRandomAccessPattern()) {
+      if (fileAccessManager.shouldAdaptToRandomAccess()) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
@@ -571,7 +571,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   @VisibleForTesting
   boolean randomAccessStatus() {
-    return contentReadChannel.fileAccessManager.isRandomAccessPattern();
+    return contentReadChannel.fileAccessManager.shouldAdaptToRandomAccess();
   }
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
