@@ -972,6 +972,17 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   @Override
+  public FileInfo getFileInfoWithHint(URI path, PathTypeHint pathTypeHint) throws IOException {
+    checkArgument(path != null, "path must not be null");
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+    FileInfo fileInfo =
+        FileInfo.fromItemInfo(
+            getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true, pathTypeHint));
+    logger.atFiner().log("getFileInfo(path: %s): %s", path, fileInfo);
+    return fileInfo;
+  }
+
+  @Override
   public FileInfo getFileInfoObject(URI path) throws IOException {
     checkArgument(path != null, "path must not be null");
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
@@ -985,18 +996,27 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     return fileInfo;
   }
 
+  private GoogleCloudStorageItemInfo getFileInfoInternal(
+      StorageResourceId resourceId, boolean inferImplicitDirectories) throws IOException {
+    return getFileInfoInternal(resourceId, inferImplicitDirectories, PathTypeHint.NONE);
+  }
+
   /**
    * @see #getFileInfo(URI)
    */
   private GoogleCloudStorageItemInfo getFileInfoInternal(
-      StorageResourceId resourceId, boolean inferImplicitDirectories) throws IOException {
+      StorageResourceId resourceId, boolean inferImplicitDirectories, PathTypeHint pathTypeHint)
+      throws IOException {
     if (resourceId.isRoot() || resourceId.isBucket()) {
       return gcs.getItemInfo(resourceId);
     }
     StorageResourceId dirId = resourceId.toDirectoryId();
 
+    logger.atInfo().log("getFileInfoInternal(%s, %s)", resourceId, pathTypeHint);
     Future<List<GoogleCloudStorageItemInfo>> listDirFuture =
-        (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
+        (options.isStatusParallelEnabled() && pathTypeHint != PathTypeHint.FILE
+                ? cachedExecutor
+                : lazyExecutor)
             .submit(
                 () ->
                     inferImplicitDirectories
@@ -1201,5 +1221,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   @Override
   public GoogleCloudStorage getGcs() {
     return gcs;
+  }
+
+  public enum PathTypeHint {
+    FILE,
+    NONE
   }
 }

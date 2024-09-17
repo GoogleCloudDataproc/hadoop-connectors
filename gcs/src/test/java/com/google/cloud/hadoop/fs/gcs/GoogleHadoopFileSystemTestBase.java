@@ -17,25 +17,28 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_METADATA_REQUEST;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -538,5 +541,43 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         assertThat(localCopiedFile.delete()).isTrue();
       }
     }
+  }
+
+  @Test
+  public void testGetFileStatusWithHint() throws Exception {
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    ghfsHelper.writeFile(hadoopPath, UUID.randomUUID().toString(), 1, /* overwrite= */ false);
+
+    Method getFileStatusWithHint =
+        ghfs.getClass().getMethod("getFileStatusWithHint", Path.class, Configuration.class);
+
+    Configuration configuration = new Configuration();
+    FileStatus warmupIgnore =
+        (FileStatus) getFileStatusWithHint.invoke(ghfs, hadoopPath, configuration);
+
+    getFileStatusAndVerify(hadoopPath, getFileStatusWithHint, configuration, 1, 2);
+
+    configuration.set(GoogleHadoopFileSystem.GETFILESTATUS_FILETYPE_HINT, "file");
+    getFileStatusAndVerify(hadoopPath, getFileStatusWithHint, configuration, 0, 1);
+    getFileStatusAndVerify(hadoopPath.getParent(), getFileStatusWithHint, configuration, 1, 2);
+  }
+
+  private void getFileStatusAndVerify(
+      Path hadoopPath,
+      Method getFileStatusWithHint,
+      Configuration configuration,
+      int listFileCount,
+      int totalCount)
+      throws Exception {
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
+    GhfsGlobalStorageStatistics stats = myghfs.getGlobalGcsStorageStatistics();
+    stats.reset();
+
+    FileStatus status = (FileStatus) getFileStatusWithHint.invoke(ghfs, hadoopPath, configuration);
+
+    assertThat(status.getPath()).isEqualTo(hadoopPath);
+    assertThat(stats.getLong(GCS_LIST_FILE_REQUEST.getSymbol())).isEqualTo(listFileCount);
+    assertThat(stats.getLong(GCS_API_REQUEST_COUNT.getSymbol())).isEqualTo(totalCount);
+    assertThat(stats.getLong(GCS_METADATA_REQUEST.getSymbol())).isEqualTo(1);
   }
 }
