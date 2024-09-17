@@ -39,22 +39,22 @@ public class FileAccessPatternManagerTest {
     FileAccessPatternManager fileAccessPattern =
         new FileAccessPatternManager(RESOURCE_ID, readOptions);
 
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isFalse();
 
     readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.RANDOM).build();
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
 
     readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.AUTO).build();
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isFalse();
 
     readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(Fadvise.AUTO_RANDOM).build();
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
   }
 
   @Test
@@ -66,11 +66,11 @@ public class FileAccessPatternManagerTest {
     // AUTO Adaptive access pattern type
     FileAccessPatternManager fileAccessPattern =
         new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isFalse();
     // backward seek would result into adapting random pattern
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
     fileAccessPattern.updateAccessPattern(currentPosition);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
 
     // overriding access pattern
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
@@ -79,7 +79,7 @@ public class FileAccessPatternManagerTest {
     // even with backward seek, pattern remains to be sequential
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
     fileAccessPattern.updateAccessPattern(currentPosition);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isFalse();
 
     // AUTO_RANDOM Adaptive access pattern type
     // just 2 request in sequential pattern will result in adaptation
@@ -92,21 +92,21 @@ public class FileAccessPatternManagerTest {
             .setFadviseRequestTrackCount(1)
             .build();
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
     // sequential read request will result in flipping to use sequential read pattern
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
     fileAccessPattern.updateAccessPattern(currentPosition);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isFalse();
 
     // overriding access pattern
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
     // override to use random pattern
     fileAccessPattern.overrideAccessPattern(true);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
     // even with sequential read request, patten remains to be random
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
     fileAccessPattern.updateAccessPattern(currentPosition);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
   }
 
   @Test
@@ -118,11 +118,11 @@ public class FileAccessPatternManagerTest {
     // AUTO Adaptive access pattern type
     FileAccessPatternManager fileAccessPattern =
         new FileAccessPatternManager(RESOURCE_ID, readOptions);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isFalse();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isFalse();
     // backward seek would result into adapting random pattern
     fileAccessPattern.updateLastServedIndex(lastServedIndex);
     fileAccessPattern.updateAccessPattern(currentPosition);
-    assertThat(fileAccessPattern.isRandomAccessPattern()).isTrue();
+    assertThat(fileAccessPattern.shouldAdaptToRandomAccess()).isTrue();
   }
 
   @Test
@@ -146,12 +146,7 @@ public class FileAccessPatternManagerTest {
     boolean expectedRandomAccess[] =
         new boolean[] {true, true, true, false, false, true, true, true, true, true};
 
-    for (int i = 0; i < readIndexes.length; i++) {
-      long currentPosition = readIndexes[i];
-      fileAccessPattern.updateAccessPattern(currentPosition);
-      assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
-      fileAccessPattern.updateLastServedIndex(currentPosition);
-    }
+    verifyAccessPattern(fileAccessPattern, readIndexes, expectedRandomAccess);
 
     // R-->S-->R forward seek
     // sequential read resulted in flipping of pattern
@@ -163,10 +158,32 @@ public class FileAccessPatternManagerTest {
         new boolean[] {true, true, true, false, false, true, true, true, true, true};
 
     fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
+    verifyAccessPattern(fileAccessPattern, readIndexes, expectedRandomAccess);
+
+    // wouldn't flip to sequential if backward seek was requester earlier
+    readIndexes = new long[] {1, 0, 1, 2, 3, 4};
+    expectedRandomAccess = new boolean[] {true, true, true, true, true, true};
+
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
+    verifyAccessPattern(fileAccessPattern, readIndexes, expectedRandomAccess);
+
+    // wouldn't flip to sequential if forward seek was requester earlier
+    readIndexes = new long[] {0, 15, 1, 2, 3, 4};
+    expectedRandomAccess = new boolean[] {true, true, true, true, true, true};
+
+    fileAccessPattern = new FileAccessPatternManager(RESOURCE_ID, readOptions);
+    verifyAccessPattern(fileAccessPattern, readIndexes, expectedRandomAccess);
+  }
+
+  private void verifyAccessPattern(
+      FileAccessPatternManager fileAccessPattern,
+      long readIndexes[],
+      boolean expectedRandomAccessPattern[]) {
     for (int i = 0; i < readIndexes.length; i++) {
       long currentPosition = readIndexes[i];
       fileAccessPattern.updateAccessPattern(currentPosition);
-      assertThat(fileAccessPattern.isRandomAccessPattern()).isEqualTo(expectedRandomAccess[i]);
+      assertThat(fileAccessPattern.shouldAdaptToRandomAccess())
+          .isEqualTo(expectedRandomAccessPattern[i]);
       fileAccessPattern.updateLastServedIndex(currentPosition);
     }
   }
