@@ -67,10 +67,4 @@ public class GoogleHadoopFileSystemJavaStorageClientIntegrationTest
   public void testGcsJsonAPIMetrics() {
     // TODO: Update this will once gRPC API metrics are added
   }
-
-  @Ignore
-  @Test
-  public void testGetFileStatusWithHint() {
-    // TODO: Update this will once gRPC API metrics are added
-  }
 }

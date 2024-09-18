@@ -468,4 +468,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testHnBucketDeleteOperationOnNonExistingFolder() {}
+
+  @Override
+  public void testGetFileStatusWithHint() {}
 }
