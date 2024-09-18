@@ -592,6 +592,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         });
   }
 
+  /** This is an experimental API and can change without notice. */
   public FSDataInputStream open(FileStatus status) throws IOException {
     logger.atFine().log("openWithStatus(%s)", status);
 
