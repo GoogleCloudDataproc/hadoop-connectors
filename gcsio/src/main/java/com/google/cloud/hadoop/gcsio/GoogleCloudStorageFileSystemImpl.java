@@ -1010,9 +1010,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     if (resourceId.isRoot() || resourceId.isBucket()) {
       return gcs.getItemInfo(resourceId);
     }
-    StorageResourceId dirId = resourceId.toDirectoryId();
 
-    logger.atInfo().log("getFileInfoInternal(%s, %s)", resourceId, pathTypeHint);
+    StorageResourceId dirId = resourceId.toDirectoryId();
     Future<List<GoogleCloudStorageItemInfo>> listDirFuture =
         (options.isStatusParallelEnabled() && pathTypeHint != PathTypeHint.FILE
                 ? cachedExecutor
