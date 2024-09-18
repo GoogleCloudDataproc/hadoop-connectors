@@ -570,6 +570,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     assertThat(getStatisticValue(GCS_LIST_FILE_REQUEST)).isLessThan(numTimes + 1);
     assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isGreaterThan(numTimes);
     assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isLessThan(numTimes * 2 + 1);
+
+    ghfsHelper.delete(hadoopPath.toUri(), true);
   }
 
   private void waitForUpdation(GoogleCloudStorageStatistics stat, int value)
