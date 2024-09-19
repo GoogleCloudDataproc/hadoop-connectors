@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc.
+ * Copyright 2013 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -510,15 +510,6 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
 
   /**
-   * Configuration key to enable JAVA_STORAGE client caching across FS objects. This config will be
-   * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_STORAGE_CLIENT_CACHING_EXPERIMENT =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.client.caching.experiment.enabled",
-          GoogleCloudStorageOptions.DEFAULT.isStorageClientCachingExperimentEnabled());
-
-  /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
    * uploads will be parked at default location pointed by java-storage client. This will only be
    * effective if fs.gs.client.upload.type is set to non-default value.
@@ -644,9 +635,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
         .setTraceLogExcludeProperties(
-            ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)))
-        .setStorageClientCachingExperimentEnabled(
-            GCS_STORAGE_CLIENT_CACHING_EXPERIMENT.get(config, config::getBoolean));
+            ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
