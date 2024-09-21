@@ -24,6 +24,7 @@ public enum GoogleCloudStorageTracingFields {
   // GRPC specific fields
   RPC_METHOD("rpcMethod"),
   IDEMPOTENCY_TOKEN("idempotency-token"),
+  REQUESTER_PAYS_PROJECT("requesterPaysProject"),
   REQUEST_COUNTER("requestCounter"),
   RESPONSE_COUNTER("responseCounter"),
   REQUEST_MESSAGE_AS_STRING("reqMessageAsString"),

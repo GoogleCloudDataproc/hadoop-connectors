@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /** Implements WritableByteChannel to provide write access to GCS via java-storage client */
 class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
@@ -46,11 +47,12 @@ class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
-      CreateObjectOptions createOptions)
+      CreateObjectOptions createOptions,
+      Function<String, Boolean> requesterShouldPay)
       throws IOException {
     this.resourceId = resourceId;
     BlobWriteSession blobWriteSession =
-        getBlobWriteSession(storage, resourceId, createOptions, storageOptions);
+        getBlobWriteSession(storage, resourceId, createOptions, storageOptions, requesterShouldPay);
     this.writableByteChannel = blobWriteSession.open();
   }
 
@@ -73,16 +75,19 @@ class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
       Storage storage,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
-      GoogleCloudStorageOptions storageOptions) {
+      GoogleCloudStorageOptions storageOptions,
+      Function<String, Boolean> requesterShouldPay) {
     return storage.blobWriteSession(
         getBlobInfo(resourceId, createOptions),
-        generateWriteOptions(createOptions, storageOptions));
+        generateWriteOptions(resourceId, createOptions, storageOptions, requesterShouldPay));
   }
 
   private static BlobWriteOption[] generateWriteOptions(
-      CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
+      StorageResourceId resourceId,
+      CreateObjectOptions createOptions,
+      GoogleCloudStorageOptions storageOptions,
+      Function<String, Boolean> requesterShouldPay) {
     List<BlobWriteOption> blobWriteOptions = new ArrayList<>();
-
     blobWriteOptions.add(BlobWriteOption.disableGzipContent());
     blobWriteOptions.add(BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
@@ -94,6 +99,10 @@ class GoogleCloudStorageClientWriteChannel implements WritableByteChannel {
     if (storageOptions.getEncryptionKey() != null) {
       blobWriteOptions.add(
           BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+    if (requesterShouldPay.apply(resourceId.getBucketName())) {
+      blobWriteOptions.add(
+          BlobWriteOption.userProject(storageOptions.getRequesterPaysOptions().getProjectId()));
     }
     return blobWriteOptions.toArray(new BlobWriteOption[blobWriteOptions.size()]);
   }
