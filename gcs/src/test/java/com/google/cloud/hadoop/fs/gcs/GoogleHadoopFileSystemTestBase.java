@@ -562,7 +562,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isEqualTo(numTimes * 2);
 
     invokeGetFileStatusWithHint(hadoopPath, numTimes, new Configuration());
-    // Update happening in a different thread. Wait a few ms.
+    // Update happening in a different thread. Busy wait a few ms.
     waitForUpdation(GCS_LIST_FILE_REQUEST, numTimes);
 
     // Some of the LIST_FILE requests might have been cancelled before completion.
@@ -576,7 +576,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   private void waitForUpdation(GoogleCloudStorageStatistics stat, int value)
       throws InterruptedException {
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100; i++) {
       if (getStatisticValue(stat) >= value) {
         return;
       }

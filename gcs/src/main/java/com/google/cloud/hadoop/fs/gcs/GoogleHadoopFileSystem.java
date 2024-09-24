@@ -897,7 +897,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           URI gcsPath = getGcsPath(hadoopPath);
           FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
           if (!fileInfo.exists()) {
-            GoogleCloudStorageEventBus.postOnException();
             throw new FileNotFoundException(
                 String.format(
                     "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
@@ -924,19 +923,19 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         traceFactory,
         () -> {
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkArgument(hint != null, "hint must not be null");
 
           checkOpen();
 
-          GoogleCloudStorageFileSystemImpl.PathTypeHint fileStatusHint = getHint(hint);
-          if (fileStatusHint == GoogleCloudStorageFileSystemImpl.PathTypeHint.NONE) {
+          GoogleCloudStorageFileSystemImpl.PathTypeHint pathTypeHint = getHint(hint);
+          if (pathTypeHint == GoogleCloudStorageFileSystemImpl.PathTypeHint.NONE) {
             logger.atWarning().atMostEvery(1, TimeUnit.MINUTES).log(
                 "No file type hint was provided for path %s", hadoopPath);
           }
 
           URI gcsPath = getGcsPath(hadoopPath);
-          FileInfo fileInfo = getGcsFs().getFileInfoWithHint(gcsPath, fileStatusHint);
+          FileInfo fileInfo = getGcsFs().getFileInfoWithHint(gcsPath, pathTypeHint);
           if (!fileInfo.exists()) {
-            GoogleCloudStorageEventBus.postOnException();
             throw new FileNotFoundException(
                 String.format(
                     "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
