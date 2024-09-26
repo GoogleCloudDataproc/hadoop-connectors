@@ -1,18 +1,11 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getCredential;
-import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getCredentials;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
-import com.google.api.services.storage.StorageScopes;
-import com.google.auth.Credentials;
-import com.google.auth.oauth2.ComputeEngineCredentials;
-import com.google.auth.oauth2.ServiceAccountCredentials;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.common.collect.ImmutableMap;
-import java.io.FileInputStream;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.junit.Test;
@@ -21,7 +14,7 @@ import org.junit.runners.JUnit4;
 
 /** Tests for GoogleCloudStorageClientImpl caching experiment. */
 @RunWith(JUnit4.class)
-public class GoogleCloudStorageJavaStorageClientCachingTest {
+public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
 
   @Test
   public void reusesCachedStorageClient_experimentEnabled() throws IOException {
@@ -61,18 +54,8 @@ public class GoogleCloudStorageJavaStorageClientCachingTest {
     return GoogleCloudStorageClientImpl.builder()
         .setOptions(optionsBuilder.build())
         .setCredential(getCredential())
-        .setCredentials(getCredentials())
+        .setCredentials(null)
+        .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
         .build();
-  }
-
-  public static Credentials getCredentials() throws IOException {
-    String serviceAccountJsonKeyFile =
-        TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
-    if (serviceAccountJsonKeyFile == null) {
-      return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
-    }
-    try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
-      return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
-    }
   }
 }

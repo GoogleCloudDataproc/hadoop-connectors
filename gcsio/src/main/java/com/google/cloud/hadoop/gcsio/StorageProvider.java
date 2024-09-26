@@ -30,11 +30,17 @@ import java.util.stream.Collectors;
  */
 public class StorageProvider {
 
+  // TODO: Replace Storage with a StorageWrapper which does not expose the close method. The
+  //  dependants of this provider should not be able to close the storage accidentally. It should
+  //  always be managed through this provider.
   @VisibleForTesting
   final Cache<StorageProviderCacheKey, Storage> cache =
       CacheBuilder.newBuilder().recordStats().build();
 
-  /** Tracks the number of times a storage client is used. */
+  /**
+   * Tracks the number of times a storage client is used. Used to determine when a storage can be
+   * closed.
+   */
   @VisibleForTesting
   final Map<Storage, Integer> storageClientToReferenceMap = new ConcurrentHashMap<>();
 
@@ -55,6 +61,7 @@ public class StorageProvider {
         .setIsDownScopingEnabled(downscopedAccessTokenFn != null)
         .setIsTracingEnabled(storageOptions.isTraceLogEnabled())
         .setWriteChannelOptions(storageOptions.getWriteChannelOptions())
+        .setProjectId(storageOptions.getProjectId())
         .build();
   }
 
@@ -78,25 +85,29 @@ public class StorageProvider {
       ExecutorService pCUExecutorService,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    if (canCache(storageOptions, interceptors, pCUExecutorService)) {
-      StorageProviderCacheKey key =
-          computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
-      Storage storage = cache.getIfPresent(key);
-      if (storage == null) {
-        storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
-        cache.put(key, storage);
-        storageToCacheKeyMap.put(storage, key);
-        logger.atFinest().log("Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %d", cache.stats().hitCount(), cache.stats().hitRate());
-      } else {
-        logger.atFinest().log("Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %d", cache.stats().hitCount(), cache.stats().hitRate());
-      }
-      // Increment the reference count of the storage object.
-      storageClientToReferenceMap.put(
-          storage, storageClientToReferenceMap.getOrDefault(storage, 0) + 1);
-      return storage;
+    if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
+      return createStorage(
+          credentials, storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn);
     }
-    return createStorage(
-        credentials, storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn);
+    StorageProviderCacheKey key =
+        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
+    Storage storage = cache.getIfPresent(key);
+    if (storage == null) {
+      storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
+      cache.put(key, storage);
+      storageToCacheKeyMap.put(storage, key);
+      logger.atFinest().log(
+          "Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %d",
+          cache.stats().hitCount(), cache.stats().hitRate());
+    } else {
+      logger.atFinest().log(
+          "Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %d",
+          cache.stats().hitCount(), cache.stats().hitRate());
+    }
+    // Increment the reference count of the storage object.
+    storageClientToReferenceMap.put(
+        storage, storageClientToReferenceMap.getOrDefault(storage, 0) + 1);
+    return storage;
   }
 
   private static Storage createStorage(
@@ -113,26 +124,26 @@ public class StorageProvider {
         .setHeaderProvider(() -> headers)
         .setGrpcInterceptorProvider(
             () -> {
-              List<ClientInterceptor> list = new ArrayList<>();
+              List<ClientInterceptor> clientInterceptorList = new ArrayList<>();
               if (interceptors != null && !interceptors.isEmpty()) {
-                list.addAll(
+                clientInterceptorList.addAll(
                     interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
               }
               if (storageOptions.isTraceLogEnabled()) {
-                list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
+                clientInterceptorList.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
               }
 
               if (downscopedAccessTokenFn != null) {
                 // When downscoping is enabled, we need to set the downscoped token for each
                 // request. In the case of gRPC, the downscoped token will be set from the
                 // Interceptor.
-                list.add(
+                clientInterceptorList.add(
                     new GoogleCloudStorageClientGrpcDownscopingInterceptor(
                         downscopedAccessTokenFn));
               }
 
-              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
-              return ImmutableList.copyOf(list);
+              clientInterceptorList.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
+              return ImmutableList.copyOf(clientInterceptorList);
             })
         .setCredentials(
             credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
@@ -167,17 +178,17 @@ public class StorageProvider {
    * only if the instance is closed by all the objects sharing this storage reference.
    */
   void close(Storage storage) {
-    if (storageClientToReferenceMap.containsKey(storage)) {
-      int referenceCount = storageClientToReferenceMap.get(storage);
-      // Decrement the reference count of the object.
-      storageClientToReferenceMap.put(storage, referenceCount - 1);
-      if (referenceCount - 1 == 0) {
-        StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
-        cache.invalidate(key);
-        storageToCacheKeyMap.remove(storage);
-        closeStorage(storage);
-      }
-    } else {
+    if (!storageClientToReferenceMap.containsKey(storage)) {
+      closeStorage(storage);
+      return;
+    }
+    // Decrement the reference count of the object.
+    storageClientToReferenceMap.put(storage, storageClientToReferenceMap.get(storage) - 1);
+    if (storageClientToReferenceMap.get(storage) == 0) {
+      StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
+      cache.invalidate(key);
+      storageToCacheKeyMap.remove(storage);
+      storageClientToReferenceMap.remove(storage);
       closeStorage(storage);
     }
   }

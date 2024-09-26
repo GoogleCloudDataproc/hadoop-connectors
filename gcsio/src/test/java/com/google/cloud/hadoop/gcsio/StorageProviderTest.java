@@ -96,7 +96,8 @@ public class StorageProviderTest {
   @Test
   public void getStorage_cacheMiss_returnsNewObject() throws Exception {
     GoogleCloudStorageOptions testOptions =
-        TEST_STORAGE_OPTIONS.toBuilder()
+        TEST_STORAGE_OPTIONS
+            .toBuilder()
             .setTraceLogEnabled(false)
             .setDirectPathPreferred(false)
             .build();
@@ -147,5 +148,6 @@ public class StorageProviderTest {
     // Item is removed from the cache.
     assertEquals(storageProvider.cache.size(), 0);
     assertEquals(getReferences(storage1), 0);
+    assertFalse(storageProvider.storageClientToReferenceMap.containsKey(storage1));
   }
 }
