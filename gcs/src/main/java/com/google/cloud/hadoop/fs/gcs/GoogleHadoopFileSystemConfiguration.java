@@ -645,7 +645,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogTimeThreshold(GCS_TRACE_LOG_TIME_THRESHOLD_MS.get(config, config::getLong))
         .setTraceLogExcludeProperties(
             ImmutableSet.copyOf(GCS_TRACE_LOG_EXCLUDE_PROPERTIES.getStringCollection(config)))
-        .setStorageClientCachingExperimentEnabled(GCS_STORAGE_CLIENT_CACHING_EXPERIMENT.get(config, config::getBoolean));
+        .setStorageClientCachingExperimentEnabled(
+            GCS_STORAGE_CLIENT_CACHING_EXPERIMENT.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

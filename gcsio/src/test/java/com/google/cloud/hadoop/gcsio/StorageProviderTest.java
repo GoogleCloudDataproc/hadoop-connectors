@@ -96,7 +96,8 @@ public class StorageProviderTest {
   @Test
   public void getStorage_cacheMiss_returnsNewObject() throws Exception {
     GoogleCloudStorageOptions testOptions =
-        TEST_STORAGE_OPTIONS.toBuilder()
+        TEST_STORAGE_OPTIONS
+            .toBuilder()
             .setTraceLogEnabled(false)
             .setDirectPathPreferred(false)
             .build();

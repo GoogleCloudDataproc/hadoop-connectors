@@ -30,11 +30,17 @@ import java.util.stream.Collectors;
  */
 public class StorageProvider {
 
+  // TODO: Replace Storage with a StorageWrapper which does not expose the close method. The
+  //  dependants of this provider should not be able close the storage accidentally. It should
+  //  always be managed through this provider.
   @VisibleForTesting
   final Cache<StorageProviderCacheKey, Storage> cache =
       CacheBuilder.newBuilder().recordStats().build();
 
-  /** Tracks the number of times a storage client is used. */
+  /**
+   * Tracks the number of times a storage client is used. Used to determine when a storage can be
+   * closed.
+   */
   @VisibleForTesting
   final Map<Storage, Integer> storageClientToReferenceMap = new ConcurrentHashMap<>();
 
@@ -86,9 +92,13 @@ public class StorageProvider {
         storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
         cache.put(key, storage);
         storageToCacheKeyMap.put(storage, key);
-        logger.atFinest().log("Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %d", cache.stats().hitCount(), cache.stats().hitRate());
+        logger.atFinest().log(
+            "Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %d",
+            cache.stats().hitCount(), cache.stats().hitRate());
       } else {
-        logger.atFinest().log("Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %d", cache.stats().hitCount(), cache.stats().hitRate());
+        logger.atFinest().log(
+            "Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %d",
+            cache.stats().hitCount(), cache.stats().hitRate());
       }
       // Increment the reference count of the storage object.
       storageClientToReferenceMap.put(
