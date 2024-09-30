@@ -49,6 +49,58 @@ public class StorageProvider {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  synchronized Storage getStorage(
+      Credentials credentials,
+      GoogleCloudStorageOptions storageOptions,
+      List<ClientInterceptor> interceptors,
+      ExecutorService pCUExecutorService,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
+      return createStorage(
+          credentials, storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn);
+    }
+    StorageProviderCacheKey key =
+        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
+    Storage storage = cache.getIfPresent(key);
+    if (storage == null) {
+      storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
+      cache.put(key, storage);
+      storageToCacheKeyMap.put(storage, key);
+      logger.atFinest().log(
+          "Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %.2f",
+          cache.stats().hitCount(), cache.stats().hitRate());
+    } else {
+      logger.atFinest().log(
+          "Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
+          cache.stats().hitCount(), cache.stats().hitRate());
+    }
+    // Increment the reference count of the storage object.
+    storageClientToReferenceMap.put(
+        storage, storageClientToReferenceMap.getOrDefault(storage, 0) + 1);
+    return storage;
+  }
+
+  /**
+   * Signal the storage object to be closed. The resources held by the storage object will be freed
+   * only if the instance is closed by all the objects sharing this storage reference.
+   */
+  synchronized void close(Storage storage) {
+    if (!storageClientToReferenceMap.containsKey(storage)) {
+      closeStorage(storage);
+      return;
+    }
+    // Decrement the reference count of the object.
+    storageClientToReferenceMap.put(storage, storageClientToReferenceMap.get(storage) - 1);
+    if (storageClientToReferenceMap.get(storage) == 0) {
+      StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
+      cache.invalidate(key);
+      storageToCacheKeyMap.remove(storage);
+      storageClientToReferenceMap.remove(storage);
+      closeStorage(storage);
+    }
+  }
+
   @VisibleForTesting
   StorageProviderCacheKey computeCacheKey(
       Credentials credentials,
@@ -78,38 +130,6 @@ public class StorageProvider {
         && (interceptors == null || interceptors.isEmpty());
   }
 
-  Storage getStorage(
-      Credentials credentials,
-      GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors,
-      ExecutorService pCUExecutorService,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
-      return createStorage(
-          credentials, storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn);
-    }
-    StorageProviderCacheKey key =
-        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
-    Storage storage = cache.getIfPresent(key);
-    if (storage == null) {
-      storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
-      cache.put(key, storage);
-      storageToCacheKeyMap.put(storage, key);
-      logger.atFinest().log(
-          "Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %d",
-          cache.stats().hitCount(), cache.stats().hitRate());
-    } else {
-      logger.atFinest().log(
-          "Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %d",
-          cache.stats().hitCount(), cache.stats().hitRate());
-    }
-    // Increment the reference count of the storage object.
-    storageClientToReferenceMap.put(
-        storage, storageClientToReferenceMap.getOrDefault(storage, 0) + 1);
-    return storage;
-  }
-
   private static Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
@@ -123,35 +143,38 @@ public class StorageProvider {
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> headers)
         .setGrpcInterceptorProvider(
-            () -> {
-              List<ClientInterceptor> clientInterceptorList = new ArrayList<>();
-              if (interceptors != null && !interceptors.isEmpty()) {
-                clientInterceptorList.addAll(
-                    interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
-              }
-              if (storageOptions.isTraceLogEnabled()) {
-                clientInterceptorList.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
-              }
-
-              if (downscopedAccessTokenFn != null) {
-                // When downscoping is enabled, we need to set the downscoped token for each
-                // request. In the case of gRPC, the downscoped token will be set from the
-                // Interceptor.
-                clientInterceptorList.add(
-                    new GoogleCloudStorageClientGrpcDownscopingInterceptor(
-                        downscopedAccessTokenFn));
-              }
-
-              clientInterceptorList.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
-              return ImmutableList.copyOf(clientInterceptorList);
-            })
+            () -> getInterceptors(interceptors, storageOptions, downscopedAccessTokenFn))
         .setCredentials(
             credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
         .setBlobWriteSessionConfig(
             getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
-        .setProjectId(storageOptions.getProjectId())
         .build()
         .getService();
+  }
+
+  private static ImmutableList<ClientInterceptor> getInterceptors(
+      List<ClientInterceptor> interceptors,
+      GoogleCloudStorageOptions storageOptions,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+    List<ClientInterceptor> clientInterceptorList = new ArrayList<>();
+    if (interceptors != null && !interceptors.isEmpty()) {
+      clientInterceptorList.addAll(
+          interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
+    }
+    if (storageOptions.isTraceLogEnabled()) {
+      clientInterceptorList.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
+    }
+
+    if (downscopedAccessTokenFn != null) {
+      // When downscoping is enabled, we need to set the downscoped token for each
+      // request. In the case of gRPC, the downscoped token will be set from the
+      // Interceptor.
+      clientInterceptorList.add(
+          new GoogleCloudStorageClientGrpcDownscopingInterceptor(downscopedAccessTokenFn));
+    }
+
+    clientInterceptorList.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
+    return ImmutableList.copyOf(clientInterceptorList);
   }
 
   private static Credentials getNoCredentials(
@@ -170,26 +193,6 @@ public class StorageProvider {
       storage.close();
     } catch (Exception e) {
       logger.atWarning().withCause(e).log("Error occurred while closing the storage client");
-    }
-  }
-
-  /**
-   * Signal the storage object to be closed. The resources held by the storage object will be freed
-   * only if the instance is closed by all the objects sharing this storage reference.
-   */
-  void close(Storage storage) {
-    if (!storageClientToReferenceMap.containsKey(storage)) {
-      closeStorage(storage);
-      return;
-    }
-    // Decrement the reference count of the object.
-    storageClientToReferenceMap.put(storage, storageClientToReferenceMap.get(storage) - 1);
-    if (storageClientToReferenceMap.get(storage) == 0) {
-      StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
-      cache.invalidate(key);
-      storageToCacheKeyMap.remove(storage);
-      storageClientToReferenceMap.remove(storage);
-      closeStorage(storage);
     }
   }
 }
