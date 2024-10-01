@@ -319,6 +319,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
           .isEqualTo(
               "Expected status to be of type GoogleHadoopFileStatus, but found class org.apache.hadoop.fs.FileStatus");
     }
+  }
 
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
