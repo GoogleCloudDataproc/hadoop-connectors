@@ -24,6 +24,7 @@ import static org.apache.hadoop.fs.VectoredReadUtils.validateRangeRequest;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -346,7 +347,8 @@ public class VectoredIOImpl implements Closeable {
         // For single range read we don't want Read channel to adjust around on channel boundaries
         // as
         // channel is used just for one read request.
-        builder.setFadvise(GoogleCloudStorageReadOptions.Fadvise.SEQUENTIAL);
+        // Using RANDOM pattern to make sure that there no unnecessary egress at gcs backend
+        builder.setFadvise(Fadvise.RANDOM);
         return builder.build();
       }
     }
