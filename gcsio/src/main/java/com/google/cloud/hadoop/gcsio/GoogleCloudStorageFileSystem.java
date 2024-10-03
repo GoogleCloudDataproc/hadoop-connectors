@@ -272,6 +272,16 @@ public interface GoogleCloudStorageFileSystem {
   FileInfo getFileInfo(URI path) throws IOException;
 
   /**
+   * Gets information about the given path item with hint providing the path type (file vs
+   * directory).
+   *
+   * @param path The path we want information about.
+   * @return Information about the given path item.
+   */
+  FileInfo getFileInfoWithHint(URI path, GoogleCloudStorageFileSystemImpl.PathTypeHint pathTypeHint)
+      throws IOException;
+
+  /**
    * Gets information about the given path item. Here path should be pointing to a gcs object and
    * can't be a directory
    *
