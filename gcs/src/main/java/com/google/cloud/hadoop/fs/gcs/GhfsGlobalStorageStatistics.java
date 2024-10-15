@@ -116,7 +116,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       long elapsedMs = stopwatch.elapsed().toMillis();
       stats.updateStats(statistic, elapsedMs, context);
       stats.updateConnectorHadoopApiTime(elapsedMs);
-      logger.atFine().log("%s(%s)", statistic.getSymbol(), context);
+      logger.atFine().log("%s(%s); elapsed=%s", statistic.getSymbol(), context, elapsedMs);
 
       // Periodically log the metrics. Once every 5 minutes.
       logger.atInfo().atMostEvery(5, TimeUnit.MINUTES).log(
@@ -268,8 +268,13 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS
           && stopwatch.elapsed().getSeconds() > WARMUP_THRESHOLD_SEC) {
         logger.atInfo().log(
-            "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s",
-            symbol, maxDurationMs, maxVal.get(), opsCount.get(symbol), context);
+            "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s; thread=%s",
+            symbol,
+            maxDurationMs,
+            maxVal.get(),
+            opsCount.get(symbol),
+            context,
+            Thread.currentThread().getName());
       }
 
       // There can be race here and can have some data points get missed. This is a corner case.
