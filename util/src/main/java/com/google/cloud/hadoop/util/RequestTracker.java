@@ -115,8 +115,11 @@ public class RequestTracker {
 
       if (stopWatch.elapsed().toMillis() > LOGGING_THRESHOLD) {
         logger.atInfo().atMostEvery(10, TimeUnit.SECONDS).log(
-            "Detected high latency for %s. durationMs=%s; method=%s",
-            context, stopWatch.elapsed().toMillis(), request.getRequestMethod());
+            "Detected high latency for %s. durationMs=%s; method=%s; thread=%s",
+            context,
+            stopWatch.elapsed().toMillis(),
+            request.getRequestMethod(),
+            Thread.currentThread().getName());
       }
     } else {
       // Control can reach here only in case of a bug. Did not want to add an assert due to huge
