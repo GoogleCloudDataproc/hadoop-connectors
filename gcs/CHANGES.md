@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.0.3 - 2024-10-16
 1. PR #1244 - Add open() API which takes FileStatus as parameter
 
