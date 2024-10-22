@@ -1,6 +1,11 @@
 # Release Notes
 
 ## Next
+
+1. Upgrade google-cloud-storage to 2.43.1
+
+1. Upgrade grpc to 1.68.0
+
 1. Add gRPC configuration documentation
 
 1.  Remove Hadoop 2.x support.
