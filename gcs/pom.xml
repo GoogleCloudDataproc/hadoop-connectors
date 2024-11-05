@@ -262,6 +262,7 @@
                   <include>com.google.cloud.bigdataoss</include>
                   <include>com.google.cloud.grpc</include>
                   <include>com.google.cloud.http</include>
+                  <include>com.google.cloud.opentelemetry</include>
                   <include>com.google.flogger</include>
                   <include>com.google.code.gson</include>
                   <include>com.google.guava</include>
@@ -300,6 +301,7 @@
                     <include>com.google.cloud.hadoop.util.**</include>
                     <include>com.google.cloud.http.**</include>
                     <include>com.google.cloud.monitoring.**</include>
+                    <include>com.google.cloud.opentelemetry.**</include>
                     <include>com.google.cloud.spi.**</include>
                     <include>com.google.cloud.storage.**</include>
                     <include>com.google.common.**</include>
