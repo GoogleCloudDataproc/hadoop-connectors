@@ -148,6 +148,7 @@ public class StorageProvider {
             credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
         .setBlobWriteSessionConfig(
             getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
+        .setEnableGrpcClientMetrics(false)
         .build()
         .getService();
   }
