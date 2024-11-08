@@ -27,6 +27,8 @@ import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.DescriptorProtos;
+import com.google.protobuf.ExtensionLite;
 import com.google.storage.v2.StorageProto;
 import java.time.Duration;
 import java.util.Map;
@@ -55,7 +57,7 @@ public abstract class GoogleCloudStorageOptions {
             StorageProto.getDescriptor()
                 .findServiceByName("Storage")
                 .getOptions()
-                .getExtension(ClientProto.defaultHost))
+                .getExtension((ExtensionLite<DescriptorProtos.ServiceOptions, String>) ClientProto.defaultHost))
         .setHttpRequestConnectTimeout(Duration.ofSeconds(5))
         .setHttpRequestHeaders(ImmutableMap.of())
         .setHttpRequestReadTimeout(Duration.ofSeconds(5))
