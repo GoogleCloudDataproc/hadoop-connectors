@@ -40,6 +40,7 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -49,6 +50,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1065,6 +1067,37 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     } finally {
       ghfs.delete(hadoopPath);
     }
+  }
+
+  @Test
+  public void testGetOpenWithStatus() throws Exception {
+    String content = UUID.randomUUID().toString();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+
+    ghfsHelper.writeFile(hadoopPath, content, 1, /* overwrite= */ false);
+
+    FileStatus fileStatus = ghfs.getFileStatus(hadoopPath);
+
+    Method openWithStatus = ghfs.getClass().getMethod("open", FileStatus.class);
+    try (FSDataInputStream readStream =
+        (FSDataInputStream) openWithStatus.invoke(ghfs, fileStatus)) {
+      String readContent = readContent(readStream);
+
+      assertThat(readContent).isEqualTo(content);
+    }
+  }
+
+  private static String readContent(FSDataInputStream readStream) throws IOException {
+    byte[] readBuffer = new byte[1024];
+    StringBuilder returnBuffer = new StringBuilder();
+
+    int numBytesRead = readStream.read(readBuffer);
+    while (numBytesRead > 0) {
+      returnBuffer.append(new String(readBuffer, 0, numBytesRead, UTF_8));
+      numBytesRead = readStream.read(readBuffer);
+    }
+
+    return returnBuffer.toString();
   }
 
   private void validateVectoredReadResult(List<FileRange> fileRanges, Path hadoopPath)

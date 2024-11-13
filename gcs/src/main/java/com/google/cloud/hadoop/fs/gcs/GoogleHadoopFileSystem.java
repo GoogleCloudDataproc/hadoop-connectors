@@ -249,7 +249,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       globalStorageStatistics = GhfsGlobalStorageStatistics.DUMMY_INSTANCE;
     }
 
-    GoogleCloudStorageEventBus.register(globalStorageStatistics);
+    GoogleCloudStorageEventBus.register(
+        GoogleCloudStorageEventSubscriber.getInstance(globalStorageStatistics));
   }
 
   /**
@@ -580,6 +581,33 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
               "open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
           URI gcsPath = getGcsPath(hadoopPath);
           return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
+        });
+  }
+
+  public FSDataInputStream open(FileStatus status) throws IOException {
+    logger.atFine().log("openWithStatus(%s)", status);
+
+    if (!GoogleHadoopFileStatus.class.isAssignableFrom(status.getClass())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Expected status to be of type GoogleHadoopFileStatus, but found %s",
+              status.getClass()));
+    }
+
+    GoogleHadoopFileStatus fileStatus = (GoogleHadoopFileStatus) status;
+
+    checkPath(status.getPath());
+
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_OPEN,
+        status.getPath(),
+        this.traceFactory,
+        () -> {
+          checkOpen();
+          return new FSDataInputStream(
+              GoogleHadoopFSInputStream.create(this, fileStatus.getFileInfo(), statistics));
         });
   }
 

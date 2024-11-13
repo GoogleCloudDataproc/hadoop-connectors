@@ -20,7 +20,6 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_DELETE_RE
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_GET_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_PATCH_REQUEST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.ACTION_HTTP_PUT_REQUEST;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_CREATE;
@@ -79,6 +78,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
@@ -550,23 +550,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     TestUtils.verifyDurationMetric(
         (GhfsGlobalStorageStatistics) stats, INVOCATION_DELETE.getSymbol(), 1);
-  }
-
-  @Test
-  public void statistics_check_directories_deleted() throws IOException {
-
-    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-
-    StorageStatistics GlobalStorageStats = TestUtils.getStorageStatistics();
-    Path testRoot = new Path("/directory1/");
-    myGhfs.mkdirs(testRoot);
-    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
-    fout.writeBytes("Test Content");
-    fout.close();
-
-    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
-    TestUtils.verifyCounter(
-        (GhfsGlobalStorageStatistics) GlobalStorageStats, DIRECTORIES_DELETED, 1);
   }
 
   @Test
@@ -2508,6 +2491,31 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertThat(statistics.isTracked(name)).isTrue();
     assertThat(statsString.contains(name + "=")).isTrue();
     assertEquals(0, statistics.getLong(name).longValue());
+  }
+  
+  public void register_subscriber_multiple_time() throws Exception {
+    GoogleHadoopFileSystem myGhfs =
+        createInMemoryGoogleHadoopFileSystem(); // registers the subscriber class first time in
+    // myGhfs1
+    StorageStatistics stats = TestUtils.getStorageStatistics();
+
+    GoogleCloudStorageEventBus.register(
+        GoogleCloudStorageEventSubscriber.getInstance(
+            (GhfsGlobalStorageStatistics)
+                stats)); // registers the same subscriber class second time
+
+    assertThat(getMetricValue(stats, INVOCATION_CREATE)).isEqualTo(0);
+    assertThat(getMetricValue(stats, FILES_CREATED)).isEqualTo(0);
+
+    try (FSDataOutputStream fout = myGhfs.create(new Path("/file1"))) {
+      fout.writeBytes("Test Content");
+    }
+    assertThat(getMetricValue(stats, INVOCATION_CREATE)).isEqualTo(1);
+    assertThat(getMetricValue(stats, FILES_CREATED)).isEqualTo(1);
+    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
+
+    TestUtils.verifyDurationMetric(
+        (GhfsGlobalStorageStatistics) stats, INVOCATION_CREATE.getSymbol(), 1);
   }
 
   private static Long getMetricValue(StorageStatistics stats, GhfsStatistic invocationCreate) {
