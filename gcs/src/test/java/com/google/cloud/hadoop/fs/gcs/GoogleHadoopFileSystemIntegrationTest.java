@@ -2492,7 +2492,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertThat(statsString.contains(name + "=")).isTrue();
     assertEquals(0, statistics.getLong(name).longValue());
   }
-  
+
   public void register_subscriber_multiple_time() throws Exception {
     GoogleHadoopFileSystem myGhfs =
         createInMemoryGoogleHadoopFileSystem(); // registers the subscriber class first time in
