@@ -1,6 +1,9 @@
 # Release Notes
 
 ## Next
+1. PR #1274 - Upgrade google-cloud-storage to 2.44.1
+
+1. Downgrade grpc to 1.67.1
 
 ## 3.0.4 - 2024-11-12
 1. PR #1268 - [Bug] Fix a failure in gRPC path due to a dependency issue
