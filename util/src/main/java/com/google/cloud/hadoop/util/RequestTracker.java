@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GOOG_API_CLIENT;
+
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.common.base.MoreObjects;
@@ -23,7 +25,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.util.concurrent.TimeUnit;
 
-class RequestTracker {
+public class RequestTracker {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final long LOGGING_THRESHOLD = 200;
   private Stopwatch stopWatch;
@@ -32,11 +34,12 @@ class RequestTracker {
   private long backOffTime;
   private HttpRequest request;
   private final long startTime = System.currentTimeMillis();
+  private boolean initialized;
 
   protected RequestTracker() {}
 
   public static RequestTracker create(HttpRequest request) {
-    return new RequestTracker().init(request);
+    return new RequestTracker();
   }
 
   void trackResponse(HttpResponse response) {
@@ -44,7 +47,8 @@ class RequestTracker {
     // it given up after the configured retries, RetryHttpRequestInitializer response interceptor
     // will also get called.
     if (stopWatch.isRunning()) {
-      postToEventQueue(GcsJsonApiEvent.getResponseEvent(response, stopWatch.elapsed().toMillis()));
+      postToEventQueue(
+          GcsJsonApiEvent.getResponseEvent(response, stopWatch.elapsed().toMillis(), context));
       stopTracking();
     }
 
@@ -57,17 +61,18 @@ class RequestTracker {
 
   void trackIOException() {
     stopTracking();
-    postToEventQueue(GcsJsonApiEvent.getExceptionEvent(request));
+    postToEventQueue(GcsJsonApiEvent.getExceptionEvent(request, context));
   }
 
   void trackUnsuccessfulResponseHandler(HttpResponse response) {
     stopTracking();
-    postToEventQueue(GcsJsonApiEvent.getResponseEvent(response, stopWatch.elapsed().toMillis()));
+    postToEventQueue(
+        GcsJsonApiEvent.getResponseEvent(response, stopWatch.elapsed().toMillis(), context));
   }
 
   void trackBackOffCompleted(long backOffStartTime) {
     long diff = System.currentTimeMillis() - backOffStartTime;
-    postToEventQueue(GcsJsonApiEvent.getBackoffEvent(request, diff, retryCount));
+    postToEventQueue(GcsJsonApiEvent.getBackoffEvent(request, diff, retryCount, context));
     backOffTime += diff;
   }
 
@@ -88,12 +93,18 @@ class RequestTracker {
     GoogleCloudStorageEventBus.postGcsJsonApiEvent(event);
   }
 
-  protected RequestTracker init(HttpRequest request) {
+  public RequestTracker init(HttpRequest request) {
+    if (this.initialized) {
+      // Can be called multiple times in case of request retries.
+      return this;
+    }
+
+    this.initialized = true;
     stopWatch = Stopwatch.createStarted();
-    context = request.getUrl();
+    context = new RequestContext(request);
     this.request = request;
 
-    postToEventQueue(GcsJsonApiEvent.getRequestStartedEvent(request));
+    postToEventQueue(GcsJsonApiEvent.getRequestStartedEvent(request, context));
 
     return this;
   }
@@ -104,8 +115,8 @@ class RequestTracker {
 
       if (stopWatch.elapsed().toMillis() > LOGGING_THRESHOLD) {
         logger.atInfo().atMostEvery(10, TimeUnit.SECONDS).log(
-            "Detected high latency for %s. duration=%s",
-            request.getUrl(), stopWatch.elapsed().toMillis());
+            "Detected high latency for %s. durationMs=%s; method=%s",
+            context, stopWatch.elapsed().toMillis(), request.getRequestMethod());
       }
     } else {
       // Control can reach here only in case of a bug. Did not want to add an assert due to huge
@@ -119,9 +130,26 @@ class RequestTracker {
   public String toString() {
     return MoreObjects.toStringHelper(this)
         .add("retryCount", retryCount)
-        .add("totalBackoffTime", backOffTime)
+        .add("totalBackoffTimeMs", backOffTime)
         .add("context", context)
-        .add("elapsed", System.currentTimeMillis() - startTime)
+        .add("method", request.getRequestMethod())
+        .add("elapsedMs", System.currentTimeMillis() - startTime)
         .toString();
+  }
+
+  // Having this class so that the cost of creating the string for logging purposes are paid only if
+  // we actually do the logging.
+  private static class RequestContext {
+    private final HttpRequest request;
+
+    public RequestContext(HttpRequest request) {
+      this.request = request;
+    }
+
+    @Override
+    public String toString() {
+      return String.format(
+          "[url=%s; invocationId=%s]", request.getUrl(), request.getHeaders().get(GOOG_API_CLIENT));
+    }
   }
 }

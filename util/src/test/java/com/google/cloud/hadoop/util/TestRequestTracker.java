@@ -44,7 +44,7 @@ public class TestRequestTracker extends RequestTracker {
       ExpectedEventDetails expected = expectedEvents.get(i);
 
       assertThat(actual.getEventType()).isEqualTo(expected.eventType);
-      assertThat(actual.getContext().toString()).isEqualTo(expected.context.toString());
+      assertThat(actual.getContext().toString()).contains(expected.context.toString());
 
       GcsJsonApiEvent.EventType eventType = actual.getEventType();
       if (eventType == GcsJsonApiEvent.EventType.RESPONSE) {
@@ -52,13 +52,13 @@ public class TestRequestTracker extends RequestTracker {
       }
 
       if (eventType == GcsJsonApiEvent.EventType.BACKOFF) {
-        verifyNotEmpty(actual, GcsJsonApiEvent.BACKOFFTIME);
+        verifyNotEmpty(actual, GcsJsonApiEvent.BACKOFF_TIME);
       }
 
       for (String key : expected.properties.keySet()) {
-        if (key.equals(GcsJsonApiEvent.BACKOFFTIME)) {
+        if (key.equals(GcsJsonApiEvent.BACKOFF_TIME)) {
           long backOffTime = (long) actual.getProperty(key);
-          int expectedBackoffTime = (int) expected.properties.get(GcsJsonApiEvent.BACKOFFTIME);
+          int expectedBackoffTime = (int) expected.properties.get(GcsJsonApiEvent.BACKOFF_TIME);
           assertThat(backOffTime).isAtLeast(expectedBackoffTime);
           // Adding a buffer of 10 seconds. If this is not sufficient increase the threshold or
           // remove this check.
@@ -99,7 +99,7 @@ public class TestRequestTracker extends RequestTracker {
     public static ExpectedEventDetails getBackoff(String url, int retryCount) {
       ExpectedEventDetails result =
           new ExpectedEventDetails(GcsJsonApiEvent.EventType.BACKOFF, url);
-      result.properties.put(GcsJsonApiEvent.RETRYCOUNT, retryCount);
+      result.properties.put(GcsJsonApiEvent.RETRY_COUNT, retryCount);
 
       return result;
     }
@@ -107,8 +107,8 @@ public class TestRequestTracker extends RequestTracker {
     public static ExpectedEventDetails getBackoff(String url, int retryCount, int backOff) {
       ExpectedEventDetails result =
           new ExpectedEventDetails(GcsJsonApiEvent.EventType.BACKOFF, url);
-      result.properties.put(GcsJsonApiEvent.RETRYCOUNT, retryCount);
-      result.properties.put(GcsJsonApiEvent.BACKOFFTIME, backOff);
+      result.properties.put(GcsJsonApiEvent.RETRY_COUNT, retryCount);
+      result.properties.put(GcsJsonApiEvent.BACKOFF_TIME, backOff);
 
       return result;
     }

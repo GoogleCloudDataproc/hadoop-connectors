@@ -19,8 +19,7 @@ package com.google.cloud.hadoop.util.interceptors;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
-import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
-import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.RequestTracker;
 import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
@@ -39,9 +38,11 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
   public static final String GOOG_API_CLIENT = "x-goog-api-client";
 
   private final HttpExecuteInterceptor interceptor;
+  private final RequestTracker tracker;
 
-  public InvocationIdInterceptor(HttpExecuteInterceptor interceptor) {
+  public InvocationIdInterceptor(HttpExecuteInterceptor interceptor, RequestTracker tracker) {
     this.interceptor = interceptor;
+    this.tracker = tracker;
   }
 
   @Override
@@ -49,6 +50,8 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
     if (this.interceptor != null) {
       this.interceptor.intercept(request);
     }
+
+    tracker.init(request);
     HttpHeaders headers = request.getHeaders();
     String existing = (String) headers.get(GOOG_API_CLIENT);
     if (isInvocationIdPresent(existing)) {
@@ -70,7 +73,7 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
       } else {
         newValue = invocationEntry;
       }
-      GoogleCloudStorageEventBus.onGcsRequest(new GcsRequestExecutionEvent());
+
       headers.set(GOOG_API_CLIENT, newValue);
 
       ThreadTrace tt = TraceOperation.current();

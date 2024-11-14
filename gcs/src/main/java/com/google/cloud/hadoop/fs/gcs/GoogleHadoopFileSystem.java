@@ -44,6 +44,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -251,6 +252,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     GoogleCloudStorageEventBus.register(
         GoogleCloudStorageEventSubscriber.getInstance(globalStorageStatistics));
+
+    globalStorageStatistics.incrementCounter(GoogleCloudStorageStatistics.GS_FILESYSTEM_CREATE, 1);
   }
 
   /**
@@ -306,6 +309,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     this.traceFactory =
         TraceFactory.get(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+
+    globalStorageStatistics.incrementCounter(
+        GoogleCloudStorageStatistics.GS_FILESYSTEM_INITIALIZE, 1);
   }
 
   private void initializeFsRoot() {

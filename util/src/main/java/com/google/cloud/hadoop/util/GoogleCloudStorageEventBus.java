@@ -16,18 +16,12 @@
 
 package com.google.cloud.hadoop.util;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpResponseException;
 import com.google.common.eventbus.EventBus;
 import io.grpc.Status;
 import java.io.IOException;
 
 /** Event Bus class */
 public class GoogleCloudStorageEventBus {
-
-  public static void postGcsJsonApiEvent(GcsJsonApiEvent gcsJsonApiEvent) {
-    eventBus.post(gcsJsonApiEvent);
-  }
 
   /** Hold the instance of the event bus here */
   private static EventBus eventBus = new EventBus();
@@ -54,33 +48,6 @@ public class GoogleCloudStorageEventBus {
   }
 
   /**
-   * Posting GoogleJsonResponseException to invoke corresponding Subscriber method.
-   *
-   * @param response contains statusCode based on which metrics are updated in Subscriber method
-   */
-  public static void postOnGoogleJsonResponseException(GoogleJsonResponseException response) {
-    eventBus.post(response);
-  }
-
-  /**
-   * Posting HttpResponseException to invoke corresponding Subscriber method.
-   *
-   * @param response contains statusCode based on which metrics are updated in Subscriber method
-   */
-  public static void postOnHttpResponseException(HttpResponseException response) {
-    eventBus.post(response);
-  }
-
-  /**
-   * Posting HttpResponse to invoke corresponding Subscriber method.
-   *
-   * @param responseStatus response status code
-   */
-  public static void postOnHttpResponseStatus(int responseStatus) {
-    eventBus.post(responseStatus);
-  }
-
-  /**
    * Posting Gcs request execution event i.e. request to gcs is being initiated.
    *
    * @param event dummy event to map to request execution type.
@@ -104,5 +71,9 @@ public class GoogleCloudStorageEventBus {
    */
   public static void onGrpcStatus(Status status) {
     eventBus.post(status);
+  }
+
+  public static void postGcsJsonApiEvent(IGcsJsonApiEvent gcsJsonApiEvent) {
+    eventBus.post(gcsJsonApiEvent);
   }
 }

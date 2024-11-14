@@ -35,7 +35,7 @@ public class GcsJsonApiEventTest {
   @Test
   public void testGetResponseEvent() throws IOException {
     int duration = Math.abs(ThreadLocalRandom.current().nextInt(1000000));
-    GcsJsonApiEvent event = GcsJsonApiEvent.getResponseEvent(getResponse(), duration);
+    GcsJsonApiEvent event = GcsJsonApiEvent.getResponseEvent(getResponse(), duration, URL);
 
     assertThat(event.getContext().toString()).isEqualTo(URL);
     assertThat(event.getMethod()).isEqualTo("GET");
@@ -45,7 +45,7 @@ public class GcsJsonApiEventTest {
 
   @Test
   public void testGetExceptionEvent() throws IOException {
-    GcsJsonApiEvent event = GcsJsonApiEvent.getExceptionEvent(getResponse().getRequest());
+    GcsJsonApiEvent event = GcsJsonApiEvent.getExceptionEvent(getResponse().getRequest(), URL);
 
     assertThat(event.getContext().toString()).isEqualTo(URL);
     assertThat(event.getMethod()).isEqualTo("GET");
@@ -61,7 +61,7 @@ public class GcsJsonApiEventTest {
 
   @Test
   public void testGetNonExistingProperty() throws IOException {
-    GcsJsonApiEvent event = GcsJsonApiEvent.getResponseEvent(getResponse(), 1);
+    GcsJsonApiEvent event = GcsJsonApiEvent.getResponseEvent(getResponse(), 1, URL);
     assertThat(event.getProperty("foo")).isNull();
   }
 }

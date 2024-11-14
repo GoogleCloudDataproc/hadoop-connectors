@@ -100,7 +100,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       headers.setUserAgent(options.getDefaultUserAgent());
     }
     headers.putAll(options.getHttpHeaders());
-    request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor()));
+    request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor(), tracker));
   }
 
   protected RequestTracker getRequestTracker(HttpRequest request) {
@@ -186,6 +186,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         tracker.trackBackOffCompleted(backOffStartTime);
         // Otherwise, we defer to the judgement of our internal backoff handler.
         tracker.trackRetryStarted();
+
         return true;
       }
 
@@ -197,9 +198,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     private void logResponseCode(HttpRequest request, HttpResponse response) {
-      // Incrementing GCS Static Statistics using status code of response.
-      GoogleCloudStorageEventBus.postOnHttpResponseStatus(response.getStatusCode());
-
       if (RESPONSE_CODES_TO_LOG.contains(response.getStatusCode())) {
         logger
             .atInfo()
