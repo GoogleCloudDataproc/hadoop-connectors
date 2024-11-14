@@ -1,8 +1,8 @@
 # Release Notes
 
 ## Next
-1. Upgrade google-cloud-storage to 2.43.1
-1. Upgrade grpc to 1.68.0
+1. Upgrade google-cloud-storage to 2.44.1
+1. Upgrade grpc to 1.67.1
 
 ## 2.2.25 - 2024-08-01
 1. PR #1227 - Avoid registering subscriber class multiple times
