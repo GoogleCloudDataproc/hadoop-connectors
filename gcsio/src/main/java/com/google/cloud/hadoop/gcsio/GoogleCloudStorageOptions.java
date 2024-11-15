@@ -126,6 +126,9 @@ public abstract class GoogleCloudStorageOptions {
   @Nullable
   public abstract RedactedString getProxyPassword();
 
+  @Nullable
+  public abstract String getRequestReason();
+
   public abstract boolean isCopyWithRewriteEnabled();
 
   public abstract long getMaxRewriteChunkSize();
@@ -230,6 +233,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
+
+    public abstract Builder setRequestReason(String reason);
 
     public abstract Builder setGrpcMessageTimeoutCheckInterval(
         Duration grpcMessageTimeoutInMillisCheckInterval);
