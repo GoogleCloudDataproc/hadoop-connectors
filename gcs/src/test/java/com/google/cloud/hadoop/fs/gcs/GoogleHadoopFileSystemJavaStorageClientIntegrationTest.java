@@ -61,4 +61,10 @@ public class GoogleHadoopFileSystemJavaStorageClientIntegrationTest
   @Ignore
   @Test
   public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() {}
+
+  @Ignore
+  @Test
+  public void testGcsJsonAPIMetrics() {
+    // TODO: Update this will once gRPC API metrics are added
+  }
 }
