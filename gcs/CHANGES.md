@@ -2,7 +2,9 @@
 
 ## Next
 
-1. PR #1253 - Add getFileStatusWithHint() API
+1. Add getFileStatusWithHint() API
+
+1. Upgrade google-cloud-storage to 2.43.1
 
 1. Upgrade grpc to 1.68.0
 
