@@ -25,21 +25,13 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.LongSummaryStatistics;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -50,12 +42,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem.Statistics;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -101,11 +89,43 @@ public class FsBenchmark extends Configured implements Tool {
                     HashMap::new));
 
     URI testUri = new Path(cmdArgs.getOrDefault("--file", cmdArgs.get("--bucket"))).toUri();
-    FileSystem fs = FileSystem.get(testUri, getConf());
+    GoogleHadoopFileSystem fs = (GoogleHadoopFileSystem) FileSystem.get(testUri, getConf());
 
     int res = 0;
     try {
+      Stopwatch sw = Stopwatch.createStarted();
       res = runWithInstrumentation(fs, cmd, cmdArgs);
+
+      //      StorageStatistics stats = fs.getGlobalGcsStorageStatistics();
+      StorageStatistics stats =
+          GlobalStorageStatistics.INSTANCE.get(GhfsGlobalStorageStatistics.NAME);
+      Map<String, Long> nonZeroMetrics = new TreeMap<>();
+      for (Iterator<StorageStatistics.LongStatistic> it = stats.getLongStatistics();
+          it.hasNext(); ) {
+        StorageStatistics.LongStatistic metric = it.next();
+        if (metric.getValue() >= 0) {
+          nonZeroMetrics.put(metric.getName(), metric.getValue());
+        } else {
+          //          System.out.println(String.format("%s is zero", metric.getName()));
+        }
+      }
+
+      System.out.println(
+          String.format(
+              "Statistics: sec=%s; nanos=%s", sw.elapsed().getSeconds(), sw.elapsed().toNanos()));
+      StringBuilder sb = new StringBuilder();
+      for (String metric : nonZeroMetrics.keySet()) {
+        if (nonZeroMetrics.get(metric) > 0) {
+          if (!metric.endsWith("min") && !metric.endsWith("mean")) {
+            System.out.println(String.format("%s - %s", metric, nonZeroMetrics.get(metric)));
+          }
+        } else {
+          sb.append(metric + ",");
+        }
+      }
+
+      //      System.out.println(sb);
+
     } catch (Throwable e) {
       logger.atSevere().withCause(e).log(
           "Failed to execute '%s' command with arguments: %s", cmd, cmdArgs);
@@ -115,7 +135,8 @@ public class FsBenchmark extends Configured implements Tool {
   }
 
   /** Helper to dispatch ToolRunner.run but with try/catch, progress-reporting, and statistics. */
-  private int runWithInstrumentation(FileSystem fs, String cmd, Map<String, String> cmdArgs) {
+  private int runWithInstrumentation(FileSystem fs, String cmd, Map<String, String> cmdArgs)
+      throws IOException {
     Statistics statistics = FileSystem.getStatistics().get(fs.getScheme());
 
     Optional<ScheduledExecutorService> progressReporter = Optional.empty();
@@ -153,7 +174,8 @@ public class FsBenchmark extends Configured implements Tool {
    *       strides through the specified file and prints results to stdout.
    * </ul>
    */
-  private int runInternal(FileSystem fs, String cmd, Map<String, String> cmdArgs) {
+  private int runInternal(FileSystem fs, String cmd, Map<String, String> cmdArgs)
+      throws IOException {
     switch (cmd) {
       case "write":
         return benchmarkWrite(fs, cmdArgs);
@@ -161,8 +183,62 @@ public class FsBenchmark extends Configured implements Tool {
         return benchmarkRead(fs, cmdArgs);
       case "random-read":
         return benchmarkRandomRead(fs, cmdArgs);
+
+      case "get-file-status":
+        return benchmarkGetFileStatus(fs, cmdArgs, false);
+
+      case "get-file-status-hint":
+        return benchmarkGetFileStatus(fs, cmdArgs, true);
     }
     throw new IllegalArgumentException("Unknown command: " + cmd);
+  }
+
+  private int benchmarkGetFileStatus(FileSystem fs, Map<String, String> args, boolean hasHint)
+      throws IOException {
+    System.out.println(String.format("benchmarkGetFileStatus: %s", args));
+
+    Path testFile = new Path(args.get("--file"));
+
+    benchmarkGetFileStatus(
+        (GoogleHadoopFileSystem) fs,
+        testFile,
+        parseInt(args.getOrDefault("--num-calls", String.valueOf(10))),
+        parseInt(args.getOrDefault("--num-threads", String.valueOf(1))),
+        hasHint);
+
+    return 0;
+  }
+
+  private void benchmarkGetFileStatus(
+      GoogleHadoopFileSystem fs, Path testFile, int numCalls, int numThreads, boolean hasHint)
+      throws IOException {
+    System.out.println(
+        String.format(
+            "benchmarkGetFileStatus: %s; calls=%s; threads=%s", testFile, numCalls, numThreads));
+
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    List<Future<?>> futures = new ArrayList<>(numThreads);
+    Configuration hintConf = new Configuration();
+    hintConf.set("fs.gs.getfilestatus.filetype.hint", "file");
+    for (int i = 0; i < numThreads; i++) {
+      futures.add(
+          executor.submit(
+              () -> {
+                for (int call = 0; call < numCalls; call++) {
+                  try {
+                    FileStatus status =
+                        hasHint
+                            ? fs.getFileStatusWithHint(testFile, hintConf)
+                            : fs.getFileStatus(testFile);
+                  } catch (IOException e) {
+                    logger.atSevere().log("Failed: %s; %s", testFile, e);
+                  }
+                  //                  System.out.println(String.format("%s: %s", i, testFile));
+                }
+              }));
+    }
+
+    futures.forEach(Futures::getUnchecked);
   }
 
   private int benchmarkWrite(FileSystem fs, Map<String, String> args) {

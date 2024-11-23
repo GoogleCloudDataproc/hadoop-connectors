@@ -81,6 +81,7 @@ public class GoogleCloudStorageEventSubscriber {
 
   @Subscribe
   private void subscriberOnGcsRequestExecutionEvent(IGcsJsonApiEvent event) {
+    logger.atInfo().log("Received event: %s", event);
     EventType eventType = event.getEventType();
     Object eventContext = event.getContext();
     if (eventType == EventType.STARTED) {

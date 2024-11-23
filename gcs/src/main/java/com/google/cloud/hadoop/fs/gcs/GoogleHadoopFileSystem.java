@@ -929,6 +929,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           checkOpen();
 
           GoogleCloudStorageFileSystemImpl.PathTypeHint pathTypeHint = getHint(hint, hadoopPath);
+          logger.atInfo().log("Hint is %s", pathTypeHint);
           if (pathTypeHint == GoogleCloudStorageFileSystemImpl.PathTypeHint.NONE) {
             logger.atWarning().atMostEvery(1, TimeUnit.MINUTES).log(
                 "No file type hint was provided for path %s", hadoopPath);
@@ -948,6 +949,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private GoogleCloudStorageFileSystemImpl.PathTypeHint getHint(Configuration hint, Path path) {
     String hintString = hint.get(GETFILESTATUS_FILETYPE_HINT);
+    logger.atInfo().log("Hintstring is %s", hintString);
     if (hintString != null && hintString.toLowerCase().equals("file")) {
       return GoogleCloudStorageFileSystemImpl.PathTypeHint.FILE;
     }

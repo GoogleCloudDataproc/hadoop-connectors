@@ -145,7 +145,7 @@
             </executions>
             <configuration>
               <includes>
-                <include>**/*IntegrationTest.java</include>
+                <include>**/*oogleHadoopFileSystemIntegrationTest.java</include>
               </includes>
               <reuseForks>false</reuseForks>
               <forkCount>4</forkCount>

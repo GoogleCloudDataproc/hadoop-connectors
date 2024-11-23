@@ -113,7 +113,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       long elapsedMs = stopwatch.elapsed().toMillis();
       stats.updateStats(statistic, elapsedMs, context);
       stats.updateConnectorHadoopApiTime(elapsedMs);
-      logger.atFine().log("%s(%s)", statistic.getSymbol(), context);
+      logger.atInfo().log("%s(%s)", statistic.getSymbol(), context);
 
       // Periodically log the metrics. Once every 5 minutes.
       logger.atInfo().atMostEvery(5, TimeUnit.MINUTES).log(
