@@ -366,11 +366,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.checksums.enable", false);
 
-  /** Configuration key for the Cloud Storage gRPC server address. */
-  public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.server.address", GoogleCloudStorageOptions.DEFAULT_GCS_GRPC_SERVER_ADDRESS);
-
   /** Configuration key for check interval (in millisecond) for gRPC request timeout to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
@@ -625,7 +620,6 @@ public class GoogleHadoopFileSystemConfiguration {
                 config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))
         .setAuthorizationHandlerProperties(
             GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config))
-        .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setGrpcMessageTimeoutCheckInterval(
             GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
