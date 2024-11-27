@@ -17,25 +17,28 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_METADATA_REQUEST;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -538,5 +541,95 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         assertThat(localCopiedFile.delete()).isTrue();
       }
     }
+  }
+
+  @Test
+  public void testGetFileStatusWithHint() throws Exception {
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    ghfsHelper.writeFile(hadoopPath, UUID.randomUUID().toString(), 1, /* overwrite= */ false);
+
+    // Running a few times to have a high probability of at least one eager operation finishing
+    int numTimes = 5;
+    Configuration configuration = new Configuration();
+    configuration.set(GoogleHadoopFileSystem.GETFILESTATUS_FILETYPE_HINT, "file");
+
+    invokeGetFileStatusWithHint(hadoopPath, numTimes, configuration);
+    assertThat(getStatisticValue(GCS_LIST_FILE_REQUEST)).isEqualTo(0);
+    assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isEqualTo(numTimes);
+
+    invokeGetFileStatusWithHint(hadoopPath.getParent(), numTimes, configuration);
+    assertThat(getStatisticValue(GCS_LIST_FILE_REQUEST)).isEqualTo(numTimes);
+    assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isEqualTo(numTimes * 2);
+
+    invokeGetFileStatusWithHint(hadoopPath, numTimes, new Configuration());
+    // Update happening in a different thread. Busy wait a few ms.
+    waitForUpdation(GCS_LIST_FILE_REQUEST, numTimes);
+
+    // Some of the LIST_FILE requests might have been cancelled before completion.
+    assertThat(getStatisticValue(GCS_LIST_FILE_REQUEST)).isGreaterThan(0);
+    assertThat(getStatisticValue(GCS_LIST_FILE_REQUEST)).isLessThan(numTimes + 1);
+    assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isGreaterThan(numTimes);
+    assertThat(getStatisticValue(GCS_API_REQUEST_COUNT)).isLessThan(numTimes * 2 + 1);
+
+    ghfsHelper.delete(hadoopPath.toUri(), true);
+  }
+
+  private void waitForUpdation(GoogleCloudStorageStatistics stat, int value)
+      throws InterruptedException {
+    for (int i = 0; i < 100; i++) {
+      if (getStatisticValue(stat) >= value) {
+        return;
+      }
+
+      Thread.sleep(1);
+    }
+  }
+
+  private Method getGetFileStatusWithHintMethod() throws NoSuchMethodException {
+    return ghfs.getClass().getMethod("getFileStatusWithHint", Path.class, Configuration.class);
+  }
+
+  private void invokeGetFileStatusWithHint(
+      Path hadoopPath, int numTimes, Configuration configuration) throws Exception {
+    resetStats();
+
+    for (int i = 0; i < numTimes; i++) {
+      FileStatus status =
+          (FileStatus) getGetFileStatusWithHintMethod().invoke(ghfs, hadoopPath, configuration);
+      assertThat(status.getPath()).isEqualTo(hadoopPath);
+    }
+
+    assertThat(getStatisticValue(GCS_METADATA_REQUEST)).isEqualTo(numTimes);
+  }
+
+  private Long getStatisticValue(GoogleCloudStorageStatistics stat) {
+    return getStatistics().getLong(stat.getSymbol());
+  }
+
+  private void resetStats() {
+    getStatistics().reset();
+  }
+
+  private GhfsGlobalStorageStatistics getStatistics() {
+    return ((GoogleHadoopFileSystem) ghfs).getGlobalGcsStorageStatistics();
+  }
+
+  private void getFileStatusAndVerify(
+      Path hadoopPath,
+      Method getFileStatusWithHint,
+      Configuration configuration,
+      int listFileCount,
+      int totalCount)
+      throws Exception {
+    GhfsGlobalStorageStatistics stats =
+        ((GoogleHadoopFileSystem) ghfs).getGlobalGcsStorageStatistics();
+    stats.reset();
+
+    FileStatus status = (FileStatus) getFileStatusWithHint.invoke(ghfs, hadoopPath, configuration);
+
+    assertThat(status.getPath()).isEqualTo(hadoopPath);
+    assertThat(stats.getLong(GCS_LIST_FILE_REQUEST.getSymbol())).isEqualTo(listFileCount);
+    assertThat(stats.getLong(GCS_API_REQUEST_COUNT.getSymbol())).isEqualTo(totalCount);
+    assertThat(stats.getLong(GCS_METADATA_REQUEST.getSymbol())).isEqualTo(1);
   }
 }
