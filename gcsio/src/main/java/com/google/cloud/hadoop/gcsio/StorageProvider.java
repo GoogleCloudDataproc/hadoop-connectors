@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
  * so they can be used re-used.
  */
 public class StorageProvider {
-
   // TODO: Replace Storage with a StorageWrapper which does not expose the close method. The
   //  dependants of this provider should not be able to close the storage accidentally. It should
   //  always be managed through this provider.
@@ -57,6 +56,7 @@ public class StorageProvider {
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
+      logger.atInfo().log("Ignoring storage object cache.");
       return createStorage(
           credentials, storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn);
     }
@@ -67,14 +67,15 @@ public class StorageProvider {
       storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
       cache.put(key, storage);
       storageToCacheKeyMap.put(storage, key);
-      logger.atFinest().log(
-          "Cache miss, created new storage client. Cache hit count : %d, Cache hit rate : %.2f",
-          cache.stats().hitCount(), cache.stats().hitRate());
+      logger.atInfo().log(
+          "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate : %.2f",
+          key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
     } else {
-      logger.atFinest().log(
-          "Cache hit, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
-          cache.stats().hitCount(), cache.stats().hitRate());
+      logger.atFine().log(
+          "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
+          key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
     }
+    logger.atFine().log("Cache stats. size: %d", cache.size());
     // Increment the reference count of the storage object.
     storageClientToReferenceMap.put(
         storage, storageClientToReferenceMap.getOrDefault(storage, 0) + 1);
@@ -88,11 +89,13 @@ public class StorageProvider {
   synchronized void close(Storage storage) {
     if (!storageClientToReferenceMap.containsKey(storage)) {
       closeStorage(storage);
+      logger.atInfo().log("close() called on storage object outside cache.");
       return;
     }
     // Decrement the reference count of the object.
     storageClientToReferenceMap.put(storage, storageClientToReferenceMap.get(storage) - 1);
     if (storageClientToReferenceMap.get(storage) == 0) {
+      logger.atInfo().log("close() called on storage object inside cache.");
       StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
       cache.invalidate(key);
       storageToCacheKeyMap.remove(storage);
