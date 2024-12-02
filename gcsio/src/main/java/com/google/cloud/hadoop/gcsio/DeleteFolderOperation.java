@@ -84,6 +84,10 @@ class DeleteFolderOperation {
     // this will avoid infinite loop when all folders are deleted
     while (folderSize != 0 && encounteredNoExceptions()) {
       FolderInfo folderToDelete = getElementFromBlockingQueue();
+      // getElementFromBlockingQueue returns null if it couldn't pull a folder within the timelimit (1 minute)
+      if (folderToDelete == null){
+        continue;
+      }
       folderSize--;
 
       // Queue the deletion request
