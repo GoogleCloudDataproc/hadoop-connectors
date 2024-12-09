@@ -22,8 +22,6 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.AccessToken;
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -38,7 +36,6 @@ import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.Ex
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
 import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
@@ -54,12 +51,10 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -73,7 +68,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private final GoogleCloudStorageOptions storageOptions;
-  private final Storage storage;
+
+  @VisibleForTesting final Storage storage;
+
+  private static final StorageProvider storageProvider = new StorageProvider();
 
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
@@ -111,8 +109,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
-            ? createStorage(
-                credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
+            ? storageProvider.getStorage(
+                credentials,
+                storageOptions,
+                gRPCInterceptors,
+                pCUExecutorService,
+                downscopedAccessTokenFn)
             : clientLibraryStorage;
   }
 
@@ -164,7 +166,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   public void close() {
     try {
       try {
-        storage.close();
+        storageProvider.close(storage);
       } catch (Exception e) {
         logger.atWarning().withCause(e).log("Error occurred while closing the storage client");
       }
@@ -228,49 +230,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return new GoogleCloudStorageImpl(storageOptions, credential, downscopedAccessTokenFn);
   }
 
-  private Storage createStorage(
-      Credentials credentials,
-      GoogleCloudStorageOptions storageOptions,
-      List<ClientInterceptor> interceptors,
-      ExecutorService pCUExecutorService,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    final ImmutableMap<String, String> headers = getUpdatedHeadersWithUserAgent(storageOptions);
-    return StorageOptions.grpc()
-        .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
-        .setHeaderProvider(() -> headers)
-        .setGrpcInterceptorProvider(
-            () -> {
-              List<ClientInterceptor> list = new ArrayList<>();
-              if (interceptors != null && !interceptors.isEmpty()) {
-                list.addAll(
-                    interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
-              }
-              if (storageOptions.isTraceLogEnabled()) {
-                list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());
-              }
-
-              if (downscopedAccessTokenFn != null) {
-                // When downscoping is enabled, we need to set the downscoped token for each
-                // request. In the case of gRPC, the downscoped token will be set from the
-                // Interceptor.
-                list.add(
-                    new GoogleCloudStorageClientGrpcDownscopingInterceptor(
-                        downscopedAccessTokenFn));
-              }
-              list.add(new GoogleCloudStorageClientGrpcStatisticsInterceptor());
-
-              return ImmutableList.copyOf(list);
-            })
-        .setCredentials(
-            credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
-        .setBlobWriteSessionConfig(
-            getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
-        .build()
-        .getService();
-  }
-
-  private static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
+  static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
       GoogleCloudStorageOptions storageOptions) {
     ImmutableMap<String, String> httpRequestHeaders =
         MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
@@ -286,18 +246,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return httpRequestHeaders;
   }
 
-  private Credentials getNoCredentials(
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    if (downscopedAccessTokenFn == null) {
-      return null;
-    }
-
-    // Workaround for https://github.com/googleapis/sdk-platform-java/issues/2356. Once this is
-    // fixed, change this to return NoCredentials.getInstance();
-    return GoogleCredentials.create(new AccessToken("", null));
-  }
-
-  private static BlobWriteSessionConfig getSessionConfig(
+  static BlobWriteSessionConfig getSessionConfig(
       AsyncWriteChannelOptions writeOptions, ExecutorService pCUExecutorService)
       throws IOException {
     logger.atFiner().log("Upload strategy in use: %s", writeOptions.getUploadType());
