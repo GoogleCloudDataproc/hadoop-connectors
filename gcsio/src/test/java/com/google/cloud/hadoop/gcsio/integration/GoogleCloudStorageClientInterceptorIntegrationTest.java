@@ -33,7 +33,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.gson.Gson;
-import com.google.protobuf.MessageLite;
+import com.google.protobuf.Message;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.TextFormat.ParseException;
 import com.google.storage.v2.BucketName;
@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nonnull;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -148,7 +147,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                 writeObjectRequestRecord
                     .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
                     .toString(),
-                WriteObjectRequest.class);
+                WriteObjectRequest.newBuilder());
     assertThat(request.getUploadId()).isNotNull();
     assertTrue(request.getFinishWrite());
     assertThat(request.getChecksummedData().getContent().toStringUtf8())
@@ -161,7 +160,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                 writeObjectResponseRecord
                     .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
                     .toString(),
-                WriteObjectResponse.class);
+                WriteObjectResponse.newBuilder());
     assertThat(response.getResource().getName()).isEqualTo(resourceId.getObjectName());
     assertThat(response.getResource().getSize()).isEqualTo(fileSize);
 
@@ -215,7 +214,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                 readObjectRequestRecord
                     .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
                     .toString(),
-                ReadObjectRequest.class);
+                ReadObjectRequest.newBuilder());
     assertThat(request.getBucket()).isEqualTo(derivedResourceId.getBucketName());
     assertThat(request.getObject()).isEqualTo(derivedResourceId.getObjectName());
     assertThat(request.getReadOffset()).isEqualTo(0);
@@ -229,7 +228,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                 readObjectResponseRecord
                     .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
                     .toString(),
-                ReadObjectResponse.class);
+                ReadObjectResponse.newBuilder());
     assertThat(response.getChecksummedData().getContent().toStringUtf8())
         .isEqualTo(String.format("<size (%d)>", partition.length));
     // asser both request-response have same invocationId
@@ -299,7 +298,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                 logRecordEntry
                     .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
                     .toString(),
-                StartResumableWriteRequest.class);
+                StartResumableWriteRequest.newBuilder());
     assertThat(request.getWriteObjectSpec().getResource().getName())
         .isEqualTo(derivedResourceId.getObjectName());
     assertThat(request.getWriteObjectSpec().getResource().getBucket())
@@ -318,7 +317,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
                     .get(1)
                     .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
                     .toString(),
-                StartResumableWriteResponse.class);
+                StartResumableWriteResponse.newBuilder());
     assertThat(response.getUploadId()).isNotNull();
     assertThat(logRecordEntry.get(GoogleCloudStorageTracingFields.RESPONSE_COUNTER.name))
         .isEqualTo(1);
@@ -330,9 +329,10 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     verifyCloseStatus(logRecord.get(2), rpcMethod, streamInvocationId, Status.OK);
   }
 
-  private MessageLite fromProtoToMsg(@Nonnull String protoMsgString, final Class protoClass)
-      throws ParseException {
-    MessageLite request = TextFormat.parse(protoMsgString.toString(), protoClass);
-    return request;
+  private Object fromProtoToMsg(String string, Message.Builder builder) throws ParseException {
+    // setAllowUnknownFields(true) so that any newly added proto fields do not break parsing.
+    TextFormat.Parser.newBuilder().setAllowUnknownFields(true).build().merge(string, builder);
+
+    return builder.build();
   }
 }
