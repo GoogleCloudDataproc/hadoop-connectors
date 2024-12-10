@@ -77,7 +77,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.read.message.timeout", 3_000L);
           put("fs.gs.grpc.read.timeout", 3_600_000L);
           put("fs.gs.grpc.read.zerocopy.enable", true);
-          put("fs.gs.grpc.server.address", "storage.googleapis.com");
           put("fs.gs.grpc.trafficdirector.enable", true);
           put("fs.gs.grpc.write.buffered.requests", 20);
           put("fs.gs.grpc.write.message.timeout", 3_000L);
