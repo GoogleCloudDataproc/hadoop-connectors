@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 2.2.26 - 2024-12-09
 1. Upgrade google-cloud-storage to 2.44.1
 1. Upgrade grpc to 1.67.1
 
