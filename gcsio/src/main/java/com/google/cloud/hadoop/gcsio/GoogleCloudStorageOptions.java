@@ -17,7 +17,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
-import com.google.api.ClientProto;
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
@@ -29,7 +28,6 @@ import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.storage.v2.StorageProto;
 import java.time.Duration;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -49,13 +47,6 @@ public abstract class GoogleCloudStorageOptions {
 
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
-
-  // Default root URL for Cloud Storage gRPC API endpoint. */
-  public static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
-      StorageProto.getDescriptor()
-          .findServiceByName("Storage")
-          .getOptions()
-          .getExtension(ClientProto.defaultHost);
 
   /** Default service Path for Cloud Storage API endpoint. */
   public static final String STORAGE_SERVICE_PATH_DEFAULT = Storage.DEFAULT_SERVICE_PATH;
@@ -125,7 +116,6 @@ public abstract class GoogleCloudStorageOptions {
         .setDirectPathPreferred(DIRECT_PATH_PREFERRED_DEFAULT)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
-        .setGrpcServerAddress(DEFAULT_GCS_GRPC_SERVER_ADDRESS)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
         .setMaxListItemsPerCall(MAX_LIST_ITEMS_PER_CALL_DEFAULT)
@@ -159,8 +149,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isGrpcEnabled();
 
   public abstract boolean isHnBucketRenameEnabled();
-
-  public abstract String getGrpcServerAddress();
 
   public abstract boolean isTrafficDirectorEnabled();
 
@@ -264,8 +252,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract static class Builder {
 
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
-
-    public abstract Builder setGrpcServerAddress(String rootUrl);
 
     public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
