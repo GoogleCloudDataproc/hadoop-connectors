@@ -76,13 +76,6 @@ public final class GoogleCloudStorageTestUtils {
   }
 
   public static GoogleCloudStorageOptions.Builder configureDefaultOptions() {
-    GoogleCloudStorageOptions.Builder optionsBuilder =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true);
-    String grpcServerAddress = System.getenv("GCS_TEST_GRPC_SERVER_ADDRESS_OVERRIDE");
-    if (grpcServerAddress != null) {
-      optionsBuilder.setGrpcServerAddress(grpcServerAddress);
-      logger.atInfo().log("Overriding gRPC server address to %s", grpcServerAddress);
-    }
-    return optionsBuilder;
+    return GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true);
   }
 }
