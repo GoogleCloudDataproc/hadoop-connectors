@@ -68,11 +68,14 @@ public abstract class GoogleCloudStorageOptions {
         .setHnBucketRenameEnabled(false)
         .setGrpcWriteEnabled(false)
         .setMoveOperationEnabled(false)
+        .setStorageClientCachingExperimentEnabled(false)
         .setBidiEnabled(false)
         .setFinalizeBeforeClose(false);
   }
 
   public abstract Builder toBuilder();
+
+  public abstract boolean isStorageClientCachingExperimentEnabled();
 
   public abstract boolean isGrpcEnabled();
 
@@ -242,6 +245,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcWriteEnabled(boolean grpcWriteEnabled);
 
     public abstract Builder setMoveOperationEnabled(boolean moveOperationEnabled);
+
+    public abstract Builder setStorageClientCachingExperimentEnabled(boolean isExperimentEnabled);
 
     /** Sets the property to use the bidirectional Rapid Storage Api. */
     public abstract Builder setBidiEnabled(boolean bidiEnabled);

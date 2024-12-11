@@ -137,6 +137,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
           put("fs.gs.bidi.finalize.on.close", false);
+          put("fs.gs.client.caching.experiment.enabled", false);
         }
       };
 
@@ -380,6 +381,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getInplaceSeekLimit()).isEqualTo(3L);
     assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
     assertThat(options.getBidiThreadCount()).isEqualTo(5);
+    assertThat(options.isBidiEnabled()).isTrue();
     assertThat(options.getBidiClientTimeout()).isEqualTo(6);
   }
 
@@ -402,7 +404,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.setLong("fs.gs.write.parallel.composite.upload.buffer.capacity", 9L);
     config.set("fs.gs.write.parallel.composite.upload.part.file.cleanup.type", "NEVER");
     config.set("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "baz");
-    config.setBoolean("fs.gs.write.rolling.checksum.enable", false);
+    config.setBoolean("fs.gs.write.rolling.checksum.enable", true);
 
     AsyncWriteChannelOptions options =
         GoogleHadoopFileSystemConfiguration.getWriteChannelOptions(config);
@@ -423,7 +425,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getPCUBufferCapacity()).isEqualTo(9L);
     assertThat(options.getPartFileCleanupType()).isEqualTo(PartFileCleanupType.NEVER);
     assertThat(options.getPartFileNamePrefix()).isEqualTo("baz");
-    assertThat(options.isRollingChecksumEnabled()).isFalse();
+    assertThat(options.isRollingChecksumEnabled()).isTrue();
   }
 
   @Test
@@ -480,24 +482,5 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
-  }
-
-  @Test
-  public void bidiProperties() {
-    Configuration config = new Configuration();
-
-    config.setBoolean("fs.gs.bidi.enable", true);
-    config.set("fs.gs.bidi.thread.count", "20");
-    config.set("fs.gs.bidi.client.timeout", "40");
-    config.setBoolean("fs.gs.bidi.finalize.on.close", true);
-
-    GoogleCloudStorageOptions storageOptions =
-        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
-    GoogleCloudStorageReadOptions readOptions = storageOptions.getReadChannelOptions();
-
-    assertThat(storageOptions.isBidiEnabled()).isEqualTo(true);
-    assertThat(storageOptions.isFinalizeBeforeClose()).isEqualTo(true);
-    assertThat(readOptions.getBidiThreadCount()).isEqualTo(20);
-    assertThat(readOptions.getBidiClientTimeout()).isEqualTo(40);
   }
 }
