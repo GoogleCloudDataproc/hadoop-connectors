@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
-import com.google.api.ClientProto;
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -27,7 +26,6 @@ import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableMap;
-import com.google.storage.v2.StorageProto;
 import java.time.Duration;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -35,7 +33,6 @@ import javax.annotation.Nullable;
 /** Configuration options for the GoogleCloudStorage class. */
 @AutoValue
 public abstract class GoogleCloudStorageOptions {
-
   public enum MetricsSink {
     NONE,
     CLOUD_MONITORING,
@@ -51,11 +48,6 @@ public abstract class GoogleCloudStorageOptions {
         .setDirectPathPreferred(true)
         .setGrpcEnabled(false)
         .setGrpcMessageTimeoutCheckInterval(Duration.ofSeconds(1))
-        .setGrpcServerAddress(
-            StorageProto.getDescriptor()
-                .findServiceByName("Storage")
-                .getOptions()
-                .getExtension(ClientProto.defaultHost))
         .setHttpRequestConnectTimeout(Duration.ofSeconds(5))
         .setHttpRequestHeaders(ImmutableMap.of())
         .setHttpRequestReadTimeout(Duration.ofSeconds(5))
@@ -82,8 +74,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isGrpcEnabled();
 
   public abstract boolean isHnBucketRenameEnabled();
-
-  public abstract String getGrpcServerAddress();
 
   public abstract boolean isTrafficDirectorEnabled();
 
@@ -174,8 +164,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract static class Builder {
 
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
-
-    public abstract Builder setGrpcServerAddress(String rootUrl);
 
     public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
