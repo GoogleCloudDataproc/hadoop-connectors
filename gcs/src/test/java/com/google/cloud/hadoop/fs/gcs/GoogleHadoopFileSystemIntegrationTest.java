@@ -98,7 +98,16 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -2722,11 +2731,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   private static void verify(
       Map<String, Long> expectedMetrics, GhfsThreadLocalStatistics statistics) {
-    System.out.println(
-        String.format(
-            "verify: %s; %s", getThreadLocalMetrics(statistics), Thread.currentThread().getId()));
-    //    System.out.println("verify: " + expectedMetrics);
-
     expectedMetrics.forEach((key, value) -> checkTracked(key, value, statistics));
     assertThat(getThreadLocalMetrics(statistics).size()).isEqualTo(expectedMetrics.size());
   }
@@ -2735,8 +2739,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       String metric, long expected, GhfsThreadLocalStatistics statistics) {
     assertThat(statistics.isTracked(metric)).isTrue();
 
-    //    System.out.println(String.format("%s; %s=%s", metric, expected,
-    // statistics.getLong(metric)));
     if (!metric.toLowerCase().contains("time")) {
       // time metrics are not deterministic
       assertThat(statistics.getLong(metric)).isEqualTo(expected);

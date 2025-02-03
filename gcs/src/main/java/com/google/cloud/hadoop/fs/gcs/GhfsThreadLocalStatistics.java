@@ -19,7 +19,9 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CONNECTOR_TIME;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.hadoop.fs.StorageStatistics;
 
 class GhfsThreadLocalStatistics extends StorageStatistics {
@@ -100,7 +102,9 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
 
   @Override
   public Iterator<LongStatistic> getLongStatistics() {
-    return new MetricsIterator(this.metrics);
+    return this.metrics.entrySet().stream()
+        .map(entry -> new LongStatistic(entry.getKey(), entry.getValue().getValue()))
+        .iterator();
   }
 
   private static class ThreadLocalValue {
@@ -116,32 +120,6 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
 
     void reset() {
       value.set(0L);
-    }
-  }
-
-  private static class MetricsIterator implements Iterator<LongStatistic> {
-    private final List<String> names;
-
-    private final Map<String, ThreadLocalValue> metrics;
-
-    private int index;
-
-    MetricsIterator(Map<String, ThreadLocalValue> metrics) {
-      this.names = new ArrayList<>(metrics.keySet());
-      this.index = 0;
-      this.metrics = metrics;
-    }
-
-    @Override
-    public boolean hasNext() {
-      return index < names.size();
-    }
-
-    @Override
-    public LongStatistic next() {
-      String metricName = names.get(index);
-      index++;
-      return new LongStatistic(metricName, metrics.get(metricName).getValue());
     }
   }
 }
