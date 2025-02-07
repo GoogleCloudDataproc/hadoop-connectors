@@ -129,6 +129,9 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   private static HashSet<String> EXPECTED_DURATION_METRICS = getExpectedDurationMetrics();
 
+  private static final String GCS_API_COUNT = "gcsApiCount";
+  private static final String HADOOP_API_COUNT = "hadoopApiCount";
+
   @Before
   public void before() throws Exception {
 
@@ -2701,7 +2704,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       verify(metrics, 3L, stats);
     }
 
-    metrics.merge(GhfsThreadLocalStatistics.GCS_API_COUNT, 1L, Long::sum);
+    metrics.merge(GCS_API_COUNT, 1L, Long::sum);
     verify(metrics, stats);
 
     try (FSDataInputStream ignored = myghfs.open(testFilePath)) {
@@ -2724,8 +2727,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   private static void verify(
       Map<String, Long> metrics, long gcsApiCount, GhfsThreadLocalStatistics stats) {
-    metrics.merge(GhfsThreadLocalStatistics.HADOOP_API_COUNT, 1L, Long::sum);
-    metrics.merge(GhfsThreadLocalStatistics.GCS_API_COUNT, gcsApiCount, Long::sum);
+    metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+    metrics.merge(GCS_API_COUNT, gcsApiCount, Long::sum);
     verify(metrics, stats);
   }
 

@@ -26,12 +26,6 @@ import org.apache.hadoop.fs.StorageStatistics;
 
 class GhfsThreadLocalStatistics extends StorageStatistics {
   static final String NAME = "GhfsThreadLocalStatistics";
-  static final String HADOOP_API_COUNT = "hadoopApiCount";
-  static final String HADOOP_API_TIME = "hadoopApiTime";
-  static final String GCS_API_COUNT = "gcsApiCount";
-  static final String GCS_API_TIME = "gcsApiTime";
-  static final String BACKOFF_COUNT = "backoffCount";
-  static final String BACKOFF_TIME = "backoffTime";
 
   private final ThreadLocalValue hadoopApiCount;
   private final ThreadLocalValue hadoopApiTime;
@@ -44,17 +38,18 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
 
   GhfsThreadLocalStatistics() {
     super(NAME);
-    this.hadoopApiCount = createMetric(HADOOP_API_COUNT);
-    this.hadoopApiTime = createMetric(HADOOP_API_TIME);
-    this.gcsApiCount = createMetric(GCS_API_COUNT);
-    this.gcsApiTime = createMetric(GCS_API_TIME);
-    this.backoffCount = createMetric(BACKOFF_COUNT);
-    this.backoffTime = createMetric(BACKOFF_TIME);
+
+    this.hadoopApiCount = createMetric(Metric.HADOOP_API_COUNT);
+    this.hadoopApiTime = createMetric(Metric.HADOOP_API_TIME);
+    this.gcsApiCount = createMetric(Metric.GCS_API_COUNT);
+    this.gcsApiTime = createMetric(Metric.GCS_API_TIME);
+    this.backoffCount = createMetric(Metric.BACKOFF_COUNT);
+    this.backoffTime = createMetric(Metric.BACKOFF_TIME);
   }
 
-  private ThreadLocalValue createMetric(String name) {
+  private ThreadLocalValue createMetric(Metric metric) {
     ThreadLocalValue result = new ThreadLocalValue();
-    metrics.put(name, result);
+    metrics.put(metric.metricName, result);
 
     return result;
   }
@@ -120,6 +115,21 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
 
     void reset() {
       value.set(0L);
+    }
+  }
+
+  private enum Metric {
+    HADOOP_API_COUNT("hadoopApiCount"),
+    HADOOP_API_TIME("hadoopApiTime"),
+    GCS_API_COUNT("gcsApiCount"),
+    GCS_API_TIME("gcsApiTime"),
+    BACKOFF_COUNT("backoffCount"),
+    BACKOFF_TIME("backoffTime");
+
+    private final String metricName;
+
+    Metric(String metricName) {
+      this.metricName = metricName;
     }
   }
 }

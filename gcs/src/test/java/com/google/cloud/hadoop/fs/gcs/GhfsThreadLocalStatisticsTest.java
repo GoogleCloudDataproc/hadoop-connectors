@@ -32,13 +32,19 @@ public class GhfsThreadLocalStatisticsTest {
   private GhfsThreadLocalStatistics statistics;
   private Map<String, Long> expected;
 
+  private static final String GCS_API_COUNT = "gcsApiCount";
+  private static final String GCS_API_TIME = "gcsApiTime";
+  private static final String BACKOFF_COUNT = "backoffCount";
+  private static final String BACKOFF_TIME = "backoffTime";
+  private static final String HADOOP_API_COUNT = "hadoopApiCount";
+  private static final String HADOOP_API_TIME = "hadoopApiTime";
+
   private static Map<GoogleCloudStorageStatistics, String> typeToNameMapping =
       Map.of(
-          GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT,
-              GhfsThreadLocalStatistics.GCS_API_COUNT,
-          GoogleCloudStorageStatistics.GCS_API_TIME, GhfsThreadLocalStatistics.GCS_API_TIME,
-          GoogleCloudStorageStatistics.GCS_BACKOFF_COUNT, GhfsThreadLocalStatistics.BACKOFF_COUNT,
-          GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, GhfsThreadLocalStatistics.BACKOFF_TIME);
+          GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT, GCS_API_COUNT,
+          GoogleCloudStorageStatistics.GCS_API_TIME, GCS_API_TIME,
+          GoogleCloudStorageStatistics.GCS_BACKOFF_COUNT, BACKOFF_COUNT,
+          GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, BACKOFF_TIME);
 
   @Before
   public void init() {
@@ -50,12 +56,12 @@ public class GhfsThreadLocalStatisticsTest {
     Map<String, Long> result =
         new HashMap<>(
             Map.of(
-                GhfsThreadLocalStatistics.BACKOFF_COUNT, 0L,
-                GhfsThreadLocalStatistics.BACKOFF_TIME, 0L,
-                GhfsThreadLocalStatistics.HADOOP_API_COUNT, 0L,
-                GhfsThreadLocalStatistics.HADOOP_API_TIME, 0L,
-                GhfsThreadLocalStatistics.GCS_API_COUNT, 0L,
-                GhfsThreadLocalStatistics.GCS_API_TIME, 0L));
+                BACKOFF_COUNT, 0L,
+                BACKOFF_TIME, 0L,
+                HADOOP_API_COUNT, 0L,
+                HADOOP_API_TIME, 0L,
+                GCS_API_COUNT, 0L,
+                GCS_API_TIME, 0L));
 
     return result;
   }
@@ -111,9 +117,9 @@ public class GhfsThreadLocalStatisticsTest {
     for (GhfsStatistic ghfsStatistic : GhfsStatistic.VALUES) {
       actualMetrics.increment(ghfsStatistic, 1);
       if (ghfsStatistic.getIsHadoopApi()) {
-        expectedMetrics.merge(GhfsThreadLocalStatistics.HADOOP_API_COUNT, 1L, Long::sum);
+        expectedMetrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
       } else if (ghfsStatistic == GhfsStatistic.GCS_CONNECTOR_TIME) {
-        expectedMetrics.merge(GhfsThreadLocalStatistics.HADOOP_API_TIME, 1L, Long::sum);
+        expectedMetrics.merge(HADOOP_API_TIME, 1L, Long::sum);
       }
 
       verify(expectedMetrics, actualMetrics);
@@ -123,9 +129,9 @@ public class GhfsThreadLocalStatisticsTest {
       long theValue = Math.abs(ThreadLocalRandom.current().nextLong(1, 2000));
       actualMetrics.increment(ghfsStatistic, theValue);
       if (ghfsStatistic.getIsHadoopApi()) {
-        expectedMetrics.merge(GhfsThreadLocalStatistics.HADOOP_API_COUNT, theValue, Long::sum);
+        expectedMetrics.merge(HADOOP_API_COUNT, theValue, Long::sum);
       } else if (ghfsStatistic == GhfsStatistic.GCS_CONNECTOR_TIME) {
-        expectedMetrics.merge(GhfsThreadLocalStatistics.HADOOP_API_TIME, theValue, Long::sum);
+        expectedMetrics.merge(HADOOP_API_TIME, theValue, Long::sum);
       }
 
       verify(expectedMetrics, actualMetrics);
