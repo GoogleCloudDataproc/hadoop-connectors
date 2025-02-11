@@ -243,6 +243,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         GlobalStorageStatistics.INSTANCE.put(
             GhfsGlobalStorageStatistics.NAME, () -> new GhfsGlobalStorageStatistics());
 
+    GlobalStorageStatistics.INSTANCE.put(
+        GhfsThreadLocalStatistics.NAME,
+        () -> ((GhfsGlobalStorageStatistics) globalStats).getThreadLocalStatistics());
+
     if (GhfsGlobalStorageStatistics.class.isAssignableFrom(globalStats.getClass())) {
       globalStorageStatistics = (GhfsGlobalStorageStatistics) globalStats;
     } else {
