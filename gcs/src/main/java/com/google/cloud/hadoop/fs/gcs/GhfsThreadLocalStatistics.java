@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CONNECTOR_TIME;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -26,32 +27,11 @@ import org.apache.hadoop.fs.StorageStatistics;
 
 class GhfsThreadLocalStatistics extends StorageStatistics {
   static final String NAME = "GhfsThreadLocalStatistics";
-
-  private final ThreadLocalValue hadoopApiCount;
-  private final ThreadLocalValue hadoopApiTime;
-  private final ThreadLocalValue gcsApiCount;
-  private final ThreadLocalValue gcsApiTime;
-  private final ThreadLocalValue backoffCount;
-  private final ThreadLocalValue backoffTime;
-
-  private Map<String, ThreadLocalValue> metrics = new HashMap<>();
+  private Map<String, Metric> metrics = new HashMap<>();
 
   GhfsThreadLocalStatistics() {
     super(NAME);
-
-    this.hadoopApiCount = createMetric(Metric.HADOOP_API_COUNT);
-    this.hadoopApiTime = createMetric(Metric.HADOOP_API_TIME);
-    this.gcsApiCount = createMetric(Metric.GCS_API_COUNT);
-    this.gcsApiTime = createMetric(Metric.GCS_API_TIME);
-    this.backoffCount = createMetric(Metric.BACKOFF_COUNT);
-    this.backoffTime = createMetric(Metric.BACKOFF_TIME);
-  }
-
-  private ThreadLocalValue createMetric(Metric metric) {
-    ThreadLocalValue result = new ThreadLocalValue();
-    metrics.put(metric.metricName, result);
-
-    return result;
+    Arrays.stream(Metric.values()).forEach(x -> metrics.put(x.metricName, x));
   }
 
   @Override
@@ -60,7 +40,7 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
       return 0L;
     }
 
-    return metrics.get(s).getValue();
+    return metrics.get(s).metricValue.getValue();
   }
 
   @Override
@@ -70,35 +50,35 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
 
   @Override
   public void reset() {
-    for (ThreadLocalValue s : metrics.values()) {
+    for (Metric s : metrics.values()) {
       s.reset();
     }
   }
 
   void increment(GhfsStatistic statistic, long count) {
     if (statistic == GCS_CONNECTOR_TIME) {
-      this.hadoopApiTime.increment(count);
+      Metric.HADOOP_API_TIME.increment(count);
     } else if (statistic.getIsHadoopApi()) {
-      this.hadoopApiCount.increment(count);
+      Metric.HADOOP_API_COUNT.increment(count);
     }
   }
 
   void increment(GoogleCloudStorageStatistics op, long count) {
     if (op == GoogleCloudStorageStatistics.GCS_API_TIME) {
-      this.gcsApiTime.increment(count);
+      Metric.GCS_API_TIME.increment(count);
     } else if (op == GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT) {
-      this.gcsApiCount.increment(count);
+      Metric.GCS_API_COUNT.increment(count);
     } else if (op == GoogleCloudStorageStatistics.GCS_BACKOFF_COUNT) {
-      this.backoffCount.increment(count);
+      Metric.BACKOFF_COUNT.increment(count);
     } else if (op == GoogleCloudStorageStatistics.GCS_BACKOFF_TIME) {
-      this.backoffTime.increment(count);
+      Metric.BACKOFF_TIME.increment(count);
     }
   }
 
   @Override
   public Iterator<LongStatistic> getLongStatistics() {
     return this.metrics.entrySet().stream()
-        .map(entry -> new LongStatistic(entry.getKey(), entry.getValue().getValue()))
+        .map(entry -> new LongStatistic(entry.getKey(), entry.getValue().metricValue.getValue()))
         .iterator();
   }
 
@@ -127,9 +107,19 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     BACKOFF_TIME("backoffTime");
 
     private final String metricName;
+    private final ThreadLocalValue metricValue;
 
     Metric(String metricName) {
       this.metricName = metricName;
+      this.metricValue = new ThreadLocalValue();
+    }
+
+    void reset() {
+      metricValue.reset();
+    }
+
+    void increment(long count) {
+      metricValue.increment(count);
     }
   }
 }

@@ -50,6 +50,7 @@ public class GhfsThreadLocalStatisticsTest {
   public void init() {
     this.statistics = new GhfsThreadLocalStatistics();
     this.expected = getInitMetrics();
+    this.statistics.reset();
   }
 
   private Map<String, Long> getInitMetrics() {
