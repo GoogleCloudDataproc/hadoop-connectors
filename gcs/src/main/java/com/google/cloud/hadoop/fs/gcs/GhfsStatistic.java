@@ -66,33 +66,48 @@ public enum GhfsStatistic {
       "files_delete_rejected",
       "Total number of files whose delete request was rejected",
       TYPE_COUNTER),
-  INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_DURATION_TOTAL),
-  INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION_TOTAL),
-  INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER),
+  INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER, true),
   INVOCATION_GET_FILE_STATUS(
-      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_DURATION_TOTAL),
+      StoreStatisticNames.OP_GET_FILE_STATUS,
+      "Calls of getFileStatus()",
+      TYPE_DURATION_TOTAL,
+      true),
   INVOCATION_GET_FILE_CHECKSUM(
       StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
 
   INVOCATION_LIST_STATUS_RESULT_SIZE(
       "op_get_list_status_result_size", "Number of files returned from list call", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(
-      StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_DURATION_TOTAL),
-  INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION_TOTAL),
-  INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION_TOTAL),
+      StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_DURATION_TOTAL, true),
   INVOCATION_LIST_STATUS(
-      StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_DURATION_TOTAL),
-  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION_TOTAL),
-  INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION_TOTAL),
-  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION_TOTAL),
+      StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION_TOTAL, true),
   INVOCATION_COPY_FROM_LOCAL_FILE(
-      StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
+      StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE,
+      "Calls of copyFromLocalFile()",
+      TYPE_COUNTER,
+      true),
   INVOCATION_CREATE_NON_RECURSIVE(
-      StoreStatisticNames.OP_CREATE_NON_RECURSIVE, "Calls of createNonRecursive()", TYPE_DURATION),
+      StoreStatisticNames.OP_CREATE_NON_RECURSIVE,
+      "Calls of createNonRecursive()",
+      TYPE_DURATION,
+      true),
   INVOCATION_GET_DELEGATION_TOKEN(
-      StoreStatisticNames.OP_GET_DELEGATION_TOKEN, "Calls of getDelegationToken()", TYPE_COUNTER),
+      StoreStatisticNames.OP_GET_DELEGATION_TOKEN,
+      "Calls of getDelegationToken()",
+      TYPE_COUNTER,
+      true),
   INVOCATION_LIST_LOCATED_STATUS(
-      StoreStatisticNames.OP_LIST_LOCATED_STATUS, "Calls of listLocatedStatus()", TYPE_COUNTER),
+      StoreStatisticNames.OP_LIST_LOCATED_STATUS,
+      "Calls of listLocatedStatus()",
+      TYPE_COUNTER,
+      true),
 
   /** Stream reads */
   STREAM_READ_BYTES(
@@ -188,6 +203,8 @@ public enum GhfsStatistic {
   private static final ImmutableMap<String, GhfsStatistic> SYMBOL_MAP =
       Maps.uniqueIndex(Iterators.forArray(values()), GhfsStatistic::getSymbol);
 
+  private final boolean isHadoopApi;
+
   /**
    * Statistic definition.
    *
@@ -196,9 +213,14 @@ public enum GhfsStatistic {
    * @param type type
    */
   GhfsStatistic(String symbol, String description, StatisticTypeEnum type) {
+    this(symbol, description, type, false);
+  }
+
+  GhfsStatistic(String symbol, String description, StatisticTypeEnum type, boolean isHadoopApi) {
     this.symbol = symbol;
     this.description = description;
     this.type = type;
+    this.isHadoopApi = isHadoopApi;
   }
 
   /** Statistic name. */
@@ -247,5 +269,9 @@ public enum GhfsStatistic {
    */
   public StatisticTypeEnum getType() {
     return type;
+  }
+
+  boolean getIsHadoopApi() {
+    return this.isHadoopApi;
   }
 }
