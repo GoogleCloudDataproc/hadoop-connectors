@@ -2752,7 +2752,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     if (!metric.toLowerCase().contains("time")) {
       // time metrics are not deterministic
-      assertThat(statistics.getLong(metric)).isEqualTo(expected);
+      assertEquals(metric, (long)statistics.getLong(metric), expected);
     } else if (!metric.toLowerCase().contains("time")) {
       // back off is not deterministic
       assertThat(statistics.getLong(metric)).isAtLeast(expected);
