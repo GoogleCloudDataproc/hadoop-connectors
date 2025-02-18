@@ -392,6 +392,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Override
   public void testGcsJsonAPIMetrics() {}
 
+  @Override
+  public void testGcsThreadLocalMetrics() {}
+
+  @Override
+  public void multiThreadTest() {}
+
   /* Custom InMemoryGoogleCloudStorage object which throws exception when reading */
   private class CustomInMemoryGoogleCloudStorage extends InMemoryGoogleCloudStorage {
     private IOException exceptionThrown =

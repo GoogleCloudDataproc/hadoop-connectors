@@ -99,17 +99,21 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -125,6 +129,9 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
   private static HashSet<String> EXPECTED_DURATION_METRICS = getExpectedDurationMetrics();
+
+  private static final String GCS_API_COUNT = "gcsApiCount";
+  private static final String HADOOP_API_COUNT = "hadoopApiCount";
 
   @Before
   public void before() throws Exception {
@@ -2621,6 +2628,135 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             .build();
 
     verifyMetrics(stats, expected, stopwatch.elapsed().toMillis());
+  }
+
+  @Test
+  public void testGcsThreadLocalMetrics() throws IOException {
+    Configuration config = loadConfig(storageClientType);
+    config.setBoolean(
+        "fs.gs.status.parallel.enable", false); // to make the test results predictable
+    config.setBoolean("fs.gs.implicit.dir.repair.enable", false);
+    config.setBoolean("fs.gs.create.items.conflict.check.enable", false);
+
+    Path parentPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+    Path subdirPath = new Path(parentPath, "foo-subdir");
+    GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem();
+    myghfs.initialize(subdirPath.toUri(), config);
+
+    GhfsThreadLocalStatistics stats =
+        (GhfsThreadLocalStatistics)
+            GlobalStorageStatistics.INSTANCE.get(GhfsThreadLocalStatistics.NAME);
+
+    // TODO: Some of the GCS API related operations, which are run in a separate thread are not
+    // tracked.
+    // It will be fixed in a separate change
+    runTest(subdirPath, myghfs, stats);
+  }
+
+  @Test
+  public void multiThreadTest() throws IOException {
+    Configuration config = loadConfig(storageClientType);
+    config.setBoolean(
+        "fs.gs.status.parallel.enable", false); // to make the test results predictable
+    config.setBoolean("fs.gs.implicit.dir.repair.enable", false);
+    config.setBoolean("fs.gs.create.items.conflict.check.enable", false);
+
+    Path parentPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+
+    GhfsThreadLocalStatistics stats =
+        (GhfsThreadLocalStatistics)
+            GlobalStorageStatistics.INSTANCE.get(GhfsThreadLocalStatistics.NAME);
+
+    IntStream.range(0, 10)
+        .parallel()
+        .forEach(
+            i -> {
+              try {
+                Path subdirPath = new Path(parentPath, "foo-subdir" + i);
+                GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem();
+                myghfs.initialize(subdirPath.toUri(), config);
+                runTest(subdirPath, myghfs, stats);
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            });
+  }
+
+  private static Map<String, Long> getThreadLocalMetrics(GhfsThreadLocalStatistics statistics) {
+    Map<String, Long> values = new HashMap<>();
+    statistics
+        .getLongStatistics()
+        .forEachRemaining(theStat -> values.put(theStat.getName(), theStat.getValue()));
+    return values;
+  }
+
+  private static void runTest(
+      Path subdirPath, GoogleHadoopFileSystem myghfs, GhfsThreadLocalStatistics stats)
+      throws IOException {
+    Map<String, Long> metrics = getThreadLocalMetrics(stats);
+    myghfs.mkdirs(subdirPath);
+
+    verify(metrics, 1L, stats);
+
+    myghfs.getFileStatus(subdirPath);
+    verify(metrics, 2L, stats);
+
+    Path testFilePath = subdirPath.suffix("/test.empty");
+    try (FSDataOutputStream outStream = myghfs.create(testFilePath)) {
+      verify(metrics, 1L, stats);
+
+      outStream.hflush();
+      verify(metrics, 1L, stats);
+
+      outStream.hsync();
+      verify(metrics, 3L, stats);
+    }
+
+    metrics.merge(GCS_API_COUNT, 1L, Long::sum);
+    verify(metrics, stats);
+
+    try (FSDataInputStream ignored = myghfs.open(testFilePath)) {
+      ignored.read();
+      verify(metrics, 1L, stats);
+    }
+
+    Path dst = subdirPath.suffix("/test.rename.empty");
+    myghfs.rename(testFilePath, dst);
+    // TODO: Operations done async in a separate thread are not tracked. This will be fixed in a
+    // separate change.
+    verify(metrics, 2L, stats);
+
+    myghfs.delete(dst);
+    verify(metrics, 2L, stats);
+
+    myghfs.delete(subdirPath, true);
+    verify(metrics, 4L, stats);
+  }
+
+  private static void verify(
+      Map<String, Long> metrics, long gcsApiCount, GhfsThreadLocalStatistics stats) {
+    metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+    metrics.merge(GCS_API_COUNT, gcsApiCount, Long::sum);
+    verify(metrics, stats);
+  }
+
+  private static void verify(
+      Map<String, Long> expectedMetrics, GhfsThreadLocalStatistics statistics) {
+    expectedMetrics.forEach((key, value) -> checkTracked(key, value, statistics));
+    assertThat(getThreadLocalMetrics(statistics).size()).isEqualTo(expectedMetrics.size());
+  }
+
+  private static void checkTracked(
+      String metric, long expected, GhfsThreadLocalStatistics statistics) {
+    assertThat(statistics.isTracked(metric)).isTrue();
+
+    if (!metric.toLowerCase().contains("time")) {
+      // time metrics are not deterministic
+      assertThat(statistics.getLong(metric)).isEqualTo(expected);
+    } else if (!metric.toLowerCase().contains("time")) {
+      // back off is not deterministic
+      assertThat(statistics.getLong(metric)).isAtLeast(expected);
+    }
   }
 
   private void verifyMetrics(
