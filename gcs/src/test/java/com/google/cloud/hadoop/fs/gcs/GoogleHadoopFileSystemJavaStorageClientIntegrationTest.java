@@ -73,4 +73,10 @@ public class GoogleHadoopFileSystemJavaStorageClientIntegrationTest
   public void testGetFileStatusWithHint() throws Exception {
     // TODO: Update this will once gRPC API metrics are added
   }
+
+  @Ignore
+  @Test
+  public void multiThreadTest() {
+    // TODO: Update this will once gRPC API metrics are added
+  }
 }
