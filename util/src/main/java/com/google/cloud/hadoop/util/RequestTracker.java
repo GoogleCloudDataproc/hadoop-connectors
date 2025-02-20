@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 public class RequestTracker {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private static final long LOGGING_THRESHOLD = 200;
+  private static final long LOGGING_THRESHOLD = 300;
   private Stopwatch stopWatch;
   private Object context;
   private int retryCount;

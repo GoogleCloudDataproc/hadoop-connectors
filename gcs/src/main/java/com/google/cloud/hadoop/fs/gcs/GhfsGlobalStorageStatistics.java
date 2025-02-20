@@ -86,7 +86,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   private final Map<String, AtomicLong> maximums = new HashMap<>();
   private final Map<String, MeanStatistic> means = new HashMap<>();
   private final Map<String, AtomicDouble> total = new HashMap<>();
-  private final Stopwatch stopwatch = Stopwatch.createStarted();
+  private static final Stopwatch uptimeStopWatch = Stopwatch.createStarted();
 
   public GhfsGlobalStorageStatistics() {
 
@@ -121,6 +121,12 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       stats.updateConnectorHadoopApiTime(elapsedMs);
       logger.atFine().log("%s(%s); elapsed=%s", statistic.getSymbol(), context, elapsedMs);
 
+      periodicallyLogMetrics(stats);
+    }
+  }
+
+  private static void periodicallyLogMetrics(GhfsGlobalStorageStatistics stats) {
+    if (uptimeStopWatch.elapsed().getSeconds() > WARMUP_THRESHOLD_SEC) {
       // Periodically log the metrics. Once every 5 minutes.
       logger.atInfo().atMostEvery(5, TimeUnit.MINUTES).log(
           "periodic connector metrics: %s", LazyArgs.lazy(() -> stats.getNonZeroMetrics()));
@@ -141,7 +147,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       }
     }
 
-    result.put("uptimeSeconds", stopwatch.elapsed().toSeconds());
+    result.put("uptimeSeconds", uptimeStopWatch.elapsed().toSeconds());
 
     return result.toString();
   }
@@ -275,7 +281,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     AtomicLong maxVal = maximums.get(maxKey);
     if (maxDurationMs > maxVal.get()) {
       if (maxDurationMs > LATENCY_LOGGING_THRESHOLD_MS
-          && stopwatch.elapsed().getSeconds() > WARMUP_THRESHOLD_SEC) {
+          && uptimeStopWatch.elapsed().getSeconds() > WARMUP_THRESHOLD_SEC) {
         logger.atInfo().log(
             "Detected potential high latency for operation %s. latencyMs=%s; previousMaxLatencyMs=%s; operationCount=%s; context=%s; thread=%s",
             symbol,
