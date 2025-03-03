@@ -88,8 +88,7 @@ class DeleteFolderOperation {
       FolderInfo folderToDelete = getElementFromBlockingQueue();
       folderSize--;
 
-      if (folderToDelete == null)
-      {
+      if (folderToDelete == null) {
         logger.atInfo().log("folderToDelete was found NULL aborting");
         timedOutCount++;
         continue;
