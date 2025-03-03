@@ -793,7 +793,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String traceContext = String.format("batchFolderDelete(size=%s)", folders.size());
     DeleteFolderOperation deleteFolderOperation =
         new DeleteFolderOperation(folders, storageOptions, lazyGetStorageControlClient());
-    for (int attempt = 1; attempt <= MAXIMUM_RETRY_COUNT_IN_FOLDER_DELETE; attempt++) {
+    for (int attempt = 0; attempt <= MAXIMUM_RETRY_COUNT_IN_FOLDER_DELETE; attempt++) {
       try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
         deleteFolderOperation.performDeleteOperation();
         break;
@@ -807,8 +807,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       } catch (IllegalStateException e) {
         if (attempt == MAXIMUM_RETRY_COUNT_IN_FOLDER_DELETE) {
           logger.atSevere().withCause(e)
-              .log("Failed to delete folders after %d attempts", MAXIMUM_RETRY_COUNT_IN_FOLDER_DELETE);
-          throw e; // Re-throw the exception after all retries are exhausted
+              .log("Failed to delete folders after %d attempts. "
+                  + "It may result in some undeleted folders.",
+                  MAXIMUM_RETRY_COUNT_IN_FOLDER_DELETE);
         }
         logger.atWarning().withCause(e)
             .log("Attempt %d to delete folders failed, retrying...", attempt);

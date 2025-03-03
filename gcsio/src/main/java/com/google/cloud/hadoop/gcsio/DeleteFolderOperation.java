@@ -81,24 +81,22 @@ class DeleteFolderOperation {
     int folderSize = folders.size();
     computeChildrenForFolderResource();
 
-    int timedOutCount = 0;
+    boolean timedOut = false;
 
     // this will avoid infinite loop when all folders are deleted
     while (folderSize != 0 && encounteredNoExceptions()) {
       FolderInfo folderToDelete = getElementFromBlockingQueue();
-      folderSize--;
-
       if (folderToDelete == null) {
         logger.atInfo().log("folderToDelete was found NULL aborting");
-        timedOutCount++;
-        continue;
+        timedOut = true;
+        break;
       }
-
+      folderSize--;
       // Queue the deletion request
       queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
     }
     batchExecutorShutdown();
-    if (timedOutCount > 0) {
+    if (timedOut) {
       throw new IllegalStateException(
           String.format(
               "Received NULL while getting element from BlockingQueue"));
