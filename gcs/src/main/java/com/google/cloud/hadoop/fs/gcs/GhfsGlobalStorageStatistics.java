@@ -75,6 +75,9 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
   // Initial requests are expected to take time due to warmup.
   private static final int WARMUP_THRESHOLD_SEC = 30;
 
+  private static final GhfsThreadLocalStatistics threadLocalStatistics =
+      new GhfsThreadLocalStatistics();
+
   private final Map<String, AtomicLong> opsCount = new HashMap<>();
   private final Map<String, AtomicLong> minimums = new HashMap<>();
   private final Map<String, AtomicLong> maximums = new HashMap<>();
@@ -121,6 +124,10 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     }
   }
 
+  public GhfsThreadLocalStatistics getThreadLocalStatistics() {
+    return threadLocalStatistics;
+  }
+
   private String getNonZeroMetrics() {
     // TreeMap to keep the result sorted.
     TreeMap<String, Long> result = new TreeMap<>();
@@ -156,6 +163,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
    * @return the new value
    */
   long incrementCounter(GhfsStatistic op, long count) {
+    threadLocalStatistics.increment(op, count);
     return opsCount.get(op.getSymbol()).addAndGet(count);
   }
 
@@ -167,6 +175,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
    */
   void incrementCounter(GoogleCloudStorageStatistics op, long count) {
     opsCount.get(op.getSymbol()).addAndGet(count);
+    threadLocalStatistics.increment(op, count);
   }
 
   @Override
@@ -242,7 +251,7 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     String symbol = statistic.getSymbol();
     updateMinMaxStats(minLatency, maxLatency, context, symbol);
     addMeanStatistic(statistic.getSymbol(), totalDuration, count);
-    opsCount.get(symbol).addAndGet(count);
+    incrementCounter(statistic, count);
 
     updateConnectorHadoopApiTime(totalDuration);
   }
