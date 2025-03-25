@@ -161,6 +161,8 @@ public class FsBenchmark extends Configured implements Tool {
         return benchmarkRead(fs, cmdArgs);
       case "random-read":
         return benchmarkRandomRead(fs, cmdArgs);
+      case "rename":
+        return benchmarkRename(fs, cmdArgs);
     }
     throw new IllegalArgumentException("Unknown command: " + cmd);
   }
@@ -193,7 +195,8 @@ public class FsBenchmark extends Configured implements Tool {
   private void benchmarkWrite(
       FileSystem fs, Path testFile, int writeSize, int numWrites, int numThreads, long totalSize) {
     System.out.printf(
-        "Running write test using %d bytes writes to fully write '%s' file %d times in %d threads%n",
+        "Running write test using %d bytes writes to fully write '%s' file %d times in %d"
+            + " threads%n",
         writeSize, testFile, numWrites, numThreads);
 
     Set<LongSummaryStatistics> writeFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
@@ -276,6 +279,150 @@ public class FsBenchmark extends Configured implements Tool {
     System.out.printf(
         "Write average throughput (MiB/s): %.3f%n",
         bytesToMebibytes(combineStats(writeFileBytesList).getSum()) / nanosToSeconds(runtimeNs));
+  }
+
+  private int benchmarkRename(FileSystem fs, Map<String, String> args) {
+    if (args.size() < 4) {
+      System.err.println(
+          "Usage: rename"
+              + " --src=gs://${BUCKET}/path/to/source/dir/"
+              + " --dst=gs://${BUCKET}/path/to/destination/dir/"
+              + " --num-files=<number of files to rename (e.g., 1000)>"
+              + " --file-prefix=<prefix of filenames (e.g., file_dummy_)>"
+              + " [--file-suffix=<suffix of filenames (e.g., .txt)>]"
+              + " [--num-threads=<number of threads to run test>]");
+      return 1;
+    }
+
+    Path srcDir = new Path(args.get("--src"));
+    Path dstDir = new Path(args.get("--dst"));
+    int numFiles = parseInt(args.get("--num-files"));
+    String filePrefix = args.get("--file-prefix");
+    String fileSuffix = args.getOrDefault("--file-suffix", ""); // Default to empty suffix
+    int numThreads = parseInt(args.getOrDefault("--num-threads", String.valueOf(1)));
+
+    if (numFiles < numThreads) {
+      System.err.println(
+          "Warning: num-files should ideally be >= num-threads. Reducing num-threads.");
+      numThreads = numFiles;
+    }
+
+    // Note: Warmup might be less relevant here if source files don't exist yet,
+    // but keeping it for consistency or if user pre-creates files for warmup.
+    // warmup(
+    //     args,
+    //     () -> benchmarkRename(fs, srcDir, dstDir, /* numFiles= */ 5, filePrefix, fileSuffix, /*
+    // numThreads= */ 2));
+
+    benchmarkRename(fs, srcDir, dstDir, numFiles, filePrefix, fileSuffix, numThreads);
+
+    return 0;
+  }
+
+  private void benchmarkRename(
+      FileSystem fs,
+      Path srcDir,
+      Path dstDir,
+      int numFiles,
+      String filePrefix,
+      String fileSuffix,
+      int numThreads) {
+    System.out.printf(
+        "Running rename test for %d files (%s[1-%d]%s) from %s to %s in %d threads%n",
+        numFiles, filePrefix, numFiles, fileSuffix, srcDir, dstDir, numThreads);
+
+    // Important: This benchmark assumes the source files (e.g., src/file_dummy_1.txt, ...)
+    // and the destination directory (dst/) already exist before running.
+    // It only measures the rename operation itself.
+
+    Set<LongSummaryStatistics> renameCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    CountDownLatch initLatch = new CountDownLatch(numThreads);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch stopLatch = new CountDownLatch(numThreads);
+    List<Future<?>> futures = new ArrayList<>(numThreads);
+
+    for (int i = 0; i < numThreads; i++) {
+      int threadId = i;
+      futures.add(
+          executor.submit(
+              () -> {
+                LongSummaryStatistics renameCallTimeNs =
+                    newLongSummaryStatistics(renameCallTimeNsList);
+
+                initLatch.countDown();
+                startLatch.await();
+                try {
+                  // Distribute the file indices across threads
+                  // Files are typically numbered starting from 1
+                  int filesPerThread = numFiles / numThreads;
+                  int startFileIndex = (threadId * filesPerThread) + 1; // Start from 1
+                  int endFileIndex =
+                      (threadId == numThreads - 1)
+                          ? numFiles + 1 // Go up to numFiles
+                          : startFileIndex + filesPerThread;
+
+                  for (int j = startFileIndex; j < endFileIndex; j++) {
+                    String fileName = filePrefix + j + fileSuffix;
+                    Path srcFile = new Path(srcDir, fileName);
+                    Path dstFile = new Path(dstDir, fileName);
+
+                    long renameStart = System.nanoTime();
+                    boolean renameSuccessful = fs.rename(srcFile, dstFile);
+                    long renameEnd = System.nanoTime();
+
+                    if (!renameSuccessful) {
+                      // Log error but continue if possible
+                      logger.atWarning().log("Rename from %s to %s failed", srcFile, dstFile);
+                    } else {
+                      renameCallTimeNs.accept(renameEnd - renameStart);
+                    }
+                  }
+                } catch (Exception e) {
+                  // Catch any other unexpected errors
+                  logger.atSevere().withCause(e).log(
+                      "Unexpected error during rename operation in thread %d", threadId);
+                } finally {
+                  stopLatch.countDown();
+                }
+                return null;
+              }));
+    }
+    executor.shutdown();
+
+    awaitUnchecked(initLatch);
+    long startTimeNs = System.nanoTime();
+    startLatch.countDown();
+    awaitUnchecked(stopLatch);
+    long runtimeNs = System.nanoTime() - startTimeNs;
+
+    // Verify that all threads completed without errors logged in futures themselves
+    // Note: Specific rename errors are logged above, but future.get() catches thread execution
+    // errors
+    try {
+      for (Future<?> future : futures) {
+        future.get(); // Check for exceptions thrown during thread execution
+      }
+    } catch (ExecutionException e) {
+      logger.atSevere().withCause(e.getCause()).log("A benchmark thread failed execution");
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      logger.atWarning().withCause(e).log("Interrupted while waiting for benchmark threads");
+    }
+
+    // --- Reporting ---
+    LongSummaryStatistics combinedStats = combineStats(renameCallTimeNsList);
+    printTimeStats("Rename call latency", combinedStats);
+
+    long totalSuccessfulRenames = combinedStats.getCount();
+    double runtimeSeconds = nanosToSeconds(runtimeNs);
+    double averageRenameThroughput =
+        (runtimeSeconds > 0) ? (double) totalSuccessfulRenames / runtimeSeconds : 0;
+
+    System.out.printf("Total successful renames: %d%n", totalSuccessfulRenames);
+    System.out.printf("Total benchmark runtime (s): %.3f%n", runtimeSeconds);
+    System.out.printf("Average rename throughput (renames/s): %.3f%n", averageRenameThroughput);
   }
 
   private int benchmarkRead(FileSystem fs, Map<String, String> args) {
