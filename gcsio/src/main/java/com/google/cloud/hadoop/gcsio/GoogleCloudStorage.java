@@ -282,6 +282,18 @@ public interface GoogleCloudStorage {
   }
 
   /**
+   * Moves metadata of the given objects. Moving between two different locations or between two
+   * different storage classes is not allowed.
+   *
+   * @param sourceToDestinationObjectsMap map of destination objects to be moved, keyed by source
+   * @throws java.io.FileNotFoundException if the source object or the destination bucket does not
+   *     exist
+   * @throws IOException in all other error cases
+   */
+  void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException;
+
+  /**
    * Checks if {@code resourceId} belongs to a Hierarchical namespace enabled bucket. This takes a
    * path and not the bucket name since the caller may not have permission to query the bucket.
    *
