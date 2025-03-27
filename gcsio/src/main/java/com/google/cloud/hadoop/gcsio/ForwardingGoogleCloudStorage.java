@@ -156,7 +156,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
     logger.atFiner().log("%s.move(%s)", delegateClassName, sourceToDestinationObjectsMap);
-    delegate.copy(sourceToDestinationObjectsMap);
+    delegate.move(sourceToDestinationObjectsMap);
   }
 
 
