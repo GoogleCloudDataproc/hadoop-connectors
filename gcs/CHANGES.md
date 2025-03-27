@@ -1,7 +1,9 @@
 # Release Notes
 
 ## Next
+1. Release 3.1.x
 
+### 3.0.x
 1. Add getFileStatusWithHint() API
 
 1. Upgrade google-cloud-storage to 2.43.1
