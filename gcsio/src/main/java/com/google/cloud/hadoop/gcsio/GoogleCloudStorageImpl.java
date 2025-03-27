@@ -1123,7 +1123,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     String traceContext = String.format("batchmove(size=%s)", sourceToDestinationObjectsMap.size());
     try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
-      // Perform the copy operations.
+      // Perform the move operations.
 
       BatchHelper batchHelper =
           batchFactory.newBatchHelper(
