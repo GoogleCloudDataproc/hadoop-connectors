@@ -1144,7 +1144,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               srcObject.getBucketName(),
               srcObject.getObjectName(),
               dstObject.getGenerationId(),
-              dstObject.getBucketName(),
               dstObject.getObjectName());
 
       }
@@ -1269,43 +1268,48 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * Performs move operation using GCS Copy requests
+   * Performs move operation using GCS MoveObject requests
    *
    * @see GoogleCloudStorage#move(String, List, String, List)
    */
   private void moveInternal(
       BatchHelper batchHelper,
       ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
-      String srcBucketName,
+      String bucketName,
       String srcObjectName,
       long dstContentGeneration,
-      String dstBucketName,
       String dstObjectName)
       throws IOException {
-    Storage.Objects.Copy copy =
-        storage.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null);
+    Storage.Objects.Move move =
+        storage.objects().move(bucketName, srcObjectName, dstObjectName);
 
     if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      copy.setIfGenerationMatch(dstContentGeneration);
+      move.setIfGenerationMatch(dstContentGeneration);
     }
 
-    Storage.Objects.Copy copyObject = initializeRequest(copy, srcBucketName);
+    Storage.Objects.Move moveObject = initializeRequest(move, bucketName);
 
     batchHelper.queue(
-        copyObject,
+        moveObject,
         new JsonBatchCallback<>() {
           @Override
           public void onSuccess(StorageObject copyResponse, HttpHeaders responseHeaders) {
-            String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
-            String dstString = StringPaths.fromComponents(dstBucketName, dstObjectName);
-            logger.atFiner().log("Successfully copied %s to %s", srcString, dstString);
+            String srcString = StringPaths.fromComponents(bucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(bucketName, dstObjectName);
+            logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
           }
 
           @Override
           public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
             GoogleCloudStorageEventBus.postOnException();
-            onCopyFailure(
-                innerExceptions, jsonError, responseHeaders, srcBucketName, srcObjectName);
+            GoogleJsonResponseException cause = createJsonResponseException(jsonError, responseHeaders);
+            innerExceptions.add(
+                errorExtractor.itemNotFound(cause)
+                    ? createFileNotFoundException(bucketName, srcObjectName, cause)
+                    : new IOException(
+                        String.format(
+                            "Error moving '%s'", StringPaths.fromComponents(bucketName, srcObjectName)),
+                        cause));
           }
         });
   }
