@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add AUTO_RANDOM as new fadvise mode.
 
 ## 3.0.5 - 2025-02-26
 1. PR #1274 - Upgrade google-cloud-storage to 2.44.1
