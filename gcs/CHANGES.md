@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 3.1.0 - 2025-03-27
 1. Release 3.1.x
 
 ### 3.0.x
