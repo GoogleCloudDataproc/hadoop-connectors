@@ -614,14 +614,19 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           StorageResourceId.fromUriPath(
               dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
 
-      gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
+      if(this.options.getCloudStorageOptions().isMoveOperationEnabled() &&
+          srcResourceId.getBucketName() == dstResourceId.getBucketName()) {
+        gcs.move(ImmutableMap.of(srcResourceId, dstResourceId));
+      } else {
+        gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
 
-      gcs.deleteObjects(
-          ImmutableList.of(
-              new StorageResourceId(
-                  srcInfo.getItemInfo().getBucketName(),
-                  srcInfo.getItemInfo().getObjectName(),
-                  srcInfo.getItemInfo().getContentGeneration())));
+        gcs.deleteObjects(
+            ImmutableList.of(
+                new StorageResourceId(
+                    srcInfo.getItemInfo().getBucketName(),
+                    srcInfo.getItemInfo().getObjectName(),
+                    srcInfo.getItemInfo().getContentGeneration())));
+      }
     }
 
     repairImplicitDirectory(srcParentInfoFuture);
