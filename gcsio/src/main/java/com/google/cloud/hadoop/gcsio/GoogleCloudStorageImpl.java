@@ -993,6 +993,55 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
+  /**
+   * Validates basic argument constraints like non-null, non-empty Strings, using {@code
+   * Preconditions} in addition to checking for src/dst bucket existence and compatibility of bucket
+   * properties such as location and storage-class.
+   *
+   * @param gcsImpl A GoogleCloudStorage for retrieving bucket info via getItemInfo, but only if
+   *     srcBucketName != dstBucketName; passed as a parameter so that this static method can be
+   *     used by other implementations of GoogleCloudStorage that want to preserve the validation
+   *     behavior of GoogleCloudStorageImpl, including disallowing cross-location copies.
+   */
+  @VisibleForTesting
+  public static void validateMoveArguments(
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap,
+      GoogleCloudStorage gcsImpl)
+      throws IOException {
+    checkNotNull(sourceToDestinationObjectsMap, "srcObjects must not be null");
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache = new HashMap<>();
+
+    for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+        sourceToDestinationObjectsMap.entrySet()) {
+      StorageResourceId source = entry.getKey();
+      StorageResourceId destination = entry.getValue();
+      String srcBucketName = source.getBucketName();
+      String dstBucketName = destination.getBucketName();
+      // Avoid move across locations or storage classes.
+      if (!srcBucketName.equals(dstBucketName)) {
+        throw new UnsupportedOperationException(
+            "This operation is not supported across two different buckets.");
+      }
+      checkArgument(
+          !isNullOrEmpty(source.getObjectName()), "srcObjectName must not be null or empty");
+      checkArgument(
+          !isNullOrEmpty(destination.getObjectName()), "dstObjectName must not be null or empty");
+      if (srcBucketName.equals(dstBucketName)
+          && source.getObjectName().equals(destination.getObjectName())) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IllegalArgumentException(
+            String.format(
+                "Move destination must be different from source for %s.",
+                StringPaths.fromComponents(srcBucketName, source.getObjectName())));
+      }
+    }
+  }
+
   private static GoogleCloudStorageItemInfo getGoogleCloudStorageItemInfo(
       GoogleCloudStorage gcsImpl,
       Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache,
@@ -1110,7 +1159,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
 
-    validateCopyArguments(sourceToDestinationObjectsMap, this);
+    validateMoveArguments(sourceToDestinationObjectsMap, this);
 
     if (sourceToDestinationObjectsMap.isEmpty()) {
       return;
