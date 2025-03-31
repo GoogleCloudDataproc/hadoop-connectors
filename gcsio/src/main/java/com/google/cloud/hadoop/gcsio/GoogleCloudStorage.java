@@ -282,8 +282,7 @@ public interface GoogleCloudStorage {
   }
 
   /**
-   * Moves metadata of the given objects. Moving between two different locations or between two
-   * different storage classes is not allowed.
+   * Moves metadata of the given objects. Moving between two different buckets is not allowed.
    *
    * @param sourceToDestinationObjectsMap map of destination objects to be moved, keyed by source
    * @throws java.io.FileNotFoundException if the source object or the destination bucket does not

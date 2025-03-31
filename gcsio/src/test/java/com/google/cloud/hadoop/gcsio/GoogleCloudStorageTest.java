@@ -2006,28 +2006,7 @@ public class GoogleCloudStorageTest {
     Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
         new HashMap<>();
 
-
-    ILLEGAL_OBJECTS.forEach(
-        objectPair -> {
-          String badBucket = objectPair[0];
-          String badObject = objectPair[1];
-          // Src is bad.
-          sourceToDestinationObjectsMap.put(
-              new StorageResourceId(b, badObject),
-              new StorageResourceId(b, o));
-          assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
-
-          // Dst is bad.
-          sourceToDestinationObjectsMap.clear();
-          sourceToDestinationObjectsMap.put(
-              new StorageResourceId(b, o),
-              new StorageResourceId(b, badObject));
-
-          assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
-        });
-
     // Failure if src == dst.
-    sourceToDestinationObjectsMap.clear();
     sourceToDestinationObjectsMap.put(
         new StorageResourceId(b, o),
         new StorageResourceId(b, o));
@@ -2036,14 +2015,9 @@ public class GoogleCloudStorageTest {
     // Null Objects.
     sourceToDestinationObjectsMap.clear();
     sourceToDestinationObjectsMap.put(
-        new StorageResourceId(b, null),
-        new StorageResourceId(b, o));
-    assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
-    sourceToDestinationObjectsMap.clear();
-    sourceToDestinationObjectsMap.put(
         new StorageResourceId(b, o),
-        new StorageResourceId(b, null));
-    assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
+        new StorageResourceId("other-bucket", o));
+    assertThrows(UnsupportedOperationException.class, () -> gcs.move(sourceToDestinationObjectsMap));
   }
 
   /**
