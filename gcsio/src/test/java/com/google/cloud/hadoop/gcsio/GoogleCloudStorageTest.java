@@ -1995,7 +1995,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
   }
 
-  /** Test argument sanitization for GoogleCloudStorage.move(4). */
+  /** Test argument sanitization for GoogleCloudStorage.move(1). */
   @Test
   public void testMoveObjectsIllegalArguments() throws IOException {
     String b = BUCKET_NAME;
@@ -2012,7 +2012,7 @@ public class GoogleCloudStorageTest {
         new StorageResourceId(b, o));
     assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
 
-    // Null Objects.
+    // Failure if srcBucket != dstBucket.
     sourceToDestinationObjectsMap.clear();
     sourceToDestinationObjectsMap.put(
         new StorageResourceId(b, o),
@@ -2021,7 +2021,7 @@ public class GoogleCloudStorageTest {
   }
 
   /**
-   * Test successful operation of GoogleCloudStorage.move(4).
+   * Test successful operation of GoogleCloudStorage.move(1).
    */
   @Test
   public void testMoveObjectsOperation() throws IOException {
