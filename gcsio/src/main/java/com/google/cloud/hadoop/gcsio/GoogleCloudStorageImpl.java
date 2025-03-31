@@ -995,18 +995,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   /**
    * Validates basic argument constraints like non-null, non-empty Strings, using {@code
-   * Preconditions} in addition to checking for src/dst bucket existence and compatibility of bucket
-   * properties such as location and storage-class.
+   * Preconditions} in addition to checking for src/dst bucket equality.
    *
-   * @param gcsImpl A GoogleCloudStorage for retrieving bucket info via getItemInfo, but only if
-   *     srcBucketName != dstBucketName; passed as a parameter so that this static method can be
-   *     used by other implementations of GoogleCloudStorage that want to preserve the validation
-   *     behavior of GoogleCloudStorageImpl, including disallowing cross-location copies.
    */
   @VisibleForTesting
   public static void validateMoveArguments(
-      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap,
-      GoogleCloudStorage gcsImpl)
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
     checkNotNull(sourceToDestinationObjectsMap, "srcObjects must not be null");
 
@@ -1014,15 +1008,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return;
     }
 
-    Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache = new HashMap<>();
-
     for (Map.Entry<StorageResourceId, StorageResourceId> entry :
         sourceToDestinationObjectsMap.entrySet()) {
       StorageResourceId source = entry.getKey();
       StorageResourceId destination = entry.getValue();
       String srcBucketName = source.getBucketName();
       String dstBucketName = destination.getBucketName();
-      // Avoid move across locations or storage classes.
+      // Avoid move across buckets.
       if (!srcBucketName.equals(dstBucketName)) {
         throw new UnsupportedOperationException(
             "This operation is not supported across two different buckets.");
@@ -1152,14 +1144,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#move(String, List, String, List)} for details about expected
-   * behavior.
+   * See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)} for details
+   *  about expected behavior.
    */
   @Override
   public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
 
-    validateMoveArguments(sourceToDestinationObjectsMap, this);
+    validateMoveArguments(sourceToDestinationObjectsMap);
 
     if (sourceToDestinationObjectsMap.isEmpty()) {
       return;
@@ -1319,7 +1311,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Performs move operation using GCS MoveObject requests
    *
-   * @see GoogleCloudStorage#move(String, List, String, List)
+   * See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)}
    */
   private void moveInternal(
       BatchHelper batchHelper,
@@ -1342,7 +1334,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         moveObject,
         new JsonBatchCallback<>() {
           @Override
-          public void onSuccess(StorageObject copyResponse, HttpHeaders responseHeaders) {
+          public void onSuccess(StorageObject moveResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(bucketName, srcObjectName);
             String dstString = StringPaths.fromComponents(bucketName, dstObjectName);
             logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
