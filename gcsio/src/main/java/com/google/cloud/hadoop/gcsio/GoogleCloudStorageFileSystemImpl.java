@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -769,6 +770,20 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
+    StorageResourceId srcResourceId =
+        StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
+    StorageResourceId dstResourceId =
+        StorageResourceId.fromUriPath(
+            dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
+    if(this.options.getCloudStorageOptions().isMoveOperationEnabled() &&
+        srcResourceId.getBucketName() == dstResourceId.getBucketName()) {
+      // First, copy all items except marker items
+      moveInternal(srcToDstItemNames);
+      // Finally, copy marker items (if any) to mark rename operation success
+      moveInternal(srcToDstMarkerItemNames);
+      return;
+    }
+
     // First, copy all items except marker items
     copyInternal(srcToDstItemNames);
     // Finally, copy marker items (if any) to mark rename operation success
@@ -818,6 +833,27 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Perform copy.
     gcs.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+  }
+
+  /** Moves items in given map that maps source items to destination items. */
+  private void moveInternal(Map<FileInfo, URI> srcToDstItemNames) throws IOException {
+    if (srcToDstItemNames.isEmpty()) {
+      return;
+    }
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(0);
+
+    // Prepare list of items to move.
+    for (Map.Entry<FileInfo, URI> srcToDstItemName : srcToDstItemNames.entrySet()) {
+      StorageResourceId srcResourceId = srcToDstItemName.getKey().getItemInfo().getResourceId();
+
+      StorageResourceId dstResourceId =
+          StorageResourceId.fromUriPath(srcToDstItemName.getValue(), true);
+      sourceToDestinationObjectsMap.put(srcResourceId, dstResourceId);
+    }
+
+    // Perform move.
+    gcs.move(sourceToDestinationObjectsMap);
   }
 
   /**
