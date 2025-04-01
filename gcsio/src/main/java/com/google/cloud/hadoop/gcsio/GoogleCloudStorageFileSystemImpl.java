@@ -777,9 +777,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
     if(this.options.getCloudStorageOptions().isMoveOperationEnabled() &&
         srcResourceId.getBucketName() == dstResourceId.getBucketName()) {
-      // First, copy all items except marker items
+      // First, move all items except marker items
       moveInternal(srcToDstItemNames);
-      // Finally, copy marker items (if any) to mark rename operation success
+      // Finally, move marker items (if any) to mark rename operation success
       moveInternal(srcToDstMarkerItemNames);
       return;
     }
@@ -841,7 +841,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       return;
     }
 
-    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(0);
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
 
     // Prepare list of items to move.
     for (Map.Entry<FileInfo, URI> srcToDstItemName : srcToDstItemNames.entrySet()) {
