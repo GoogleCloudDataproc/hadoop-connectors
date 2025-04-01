@@ -389,7 +389,7 @@ Knobs configure the vectoredRead API
 *   `fs.gs.proxy.password` (not set by default)
 
     Proxy password that connector can use to send Cloud Storage requests.
-
+#### Note: Retry configuration is only valid for HTTP_API_CLIENT client type for now.
 *   `fs.gs.http.max.retry` (default: `10`)
 
     The maximum number of retries for low-level HTTP requests to Google Cloud
