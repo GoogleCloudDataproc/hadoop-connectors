@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.EMPTY_OBJECT_
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.sleeper;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateCopyArguments;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateMoveArguments;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -478,6 +479,59 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
     copy(sourceToDestinationObjectsMap);
   }
+
+
+  /**
+   * See {@link GoogleCloudStorage#move(Map)} for details about expected behavior.
+   */
+  @Override
+  public void move(
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+
+    validateMoveArguments(sourceToDestinationObjectsMap);
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    // Gather FileNotFoundExceptions for individual objects,
+    // but only throw a single combined exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
+
+    try {
+      for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+          sourceToDestinationObjectsMap.entrySet()) {
+        StorageResourceId srcObject = entry.getKey();
+        StorageResourceId dstObject = entry.getValue();
+        moveInternal(
+            executor,
+            innerExceptions,
+            srcObject.getBucketName(),
+            srcObject.getObjectName(),
+            dstObject.getGenerationId(),
+            dstObject.getBucketName(),
+            dstObject.getObjectName());
+      }
+    } finally {
+      executor.shutdown();
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void moveInternal(BatchExecutor executor,
+      KeySetView<IOException, Boolean> innerExceptions, String bucketName, String objectName,
+      long generationId, String bucketName1, String objectName1) {
+    // TODO : Implement moveInternal
+  }
+
 
   /**
    * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
