@@ -60,7 +60,7 @@ class FileAccessPatternManager {
 
   public void updateAccessPattern(long currentPosition) {
     if (isPatternOverriden) {
-      logger.atFiner().log(
+      logger.atFinest().log(
           "Will bypass computing access pattern as it's overriden for resource :%s", resourceId);
       return;
     }
@@ -91,7 +91,7 @@ class FileAccessPatternManager {
   public void overrideAccessPattern(boolean isRandomPattern) {
     this.isPatternOverriden = true;
     this.randomAccess = isRandomPattern;
-    logger.atInfo().log(
+    logger.atFinest().log(
         "Overriding the random access pattern to %s for fadvise:%s for resource: %s ",
         isRandomPattern, readOptions.getFadvise(), resourceId);
   }
@@ -113,7 +113,7 @@ class FileAccessPatternManager {
     if (consecutiveSequentialCount < readOptions.getFadviseRequestTrackCount()) {
       return false;
     }
-    logger.atInfo().log(
+    logger.atFinest().log(
         "Detected %d consecutive read request within distance threshold %d with fadvise: %s switching to sequential IO for '%s'",
         consecutiveSequentialCount,
         readOptions.getInplaceSeekLimit(),
@@ -131,7 +131,7 @@ class FileAccessPatternManager {
     }
 
     if (isBackwardOrForwardSeekRequested()) {
-      logger.atFine().log(
+      logger.atFinest().log(
           "Backward or forward seek requested, isBackwardSeek: %s, isForwardSeek:%s for '%s'",
           isBackwardSeekRequested, isForwardSeekRequested, resourceId);
       return true;
@@ -171,13 +171,13 @@ class FileAccessPatternManager {
 
     if (currentPosition < lastServedIndex) {
       isBackwardSeekRequested = true;
-      logger.atFine().log(
+      logger.atFinest().log(
           "Detected backward read from %s to %s position, updating to backwardSeek for '%s'",
           lastServedIndex, currentPosition, resourceId);
 
     } else if (lastServedIndex + readOptions.getInplaceSeekLimit() < currentPosition) {
       isForwardSeekRequested = true;
-      logger.atFine().log(
+      logger.atFinest().log(
           "Detected forward read from %s to %s position over %s threshold,"
               + " updated to forwardSeek for '%s'",
           lastServedIndex, currentPosition, readOptions.getInplaceSeekLimit(), resourceId);
