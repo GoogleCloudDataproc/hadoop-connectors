@@ -616,7 +616,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
 
       if(this.options.getCloudStorageOptions().isMoveOperationEnabled() &&
-          srcResourceId.getBucketName() == dstResourceId.getBucketName()) {
+          srcResourceId.getBucketName().equals(dstResourceId.getBucketName()) ) {
         gcs.move(ImmutableMap.of(srcResourceId, dstResourceId));
       } else {
         gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
@@ -776,10 +776,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(
             dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
     if(this.options.getCloudStorageOptions().isMoveOperationEnabled() &&
-        srcResourceId.getBucketName() == dstResourceId.getBucketName()) {
-      // First, copy all items except marker items
+        srcResourceId.getBucketName().equals(dstResourceId.getBucketName())) {
+      // First, move all items except marker items
       moveInternal(srcToDstItemNames);
-      // Finally, copy marker items (if any) to mark rename operation success
+      // Finally, move marker items (if any) to mark rename operation success
       moveInternal(srcToDstMarkerItemNames);
       return;
     }

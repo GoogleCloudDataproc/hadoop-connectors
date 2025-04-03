@@ -68,6 +68,7 @@ import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.Storage.ComposeRequest;
 import com.google.cloud.storage.Storage.CopyRequest;
+import com.google.cloud.storage.Storage.MoveBlobRequest;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
@@ -480,13 +481,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     copy(sourceToDestinationObjectsMap);
   }
 
-
-  /**
-   * See {@link GoogleCloudStorage#move(Map)} for details about expected behavior.
-   */
+  /** See {@link GoogleCloudStorage#move(Map)} for details about expected behavior. */
   @Override
-  public void move(
-      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+  public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
 
     validateMoveArguments(sourceToDestinationObjectsMap);
@@ -513,7 +510,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             srcObject.getBucketName(),
             srcObject.getObjectName(),
             dstObject.getGenerationId(),
-            dstObject.getBucketName(),
             dstObject.getObjectName());
       }
     } finally {
@@ -526,12 +522,60 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
-  private void moveInternal(BatchExecutor executor,
-      KeySetView<IOException, Boolean> innerExceptions, String bucketName, String objectName,
-      long generationId, String bucketName1, String objectName1) {
-    // TODO : Implement moveInternal
-  }
+  private void moveInternal(
+      BatchExecutor executor,
+      KeySetView<IOException, Boolean> innerExceptions,
+      String srcBucketName,
+      String srcObjectName,
+      long dstContentGeneration,
+      String dstObjectName) {
+    MoveBlobRequest.Builder moveRequestBuilder =
+        MoveBlobRequest.newBuilder().setSource(BlobId.of(srcBucketName, srcObjectName));
+    moveRequestBuilder.setTarget(BlobId.of(srcBucketName, dstObjectName));
 
+    List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
+
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      blobTargetOptions.add(BlobTargetOption.generationMatch(dstContentGeneration));
+    }
+
+    if (storageOptions.getEncryptionKey() != null) {
+      moveRequestBuilder.setSourceOptions(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      blobTargetOptions.add(
+          BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+
+    moveRequestBuilder.setTargetOptions(blobTargetOptions);
+
+    executor.queue(
+        () -> {
+          try {
+            String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(srcBucketName, dstObjectName);
+
+            Blob blob = storage.moveBlob(moveRequestBuilder.build());
+            if (blob.exists()) {
+              logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
+            }
+          } catch (StorageException e) {
+            GoogleCloudStorageEventBus.postOnException();
+            if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
+              innerExceptions.add(
+                  createFileNotFoundException(srcBucketName, srcObjectName, new IOException(e)));
+            } else {
+              innerExceptions.add(
+                  new IOException(
+                      String.format(
+                          "Error moving '%s'",
+                          StringPaths.fromComponents(srcBucketName, srcObjectName)),
+                      e));
+            }
+          }
+          return null;
+        },
+        null);
+  }
 
   /**
    * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
