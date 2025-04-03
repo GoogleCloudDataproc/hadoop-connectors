@@ -841,7 +841,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       return;
     }
 
-    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(0);
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
 
     // Prepare list of items to move.
     for (Map.Entry<FileInfo, URI> srcToDstItemName : srcToDstItemNames.entrySet()) {
