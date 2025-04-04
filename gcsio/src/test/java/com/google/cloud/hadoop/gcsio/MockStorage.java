@@ -20,6 +20,8 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
 import com.google.storage.v2.Bucket;
 import com.google.storage.v2.ComposeObjectRequest;
+import com.google.storage.v2.MoveObjectRequest;
+import com.google.storage.v2.Object;
 import com.google.storage.v2.CreateBucketRequest;
 import com.google.storage.v2.DeleteBucketRequest;
 import com.google.storage.v2.DeleteObjectRequest;
@@ -278,5 +280,24 @@ final class MockStorage extends StorageImplBase {
       @Override
       public void onCompleted() {}
     };
+  }
+  @Override
+  public void moveObject(MoveObjectRequest request, StreamObserver<Object> responseObserver) {
+    java.lang.Object response = responses.poll();
+    if (response instanceof Object) {
+      requests.add(request);
+      responseObserver.onNext(((Object) response));
+      responseObserver.onCompleted();
+    } else if (response instanceof Exception) {
+      responseObserver.onError(((Exception) response));
+    } else {
+      responseObserver.onError(
+          new IllegalArgumentException(
+              String.format(
+                  "Unrecognized response type %s for method MoveObject, expected %s or %s",
+                  response == null ? "null" : response.getClass().getName(),
+                  Object.class.getName(),
+                  Exception.class.getName())));
+    }
   }
 }

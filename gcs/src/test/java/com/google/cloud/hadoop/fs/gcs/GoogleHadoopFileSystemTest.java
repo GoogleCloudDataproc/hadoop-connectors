@@ -390,6 +390,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void testRenameHnBucket() {}
 
   @Override
+  public void testRenameWithMoveOperation() {}
+
+  @Override
   public void testGcsJsonAPIMetrics() {}
 
   @Override
