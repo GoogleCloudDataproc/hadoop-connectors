@@ -145,20 +145,19 @@ public class GoogleCloudStorageClientTest {
           .setSize(1234)
           .build();
 
-  // Object representing the state *after* a successful move
   private static final Object MOVED_OBJECT =
       TEST_OBJECT.toBuilder()
-          .setName(DEST_OBJECT_NAME) // Name changed
-          .setGeneration(GENERATION + 1) // Generation likely changes
-          .setMetageneration(1L) // Metageneration resets or changes
+          .setName(DEST_OBJECT_NAME)
+          .setGeneration(GENERATION + 1)
+          .setMetageneration(1L)
           .build();
 
   private static final Object MOVED_OBJECT_2 =
       TEST_OBJECT.toBuilder()
-          .setName(DEST_OBJECT_NAME_2) // Name changed
+          .setName(DEST_OBJECT_NAME_2)
           .setBucket(BucketName.of("", TEST_BUCKET_NAME).toString())
-          .setGeneration(GENERATION + 2) // Generation likely changes
-          .setMetageneration(1L) // Metageneration resets or changes
+          .setGeneration(GENERATION + 2)
+          .setMetageneration(1L)
           .build();
 
   private static MockHttpTransport transport = mockTransport();
@@ -521,8 +520,8 @@ public class GoogleCloudStorageClientTest {
   @Test
   public void move_succeedsMultipleObjects() throws Exception {
     // Mock responses for two move operations
-    mockStorage.addResponse(MOVED_OBJECT); // Response for moving TEST_RESOURCE_ID
-    mockStorage.addResponse(MOVED_OBJECT_2); // Response for moving TEST_RESOURCE_ID_2
+    mockStorage.addResponse(MOVED_OBJECT);
+    mockStorage.addResponse(MOVED_OBJECT_2);
 
     Map<StorageResourceId, StorageResourceId> moveMap =
         ImmutableMap.of(
@@ -569,10 +568,9 @@ public class GoogleCloudStorageClientTest {
                 + " is still available but the requested generation is deleted.",
             TEST_RESOURCE_ID.toString()));
       } catch (Exception e) {
-      // Catch other exceptions to fail the test explicitly if something else goes wrong
       fail("Expected FileNotFoundException but got " + e.getClass().getName());
     }
-      assertEquals(mockStorage.getRequests().size(), 0); // The failed move attempt
+      assertEquals(mockStorage.getRequests().size(), 0);
     }
 
   @Test
@@ -600,7 +598,7 @@ public class GoogleCloudStorageClientTest {
         // Catch other exceptions to fail the test explicitly if something else goes wrong
         fail("Expected IOException but got " + e.getClass().getName());
     }
-    assertEquals(mockStorage.getRequests().size(), 0); // The failed move attempt
+    assertEquals(mockStorage.getRequests().size(), 0);
   }
 
   @Test
@@ -611,7 +609,7 @@ public class GoogleCloudStorageClientTest {
       GoogleCloudStorage gcs =
           mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
 
-      gcs.move(moveMap); // Should not throw
+      gcs.move(moveMap);
     }
     assertEquals(mockStorage.getRequests().size(), 0); // No requests should be sent
   }
@@ -626,7 +624,7 @@ public class GoogleCloudStorageClientTest {
       GoogleCloudStorage gcs =
           mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
 
-        gcs.move(moveMap); // Call the method expected to throw
+        gcs.move(moveMap);
         fail("Expected UnsupportedOperationException was not thrown.");
       } catch (UnsupportedOperationException e) {
         // Exception was caught as expected, now assert the message
@@ -637,7 +635,7 @@ public class GoogleCloudStorageClientTest {
       // Catch other exceptions to fail the test explicitly if something else goes wrong
       fail("Expected UnsupportedOperationException but got " + e.getClass().getName());
     }
-    assertEquals(mockStorage.getRequests().size(), 0); // Validation fails before request
+    assertEquals(mockStorage.getRequests().size(), 0);
   }
 
   @Test
@@ -661,7 +659,7 @@ public class GoogleCloudStorageClientTest {
     assertThat(actualRequest.getDestinationObject()).isEqualTo(DEST_OBJECT_NAME);
     assertThat(actualRequest.getSourceObject()).contains(TEST_OBJECT_NAME);
     assertThat(actualRequest.getBucket()).contains(TEST_BUCKET_NAME);
-    // Assert generation condition *was* set
+    // Assert generation condition was set
    assertThat(actualRequest.getIfGenerationMatch()).isEqualTo(DEST_RESOURCE_ID_WITH_GEN.getGenerationId());
   }
 
