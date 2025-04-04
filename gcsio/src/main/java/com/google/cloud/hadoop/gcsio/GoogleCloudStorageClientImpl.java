@@ -481,7 +481,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     copy(sourceToDestinationObjectsMap);
   }
 
-  /** See {@link GoogleCloudStorage#move(Map)} for details about expected behavior. */
+  /** See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)} for details about expected behavior. */
   @Override
   public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
@@ -554,8 +554,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
             String dstString = StringPaths.fromComponents(srcBucketName, dstObjectName);
 
-            Blob blob = storage.moveBlob(moveRequestBuilder.build());
-            if (blob.exists()) {
+            Blob movedBlob = storage.moveBlob(moveRequestBuilder.build());
+            if (movedBlob != null) {
               logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
             }
           } catch (StorageException e) {

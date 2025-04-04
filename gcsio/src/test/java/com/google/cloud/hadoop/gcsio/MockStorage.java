@@ -20,6 +20,8 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
 import com.google.storage.v2.Bucket;
 import com.google.storage.v2.ComposeObjectRequest;
+import com.google.storage.v2.MoveObjectRequest; // <-- Add this import
+import com.google.storage.v2.Object;
 import com.google.storage.v2.CreateBucketRequest;
 import com.google.storage.v2.DeleteBucketRequest;
 import com.google.storage.v2.DeleteObjectRequest;
@@ -278,5 +280,24 @@ final class MockStorage extends StorageImplBase {
       @Override
       public void onCompleted() {}
     };
+  }
+  @Override
+  public void moveObject(MoveObjectRequest request, StreamObserver<Object> responseObserver) {
+    java.lang.Object response = responses.poll(); // Get the next queued response/exception
+    if (response instanceof Object) { // Check if it's the expected success response type
+      requests.add(request); // Record the request
+      responseObserver.onNext(((Object) response)); // Send the successful response
+      responseObserver.onCompleted(); // Mark the RPC as complete
+    } else if (response instanceof Exception) { // Check if it's a queued exception
+      responseObserver.onError(((Exception) response)); // Send the error back to the client
+    } else { // Handle cases where an unexpected type was queued
+      responseObserver.onError(
+          new IllegalArgumentException(
+              String.format(
+                  "Unrecognized response type %s for method MoveObject, expected %s or %s",
+                  response == null ? "null" : response.getClass().getName(),
+                  Object.class.getName(), // Expected success type is Object proto
+                  Exception.class.getName())));
+    }
   }
 }
