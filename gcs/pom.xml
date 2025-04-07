@@ -224,6 +224,14 @@
               <filters>
                 <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
                 <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+                <filter>
                   <artifact>com.google.auth:*</artifact>
                   <includes>
                     <include>**</include>
