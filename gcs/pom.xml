@@ -281,6 +281,7 @@
                   <include>io.opentelemetry.semconv</include>
                   <include>io.perfmark</include>
                   <include>org.apache.httpcomponents</include>
+                  <include>org.conscrypt:conscrypt-openjdk-uber</include>
                   <include>org.threeten:threetenbp</include>
                 </includes>
               </artifactSet>
@@ -337,6 +338,7 @@
                     <include>org.apache.commons.codec.**</include>
                     <include>org.apache.http.**</include>
                     <include>org.threeten.**</include>
+                    <include>org.conscrypt.**</include>
                   </includes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package
