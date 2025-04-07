@@ -9,9 +9,7 @@ open-source software and Google Cloud Platform.
 
 ## Google Cloud Storage connector for Apache Hadoop (HCFS)
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop1.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop1-*)
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop2.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop2-*)
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22com.google.cloud.bigdataoss%22%20AND%20a:%22gcs-connector%22)
+[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop3.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:3.1.0)
 
 The Google Cloud Storage connector for Hadoop enables running MapReduce jobs
 directly on data in Google Cloud Storage by implementing the Hadoop FileSystem
