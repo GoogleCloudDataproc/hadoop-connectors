@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1323: Fix a bug where gRPC path was failing due to some of the dependencies not getting shaded. 
 
 ## 3.1.0 - 2025-03-27
 1. Release 3.1.x
