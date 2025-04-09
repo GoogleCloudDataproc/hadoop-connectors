@@ -333,11 +333,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   public static String moveRequestString(
       String bucket, String srcObject, String dstObject, String requestType) {
     return String.format(
-        POST_MOVE_REQUEST_FORMAT,
-        bucket,
-        urlEncode(srcObject),
-        requestType,
-        urlEncode(dstObject));
+        POST_MOVE_REQUEST_FORMAT, bucket, urlEncode(srcObject), requestType, urlEncode(dstObject));
   }
 
   public static String uploadRequestString(String bucketName, String object, Integer generationId) {

@@ -2003,26 +2003,21 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
 
-    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
-        new HashMap<>();
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
 
     // Failure if src == dst.
-    sourceToDestinationObjectsMap.put(
-        new StorageResourceId(b, o),
-        new StorageResourceId(b, o));
+    sourceToDestinationObjectsMap.put(new StorageResourceId(b, o), new StorageResourceId(b, o));
     assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
 
     // Failure if srcBucket != dstBucket.
     sourceToDestinationObjectsMap.clear();
     sourceToDestinationObjectsMap.put(
-        new StorageResourceId(b, o),
-        new StorageResourceId("other-bucket", o));
-    assertThrows(UnsupportedOperationException.class, () -> gcs.move(sourceToDestinationObjectsMap));
+        new StorageResourceId(b, o), new StorageResourceId("other-bucket", o));
+    assertThrows(
+        UnsupportedOperationException.class, () -> gcs.move(sourceToDestinationObjectsMap));
   }
 
-  /**
-   * Test successful operation of GoogleCloudStorage.move(1).
-   */
+  /** Test successful operation of GoogleCloudStorage.move(1). */
   @Test
   public void testMoveObjectsOperation() throws IOException {
     String dstObject = OBJECT_NAME + "-move";
@@ -2033,8 +2028,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
-        new HashMap<>(1);
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
     sourceToDestinationObjectsMap.put(
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         new StorageResourceId(BUCKET_NAME, dstObject));
@@ -2042,8 +2036,7 @@ public class GoogleCloudStorageTest {
     gcs.move(sourceToDestinationObjectsMap);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(
-            moveRequestString(BUCKET_NAME, OBJECT_NAME, dstObject, "moveTo"))
+        .containsExactly(moveRequestString(BUCKET_NAME, OBJECT_NAME, dstObject, "moveTo"))
         .inOrder();
   }
 

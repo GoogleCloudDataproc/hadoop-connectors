@@ -996,12 +996,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Validates basic argument constraints like non-null, non-empty Strings, using {@code
    * Preconditions} in addition to checking for src/dst bucket equality.
-   *
    */
   @VisibleForTesting
   public static void validateMoveArguments(
-      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
-      throws IOException {
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
     checkNotNull(sourceToDestinationObjectsMap, "srcObjects must not be null");
 
     if (sourceToDestinationObjectsMap.isEmpty()) {
@@ -1145,7 +1143,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   /**
    * See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)} for details
-   *  about expected behavior.
+   * about expected behavior.
    */
   @Override
   public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
@@ -1180,13 +1178,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         StorageResourceId srcObject = entry.getKey();
         StorageResourceId dstObject = entry.getValue();
         moveInternal(
-              batchHelper,
-              innerExceptions,
-              srcObject.getBucketName(),
-              srcObject.getObjectName(),
-              dstObject.getGenerationId(),
-              dstObject.getObjectName());
-
+            batchHelper,
+            innerExceptions,
+            srcObject.getBucketName(),
+            srcObject.getObjectName(),
+            dstObject.getGenerationId(),
+            dstObject.getObjectName());
       }
 
       // Execute any remaining requests not divisible by the max batch size.
@@ -1311,7 +1308,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Performs move operation using GCS MoveObject requests
    *
-   * See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)}
+   * <p>See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)}
    */
   private void moveInternal(
       BatchHelper batchHelper,
@@ -1321,8 +1318,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       long dstContentGeneration,
       String dstObjectName)
       throws IOException {
-    Storage.Objects.Move move =
-        storage.objects().move(bucketName, srcObjectName, dstObjectName);
+    Storage.Objects.Move move = storage.objects().move(bucketName, srcObjectName, dstObjectName);
 
     if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
       move.setIfGenerationMatch(dstContentGeneration);
@@ -1343,13 +1339,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           @Override
           public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
             GoogleCloudStorageEventBus.postOnException();
-            GoogleJsonResponseException cause = createJsonResponseException(jsonError, responseHeaders);
+            GoogleJsonResponseException cause =
+                createJsonResponseException(jsonError, responseHeaders);
             innerExceptions.add(
                 errorExtractor.itemNotFound(cause)
                     ? createFileNotFoundException(bucketName, srcObjectName, cause)
                     : new IOException(
                         String.format(
-                            "Error moving '%s'", StringPaths.fromComponents(bucketName, srcObjectName)),
+                            "Error moving '%s'",
+                            StringPaths.fromComponents(bucketName, srcObjectName)),
                         cause));
           }
         });

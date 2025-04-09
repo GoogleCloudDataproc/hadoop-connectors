@@ -327,8 +327,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
-      throws IOException {
+  public synchronized void move(
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
     throw new IOException("Not implemented");
   }
 

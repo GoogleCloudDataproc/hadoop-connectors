@@ -20,8 +20,6 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
 import com.google.storage.v2.Bucket;
 import com.google.storage.v2.ComposeObjectRequest;
-import com.google.storage.v2.MoveObjectRequest;
-import com.google.storage.v2.Object;
 import com.google.storage.v2.CreateBucketRequest;
 import com.google.storage.v2.DeleteBucketRequest;
 import com.google.storage.v2.DeleteObjectRequest;
@@ -29,6 +27,7 @@ import com.google.storage.v2.GetBucketRequest;
 import com.google.storage.v2.GetObjectRequest;
 import com.google.storage.v2.ListBucketsRequest;
 import com.google.storage.v2.ListBucketsResponse;
+import com.google.storage.v2.MoveObjectRequest;
 import com.google.storage.v2.Object;
 import com.google.storage.v2.RewriteObjectRequest;
 import com.google.storage.v2.RewriteResponse;
@@ -281,6 +280,7 @@ final class MockStorage extends StorageImplBase {
       public void onCompleted() {}
     };
   }
+
   @Override
   public void moveObject(MoveObjectRequest request, StreamObserver<Object> responseObserver) {
     java.lang.Object response = responses.poll();
