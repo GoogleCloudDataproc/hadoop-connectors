@@ -232,6 +232,9 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     config.setBoolean("fs.gs.operation.move.enable", true);
     googleHadoopFileSystem.initialize(initUri, config);
 
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(bucketName);
+
     try {
       GoogleCloudStorageFileSystemIntegrationHelper helper =
           new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem);
