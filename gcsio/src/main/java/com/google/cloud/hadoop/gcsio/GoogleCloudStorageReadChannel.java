@@ -861,7 +861,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
 
     String rangeHeader;
-    if (readOptions.isReadOnlyRequestBytesEnabled() && !gzipEncoded) {
+    if (readOptions.isReadExactRequestedBytesEnabled() && !gzipEncoded) {
       contentChannelPosition = currentPosition;
       contentChannelEnd = contentChannelPosition + bytesToRead;
       rangeHeader = "bytes=" + contentChannelPosition + "-" + (contentChannelEnd - 1);

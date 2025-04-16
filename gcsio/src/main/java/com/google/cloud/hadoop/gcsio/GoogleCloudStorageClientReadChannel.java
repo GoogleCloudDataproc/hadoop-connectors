@@ -414,7 +414,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
           && isFooterRead()
-          && !readOptions.isReadOnlyRequestBytesEnabled()) {
+          && !readOptions.isReadExactRequestedBytesEnabled()) {
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
@@ -437,7 +437,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         }
       }
 
-      if (readOptions.isReadOnlyRequestBytesEnabled()) {
+      if (readOptions.isReadExactRequestedBytesEnabled()) {
         endPosition = startPosition + bytesToRead;
       }
 

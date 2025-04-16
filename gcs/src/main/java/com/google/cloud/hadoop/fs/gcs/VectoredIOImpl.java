@@ -325,7 +325,6 @@ public class VectoredIOImpl implements Closeable {
       public SeekableByteChannel getReadChannel() throws IOException {
         GoogleCloudStorageReadOptions options =
             channelReadOptions(gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-        options.toBuilder().setReadOnlyRequestBytesEnabled(true).build();
         if (fileInfo != null) {
           return gcsFs.open(fileInfo, options);
         }
@@ -346,7 +345,7 @@ public class VectoredIOImpl implements Closeable {
         GoogleCloudStorageReadOptions.Builder builder = readOptions.toBuilder();
         // For single range read we don't want Read channel to adjust around on channel boundaries
         // as channel is used just for one read request.
-        builder.setReadOnlyRequestBytesEnabled(true);
+        builder.setReadExactRequestedBytesEnabled(true);
         return builder.build();
       }
     }

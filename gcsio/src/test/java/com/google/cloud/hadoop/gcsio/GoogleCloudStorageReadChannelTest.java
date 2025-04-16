@@ -323,7 +323,7 @@ public class GoogleCloudStorageReadChannelTest {
         newLazyReadOptionsBuilder()
             .setFadvise(Fadvise.SEQUENTIAL)
             .setMinRangeRequestSize(4)
-            .setReadOnlyRequestBytesEnabled(true)
+            .setReadExactRequestedBytesEnabled(true)
             .build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
