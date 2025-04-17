@@ -20,7 +20,9 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.as
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -32,7 +34,6 @@ import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -213,7 +214,7 @@ public class VectoredIOImplTest {
 
     verify(mockedGcsFs, times(2)).open((FileInfo) any(), any());
 
-    assertThat(readOptionsArgumentCaptor.getValue().getFadvise()).isEqualTo(Fadvise.SEQUENTIAL);
+    assertTrue(readOptionsArgumentCaptor.getValue().isReadExactRequestedBytesEnabled());
     assertThat(fileInfoArgumentCaptor.getValue().getPath()).isEqualTo(fileInfo.getPath());
   }
 
@@ -242,7 +243,13 @@ public class VectoredIOImplTest {
 
     verify(mockedGcsFs, times(1)).open((FileInfo) any(), any());
 
-    assertThat(readOptionsArgumentCaptor.getValue().getFadvise()).isEqualTo(Fadvise.SEQUENTIAL);
+    assertTrue(readOptionsArgumentCaptor.getValue().isReadExactRequestedBytesEnabled());
+    assertFalse(
+        mockedGcsFs
+            .getOptions()
+            .getCloudStorageOptions()
+            .getReadChannelOptions()
+            .isReadExactRequestedBytesEnabled());
     assertThat(fileInfoArgumentCaptor.getValue().getPath()).isEqualTo(fileInfo.getPath());
   }
 

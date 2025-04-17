@@ -407,7 +407,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (gzipEncoded) {
         return 0;
       }
-      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
+      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
+          && isFooterRead()
+          && !readOptions.isReadExactRequestedBytesEnabled()) {
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
@@ -426,6 +428,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
       }
+
+      if (readOptions.isReadExactRequestedBytesEnabled()) {
+        endPosition = startPosition + bytesToRead;
+      }
+
       if (footerContent != null) {
         // If footer is cached open just till footerStart.
         // Remaining content ill be served from cached footer itself.

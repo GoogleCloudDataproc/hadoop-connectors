@@ -238,6 +238,44 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
+  public void read_onlyRequestedRange() throws IOException {
+    int rangeSize = 2;
+    int seekPosition = 0;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] requestedContent = Arrays.copyOfRange(testData, seekPosition, seekPosition + rangeSize);
+
+    MockHttpTransport transport =
+        mockTransport(
+            // Footer prefetch response
+            dataRangeResponse(requestedContent, 0, testData.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .setMinRangeRequestSize(4)
+            .setReadExactRequestedBytesEnabled(true)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    assertThat(requests).isEmpty();
+
+    byte[] readBytes = new byte[rangeSize];
+
+    assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(readBytes.length);
+    assertThat(readChannel.size()).isEqualTo(testData.length);
+    assertThat(readBytes).isEqualTo(requestedContent);
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    assertThat(rangeHeaders).containsExactly("bytes=0-1").inOrder();
+  }
+
+  @Test
   public void read_whenBufferIsEmpty() throws IOException {
     ByteBuffer emptyBuffer = ByteBuffer.wrap(new byte[0]);
 
