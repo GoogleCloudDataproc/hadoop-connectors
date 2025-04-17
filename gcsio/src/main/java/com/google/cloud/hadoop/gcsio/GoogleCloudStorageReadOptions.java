@@ -54,7 +54,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGrpcReadZeroCopyEnabled(true)
         .setGzipEncodingSupportEnabled(false)
         .setInplaceSeekLimit(8 * 1024 * 1024)
-        .setMinRangeRequestSize(2 * 1024 * 1024);
+        .setMinRangeRequestSize(2 * 1024 * 1024)
+        .setReadExactRequestedBytesEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -91,6 +92,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean isGrpcChecksumsEnabled();
+
+  /** See {@link Builder#setReadExactRequestedBytesEnabled}. */
+  public abstract boolean isReadExactRequestedBytesEnabled();
 
   /** See {@link Builder#setGrpcReadTimeout}. */
   public abstract Duration getGrpcReadTimeout();
@@ -189,6 +193,9 @@ public abstract class GoogleCloudStorageReadOptions {
      * them and we're validating them.
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
+    public abstract Builder setReadExactRequestedBytesEnabled(
+        boolean readExactRequestedBytesEnabled);
 
     /** Sets the property to override the default GCS gRPC read stream timeout. */
     public abstract Builder setGrpcReadTimeout(Duration grpcReadTimeout);
