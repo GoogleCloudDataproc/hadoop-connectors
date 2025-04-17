@@ -344,9 +344,8 @@ public class VectoredIOImpl implements Closeable {
           GoogleCloudStorageReadOptions readOptions) {
         GoogleCloudStorageReadOptions.Builder builder = readOptions.toBuilder();
         // For single range read we don't want Read channel to adjust around on channel boundaries
-        // as
-        // channel is used just for one read request.
-        builder.setFadvise(GoogleCloudStorageReadOptions.Fadvise.SEQUENTIAL);
+        // as channel is used just for one read request.
+        builder.setReadExactRequestedBytesEnabled(true);
         return builder.build();
       }
     }
