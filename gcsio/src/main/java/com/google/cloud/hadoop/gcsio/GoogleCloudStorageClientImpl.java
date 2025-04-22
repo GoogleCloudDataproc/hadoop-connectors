@@ -511,6 +511,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             executor,
             innerExceptions,
             srcObject.getBucketName(),
+            srcObject.getGenerationId(),
             srcObject.getObjectName(),
             dstObject.getGenerationId(),
             dstObject.getObjectName());
@@ -529,6 +530,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       BatchExecutor executor,
       KeySetView<IOException, Boolean> innerExceptions,
       String srcBucketName,
+      long srcContentGeneration,
       String srcObjectName,
       long dstContentGeneration,
       String dstObjectName) {
@@ -537,18 +539,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     moveRequestBuilder.setTarget(BlobId.of(srcBucketName, dstObjectName));
 
     List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
+    List<BlobSourceOption> blobSourceOptions = new ArrayList<>();
+
+    if(srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID)
+    {
+      blobSourceOptions.add(BlobSourceOption.generationMatch(srcContentGeneration));
+    }
 
     if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
       blobTargetOptions.add(BlobTargetOption.generationMatch(dstContentGeneration));
     }
 
     if (storageOptions.getEncryptionKey() != null) {
-      moveRequestBuilder.setSourceOptions(
-          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      blobSourceOptions.add(BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
       blobTargetOptions.add(
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
+    moveRequestBuilder.setSourceOptions(blobSourceOptions);
     moveRequestBuilder.setTargetOptions(blobTargetOptions);
 
     executor.queue(
@@ -564,8 +572,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           } catch (StorageException e) {
             GoogleCloudStorageEventBus.postOnException();
             if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
-              innerExceptions.add(
-                  createFileNotFoundException(srcBucketName, srcObjectName, new IOException(e)));
+              // If the item isn't found, treat it the same as if it's not found
+              // in the move case: assume the user wanted to move the object and
+              // if there are no object to move, we cannot move the object.
+              logger.atFiner().log(
+                  "moveInternal(%s): not found:%s", srcObjectName, e.getMessage());
             } else {
               innerExceptions.add(
                   new IOException(

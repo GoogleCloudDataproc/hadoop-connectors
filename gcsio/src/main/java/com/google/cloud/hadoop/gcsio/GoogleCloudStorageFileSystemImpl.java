@@ -617,7 +617,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
       if (this.options.getCloudStorageOptions().isMoveOperationEnabled()
           && srcResourceId.getBucketName().equals(dstResourceId.getBucketName())) {
-        gcs.move(ImmutableMap.of(srcResourceId, dstResourceId));
+        gcs.move(ImmutableMap.of(new StorageResourceId(
+            srcInfo.getItemInfo().getBucketName(),
+            srcInfo.getItemInfo().getObjectName(),
+            srcInfo.getItemInfo().getContentGeneration()), dstResourceId));
       } else {
         gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
 
@@ -777,10 +780,24 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
     if (this.options.getCloudStorageOptions().isMoveOperationEnabled()
         && srcResourceId.getBucketName().equals(dstResourceId.getBucketName())) {
+
       // First, move all items except marker items
       moveInternal(srcToDstItemNames);
       // Finally, move marker items (if any) to mark rename operation success
       moveInternal(srcToDstMarkerItemNames);
+
+      List<FileInfo> bucketToDelete = new ArrayList<>();
+      List<FileInfo> objectToDelete = new ArrayList<>();
+
+      if (srcInfo.getItemInfo().isBucket()) {
+       bucketToDelete.add(srcInfo);
+       deleteBucket(bucketToDelete);
+      } else {
+        // If src is a directory then srcItemInfos does not contain its own name,
+        // we delete item separately in the list.
+        objectToDelete.add(srcInfo);
+        deleteObjects(objectToDelete);
+      }
       return;
     }
 

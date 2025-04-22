@@ -1181,6 +1181,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             batchHelper,
             innerExceptions,
             srcObject.getBucketName(),
+            srcObject.getGenerationId(),
             srcObject.getObjectName(),
             dstObject.getGenerationId(),
             dstObject.getObjectName());
@@ -1314,11 +1315,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       BatchHelper batchHelper,
       ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
       String bucketName,
+      long srcContentGeneration,
       String srcObjectName,
       long dstContentGeneration,
       String dstObjectName)
       throws IOException {
     Storage.Objects.Move move = storage.objects().move(bucketName, srcObjectName, dstObjectName);
+
+    if(srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID)
+    {
+      move.setIfSourceGenerationMatch(srcContentGeneration);
+    }
 
     if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
       move.setIfGenerationMatch(dstContentGeneration);
@@ -1341,14 +1348,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             GoogleCloudStorageEventBus.postOnException();
             GoogleJsonResponseException cause =
                 createJsonResponseException(jsonError, responseHeaders);
-            innerExceptions.add(
-                errorExtractor.itemNotFound(cause)
-                    ? createFileNotFoundException(bucketName, srcObjectName, cause)
-                    : new IOException(
-                        String.format(
-                            "Error moving '%s'",
-                            StringPaths.fromComponents(bucketName, srcObjectName)),
-                        cause));
+
+            if (errorExtractor.itemNotFound(cause)) {
+              // If the item isn't found, treat it the same as if it's not found
+              // in the move case: assume the user wanted to move the object and
+              // if there are no object to move, we cannot move the object.
+              logger.atFiner().log(
+                  "moveInternal(%s): not found:%n%s", srcObjectName, jsonError);
+            } else {
+              innerExceptions.add(
+                  new IOException(String.format(
+                      "Error moving '%s'", StringPaths.fromComponents(bucketName, srcObjectName)), cause));
+            }
           }
         });
   }
