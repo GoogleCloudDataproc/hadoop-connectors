@@ -329,7 +329,68 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public synchronized void move(
       Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
-    throw new IOException("Not implemented");
+    if (sourceToDestinationObjectsMap == null) {
+      throw new IllegalArgumentException("sourceToDestinationObjectsMap must not be null");
+    }
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    // Gather exceptions
+    List<IOException> innerExceptions = new ArrayList<>();
+
+    for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+        sourceToDestinationObjectsMap.entrySet()) {
+      StorageResourceId srcObject = entry.getKey();
+      StorageResourceId dstObject = entry.getValue();
+
+      if (!validateObjectName(srcObject.getObjectName())
+          || !validateObjectName(dstObject.getObjectName())) {
+        innerExceptions.add(
+            new IOException(
+                String.format(
+                    "Invalid object name for move source '%s' or destination '%s'",
+                    srcObject, dstObject)));
+        continue;
+      }
+
+      try {
+        GoogleCloudStorageItemInfo srcInfo = getItemInfo(srcObject);
+        if (!srcInfo.exists()) {
+          // If the source is not found, ignore the error.
+          continue;
+        }
+
+        // Simulate copy part of the move.
+        InMemoryBucketEntry srcBucketEntry = bucketLookup.get(srcObject.getBucketName());
+        InMemoryObjectEntry srcEntry = srcBucketEntry.get(srcObject.getObjectName());
+
+        bucketLookup
+            .get(dstObject.getBucketName())
+            .add(srcEntry.getShallowCopy(dstObject.getBucketName(), dstObject.getObjectName()));
+
+        // Simulate GCS move using copy and delete.
+        if (srcObject.hasGenerationId()) {
+          if (srcInfo.getContentGeneration() != srcObject.getGenerationId()) {
+            innerExceptions.add(
+                new IOException(
+                    String.format(
+                        "Required source generationId '%d' doesn't match existing '%d' for '%s' during delete phase of move",
+                        srcObject.getGenerationId(), srcInfo.getContentGeneration(), srcObject)));
+            // Don't remove the source if generation mismatch
+            continue;
+          }
+        }
+        srcBucketEntry.remove(srcObject.getObjectName());
+      } catch (IOException e) {
+        innerExceptions.add(e);
+      }
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
   }
 
   @Override

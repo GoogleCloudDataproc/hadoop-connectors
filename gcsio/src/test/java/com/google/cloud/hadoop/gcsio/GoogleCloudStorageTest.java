@@ -2041,6 +2041,32 @@ public class GoogleCloudStorageTest {
   }
 
   /**
+   * Test successful operation of GoogleCloudStorage.move(1) even when the source object does not
+   * exist. The operation should silently succeed and does not throw any error.
+   */
+  @Test
+  public void testMoveObjectsSourceNotFound() throws IOException {
+    String srcObject = OBJECT_NAME + "-src-nonexistent";
+    String dstObject = OBJECT_NAME + "-move-dst";
+    StorageResourceId srcId = new StorageResourceId(BUCKET_NAME, srcObject);
+    StorageResourceId dstId = new StorageResourceId(BUCKET_NAME, dstObject);
+
+    MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
+    sourceToDestinationObjectsMap.put(srcId, dstId);
+
+    gcs.move(sourceToDestinationObjectsMap);
+
+    assertThat(trackingRequestInitializerWithoutRetries.getAllRequestStrings())
+        .containsExactly(moveRequestString(BUCKET_NAME, srcObject, dstObject, "moveTo"))
+        .inOrder();
+  }
+
+  /**
    * Test successful operation of GoogleCloudStorage.copy(4) where srcBucketName != dstBucketName.
    */
   @Test

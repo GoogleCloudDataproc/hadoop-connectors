@@ -666,6 +666,46 @@ public class GoogleCloudStorageClientTest {
   }
 
   @Test
+  public void move_withSourceGeneration_succeeds() throws Exception {
+    String destinationObjectName = TEST_OBJECT_NAME + "-move";
+    long sourceGeneration = 999L;
+
+    // Add Mock response for the move operation.
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder()
+            .setName(destinationObjectName)
+            .setGeneration(GENERATION + 1)
+            .setMetageneration(1L)
+            .build());
+
+    StorageResourceId srcResourceIdWithGen =
+        new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME, sourceGeneration);
+    StorageResourceId dstResourceId =
+        new StorageResourceId(TEST_BUCKET_NAME, destinationObjectName);
+
+    Map<StorageResourceId, StorageResourceId> moveMap =
+        ImmutableMap.of(srcResourceIdWithGen, dstResourceId);
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.move(moveMap);
+    }
+
+    assertEquals(mockStorage.getRequests().size(), 1);
+    MoveObjectRequest actualRequest = (MoveObjectRequest) mockStorage.getRequests().get(0);
+
+    assertThat(actualRequest.getDestinationObject()).isEqualTo(destinationObjectName);
+    assertThat(actualRequest.getBucket()).contains(TEST_BUCKET_NAME);
+    assertThat(actualRequest.getSourceObject()).isEqualTo(TEST_OBJECT_NAME);
+    // Assert that source generation condition was set.
+    assertThat(actualRequest.getIfSourceGenerationMatch()).isEqualTo(sourceGeneration);
+    // Assert that destination generation condition was NOT set.
+    assertThat(actualRequest.getIfGenerationMatch()).isEqualTo(0);
+  }
+
+  @Test
   public void deleteBuckets_illegalArguments() throws Exception {
     try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
       GoogleCloudStorage gcs =

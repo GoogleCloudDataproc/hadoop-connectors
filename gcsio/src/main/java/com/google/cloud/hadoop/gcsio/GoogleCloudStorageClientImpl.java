@@ -541,8 +541,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
     List<BlobSourceOption> blobSourceOptions = new ArrayList<>();
 
-    if(srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID)
-    {
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
       blobSourceOptions.add(BlobSourceOption.generationMatch(srcContentGeneration));
     }
 
@@ -551,7 +550,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     if (storageOptions.getEncryptionKey() != null) {
-      blobSourceOptions.add(BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      blobSourceOptions.add(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
       blobTargetOptions.add(
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
@@ -575,8 +575,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               // If the item isn't found, treat it the same as if it's not found
               // in the move case: assume the user wanted to move the object and
               // if there are no object to move, we cannot move the object.
-              logger.atFiner().log(
-                  "moveInternal(%s): not found:%s", srcObjectName, e.getMessage());
+              logger.atFiner().log("moveInternal(%s): not found:%s", srcObjectName, e.getMessage());
             } else {
               innerExceptions.add(
                   new IOException(
