@@ -2257,8 +2257,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Storage.Buckets.GetStorageLayout request =
         initializeRequest(storage.buckets().getStorageLayout(bucketName), bucketName);
     try (ITraceOperation to = TraceOperation.addToExistingTrace("getStorageLayout.HN")) {
-      BucketStorageLayout b = request.execute();
-      boolean result = b.getHierarchicalNamespace().getEnabled();
+      BucketStorageLayout layout = request.execute();
+      boolean result = layout.getHierarchicalNamespace().getEnabled();
 
       logger.atInfo().log("Checking if %s is HN enabled returned %s", src, result);
 
