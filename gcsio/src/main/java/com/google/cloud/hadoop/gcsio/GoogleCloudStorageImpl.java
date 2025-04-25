@@ -46,6 +46,7 @@ import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
+import com.google.api.services.storage.model.BucketStorageLayout;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
@@ -2253,20 +2254,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return isEnabled;
     }
 
-    String prefix = src.getPath().substring(1);
-
-    StorageControlClient storageControlClient = lazyGetStorageControlClient();
-    GetStorageLayoutRequest request =
-        GetStorageLayoutRequest.newBuilder()
-            .setPrefix(prefix)
-            .setName(StorageLayoutName.format("_", bucketName))
-            .build();
-
+    Storage.Buckets.GetStorageLayout request =
+        initializeRequest(storage.buckets().getStorageLayout(bucketName), bucketName);
     try (ITraceOperation to = TraceOperation.addToExistingTrace("getStorageLayout.HN")) {
-      StorageLayout storageLayout = storageControlClient.getStorageLayout(request);
-      boolean result =
-          storageLayout.hasHierarchicalNamespace()
-              && storageLayout.getHierarchicalNamespace().getEnabled();
+      BucketStorageLayout b = request.execute();
+      boolean result = b.getHierarchicalNamespace().getEnabled();
 
       logger.atInfo().log("Checking if %s is HN enabled returned %s", src, result);
 
