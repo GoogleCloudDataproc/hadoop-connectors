@@ -572,10 +572,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           } catch (StorageException e) {
             GoogleCloudStorageEventBus.postOnException();
             if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
-              // If the item isn't found, treat it the same as if it's not found
-              // in the move case: assume the user wanted to move the object and
-              // if there are no object to move, we cannot move the object.
-              logger.atFiner().log("moveInternal(%s): not found:%s", srcObjectName, e.getMessage());
+              innerExceptions.add(
+                  createFileNotFoundException(srcBucketName, srcObjectName, new IOException(e)));
             } else {
               innerExceptions.add(
                   new IOException(

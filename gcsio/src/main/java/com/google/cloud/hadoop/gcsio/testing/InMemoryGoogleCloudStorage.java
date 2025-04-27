@@ -358,7 +358,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       try {
         GoogleCloudStorageItemInfo srcInfo = getItemInfo(srcObject);
         if (!srcInfo.exists()) {
-          // If the source is not found, ignore the error.
+          // If the source is not found, add an error to the list and continue.
+          innerExceptions.add(
+              new IOException(String.format("Source object '%s' not found.", srcObject)));
           continue;
         }
 

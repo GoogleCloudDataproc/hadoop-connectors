@@ -2041,8 +2041,8 @@ public class GoogleCloudStorageTest {
   }
 
   /**
-   * Test successful operation of GoogleCloudStorage.move(1) even when the source object does not
-   * exist. The operation should silently succeed and does not throw any error.
+   * Test GoogleCloudStorage.move(1),throws FILE_NOT_FOUND Exception when the source object does not
+   * exist.
    */
   @Test
   public void testMoveObjectsSourceNotFound() throws IOException {
@@ -2059,11 +2059,7 @@ public class GoogleCloudStorageTest {
     Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
     sourceToDestinationObjectsMap.put(srcId, dstId);
 
-    gcs.move(sourceToDestinationObjectsMap);
-
-    assertThat(trackingRequestInitializerWithoutRetries.getAllRequestStrings())
-        .containsExactly(moveRequestString(BUCKET_NAME, srcObject, dstObject, "moveTo"))
-        .inOrder();
+    assertThrows(FileNotFoundException.class, () -> gcs.move(sourceToDestinationObjectsMap));
   }
 
   /**

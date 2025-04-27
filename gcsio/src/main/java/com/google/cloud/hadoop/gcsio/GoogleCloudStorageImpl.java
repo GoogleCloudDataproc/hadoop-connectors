@@ -1347,20 +1347,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             GoogleCloudStorageEventBus.postOnException();
             GoogleJsonResponseException cause =
                 createJsonResponseException(jsonError, responseHeaders);
-
-            if (errorExtractor.itemNotFound(cause)) {
-              // If the item isn't found, treat it the same as if it's not found
-              // in the move case: assume the user wanted to move the object and
-              // if there are no object to move, we cannot move the object.
-              logger.atFiner().log("moveInternal(%s): not found:%n%s", srcObjectName, jsonError);
-            } else {
-              innerExceptions.add(
-                  new IOException(
-                      String.format(
-                          "Error moving '%s'",
-                          StringPaths.fromComponents(bucketName, srcObjectName)),
-                      cause));
-            }
+            innerExceptions.add(
+                errorExtractor.itemNotFound(cause)
+                    ? createFileNotFoundException(bucketName, srcObjectName, cause)
+                    : new IOException(
+                        String.format(
+                            "Error moving '%s'",
+                            StringPaths.fromComponents(bucketName, srcObjectName)),
+                        cause));
           }
         });
   }

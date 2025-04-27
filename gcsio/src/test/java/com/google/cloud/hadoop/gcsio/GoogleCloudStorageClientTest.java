@@ -547,7 +547,7 @@ public class GoogleCloudStorageClientTest {
   }
 
   @Test
-  public void move_doesNotThrowExceptionOnSourceMissing() throws Exception {
+  public void move_throwsFileNotFoundExceptionOnSourceMissing() throws Exception {
     // Mock the move operation to fail with FILE_NOT_FOUND exception.
     mockStorage.addException(new StatusRuntimeException(Status.NOT_FOUND));
 
@@ -561,7 +561,15 @@ public class GoogleCloudStorageClientTest {
       GoogleCloudStorage gcs =
           mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
 
-      gcs.move(moveMap);
+      FileNotFoundException thrown =
+          assertThrows(FileNotFoundException.class, () -> gcs.move(moveMap));
+      assertThat(thrown)
+          .hasMessageThat()
+          .contains(
+              String.format(
+                  "Item not found: '%s'. Note, it is possible that the live version"
+                      + " is still available but the requested generation is deleted.",
+                  TEST_RESOURCE_ID.toString()));
     }
     // Verify no requests should is sent.
     assertEquals(mockStorage.getRequests().size(), 0);
