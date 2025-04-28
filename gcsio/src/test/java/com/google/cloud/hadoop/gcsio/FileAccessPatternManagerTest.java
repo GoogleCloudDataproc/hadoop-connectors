@@ -86,7 +86,8 @@ public class FileAccessPatternManagerTest {
     lastServedIndex = 10;
     currentPosition = 11;
     readOptions =
-        GoogleCloudStorageReadOptions.DEFAULT.toBuilder()
+        GoogleCloudStorageReadOptions.DEFAULT
+            .toBuilder()
             .setFadvise(Fadvise.AUTO_RANDOM)
             .setFadviseRequestTrackCount(1)
             .build();
@@ -128,7 +129,8 @@ public class FileAccessPatternManagerTest {
   public void testAutoRandomMode() {
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.DEFAULT.toBuilder()
+        GoogleCloudStorageReadOptions.DEFAULT
+            .toBuilder()
             .setFadvise(Fadvise.AUTO_RANDOM)
             .setFadviseRequestTrackCount(3)
             .setInplaceSeekLimit(10)
