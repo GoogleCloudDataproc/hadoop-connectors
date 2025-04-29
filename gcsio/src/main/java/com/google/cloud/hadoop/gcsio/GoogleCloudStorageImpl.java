@@ -1320,17 +1320,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       long dstContentGeneration,
       String dstObjectName)
       throws IOException {
-    Storage.Objects.Move move = storage.objects().move(bucketName, srcObjectName, dstObjectName);
-
-    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      move.setIfSourceGenerationMatch(srcContentGeneration);
-    }
-
-    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      move.setIfGenerationMatch(dstContentGeneration);
-    }
-
-    Storage.Objects.Move moveObject = initializeRequest(move, bucketName);
+    Storage.Objects.Move moveObject =
+        createMoveObjectRequest(
+            bucketName, srcObjectName, dstObjectName, srcContentGeneration, dstContentGeneration);
 
     batchHelper.queue(
         moveObject,
@@ -1357,6 +1349,26 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                         cause));
           }
         });
+  }
+
+  /** Creates a {@link Storage.Objects.Move} request, configured with generation matches. */
+  private Storage.Objects.Move createMoveObjectRequest(
+      String bucketName,
+      String srcObjectName,
+      String dstObjectName,
+      long srcContentGeneration,
+      long dstContentGeneration)
+      throws IOException {
+    Storage.Objects.Move move = storage.objects().move(bucketName, srcObjectName, dstObjectName);
+
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      move.setIfSourceGenerationMatch(srcContentGeneration);
+    }
+
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      move.setIfGenerationMatch(dstContentGeneration);
+    }
+    return initializeRequest(move, bucketName);
   }
 
   /** Processes failed copy requests */

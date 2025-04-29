@@ -789,17 +789,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       // Finally, move marker items (if any) to mark rename operation success
       moveInternal(srcToDstMarkerItemNames);
 
-      List<FileInfo> bucketToDelete = new ArrayList<>();
-      List<FileInfo> objectToDelete = new ArrayList<>();
-
       if (srcInfo.getItemInfo().isBucket()) {
-        bucketToDelete.add(srcInfo);
-        deleteBucket(bucketToDelete);
+        deleteBucket(Collections.singletonList(srcInfo));
       } else {
         // If src is a directory then srcItemInfos does not contain its own name,
         // we delete item separately in the list.
-        objectToDelete.add(srcInfo);
-        deleteObjects(objectToDelete);
+        deleteObjects(Collections.singletonList(srcInfo));
       }
       return;
     }

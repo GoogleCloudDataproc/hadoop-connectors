@@ -535,29 +535,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       long dstContentGeneration,
       String dstObjectName) {
     MoveBlobRequest.Builder moveRequestBuilder =
-        MoveBlobRequest.newBuilder().setSource(BlobId.of(srcBucketName, srcObjectName));
-    moveRequestBuilder.setTarget(BlobId.of(srcBucketName, dstObjectName));
-
-    List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
-    List<BlobSourceOption> blobSourceOptions = new ArrayList<>();
-
-    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      blobSourceOptions.add(BlobSourceOption.generationMatch(srcContentGeneration));
-    }
-
-    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      blobTargetOptions.add(BlobTargetOption.generationMatch(dstContentGeneration));
-    }
-
-    if (storageOptions.getEncryptionKey() != null) {
-      blobSourceOptions.add(
-          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
-      blobTargetOptions.add(
-          BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
-    }
-
-    moveRequestBuilder.setSourceOptions(blobSourceOptions);
-    moveRequestBuilder.setTargetOptions(blobTargetOptions);
+        createMoveRequestBuilder(
+            srcBucketName,
+            srcObjectName,
+            dstObjectName,
+            srcContentGeneration,
+            dstContentGeneration);
 
     executor.queue(
         () -> {
@@ -718,6 +701,42 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
     }
     return bucketInfos;
+  }
+
+  /** Creates a builder for a blob move request. */
+  private MoveBlobRequest.Builder createMoveRequestBuilder(
+      String srcBucketName,
+      String srcObjectName,
+      String dstObjectName,
+      long srcContentGeneration,
+      long dstContentGeneration) {
+
+    MoveBlobRequest.Builder moveRequestBuilder =
+        MoveBlobRequest.newBuilder().setSource(BlobId.of(srcBucketName, srcObjectName));
+    moveRequestBuilder.setTarget(BlobId.of(srcBucketName, dstObjectName));
+
+    List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
+    List<BlobSourceOption> blobSourceOptions = new ArrayList<>();
+
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      blobSourceOptions.add(BlobSourceOption.generationMatch(srcContentGeneration));
+    }
+
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      blobTargetOptions.add(BlobTargetOption.generationMatch(dstContentGeneration));
+    }
+
+    if (storageOptions.getEncryptionKey() != null) {
+      blobSourceOptions.add(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      blobTargetOptions.add(
+          BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+
+    moveRequestBuilder.setSourceOptions(blobSourceOptions);
+    moveRequestBuilder.setTargetOptions(blobTargetOptions);
+
+    return moveRequestBuilder;
   }
 
   /**
