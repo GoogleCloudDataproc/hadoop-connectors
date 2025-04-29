@@ -176,6 +176,14 @@ public abstract class GoogleCloudStorageFileSystemTestBase
     assertThat(tmpGcsFs.getGcs()).isInstanceOf(getGoogleCloudStorageImplClass());
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getRequesterPaysOptions())
         .isEqualTo(RequesterPaysOptions.DEFAULT);
+
+    // Verify constructor return a Performance cache instance when enabled.
+    optionsBuilder.setPerformanceCacheEnabled(true);
+    GoogleCloudStorageFileSystem gcsfsWithCache =
+        new GoogleCloudStorageFileSystemImpl(cred, optionsBuilder.build());
+
+    assertThat(gcsfsWithCache.getGcs()).isInstanceOf(PerformanceCachingGoogleCloudStorage.class);
+    assertThat(gcsfsWithCache.getGcs()).isInstanceOf(PerformanceCachingGoogleCloudStorage.class);
   }
 
   /** Verify that PATH_COMPARATOR produces correct sorting order. */

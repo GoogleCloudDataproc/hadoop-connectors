@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType.STORAGE_CLIENT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -131,20 +132,25 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       throws IOException {
     checkNotNull(options, "options must not be null");
 
-    switch (options.getClientType()) {
-      case STORAGE_CLIENT:
-        return GoogleCloudStorageClientImpl.builder()
-            .setOptions(options.getCloudStorageOptions())
-            .setCredentials(credentials)
-            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .build();
-      default:
-        return GoogleCloudStorageImpl.builder()
-            .setOptions(options.getCloudStorageOptions())
-            .setCredentials(credentials)
-            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .build();
+    GoogleCloudStorage gcs;
+    if (options.getClientType() == STORAGE_CLIENT) {
+      gcs =
+          GoogleCloudStorageClientImpl.builder()
+              .setOptions(options.getCloudStorageOptions())
+              .setCredentials(credentials)
+              .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+              .build();
+    } else {
+      gcs =
+          GoogleCloudStorageImpl.builder()
+              .setOptions(options.getCloudStorageOptions())
+              .setCredentials(credentials)
+              .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+              .build();
     }
+    return options.isPerformanceCacheEnabled()
+        ? new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions())
+        : gcs;
   }
 
   /**
