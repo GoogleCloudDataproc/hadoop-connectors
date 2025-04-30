@@ -39,6 +39,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
@@ -136,11 +137,11 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(readBytes).isEqualTo(new byte[] {testData[1]});
 
     readChannel.position(seekPosition);
-    assertThat(readChannel.randomAccess).isFalse();
+    assertThat(readChannel.randomAccessStatus()).isFalse();
 
     assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(1);
     assertThat(readBytes).isEqualTo(new byte[] {testData[seekPosition]});
-    assertThat(readChannel.randomAccess).isTrue();
+    assertThat(readChannel.randomAccessStatus()).isTrue();
 
     List<String> rangeHeaders =
         requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
@@ -178,16 +179,81 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(readBytes).isEqualTo(new byte[] {testData[seekPosition]});
 
     readChannel.position(0);
-    assertThat(readChannel.randomAccess).isFalse();
+    assertThat(readChannel.randomAccessStatus()).isFalse();
 
     assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(1);
     assertThat(readBytes).isEqualTo(new byte[] {testData[0]});
-    assertThat(readChannel.randomAccess).isTrue();
+    assertThat(readChannel.randomAccessStatus()).isTrue();
 
     List<String> rangeHeaders =
         requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
 
     assertThat(rangeHeaders).containsExactly("bytes=5-", "bytes=0-0").inOrder();
+  }
+
+  @Test
+  public void fadviseAutoRandom_onSequentialRead_switchToSequential() throws IOException {
+    int blockSize = 3;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    List<MockLowLevelHttpResponse> lowLevelHttpResponses = new ArrayList<>();
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.AUTO_RANDOM)
+            .setMinRangeRequestSize(1)
+            .setBlockSize(blockSize)
+            .build();
+
+    int requestLength = (int) options.getMinRangeRequestSize();
+    int rangeStartIndex = 0;
+    for (int i = 0; i <= options.getFadviseRequestTrackCount(); i++) {
+      int rangeEndIndex = rangeStartIndex + requestLength;
+      if (i == options.getFadviseRequestTrackCount()) {
+        rangeEndIndex = rangeStartIndex + blockSize;
+      }
+      MockLowLevelHttpResponse request =
+          dataRangeResponse(
+              Arrays.copyOfRange(testData, rangeStartIndex, rangeEndIndex),
+              rangeStartIndex,
+              testData.length);
+      lowLevelHttpResponses.add(request);
+      rangeStartIndex = rangeEndIndex;
+    }
+
+    MockHttpTransport transport =
+        mockTransport(
+            lowLevelHttpResponses.toArray(
+                new MockLowLevelHttpResponse[lowLevelHttpResponses.size()]));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    byte[] readBytes = new byte[requestLength];
+    rangeStartIndex = 0;
+    for (int i = 0; i <= options.getFadviseRequestTrackCount(); i++) {
+      readChannel.position(rangeStartIndex);
+
+      assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(requestLength);
+      assertThat(readBytes).isEqualTo(new byte[] {testData[rangeStartIndex]});
+      if (i == options.getFadviseRequestTrackCount()) {
+        assertThat(readChannel.randomAccessStatus()).isFalse();
+      } else {
+        assertThat(readChannel.randomAccessStatus()).isTrue();
+      }
+      rangeStartIndex += requestLength;
+    }
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    // bytes=3-5 instead of opening channel till end as in AUTO_RANDOM adapting to sequential read
+    // will result in opening channel till blockSize.
+    assertThat(rangeHeaders)
+        .containsExactly("bytes=0-0", "bytes=1-1", "bytes=2-2", "bytes=3-5")
+        .inOrder();
   }
 
   @Test
