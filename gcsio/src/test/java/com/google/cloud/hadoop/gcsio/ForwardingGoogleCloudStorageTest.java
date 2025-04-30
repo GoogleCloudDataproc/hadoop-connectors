@@ -223,8 +223,7 @@ public class ForwardingGoogleCloudStorageTest {
 
   @Test
   public void testMove() throws IOException {
-    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
-        new HashMap<>(TEST_STRINGS.size());
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
     sourceToDestinationObjectsMap.put(
         new StorageResourceId(TEST_STRING, TEST_STRING),
         new StorageResourceId(TEST_STRING, TEST_STRING));

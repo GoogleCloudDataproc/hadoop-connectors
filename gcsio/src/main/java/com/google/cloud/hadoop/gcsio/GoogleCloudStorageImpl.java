@@ -1344,8 +1344,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                     ? createFileNotFoundException(bucketName, srcObjectName, cause)
                     : new IOException(
                         String.format(
-                            "Error moving '%s'",
-                            StringPaths.fromComponents(bucketName, srcObjectName)),
+                            "Error moving '%s' to '%s'",
+                            StringPaths.fromComponents(bucketName, srcObjectName),
+                            StringPaths.fromComponents(bucketName, dstObjectName)),
                         cause));
           }
         });

@@ -348,10 +348,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       if (!validateObjectName(srcObject.getObjectName())
           || !validateObjectName(dstObject.getObjectName())) {
         innerExceptions.add(
-            new IOException(
-                String.format(
-                    "Invalid object name for move source '%s' or destination '%s'",
-                    srcObject, dstObject)));
+            createFileNotFoundException(
+                srcObject.getBucketName(), srcObject.getObjectName(), /* cause= */ null));
         continue;
       }
 
@@ -372,18 +370,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             .get(dstObject.getBucketName())
             .add(srcEntry.getShallowCopy(dstObject.getBucketName(), dstObject.getObjectName()));
 
-        // Simulate GCS move using copy and delete.
-        if (srcObject.hasGenerationId()) {
-          if (srcInfo.getContentGeneration() != srcObject.getGenerationId()) {
-            innerExceptions.add(
-                new IOException(
-                    String.format(
-                        "Required source generationId '%d' doesn't match existing '%d' for '%s' during delete phase of move",
-                        srcObject.getGenerationId(), srcInfo.getContentGeneration(), srcObject)));
-            // Don't remove the source if generation mismatch
-            continue;
-          }
-        }
+        // simulate delete
         srcBucketEntry.remove(srcObject.getObjectName());
       } catch (IOException e) {
         innerExceptions.add(e);
