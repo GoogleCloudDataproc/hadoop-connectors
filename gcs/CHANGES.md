@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade to use cloud-storage libraries-bom
 
 ## 3.1.1 - 2025-04-07
 1. PR #1323: Fix a bug where gRPC path was failing due to some of the dependencies not getting shaded.
