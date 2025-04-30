@@ -255,9 +255,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           }
           int bytesRead = byteChannel.read(dst);
 
+          /*
+          As we are using the zero copy implementation of byteChannel, it can return even zero bytes,
+          while reading,
+          we should not treat it as an error scenario anymore.
+          */
           if (bytesRead == 0) {
-            throw new IOException(
-                String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
+            logger.atFiner().log(
+                "Read %d from storage-client's byte channel at position: %d with channel ending at: %d for resourceId: %s of size: %d",
+                bytesRead, currentPosition, contentChannelEnd, resourceId, objectSize);
           }
 
           if (bytesRead < 0) {
@@ -537,6 +543,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       try {
         readChannel.seek(seek);
         readChannel.limit(limit);
+        // bypass the storage-client caching layer hence eliminates the need to maintain a copy of
+        // chunk
+        readChannel.setChunkSize(0);
         return readChannel;
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
