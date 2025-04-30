@@ -222,6 +222,13 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.batch.threads", GoogleCloudStorageOptions.DEFAULT.getBatchThreads());
 
   /**
+   * Configuration key for number of request to track for adapting the access pattern i.e. fadvise:
+   * AUTO & AUTO_RANDOM.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_FADVISE_REQUEST_TRACK_COUNT =
+      new HadoopConfigurationProperty<>("fs.gs.fadvise.request.track.count", 3);
+
+  /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
    * has the same effect as Copy request, but it can handle moving large objects that may
    * potentially time out a Copy request.
@@ -698,6 +705,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
