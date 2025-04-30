@@ -659,8 +659,6 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
         .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
         .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
-        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
-        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .build();
   }
 
