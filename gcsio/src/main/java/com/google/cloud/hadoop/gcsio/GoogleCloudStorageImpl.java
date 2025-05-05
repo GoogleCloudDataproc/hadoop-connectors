@@ -1664,7 +1664,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     checkNotNull(listedFolder, "Must provide a non-null container for listedFolder.");
 
     ListFoldersPagedResponse listFolderRespose =
-        storageControlClient.listFolders(listFoldersRequest);
+        lazyGetStorageControlClient().listFolders(listFoldersRequest);
     try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.list")) {
       Iterator<Folder> itemsIterator = listFolderRespose.getPage().getValues().iterator();
       while (itemsIterator.hasNext()) {
@@ -2292,7 +2292,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     try (ITraceOperation to = TraceOperation.addToExistingTrace("renameHnFolder")) {
       logger.atFine().log("Renaming HN folder (%s -> %s)", src, dst);
-      this.storageControlClient.renameFolderOperationCallable().call(request);
+      lazyGetStorageControlClient().renameFolderOperationCallable().call(request);
     } catch (Throwable t) {
       logger.atSevere().withCause(t).log("Renaming %s to %s failed", src, dst);
       throw t;
