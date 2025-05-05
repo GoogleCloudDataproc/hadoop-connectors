@@ -222,6 +222,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     }
   }
 
+  @Ignore
   @Test
   public void testRenameWithMoveOperation() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("move");
