@@ -33,6 +33,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMe
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listBucketsRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.moveRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
@@ -1992,6 +1993,73 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             copyRequestString(BUCKET_NAME, OBJECT_NAME, BUCKET_NAME, dstObject, "copyTo"))
         .inOrder();
+  }
+
+  /** Test argument sanitization for GoogleCloudStorage.move(1). */
+  @Test
+  public void testMoveObjectsIllegalArguments() throws IOException {
+    String b = BUCKET_NAME;
+    String o = OBJECT_NAME;
+
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
+
+    // Failure if src == dst.
+    sourceToDestinationObjectsMap.put(new StorageResourceId(b, o), new StorageResourceId(b, o));
+    assertThrows(IllegalArgumentException.class, () -> gcs.move(sourceToDestinationObjectsMap));
+
+    // Failure if srcBucket != dstBucket.
+    sourceToDestinationObjectsMap.clear();
+    sourceToDestinationObjectsMap.put(
+        new StorageResourceId(b, o), new StorageResourceId("other-bucket", o));
+    assertThrows(
+        UnsupportedOperationException.class, () -> gcs.move(sourceToDestinationObjectsMap));
+  }
+
+  /** Test successful operation of GoogleCloudStorage.move(1). */
+  @Test
+  public void testMoveObjectsOperation() throws IOException {
+    String dstObject = OBJECT_NAME + "-move";
+    StorageObject object = newStorageObject(BUCKET_NAME, dstObject);
+    MockHttpTransport transport =
+        mockTransport(jsonDataResponse(new Objects().setItems(ImmutableList.of(object))));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
+    sourceToDestinationObjectsMap.put(
+        new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        new StorageResourceId(BUCKET_NAME, dstObject));
+
+    gcs.move(sourceToDestinationObjectsMap);
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(moveRequestString(BUCKET_NAME, OBJECT_NAME, dstObject, "moveTo"))
+        .inOrder();
+  }
+
+  /**
+   * Test GoogleCloudStorage.move(1),throws FILE_NOT_FOUND Exception when the source object does not
+   * exist.
+   */
+  @Test
+  public void testMoveObjectsSourceNotFound() throws IOException {
+    String srcObject = OBJECT_NAME + "-src-nonexistent";
+    String dstObject = OBJECT_NAME + "-move-dst";
+    StorageResourceId srcId = new StorageResourceId(BUCKET_NAME, srcObject);
+    StorageResourceId dstId = new StorageResourceId(BUCKET_NAME, dstObject);
+
+    MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
+    sourceToDestinationObjectsMap.put(srcId, dstId);
+
+    assertThrows(FileNotFoundException.class, () -> gcs.move(sourceToDestinationObjectsMap));
   }
 
   /**

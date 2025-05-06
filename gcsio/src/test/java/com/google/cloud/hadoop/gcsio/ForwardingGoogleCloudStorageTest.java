@@ -25,7 +25,9 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -217,6 +219,17 @@ public class ForwardingGoogleCloudStorageTest {
 
     verify(mockGcsDelegate)
         .copy(eq(TEST_STRING), eq(TEST_STRINGS), eq(TEST_STRING), eq(TEST_STRINGS));
+  }
+
+  @Test
+  public void testMove() throws IOException {
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
+    sourceToDestinationObjectsMap.put(
+        new StorageResourceId(TEST_STRING, TEST_STRING),
+        new StorageResourceId(TEST_STRING, TEST_STRING));
+    gcs.move(sourceToDestinationObjectsMap);
+
+    verify(mockGcsDelegate).move(eq(sourceToDestinationObjectsMap));
   }
 
   @Test
