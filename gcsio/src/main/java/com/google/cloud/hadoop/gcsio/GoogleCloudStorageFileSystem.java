@@ -60,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -758,15 +759,26 @@ public class GoogleCloudStorageFileSystem {
           StorageResourceId.fromUriPath(
               dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
 
-      gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
+      if (this.options.getCloudStorageOptions().isMoveOperationEnabled()
+          && srcResourceId.getBucketName().equals(dstResourceId.getBucketName())) {
+        gcs.move(
+            ImmutableMap.of(
+                new StorageResourceId(
+                    srcInfo.getItemInfo().getBucketName(),
+                    srcInfo.getItemInfo().getObjectName(),
+                    srcInfo.getItemInfo().getContentGeneration()),
+                dstResourceId));
+      } else{
+          gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
 
-      gcs.deleteObjects(
-          ImmutableList.of(
-              new StorageResourceId(
-                  srcInfo.getItemInfo().getBucketName(),
-                  srcInfo.getItemInfo().getObjectName(),
-                  srcInfo.getItemInfo().getContentGeneration())));
-    }
+          gcs.deleteObjects(
+              ImmutableList.of(
+                  new StorageResourceId(
+                      srcInfo.getItemInfo().getBucketName(),
+                      srcInfo.getItemInfo().getObjectName(),
+                      srcInfo.getItemInfo().getContentGeneration())));
+        }
+      }
 
     repairImplicitDirectory(srcParentInfoFuture);
   }
@@ -942,6 +954,31 @@ public class GoogleCloudStorageFileSystem {
         mkdir(dst);
       }
 
+      StorageResourceId srcResourceId =
+          StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
+      StorageResourceId dstResourceId =
+          StorageResourceId.fromUriPath(
+              dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
+      if (this.options.getCloudStorageOptions().isMoveOperationEnabled()
+          && srcResourceId.getBucketName().equals(dstResourceId.getBucketName())) {
+
+        // First, move all items except marker items
+        moveInternal(srcToDstItemNames);
+        // Finally, move marker items (if any) to mark rename operation success
+        moveInternal(srcToDstMarkerItemNames);
+
+        coopLockOp.ifPresent(CoopLockOperationRename::checkpoint);
+
+        if (srcInfo.getItemInfo().isBucket()) {
+          deleteBucket(Collections.singletonList(srcInfo));
+        } else {
+          // If src is a directory then srcItemInfos does not contain its own name,
+          // we delete item separately in the list.
+          deleteObjects(Collections.singletonList(srcInfo));
+        }
+        return;
+      }
+
       // First, copy all items except marker items
       copyInternal(srcToDstItemNames);
       // Finally, copy marker items (if any) to mark rename operation success
@@ -998,6 +1035,27 @@ public class GoogleCloudStorageFileSystem {
 
     // Perform copy.
     gcs.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+  }
+
+  /** Moves items in given map that maps source items to destination items. */
+  private void moveInternal(Map<FileInfo, URI> srcToDstItemNames) throws IOException {
+    if (srcToDstItemNames.isEmpty()) {
+      return;
+    }
+
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
+
+    // Prepare list of items to move.
+    for (Map.Entry<FileInfo, URI> srcToDstItemName : srcToDstItemNames.entrySet()) {
+      StorageResourceId srcResourceId = srcToDstItemName.getKey().getItemInfo().getResourceId();
+
+      StorageResourceId dstResourceId =
+          StorageResourceId.fromUriPath(srcToDstItemName.getValue(), true);
+      sourceToDestinationObjectsMap.put(srcResourceId, dstResourceId);
+    }
+
+    // Perform move.
+    gcs.move(sourceToDestinationObjectsMap);
   }
 
   /**
