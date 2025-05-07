@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 3.0.7 - 2025-05-06
 1. Optimize channel creation in vectoredRead
 1. Update GhfsThreadLocalStats with read vectored metrices
 
