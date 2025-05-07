@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+1. Optimize channel creation in vectoredRead
+1. Update GhfsThreadLocalStats with read vectored metrices
 
 ## 3.0.6 - 2025-04-02
 1. Add AUTO_RANDOM as new fadvise mode.
