@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.2 - 2025-05-06
 1. Upgrade to use cloud-storage libraries-bom
 1. Add AUTO_RANDOM as new fadvise mode.
 
