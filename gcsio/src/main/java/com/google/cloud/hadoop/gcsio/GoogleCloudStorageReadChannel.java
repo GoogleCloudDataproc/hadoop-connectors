@@ -1165,8 +1165,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   /**
    * Throws an IOException if precondition is false.
    *
-   * <p>This method should be used in place of Preconditions.checkState in cases where the
-   * the operation by catching IOException.
+   * <p>This method should be used in place of Preconditions.checkState in cases where the the
+   * operation by catching IOException.
    */
   private void checkIOPrecondition(boolean precondition, String errorMessage) throws IOException {
     if (!precondition) {
