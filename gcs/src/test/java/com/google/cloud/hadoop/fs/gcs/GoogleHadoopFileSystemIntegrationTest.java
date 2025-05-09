@@ -222,8 +222,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     }
   }
 
-  // TODO: Enable the integration tests after move is enabled for the cloud project.
-  @Ignore
   @Test
   public void testRenameWithMoveOperation() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("move");

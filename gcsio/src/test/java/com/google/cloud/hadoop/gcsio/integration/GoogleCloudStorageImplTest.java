@@ -204,8 +204,6 @@ public class GoogleCloudStorageImplTest {
     trackingGcs.delegate.close();
   }
 
-  // TODO: Enable the integration tests after move is enabled for the cloud project.
-  @Ignore
   @Test
   public void moveObject_successful() throws IOException {
     int expectedSize = 5 * 1024 * 1024;
@@ -252,8 +250,6 @@ public class GoogleCloudStorageImplTest {
     trackingGcs.delegate.close();
   }
 
-  // TODO: Enable the integration tests after move is enabled for the cloud project.
-  @Ignore
   @Test
   public void moveObject_sourceAndDestinationSame_throwsError() throws IOException {
     StorageResourceId resourceId =
@@ -279,8 +275,6 @@ public class GoogleCloudStorageImplTest {
     trackingGcs.delegate.close();
   }
 
-  // TODO: Enable the integration tests after move is enabled for the cloud project.
-  @Ignore
   @Test
   public void moveObject_differentBuckets_throwsError() throws IOException {
     StorageResourceId srcResourceId =
@@ -309,8 +303,6 @@ public class GoogleCloudStorageImplTest {
     trackingGcs.delegate.close();
   }
 
-  // TODO: Enable the integration tests after move is enabled for the cloud project.
-  @Ignore
   @Test
   public void moveObject_sourceNotFound_throwsError() throws IOException {
     StorageResourceId srcResourceId =
