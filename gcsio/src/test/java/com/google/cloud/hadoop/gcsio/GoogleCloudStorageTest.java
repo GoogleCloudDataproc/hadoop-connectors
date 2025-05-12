@@ -61,6 +61,8 @@ import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
+import com.google.api.services.storage.model.BucketStorageLayout;
+import com.google.api.services.storage.model.BucketStorageLayout.HierarchicalNamespace;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
@@ -84,6 +86,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
@@ -2238,6 +2241,38 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(listBucketsRequestString(PROJECT_ID))
         .inOrder();
+  }
+
+  /** Test for GoogleCloudStorage.isHnBucket(1). */
+  @Test
+  public void testIsHnBucket_enabled() throws Exception {
+    BucketStorageLayout layout =
+        new BucketStorageLayout()
+            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(true));
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    URI bucketUri = new URI("gs://hns-enabled-bucket");
+    boolean result = gcs.isHnBucket(bucketUri);
+
+    assertThat(result).isTrue();
+  }
+
+  /** Test for GoogleCloudStorage.isHnBucket(1). */
+  @Test
+  public void testIsHnBucket_disabled() throws Exception {
+    BucketStorageLayout layout =
+        new BucketStorageLayout()
+            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(false));
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    URI bucketUri = new URI("gs://hns-disabled-bucket");
+    boolean result = gcs.isHnBucket(bucketUri);
+
+    assertThat(result).isFalse();
   }
 
   @Test
