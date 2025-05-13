@@ -32,6 +32,7 @@ import com.google.common.hash.Hashing;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,6 +66,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
   // Sample bucket names.
   private static final String BUCKET_A = "alpha";
   private static final String BUCKET_B = "alph";
+  private static final String BUCKET_C = "charlie";
 
   // Sample object names.
   private static final String PREFIX_A = "bar";
@@ -75,6 +77,9 @@ public class PerformanceCachingGoogleCloudStorageTest {
   /* Sample bucket item info. */
   private static final GoogleCloudStorageItemInfo ITEM_A = createBucketItemInfo(BUCKET_A);
   private static final GoogleCloudStorageItemInfo ITEM_B = createBucketItemInfo(BUCKET_B);
+
+  private static final GoogleCloudStorageItemInfo ITEM_C_A_DEST =
+      createObjectItemInfo(BUCKET_C, PREFIX_A);
 
   /* Sample item info. */
   private static final GoogleCloudStorageItemInfo ITEM_A_A =
@@ -118,6 +123,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
     // Prepare the delegate.
     gcsDelegate.createBucket(BUCKET_A, CREATE_BUCKET_OPTIONS);
     gcsDelegate.createBucket(BUCKET_B, CREATE_BUCKET_OPTIONS);
+
     gcsDelegate.createEmptyObject(ITEM_A_A.getResourceId(), CREATE_OBJECT_OPTIONS);
     gcsDelegate.createEmptyObject(ITEM_A_AA.getResourceId(), CREATE_OBJECT_OPTIONS);
     gcsDelegate.createEmptyObject(ITEM_A_ABA.getResourceId(), CREATE_OBJECT_OPTIONS);
@@ -158,6 +164,31 @@ public class PerformanceCachingGoogleCloudStorageTest {
     verify(gcsDelegate).deleteObjects(eq(ids));
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactly(ITEM_B_B);
+  }
+
+  @Test
+  public void testMove_invalidatesSourceAndNotDestinationInCache_simple() throws IOException {
+    gcsDelegate.createBucket(BUCKET_C, CREATE_BUCKET_OPTIONS);
+
+    StorageResourceId sourceId = ITEM_A_A.getResourceId();
+    StorageResourceId destinationId = ITEM_C_A_DEST.getResourceId();
+
+    Map<StorageResourceId, StorageResourceId> moveMap = ImmutableMap.of(sourceId, destinationId);
+
+    // Prepare the cache.
+    cache.putItem(ITEM_A_A);
+    assertThat(cache.getItem(sourceId)).isEqualTo(ITEM_A_A);
+    assertThat(cache.getItem(destinationId)).isNull();
+
+    // Call the move operation on the caching GCS instance
+    gcs.move(moveMap);
+
+    // Verify the delegate's move method was called
+    verify(gcsDelegate).move(eq(moveMap));
+    // Verify the source item is removed from the cache
+    assertThat(cache.getItem(sourceId)).isNull();
+    // Verify the destination item was NOT added to the cache by the move operation itself
+    assertThat(cache.getItem(destinationId)).isNull();
   }
 
   @Test

@@ -339,8 +339,10 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       if (!validateObjectName(srcObject.getObjectName())
           || !validateObjectName(dstObject.getObjectName())) {
         innerExceptions.add(
-            createFileNotFoundException(
-                srcObject.getBucketName(), srcObject.getObjectName(), /* cause= */ null));
+            new IOException(
+                String.format(
+                    "Invalid object name for move source '%s' or destination '%s'",
+                    srcObject, dstObject)));
         continue;
       }
 
@@ -349,7 +351,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         if (!srcInfo.exists()) {
           // If the source is not found, add an error to the list and continue.
           innerExceptions.add(
-              new IOException(String.format("Source object '%s' not found.", srcObject)));
+              createFileNotFoundException(
+                  srcObject.getBucketName(), srcObject.getObjectName(), /* cause= */ null));
           continue;
         }
 
@@ -369,7 +372,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     }
 
     if (!innerExceptions.isEmpty()) {
-      GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
   }
 

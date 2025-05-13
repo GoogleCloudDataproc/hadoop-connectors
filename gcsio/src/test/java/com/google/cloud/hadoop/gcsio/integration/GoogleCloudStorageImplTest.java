@@ -27,6 +27,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
@@ -44,6 +45,7 @@ import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -205,6 +207,176 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void moveObject_successful() throws IOException {
+    int expectedSize = 5 * 1024 * 1024;
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src.txt");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_dst.txt");
+
+    // Create source object
+    writeObject(helperGcs, srcResourceId, expectedSize, 1);
+    GoogleCloudStorageItemInfo srcInfoBeforeMove = helperGcs.getItemInfo(srcResourceId);
+    assertThat(srcInfoBeforeMove.exists()).isTrue();
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    // Perform move
+    trackingGcs.delegate.move(ImmutableMap.of(srcResourceId, dstResourceId));
+
+    // Assertions
+    GoogleCloudStorageItemInfo srcInfoAfterMove = helperGcs.getItemInfo(srcResourceId);
+    GoogleCloudStorageItemInfo dstInfoAfterMove = helperGcs.getItemInfo(dstResourceId);
+
+    assertThat(srcInfoAfterMove.exists()).isFalse();
+    assertThat(dstInfoAfterMove.exists()).isTrue();
+    assertThat(dstInfoAfterMove.getSize()).isEqualTo(expectedSize);
+
+    // Assert requests
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
+    if (testStorageClientImpl) {
+      assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings()).isNotEmpty();
+    } else {
+      assertThat(trackingGcs.getAllRequestStrings())
+          .containsExactly(
+              TrackingHttpRequestInitializer.moveRequestString(
+                  testBucket,
+                  srcResourceId.getObjectName(),
+                  dstResourceId.getObjectName(),
+                  "moveTo"))
+          .inOrder();
+    }
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void moveObject_sourceAndDestinationSame_throwsError() throws IOException {
+    StorageResourceId resourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_samesrcdst.txt");
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> trackingGcs.delegate.move(ImmutableMap.of(resourceId, resourceId)));
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .contains(
+            String.format("Move destination must be different from source for %s", resourceId));
+
+    assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
+    if (testStorageClientImpl) {
+      assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings()).isEmpty();
+    }
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void moveObject_differentBuckets_throwsError() throws IOException {
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src_diffbuckets.txt");
+    // Create a unique name for the other bucket to avoid conflicts if it were created.
+    String otherBucketName = bucketHelper.getUniqueBucketName("gcsio-other-move-bucket");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(otherBucketName, name.getMethodName() + "_dst_diffbuckets.txt");
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    UnsupportedOperationException thrown =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () -> trackingGcs.delegate.move(ImmutableMap.of(srcResourceId, dstResourceId)));
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .contains("This operation is not supported across two different buckets.");
+
+    assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
+    if (testStorageClientImpl) {
+      assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings()).isEmpty();
+    }
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void moveObject_sourceNotFound_throwsError() throws IOException {
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src_notfound.txt");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_dst_for_notfound.txt");
+
+    // Source object is not created.
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    IOException thrown =
+        assertThrows(
+            IOException.class,
+            () -> trackingGcs.delegate.move(ImmutableMap.of(srcResourceId, dstResourceId)));
+
+    assertThat(thrown).isInstanceOf(java.io.FileNotFoundException.class);
+    assertThat(thrown)
+        .hasMessageThat()
+        .contains("Item not found: '" + srcResourceId.toString() + "'");
+
+    if (testStorageClientImpl) {
+      Throwable cause = thrown.getCause().getCause();
+      assertThat(cause).isInstanceOf(StorageException.class);
+
+      List<String> grpcRequests = trackingGcs.grpcRequestInterceptor.getAllRequestStrings();
+      assertThat(grpcRequests).isNotEmpty();
+      assertThat(grpcRequests.toString()).contains("MoveObject");
+
+      assertThat(((StorageException) cause).getCode()).isEqualTo(404);
+    } else {
+      Throwable cause = thrown.getCause();
+      assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
+      GoogleJsonResponseException gjre = (GoogleJsonResponseException) cause;
+      assertThat(gjre.getStatusCode()).isEqualTo(404);
+
+      assertThat(trackingGcs.getAllRequestStrings())
+          .containsExactly(
+              TrackingHttpRequestInitializer.moveRequestString(
+                  testBucket,
+                  srcResourceId.getObjectName(),
+                  dstResourceId.getObjectName(),
+                  "moveTo"));
+    }
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void open_withItemInfo() throws IOException {
+    int expectedSize = 5 * 1024 * 1024;
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
+    writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    GoogleCloudStorageItemInfo itemInfo = helperGcs.getItemInfo(resourceId);
+
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(itemInfo)) {
+      assertThat(readChannel.size()).isEqualTo(expectedSize);
+    }
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
+    assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+>>>>>>> 95f39f57 ([Follow-ups] Add integration tests for gcsio layer and add move support in PerformanceCachingGoogleCloudStorage (#1342))
   public void writeLargeObject_withSmallUploadChunk() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
