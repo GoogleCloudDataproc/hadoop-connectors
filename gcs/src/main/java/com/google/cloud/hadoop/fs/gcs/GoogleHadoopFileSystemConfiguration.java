@@ -488,9 +488,8 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.operation.tracelog.enable", GoogleCloudStorageOptions.DEFAULT.isTraceLogEnabled());
 
   /** Configuration key to export logs to Google cloud logging. */
-    public static final HadoopConfigurationProperty<Boolean> GCS_CLOUD_LOGGING_ENABLE =
-        new HadoopConfigurationProperty<>(
-            "fs.gs.cloud.logging.enable", false);
+  public static final HadoopConfigurationProperty<Boolean> GCS_CLOUD_LOGGING_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.cloud.logging.enable", false);
 
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
