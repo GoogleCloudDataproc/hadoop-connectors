@@ -1133,6 +1133,99 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testMoveSingleItem_withMove() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId srcResourceId =
+        new StorageResourceId(bucketName, "testMoveSingleItem_srcFile.txt");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(bucketName, "testMoveSingleItem_dstFile.txt");
+
+    rawStorage.deleteObjects(ImmutableList.of(srcResourceId, dstResourceId));
+
+    assertThat(rawStorage.getItemInfo(srcResourceId).exists()).isFalse();
+    assertThat(rawStorage.getItemInfo(dstResourceId).exists()).isFalse();
+
+    byte[] objectContent = writeObject(rawStorage, srcResourceId, /* objectSize= */ 4096);
+    assertThat(rawStorage.getItemInfo(srcResourceId).exists()).isTrue();
+
+    rawStorage.move(ImmutableMap.of(srcResourceId, dstResourceId));
+
+    // Verify source no longer exists
+    GoogleCloudStorageItemInfo srcInfo = rawStorage.getItemInfo(srcResourceId);
+    assertWithMessage("Source object %s should not exist after move", srcResourceId)
+        .that(srcInfo.exists())
+        .isFalse();
+
+    // Verify destination exists and has the correct content
+    GoogleCloudStorageItemInfo dstInfo = rawStorage.getItemInfo(dstResourceId);
+    assertWithMessage("Destination object %s should exist after move", dstResourceId)
+        .that(dstInfo.exists())
+        .isTrue();
+    assertObjectContent(rawStorage, dstResourceId, objectContent);
+  }
+
+  @Test
+  public void testMoveMultipleItems() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId src1 = new StorageResourceId(bucketName, "testMoveMultipleItems_src1.txt");
+    StorageResourceId dst1 = new StorageResourceId(bucketName, "testMoveMultipleItems_dst1.txt");
+    StorageResourceId src2 = new StorageResourceId(bucketName, "testMoveMultipleItems_src2.dat");
+    StorageResourceId dst2 = new StorageResourceId(bucketName, "testMoveMultipleItems_dst2.dat");
+    StorageResourceId src3 =
+        new StorageResourceId(bucketName, "testMoveMultipleItems_src3/sub.txt");
+    StorageResourceId dst3 =
+        new StorageResourceId(bucketName, "testMoveMultipleItems_dst3/sub_moved.txt");
+
+    rawStorage.deleteObjects(ImmutableList.of(src1, dst1, src2, dst2, src3, dst3));
+
+    byte[] content1 = writeObject(rawStorage, src1, 100);
+    byte[] content2 = writeObject(rawStorage, src2, 200);
+    byte[] content3 = writeObject(rawStorage, src3, 300);
+
+    Map<StorageResourceId, StorageResourceId> moveMap =
+        ImmutableMap.of(
+            src1, dst1,
+            src2, dst2,
+            src3, dst3);
+
+    rawStorage.move(moveMap);
+
+    // Verify sources are deleted and destinations exist with correct content
+    assertThat(rawStorage.getItemInfo(src1).exists()).isFalse();
+    assertObjectContent(rawStorage, dst1, content1);
+    assertThat(rawStorage.getItemInfo(dst1).getSize()).isEqualTo(content1.length);
+
+    assertThat(rawStorage.getItemInfo(src2).exists()).isFalse();
+    assertObjectContent(rawStorage, dst2, content2);
+    assertThat(rawStorage.getItemInfo(dst2).getSize()).isEqualTo(content2.length);
+
+    assertThat(rawStorage.getItemInfo(src3).exists()).isFalse();
+    assertObjectContent(rawStorage, dst3, content3);
+    assertThat(rawStorage.getItemInfo(dst3).getSize()).isEqualTo(content3.length);
+  }
+
+  @Test
+  public void testMove_sourceNotExists_throwsFileNotFound() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId nonExistentSource =
+        new StorageResourceId(bucketName, "nonExistentSourceForMove.txt");
+    StorageResourceId destination =
+        new StorageResourceId(bucketName, "destinationForNonExistentMove.txt");
+
+    // Verify source doesn't exist
+    rawStorage.deleteObjects(ImmutableList.of(nonExistentSource, destination));
+    assertThat(rawStorage.getItemInfo(nonExistentSource).exists()).isFalse();
+
+    Map<StorageResourceId, StorageResourceId> moveMap =
+        ImmutableMap.of(nonExistentSource, destination);
+
+    // Verify FileNotFound Exception thrown
+    assertThrows(FileNotFoundException.class, () -> rawStorage.move(moveMap));
+  }
+
+  @Test
   public void testOpen() throws IOException {
     String bucketName = getSharedBucketName();
 
@@ -1515,7 +1608,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testMoveSingleItem() throws IOException {
+  public void testMoveSingleItem_withCopyDelete() throws IOException {
     String bucketName = getSharedBucketName();
 
     StorageResourceId srcResourceId = new StorageResourceId(bucketName, "testMoveSingleItem_src");
