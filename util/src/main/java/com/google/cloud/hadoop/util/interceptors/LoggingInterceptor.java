@@ -13,9 +13,11 @@ import java.util.logging.LogRecord;
 public class LoggingInterceptor extends Handler {
 
   private final Logging cloudLogging;
+  private final String logNameSuffix;
 
-  public LoggingInterceptor() {
+  public LoggingInterceptor(String logNameSuffix) {
     this.cloudLogging = createLoggingService();
+    this.logNameSuffix = logNameSuffix;
   }
 
   protected Logging createLoggingService() {
@@ -27,14 +29,12 @@ public class LoggingInterceptor extends Handler {
     if (!isLoggable(record)) {
       return;
     }
-    // TODO: Add support for structured logging and configurable names
-    String logName = "gcs-connector";
-    String message = record.getMessage();
-    Severity severity = mapToCloudSeverity(record.getLevel());
+    String logNamePrefix = "gcs-connector";
+    String logName = logNamePrefix + (logNameSuffix != null ? "-" + logNameSuffix : "");
 
     LogEntry entry =
-        LogEntry.newBuilder(StringPayload.of(message))
-            .setSeverity(severity)
+        LogEntry.newBuilder(StringPayload.of(record.getMessage()))
+            .setSeverity(mapToCloudSeverity(record.getLevel()))
             .setLogName(logName)
             .build();
 
