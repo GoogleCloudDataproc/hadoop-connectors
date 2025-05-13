@@ -30,7 +30,7 @@ public class LoggingInterceptor extends Handler {
       return;
     }
     String logNamePrefix = "gcs-connector";
-    String logName = logNamePrefix + (logNameSuffix != null ? "-" + logNameSuffix : "");
+    String logName = String.join("-", logNamePrefix, logNameSuffix).replaceAll("-$", "");
 
     LogEntry entry =
         LogEntry.newBuilder(StringPayload.of(record.getMessage()))
