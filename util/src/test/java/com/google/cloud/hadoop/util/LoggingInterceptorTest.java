@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.util;
 
 import static org.mockito.Mockito.*;
 
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.util.interceptors.LoggingInterceptor;
 import com.google.cloud.logging.LogEntry;
 import com.google.cloud.logging.Logging;
@@ -22,9 +23,9 @@ public class LoggingInterceptorTest {
   public void setUp() {
     mockLogging = mock(Logging.class);
     loggingInterceptor =
-        new LoggingInterceptor(null) {
+        new LoggingInterceptor(GoogleCredentials.newBuilder().build(), "") {
           @Override
-          protected Logging createLoggingService() {
+          protected Logging createLoggingService(GoogleCredentials credentials) {
             return mockLogging;
           }
         };
@@ -47,9 +48,9 @@ public class LoggingInterceptorTest {
   @Test
   public void publishesLogEntryWithSuffixedLogName() {
     LoggingInterceptor customloggingInterceptor =
-        new LoggingInterceptor("suffix") {
+        new LoggingInterceptor(GoogleCredentials.newBuilder().build(), "suffix") {
           @Override
-          protected Logging createLoggingService() {
+          protected Logging createLoggingService(GoogleCredentials credentials) {
             return mockLogging;
           }
         };
@@ -69,14 +70,14 @@ public class LoggingInterceptorTest {
   @Test
   public void doesNotPublishNonLoggableRecord() {
     LoggingInterceptor nonLoggableInterceptor =
-        new LoggingInterceptor(null) {
+        new LoggingInterceptor(GoogleCredentials.newBuilder().build(), "") {
           @Override
           public boolean isLoggable(LogRecord record) {
             return false; // Force isLoggable() to return false
           }
 
           @Override
-          protected Logging createLoggingService() {
+          protected Logging createLoggingService(GoogleCredentials credentials) {
             return mockLogging;
           }
         };

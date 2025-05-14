@@ -280,6 +280,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public void initialize(URI path, Configuration config) throws IOException {
+    logger.atFiner().log("initialize(path: %s, config: %s)", path, config);
+
     checkArgument(path != null, "path must not be null");
     checkArgument(config != null, "config must not be null");
     checkArgument(path.getScheme() != null, "scheme of path must not be null");
@@ -297,14 +299,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     setConf(config);
 
     if (GCS_CLOUD_LOGGING_ENABLE.get(getConf(), getConf()::getBoolean)) {
-      String suffix = GCS_APPLICATION_NAME_SUFFIX.get(getConf(), getConf()::get);
-      LoggingInterceptor loggingInterceptor = new LoggingInterceptor(suffix);
-      // Add the LoggingInterceptor to the root logger
-      Logger rootLogger = Logger.getLogger("");
-      rootLogger.addHandler(loggingInterceptor);
+      initializeCloudLogger(config);
     }
 
-    logger.atFiner().log("initialize(path: %s, config: %s)", path, config);
     globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
@@ -426,6 +423,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private void initializeGcsFs(GoogleCloudStorageFileSystem gcsFs) {
     gcsFsSupplier = Suppliers.ofInstance(gcsFs);
     gcsFsInitialized = true;
+  }
+
+  private void initializeCloudLogger(Configuration config) throws IOException {
+    GoogleCredentials credentials = getCredentials(config);
+    String suffix = GCS_APPLICATION_NAME_SUFFIX.get(getConf(), getConf()::get);
+    LoggingInterceptor loggingInterceptor = new LoggingInterceptor(credentials, suffix);
+    // Add the LoggingInterceptor to the root logger
+    Logger rootLogger = Logger.getLogger("");
+    rootLogger.addHandler(loggingInterceptor);
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {

@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.util.interceptors;
 
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.logging.LogEntry;
 import com.google.cloud.logging.Logging;
 import com.google.cloud.logging.LoggingOptions;
@@ -15,13 +16,13 @@ public class LoggingInterceptor extends Handler {
   private final Logging cloudLogging;
   private final String logNameSuffix;
 
-  public LoggingInterceptor(String logNameSuffix) {
-    this.cloudLogging = createLoggingService();
+  public LoggingInterceptor(GoogleCredentials credentials, String logNameSuffix) {
+    this.cloudLogging = createLoggingService(credentials);
     this.logNameSuffix = logNameSuffix;
   }
 
-  protected Logging createLoggingService() {
-    return LoggingOptions.getDefaultInstance().getService();
+  protected Logging createLoggingService(GoogleCredentials credentials) {
+    return LoggingOptions.newBuilder().setCredentials(credentials).build().getService();
   }
 
   @Override
@@ -36,6 +37,8 @@ public class LoggingInterceptor extends Handler {
         LogEntry.newBuilder(StringPayload.of(record.getMessage()))
             .setSeverity(mapToCloudSeverity(record.getLevel()))
             .setLogName(logName)
+            .addLabel("class", record.getSourceClassName())
+            .addLabel("method", record.getSourceMethodName())
             .build();
 
     cloudLogging.write(Collections.singleton(entry));
