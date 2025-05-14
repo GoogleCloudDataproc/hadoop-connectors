@@ -327,6 +327,62 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public synchronized void move(
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
+    if (sourceToDestinationObjectsMap == null) {
+      throw new IllegalArgumentException("sourceToDestinationObjectsMap must not be null");
+    }
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    // Gather exceptions
+    List<IOException> innerExceptions = new ArrayList<>();
+
+    for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+        sourceToDestinationObjectsMap.entrySet()) {
+      StorageResourceId srcObject = entry.getKey();
+      StorageResourceId dstObject = entry.getValue();
+
+      if (!validateObjectName(srcObject.getObjectName())
+          || !validateObjectName(dstObject.getObjectName())) {
+        innerExceptions.add(
+            createFileNotFoundException(
+                srcObject.getBucketName(), srcObject.getObjectName(), /* cause= */ null));
+        continue;
+      }
+
+      try {
+        GoogleCloudStorageItemInfo srcInfo = getItemInfo(srcObject);
+        if (!srcInfo.exists()) {
+          // If the source is not found, add an error to the list and continue.
+          innerExceptions.add(
+              new IOException(String.format("Source object '%s' not found.", srcObject)));
+          continue;
+        }
+
+        // Simulate copy part of the move.
+        InMemoryBucketEntry srcBucketEntry = bucketLookup.get(srcObject.getBucketName());
+        InMemoryObjectEntry srcEntry = srcBucketEntry.get(srcObject.getObjectName());
+
+        bucketLookup
+            .get(dstObject.getBucketName())
+            .add(srcEntry.getShallowCopy(dstObject.getBucketName(), dstObject.getObjectName()));
+
+        // simulate delete
+        srcBucketEntry.remove(srcObject.getObjectName());
+      } catch (IOException e) {
+        innerExceptions.add(e);
+      }
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  @Override
   public synchronized void copy(
       String srcBucketName,
       List<String> srcObjectNames,

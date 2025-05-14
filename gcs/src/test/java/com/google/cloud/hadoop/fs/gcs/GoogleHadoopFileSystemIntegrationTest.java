@@ -222,6 +222,43 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     }
   }
 
+  @Ignore
+  @Test
+  public void testRenameWithMoveOperation() throws Exception {
+    String bucketName = this.gcsiHelper.getUniqueBucketName("move");
+    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
+
+    URI initUri = new URI("gs://" + bucketName);
+    Configuration config = loadConfig();
+    config.setBoolean("fs.gs.operation.move.enable", true);
+    googleHadoopFileSystem.initialize(initUri, config);
+
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(bucketName);
+
+    try {
+      GoogleCloudStorageFileSystemIntegrationHelper helper =
+          new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem);
+
+      renameHelper(
+          new HdfsBehavior() {
+            /**
+             * Returns the MethodOutcome of trying to rename an existing file into the root
+             * directory.
+             */
+            @Override
+            public MethodOutcome renameFileIntoRootOutcome() {
+              return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+            }
+          },
+          bucketName,
+          bucketName,
+          helper);
+    } finally {
+      googleHadoopFileSystem.delete(new Path(initUri));
+    }
+  }
+
   @Test
   public void testInitializePath_success() throws Exception {
     List<String> validPaths = Arrays.asList("gs://foo", "gs://foo/bar");
