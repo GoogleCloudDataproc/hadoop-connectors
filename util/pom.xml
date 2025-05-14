@@ -69,6 +69,11 @@
       <groupId>com.google.flogger</groupId>
       <artifactId>flogger-system-backend</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-logging</artifactId>
+      <version>3.21.3</version>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
