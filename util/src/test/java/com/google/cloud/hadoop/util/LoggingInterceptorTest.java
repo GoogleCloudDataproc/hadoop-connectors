@@ -34,12 +34,16 @@ public class LoggingInterceptorTest {
   @Test
   public void publishesLogEntryWithCorrectSeverity() {
     LogRecord record = new LogRecord(Level.SEVERE, "Critical error occurred");
+    record.setSourceClassName("com.example.MyClass");
+    record.setSourceMethodName("myMethod");
     loggingInterceptor.publish(record);
 
     LogEntry expectedEntry =
         LogEntry.newBuilder(StringPayload.of("Critical error occurred"))
             .setSeverity(Severity.ERROR)
             .setLogName("gcs-connector")
+            .addLabel("class", "com.example.MyClass")
+            .addLabel("method", "myMethod")
             .build();
 
     verify(mockLogging).write(Collections.singleton(expectedEntry));
@@ -54,14 +58,17 @@ public class LoggingInterceptorTest {
             return mockLogging;
           }
         };
-
     LogRecord record = new LogRecord(Level.INFO, "Information message");
+    record.setSourceClassName("com.example.MyClass");
+    record.setSourceMethodName("myMethod");
     customloggingInterceptor.publish(record);
 
     LogEntry expectedEntry =
         LogEntry.newBuilder(StringPayload.of("Information message"))
             .setSeverity(Severity.INFO)
             .setLogName("gcs-connector-suffix")
+            .addLabel("class", "com.example.MyClass")
+            .addLabel("method", "myMethod")
             .build();
 
     verify(mockLogging).write(Collections.singleton(expectedEntry));
@@ -97,12 +104,16 @@ public class LoggingInterceptorTest {
   @Test
   public void mapsUnknownLogLevelToDefaultSeverity() {
     LogRecord record = new LogRecord(Level.CONFIG, "Configuration message");
+    record.setSourceClassName("com.example.MyClass");
+    record.setSourceMethodName("myMethod");
     loggingInterceptor.publish(record);
 
     LogEntry expectedEntry =
         LogEntry.newBuilder(StringPayload.of("Configuration message"))
             .setSeverity(Severity.DEFAULT)
             .setLogName("gcs-connector")
+            .addLabel("class", "com.example.MyClass")
+            .addLabel("method", "myMethod")
             .build();
 
     verify(mockLogging).write(Collections.singleton(expectedEntry));
