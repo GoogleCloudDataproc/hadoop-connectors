@@ -152,7 +152,7 @@ class GoogleCloudStorageClientGrpcDownscopingInterceptor implements ClientInterc
           com.google.storage.v2.Object obj = writeObjectSpec.getResource();
 
           String theBucket = obj.getBucket();
-          if (theBucket == null || theBucket.length() == 0) {
+          if (theBucket.isEmpty()) {
             // TODO: Check why this is required.
             return ImmutableList.of();
           }

@@ -993,6 +993,45 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
+  /**
+   * Validates basic argument constraints like non-null, non-empty Strings, using {@code
+   * Preconditions} in addition to checking for src/dst bucket equality.
+   */
+  @VisibleForTesting
+  public static void validateMoveArguments(
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
+    checkNotNull(sourceToDestinationObjectsMap, "srcObjects must not be null");
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+        sourceToDestinationObjectsMap.entrySet()) {
+      StorageResourceId source = entry.getKey();
+      StorageResourceId destination = entry.getValue();
+      String srcBucketName = source.getBucketName();
+      String dstBucketName = destination.getBucketName();
+      // Avoid move across buckets.
+      if (!srcBucketName.equals(dstBucketName)) {
+        throw new UnsupportedOperationException(
+            "This operation is not supported across two different buckets.");
+      }
+      checkArgument(
+          !isNullOrEmpty(source.getObjectName()), "srcObjectName must not be null or empty");
+      checkArgument(
+          !isNullOrEmpty(destination.getObjectName()), "dstObjectName must not be null or empty");
+      if (srcBucketName.equals(dstBucketName)
+          && source.getObjectName().equals(destination.getObjectName())) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IllegalArgumentException(
+            String.format(
+                "Move destination must be different from source for %s.",
+                StringPaths.fromComponents(srcBucketName, source.getObjectName())));
+      }
+    }
+  }
+
   private static GoogleCloudStorageItemInfo getGoogleCloudStorageItemInfo(
       GoogleCloudStorage gcsImpl,
       Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache,
@@ -1090,6 +1129,62 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               dstObject.getBucketName(),
               dstObject.getObjectName());
         }
+      }
+
+      // Execute any remaining requests not divisible by the max batch size.
+      batchHelper.flush();
+
+      if (!innerExceptions.isEmpty()) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+      }
+    }
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)} for details
+   * about expected behavior.
+   */
+  @Override
+  public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+
+    validateMoveArguments(sourceToDestinationObjectsMap);
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    // Gather FileNotFoundExceptions for individual objects,
+    // but only throw a single combined exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    String traceContext = String.format("batchmove(size=%s)", sourceToDestinationObjectsMap.size());
+    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+      // Perform the move operations.
+
+      BatchHelper batchHelper =
+          batchFactory.newBatchHelper(
+              httpRequestInitializer,
+              storage,
+              storageOptions.getMaxRequestsPerBatch(),
+              sourceToDestinationObjectsMap.size(),
+              storageOptions.getBatchThreads(),
+              "batchmove");
+
+      for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+          sourceToDestinationObjectsMap.entrySet()) {
+        StorageResourceId srcObject = entry.getKey();
+        StorageResourceId dstObject = entry.getValue();
+        moveInternal(
+            batchHelper,
+            innerExceptions,
+            srcObject.getBucketName(),
+            srcObject.getGenerationId(),
+            srcObject.getObjectName(),
+            dstObject.getGenerationId(),
+            dstObject.getObjectName());
       }
 
       // Execute any remaining requests not divisible by the max batch size.
@@ -1209,6 +1304,72 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 innerExceptions, jsonError, responseHeaders, srcBucketName, srcObjectName);
           }
         });
+  }
+
+  /**
+   * Performs move operation using GCS MoveObject requests
+   *
+   * <p>See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)}
+   */
+  private void moveInternal(
+      BatchHelper batchHelper,
+      ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions,
+      String bucketName,
+      long srcContentGeneration,
+      String srcObjectName,
+      long dstContentGeneration,
+      String dstObjectName)
+      throws IOException {
+    Storage.Objects.Move moveObject =
+        createMoveObjectRequest(
+            bucketName, srcObjectName, dstObjectName, srcContentGeneration, dstContentGeneration);
+
+    batchHelper.queue(
+        moveObject,
+        new JsonBatchCallback<>() {
+          @Override
+          public void onSuccess(StorageObject moveResponse, HttpHeaders responseHeaders) {
+            String srcString = StringPaths.fromComponents(bucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(bucketName, dstObjectName);
+            logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
+          }
+
+          @Override
+          public void onFailure(GoogleJsonError jsonError, HttpHeaders responseHeaders) {
+            GoogleCloudStorageEventBus.postOnException();
+            GoogleJsonResponseException cause =
+                createJsonResponseException(jsonError, responseHeaders);
+            innerExceptions.add(
+                errorExtractor.itemNotFound(cause)
+                    ? createFileNotFoundException(bucketName, srcObjectName, cause)
+                    : new IOException(
+                        String.format(
+                            "Error moving '%s' to '%s'",
+                            StringPaths.fromComponents(bucketName, srcObjectName),
+                            StringPaths.fromComponents(bucketName, dstObjectName)),
+                        cause));
+          }
+        });
+  }
+
+  /** Creates a {@link Storage.Objects.Move} request, configured with generation matches. */
+  private Storage.Objects.Move createMoveObjectRequest(
+      String bucketName,
+      String srcObjectName,
+      String dstObjectName,
+      long srcContentGeneration,
+      long dstContentGeneration)
+      throws IOException {
+    Storage.Objects.Move move = storage.objects().move(bucketName, srcObjectName, dstObjectName);
+
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      move.setIfSourceGenerationMatch(srcContentGeneration);
+    }
+
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      move.setIfGenerationMatch(dstContentGeneration);
+    }
+    return initializeRequest(move, bucketName);
   }
 
   /** Processes failed copy requests */

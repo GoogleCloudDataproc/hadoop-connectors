@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.EMPTY_OBJECT_
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.sleeper;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateCopyArguments;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.validateMoveArguments;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -67,6 +68,7 @@ import com.google.cloud.storage.Storage.BucketField;
 import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.Storage.ComposeRequest;
 import com.google.cloud.storage.Storage.CopyRequest;
+import com.google.cloud.storage.Storage.MoveBlobRequest;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
@@ -480,6 +482,96 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   /**
+   * See {@link GoogleCloudStorage#move(Map<StorageResourceId, StorageResourceId>)} for details
+   * about expected behavior.
+   */
+  @Override
+  public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+
+    validateMoveArguments(sourceToDestinationObjectsMap);
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    // Gather FileNotFoundExceptions for individual objects,
+    // but only throw a single combined exception at the end.
+    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+        ConcurrentHashMap.newKeySet();
+
+    BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
+
+    try {
+      for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+          sourceToDestinationObjectsMap.entrySet()) {
+        StorageResourceId srcObject = entry.getKey();
+        StorageResourceId dstObject = entry.getValue();
+        moveInternal(
+            executor,
+            innerExceptions,
+            srcObject.getBucketName(),
+            srcObject.getGenerationId(),
+            srcObject.getObjectName(),
+            dstObject.getGenerationId(),
+            dstObject.getObjectName());
+      }
+    } finally {
+      executor.shutdown();
+    }
+
+    if (!innerExceptions.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void moveInternal(
+      BatchExecutor executor,
+      KeySetView<IOException, Boolean> innerExceptions,
+      String srcBucketName,
+      long srcContentGeneration,
+      String srcObjectName,
+      long dstContentGeneration,
+      String dstObjectName) {
+    MoveBlobRequest.Builder moveRequestBuilder =
+        createMoveRequestBuilder(
+            srcBucketName,
+            srcObjectName,
+            dstObjectName,
+            srcContentGeneration,
+            dstContentGeneration);
+
+    executor.queue(
+        () -> {
+          try {
+            String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(srcBucketName, dstObjectName);
+
+            Blob movedBlob = storage.moveBlob(moveRequestBuilder.build());
+            if (movedBlob != null) {
+              logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
+            }
+          } catch (StorageException e) {
+            GoogleCloudStorageEventBus.postOnException();
+            if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
+              innerExceptions.add(
+                  createFileNotFoundException(srcBucketName, srcObjectName, new IOException(e)));
+            } else {
+              innerExceptions.add(
+                  new IOException(
+                      String.format(
+                          "Error moving '%s'",
+                          StringPaths.fromComponents(srcBucketName, srcObjectName)),
+                      e));
+            }
+          }
+          return null;
+        },
+        null);
+  }
+
+  /**
    * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
    * behavior.
    */
@@ -609,6 +701,42 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
     }
     return bucketInfos;
+  }
+
+  /** Creates a builder for a blob move request. */
+  private MoveBlobRequest.Builder createMoveRequestBuilder(
+      String srcBucketName,
+      String srcObjectName,
+      String dstObjectName,
+      long srcContentGeneration,
+      long dstContentGeneration) {
+
+    MoveBlobRequest.Builder moveRequestBuilder =
+        MoveBlobRequest.newBuilder().setSource(BlobId.of(srcBucketName, srcObjectName));
+    moveRequestBuilder.setTarget(BlobId.of(srcBucketName, dstObjectName));
+
+    List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
+    List<BlobSourceOption> blobSourceOptions = new ArrayList<>();
+
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      blobSourceOptions.add(BlobSourceOption.generationMatch(srcContentGeneration));
+    }
+
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      blobTargetOptions.add(BlobTargetOption.generationMatch(dstContentGeneration));
+    }
+
+    if (storageOptions.getEncryptionKey() != null) {
+      blobSourceOptions.add(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+      blobTargetOptions.add(
+          BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+
+    moveRequestBuilder.setSourceOptions(blobSourceOptions);
+    moveRequestBuilder.setTargetOptions(blobTargetOptions);
+
+    return moveRequestBuilder;
   }
 
   /**
