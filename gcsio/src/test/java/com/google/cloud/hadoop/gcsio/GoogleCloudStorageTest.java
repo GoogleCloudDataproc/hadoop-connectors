@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.creat
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteBucketRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketStorageLayoutRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listBucketsRequestString;
@@ -2185,9 +2186,11 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    URI bucketUri = new URI("gs://hns-enabled-bucket");
+    URI bucketUri = new URI("gs://" + BUCKET_NAME);
     boolean result = gcs.isHnBucket(bucketUri);
 
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME));
     assertThat(result).isTrue();
   }
 
@@ -2201,9 +2204,11 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    URI bucketUri = new URI("gs://hns-disabled-bucket");
+    URI bucketUri = new URI("gs://" + BUCKET_NAME);
     boolean result = gcs.isHnBucket(bucketUri);
 
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME));
     assertThat(result).isFalse();
   }
 

@@ -50,6 +50,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String GET_BUCKET_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s";
 
+  private static final String GET_BUCKET_STORAGE_LAYOUT_REQUEST_FORMAT =
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/storageLayout";
+
   private static final String POST_REQUEST_FORMAT =
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s";
 
@@ -259,6 +262,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String getBucketRequestString(String bucketName) {
     return String.format(GET_BUCKET_REQUEST_FORMAT, bucketName);
+  }
+
+  public static String getBucketStorageLayoutRequestString(String bucketName) {
+    return String.format(GET_BUCKET_STORAGE_LAYOUT_REQUEST_FORMAT, bucketName);
   }
 
   public static String postRequestString(String bucketName, String object) {
