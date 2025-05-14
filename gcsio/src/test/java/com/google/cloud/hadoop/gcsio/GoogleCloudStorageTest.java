@@ -2258,7 +2258,8 @@ public class GoogleCloudStorageTest {
     boolean result = gcs.isHnBucket(bucketUri);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME));
+        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME))
+        .inOrder();
     assertThat(result).isTrue();
   }
 
@@ -2276,7 +2277,8 @@ public class GoogleCloudStorageTest {
     boolean result = gcs.isHnBucket(bucketUri);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME));
+        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME))
+        .inOrder();
     assertThat(result).isFalse();
   }
 
