@@ -24,6 +24,7 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -240,7 +241,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           }
           return null;
         },
-        null);
+        new FutureCallback<Blob>() {
+          @Override
+          public void onSuccess(@Nullable Blob result) {
+            logger.atFiner().log("Move operation succeeded via callback for %s.", StringPaths.fromComponents(srcBucketName, srcObjectName));
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            logger.atWarning().withCause(t).log("Move operation failed via callback for %s.", StringPaths.fromComponents(srcBucketName, srcObjectName));
+          }
+        });
   }
 
   /** Creates a builder for a blob move request. */
