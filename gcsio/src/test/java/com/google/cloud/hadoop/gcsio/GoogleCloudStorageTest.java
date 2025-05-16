@@ -1754,7 +1754,7 @@ public class GoogleCloudStorageTest {
     String b = BUCKET_NAME;
     String o = OBJECT_NAME;
 
-    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
 
     Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
 
@@ -1779,7 +1779,7 @@ public class GoogleCloudStorageTest {
         mockTransport(jsonDataResponse(new Objects().setItems(ImmutableList.of(object))));
 
     GoogleCloudStorage gcs =
-        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
     sourceToDestinationObjectsMap.put(
@@ -1807,7 +1807,7 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
 
     GoogleCloudStorage gcs =
-        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
 
     Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
     sourceToDestinationObjectsMap.put(srcId, dstId);

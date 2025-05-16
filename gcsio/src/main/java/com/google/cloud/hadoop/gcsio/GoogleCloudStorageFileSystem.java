@@ -768,17 +768,17 @@ public class GoogleCloudStorageFileSystem {
                     srcInfo.getItemInfo().getObjectName(),
                     srcInfo.getItemInfo().getContentGeneration()),
                 dstResourceId));
-      } else{
-          gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
+      } else {
+        gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
 
-          gcs.deleteObjects(
-              ImmutableList.of(
-                  new StorageResourceId(
-                      srcInfo.getItemInfo().getBucketName(),
-                      srcInfo.getItemInfo().getObjectName(),
-                      srcInfo.getItemInfo().getContentGeneration())));
-        }
+        gcs.deleteObjects(
+            ImmutableList.of(
+                new StorageResourceId(
+                    srcInfo.getItemInfo().getBucketName(),
+                    srcInfo.getItemInfo().getObjectName(),
+                    srcInfo.getItemInfo().getContentGeneration())));
       }
+    }
 
     repairImplicitDirectory(srcParentInfoFuture);
   }
@@ -976,32 +976,30 @@ public class GoogleCloudStorageFileSystem {
           // we delete item separately in the list.
           deleteObjects(Collections.singletonList(srcInfo));
         }
-        return;
-      }
-
-      // First, copy all items except marker items
-      copyInternal(srcToDstItemNames);
-      // Finally, copy marker items (if any) to mark rename operation success
-      copyInternal(srcToDstMarkerItemNames);
-
-      coopLockOp.ifPresent(CoopLockOperationRename::checkpoint);
-
-      List<FileInfo> bucketsToDelete = new ArrayList<>(1);
-      List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
-      srcItemsToDelete.addAll(srcToDstItemNames.keySet());
-      if (srcInfo.getItemInfo().isBucket()) {
-        bucketsToDelete.add(srcInfo);
       } else {
-        // If src is a directory then srcItemInfos does not contain its own name,
-        // therefore add it to the list before we delete items in the list.
-        srcItemsToDelete.add(srcInfo);
+        // First, copy all items except marker items
+        copyInternal(srcToDstItemNames);
+        // Finally, copy marker items (if any) to mark rename operation success
+        copyInternal(srcToDstMarkerItemNames);
+
+        coopLockOp.ifPresent(CoopLockOperationRename::checkpoint);
+
+        List<FileInfo> bucketsToDelete = new ArrayList<>(1);
+        List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
+        srcItemsToDelete.addAll(srcToDstItemNames.keySet());
+        if (srcInfo.getItemInfo().isBucket()) {
+          bucketsToDelete.add(srcInfo);
+        } else {
+          // If src is a directory then srcItemInfos does not contain its own name,
+          // therefore add it to the list before we delete items in the list.
+          srcItemsToDelete.add(srcInfo);
+        }
+
+        // First delete marker files from the src
+        deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
+        // Then delete rest of the items that we successfully copied.
+        deleteInternal(srcItemsToDelete, bucketsToDelete);
       }
-
-      // First delete marker files from the src
-      deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
-      // Then delete rest of the items that we successfully copied.
-      deleteInternal(srcItemsToDelete, bucketsToDelete);
-
       coopLockOp.ifPresent(CoopLockOperationRename::unlock);
     } finally {
       coopLockOp.ifPresent(CoopLockOperationRename::cancelRenewal);

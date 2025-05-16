@@ -203,7 +203,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     try {
       GoogleCloudStorageFileSystemIntegrationHelper helper =
-          new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem);
+          new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem, googleHadoopFileSystem);
 
       renameHelper(
           new HdfsBehavior() {

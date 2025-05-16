@@ -1484,7 +1484,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     batchHelper.queue(
         moveObject,
-        new JsonBatchCallback<>() {
+        new JsonBatchCallback<StorageObject>() {
           @Override
           public void onSuccess(StorageObject moveResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(bucketName, srcObjectName);
