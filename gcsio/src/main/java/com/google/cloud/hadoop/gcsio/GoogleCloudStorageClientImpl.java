@@ -112,7 +112,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storage =
         clientLibraryStorage == null
             ? createStorage(
-            credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
+                credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
             : clientLibraryStorage;
   }
 
