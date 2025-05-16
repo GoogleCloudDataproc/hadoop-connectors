@@ -207,8 +207,6 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-<<<<<<< HEAD
-=======
   public void moveObject_successful() throws IOException {
     int expectedSize = 5 * 1024 * 1024;
     StorageResourceId srcResourceId =
@@ -355,28 +353,6 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void open_withItemInfo() throws IOException {
-    int expectedSize = 5 * 1024 * 1024;
-    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
-    writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
-
-    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
-
-    GoogleCloudStorageItemInfo itemInfo = helperGcs.getItemInfo(resourceId);
-
-    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(itemInfo)) {
-      assertThat(readChannel.size()).isEqualTo(expectedSize);
-    }
-    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
-        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
-
-    assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
-    trackingGcs.delegate.close();
-  }
-
-  @Test
->>>>>>> 95f39f57 ([Follow-ups] Add integration tests for gcsio layer and add move support in PerformanceCachingGoogleCloudStorage (#1342))
   public void writeLargeObject_withSmallUploadChunk() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
