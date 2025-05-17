@@ -52,6 +52,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
@@ -242,7 +243,21 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           }
           return null;
         },
-        null);
+        new FutureCallback<Blob>() {
+          @Override
+          public void onSuccess(@Nullable Blob result) {
+            logger.atFiner().log(
+                "Move operation succeeded via callback for %s.",
+                StringPaths.fromComponents(srcBucketName, srcObjectName));
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            logger.atWarning().withCause(t).log(
+                "Move operation failed via callback for %s.",
+                StringPaths.fromComponents(srcBucketName, srcObjectName));
+          }
+        });
   }
 
   /** Creates a builder for a blob move request. */
