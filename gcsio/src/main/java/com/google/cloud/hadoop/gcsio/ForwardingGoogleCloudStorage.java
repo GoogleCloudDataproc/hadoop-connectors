@@ -153,6 +153,13 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+    logger.atFiner().log("%s.move(%s)", delegateClassName, sourceToDestinationObjectsMap);
+    delegate.move(sourceToDestinationObjectsMap);
+  }
+
+  @Override
   public boolean isHnBucket(URI src) throws IOException {
     return delegate.isHnBucket(src);
   }
