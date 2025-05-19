@@ -45,7 +45,6 @@ import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -237,14 +236,11 @@ public class GoogleCloudStorageImplTest {
     assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
         .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
-      assertThat(trackingGcs.getAllRequestStrings())
-          .containsExactly(
-              TrackingHttpRequestInitializer.moveRequestString(
-                  testBucket,
-                  srcResourceId.getObjectName(),
-                  dstResourceId.getObjectName(),
-                  "moveTo"))
-          .inOrder();
+    assertThat(trackingGcs.getAllRequestStrings())
+        .containsExactly(
+            TrackingHttpRequestInitializer.moveRequestString(
+                testBucket, srcResourceId.getObjectName(), dstResourceId.getObjectName(), "moveTo"))
+        .inOrder();
     trackingGcs.delegate.close();
   }
 
@@ -317,18 +313,18 @@ public class GoogleCloudStorageImplTest {
         .hasMessageThat()
         .contains("Item not found: '" + srcResourceId.toString() + "'");
 
-      Throwable cause = thrown.getCause();
-      assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
-      GoogleJsonResponseException gjre = (GoogleJsonResponseException) cause;
-      assertThat(gjre.getStatusCode()).isEqualTo(404);
+    Throwable cause = thrown.getCause();
+    assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
+    GoogleJsonResponseException gjre = (GoogleJsonResponseException) cause;
+    assertThat(gjre.getStatusCode()).isEqualTo(404);
 
-      assertThat(trackingGcs.getAllRequestStrings())
-          .containsExactly(
-              TrackingHttpRequestInitializer.moveRequestString(
-                  testBucket,
-                  srcResourceId.getObjectName(),
-                  dstResourceId.getObjectName(),
-                  "moveTo"));
+    assertThat(trackingGcs.getAllRequestStrings())
+        .containsExactly(
+            TrackingHttpRequestInitializer.moveRequestString(
+                testBucket,
+                srcResourceId.getObjectName(),
+                dstResourceId.getObjectName(),
+                "moveTo"));
     trackingGcs.delegate.close();
   }
 
