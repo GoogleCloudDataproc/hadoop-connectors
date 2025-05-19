@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.creat
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteBucketRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketStorageLayoutRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listBucketsRequestString;
@@ -61,6 +62,8 @@ import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
+import com.google.api.services.storage.model.BucketStorageLayout;
+import com.google.api.services.storage.model.BucketStorageLayout.HierarchicalNamespace;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
@@ -84,6 +87,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
@@ -2238,6 +2242,46 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(listBucketsRequestString(PROJECT_ID))
         .inOrder();
+  }
+
+  /** Test for GoogleCloudStorage.isHnBucket(1). */
+  @Test
+  public void testIsHnBucket_enabled() throws Exception {
+    BucketStorageLayout layout =
+        new BucketStorageLayout()
+            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(true));
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    String testHnsBucket = "hns-bucket-enabled";
+    URI bucketUri = new URI("gs://" + testHnsBucket);
+    boolean result = gcs.isHnBucket(bucketUri);
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
+        .inOrder();
+    assertThat(result).isTrue();
+  }
+
+  /** Test for GoogleCloudStorage.isHnBucket(1). */
+  @Test
+  public void testIsHnBucket_disabled() throws Exception {
+    BucketStorageLayout layout =
+        new BucketStorageLayout()
+            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(false));
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    String testHnsBucket = "hns-bucket-disabled";
+    URI bucketUri = new URI("gs://" + testHnsBucket);
+    boolean result = gcs.isHnBucket(bucketUri);
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
+        .inOrder();
+    assertThat(result).isFalse();
   }
 
   @Test
