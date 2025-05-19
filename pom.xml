@@ -88,7 +88,7 @@
     <google.api-client-libraries.version>2.0.0</google.api-client-libraries.version>
     <google.api-bigquery.version>v2-rev20221028-${google.api-client-libraries.version}</google.api-bigquery.version>
     <google.api-iamcredentials.version>v1-rev20211203-${google.api-client-libraries.version}</google.api-iamcredentials.version>
-    <google.api-storage.version>v1-rev20240105-${google.api-client-libraries.version}</google.api-storage.version>
+    <google.api-storage.version>v1-rev20250312-${google.api-client-libraries.version}</google.api-storage.version>
     <google.auth.version>1.29.0</google.auth.version>
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud-bigquerystorage.version>2.39.1</google.cloud-bigquerystorage.version>
