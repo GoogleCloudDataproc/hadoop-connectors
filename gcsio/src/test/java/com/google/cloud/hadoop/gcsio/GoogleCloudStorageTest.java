@@ -2254,11 +2254,12 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    URI bucketUri = new URI("gs://" + BUCKET_NAME);
+    String testHnsBucket = "hns-bucket-enabled";
+    URI bucketUri = new URI("gs://" + testHnsBucket);
     boolean result = gcs.isHnBucket(bucketUri);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME))
+        .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
         .inOrder();
     assertThat(result).isTrue();
   }
@@ -2273,11 +2274,12 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    URI bucketUri = new URI("gs://" + BUCKET_NAME);
+    String testHnsBucket = "hns-bucket-disabled";
+    URI bucketUri = new URI("gs://" + testHnsBucket);
     boolean result = gcs.isHnBucket(bucketUri);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(getBucketStorageLayoutRequestString(BUCKET_NAME))
+        .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
         .inOrder();
     assertThat(result).isFalse();
   }
