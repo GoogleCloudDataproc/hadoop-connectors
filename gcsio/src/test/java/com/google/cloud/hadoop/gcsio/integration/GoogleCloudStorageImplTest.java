@@ -237,9 +237,6 @@ public class GoogleCloudStorageImplTest {
     assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
         .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
-    if (testStorageClientImpl) {
-      assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings()).isNotEmpty();
-    } else {
       assertThat(trackingGcs.getAllRequestStrings())
           .containsExactly(
               TrackingHttpRequestInitializer.moveRequestString(
@@ -248,7 +245,6 @@ public class GoogleCloudStorageImplTest {
                   dstResourceId.getObjectName(),
                   "moveTo"))
           .inOrder();
-    }
     trackingGcs.delegate.close();
   }
 
@@ -271,9 +267,7 @@ public class GoogleCloudStorageImplTest {
             String.format("Move destination must be different from source for %s", resourceId));
 
     assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
-    if (testStorageClientImpl) {
-      assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings()).isEmpty();
-    }
+
     trackingGcs.delegate.close();
   }
 
@@ -299,9 +293,6 @@ public class GoogleCloudStorageImplTest {
         .contains("This operation is not supported across two different buckets.");
 
     assertThat(trackingGcs.getAllRequestStrings()).isEmpty();
-    if (testStorageClientImpl) {
-      assertThat(trackingGcs.grpcRequestInterceptor.getAllRequestStrings()).isEmpty();
-    }
     trackingGcs.delegate.close();
   }
 
@@ -326,16 +317,6 @@ public class GoogleCloudStorageImplTest {
         .hasMessageThat()
         .contains("Item not found: '" + srcResourceId.toString() + "'");
 
-    if (testStorageClientImpl) {
-      Throwable cause = thrown.getCause().getCause();
-      assertThat(cause).isInstanceOf(StorageException.class);
-
-      List<String> grpcRequests = trackingGcs.grpcRequestInterceptor.getAllRequestStrings();
-      assertThat(grpcRequests).isNotEmpty();
-      assertThat(grpcRequests.toString()).contains("MoveObject");
-
-      assertThat(((StorageException) cause).getCode()).isEqualTo(404);
-    } else {
       Throwable cause = thrown.getCause();
       assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
       GoogleJsonResponseException gjre = (GoogleJsonResponseException) cause;
@@ -348,7 +329,6 @@ public class GoogleCloudStorageImplTest {
                   srcResourceId.getObjectName(),
                   dstResourceId.getObjectName(),
                   "moveTo"));
-    }
     trackingGcs.delegate.close();
   }
 
