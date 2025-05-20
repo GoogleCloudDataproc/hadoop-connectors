@@ -43,6 +43,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
+  private static final String DEFAULT_IDEMPOTENCY_TOKEN_VALUE = "IDEMPOTENCY_TOKEN_NOT_FOUND";
   private static final DateTimeFormatter dtf =
       DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS");
   private static final Metadata.Key<String> idempotencyKey =
@@ -215,7 +216,14 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     private String getInvocationId() {
-      return headers.get(idempotencyKey);
+      if (this.headers == null) {
+        return DEFAULT_IDEMPOTENCY_TOKEN_VALUE;
+      }
+      String token = this.headers.get(idempotencyKey);
+      if (token == null) {
+        return DEFAULT_IDEMPOTENCY_TOKEN_VALUE;
+      }
+      return token;
     }
 
     private ImmutableMap.Builder<String, Object> getStreamContext() {
