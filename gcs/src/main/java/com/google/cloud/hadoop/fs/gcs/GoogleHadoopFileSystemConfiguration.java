@@ -643,7 +643,7 @@ public class GoogleHadoopFileSystemConfiguration {
     return applicationName;
   }
 
-  private static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
+  public static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
     return GoogleCloudStorageReadOptions.builder()
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setFastFailOnNotFoundEnabled(
@@ -660,7 +660,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .build();
   }
 
-  private static AsyncWriteChannelOptions getWriteChannelOptions(Configuration config) {
+  public static AsyncWriteChannelOptions getWriteChannelOptions(Configuration config) {
     return AsyncWriteChannelOptions.builder()
         .setBufferSize(toIntExact(GCS_OUTPUT_STREAM_BUFFER_SIZE.get(config, config::getLongBytes)))
         .setDirectUploadEnabled(
