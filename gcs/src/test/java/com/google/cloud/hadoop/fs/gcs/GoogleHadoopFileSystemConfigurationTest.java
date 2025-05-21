@@ -60,6 +60,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
           put("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
+          put("fs.gs.cloud.logging.enable", false);
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
@@ -118,7 +119,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.operation.tracelog.enable", false);
-          put("fs.gs.cloud.logging.enable", false);
           put("fs.gs.working.dir", "/");
           put("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
           put("fs.gs.write.temporary.dirs", ImmutableSet.of());

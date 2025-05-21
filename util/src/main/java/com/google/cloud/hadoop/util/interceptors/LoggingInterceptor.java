@@ -11,28 +11,48 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
+/**
+ * A logging interceptor that publishes log records to Google Cloud Logging. This class extends
+ * {@link Handler} to integrate with the Java logging framework.
+ */
 public class LoggingInterceptor extends Handler {
 
   private final Logging cloudLogging;
   private final String logNameSuffix;
+  private static final String LOG_NAME_PREFIX = "gcs-connector";
 
+  /**
+   * Constructs a new {@code LoggingInterceptor}.
+   *
+   * @param credentials the Google Cloud credentials used to authenticate with the Logging service
+   * @param logNameSuffix the suffix to append to the log name
+   */
   public LoggingInterceptor(GoogleCredentials credentials, String logNameSuffix) {
     this.cloudLogging = createLoggingService(credentials);
     this.logNameSuffix = logNameSuffix;
   }
 
+  /**
+   * Creates a Google Cloud Logging service instance.
+   *
+   * @param credentials the Google Cloud credentials used to authenticate with the Logging service
+   * @return a {@link Logging} instance
+   */
   protected Logging createLoggingService(GoogleCredentials credentials) {
     return LoggingOptions.newBuilder().setCredentials(credentials).build().getService();
   }
 
+  /**
+   * Publishes a log record to Google Cloud Logging.
+   *
+   * @param record the log record to publish
+   */
   @Override
   public void publish(LogRecord record) {
     if (!isLoggable(record)) {
       return;
     }
-    // Log name is 'gcs-connector-app-name' if application name is 'app-name'.
-    String logNamePrefix = "gcs-connector";
-    String logName = String.join("-", logNamePrefix, logNameSuffix).replaceAll("-$", "");
+    String logName = String.join("-", LOG_NAME_PREFIX, logNameSuffix).replaceAll("-$", "");
 
     LogEntry entry =
         LogEntry.newBuilder(StringPayload.of(record.getMessage()))
@@ -45,11 +65,17 @@ public class LoggingInterceptor extends Handler {
     cloudLogging.write(Collections.singleton(entry));
   }
 
+  /** Flushes any buffered log entries to Google Cloud Logging. */
   @Override
   public void flush() {
     cloudLogging.flush();
   }
 
+  /**
+   * Closes the Google Cloud Logging service.
+   *
+   * @throws SecurityException if an error occurs while closing the service
+   */
   @Override
   public void close() throws SecurityException {
     try {
@@ -59,17 +85,26 @@ public class LoggingInterceptor extends Handler {
     }
   }
 
+  /**
+   * Maps a {@link Level} to a corresponding Google Cloud Logging {@link Severity}.
+   *
+   * @param level the Java logging level
+   * @return the corresponding Google Cloud Logging severity
+   */
   private Severity mapToCloudSeverity(Level level) {
-    if (level == Level.SEVERE) {
-      return Severity.ERROR;
-    } else if (level == Level.WARNING) {
-      return Severity.WARNING;
-    } else if (level == Level.INFO) {
-      return Severity.INFO;
-    } else if (level == Level.FINE || level == Level.FINER || level == Level.FINEST) {
-      return Severity.DEBUG;
-    } else {
-      return Severity.DEFAULT;
+    switch (level.getName()) {
+      case "SEVERE":
+        return Severity.ERROR;
+      case "WARNING":
+        return Severity.WARNING;
+      case "INFO":
+        return Severity.INFO;
+      case "FINE":
+      case "FINER":
+      case "FINEST":
+        return Severity.DEBUG;
+      default:
+        return Severity.DEFAULT;
     }
   }
 }
