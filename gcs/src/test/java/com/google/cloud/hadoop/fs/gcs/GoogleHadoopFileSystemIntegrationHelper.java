@@ -27,6 +27,8 @@ import org.apache.hadoop.conf.Configuration;
 public final class GoogleHadoopFileSystemIntegrationHelper {
 
   private static final String ENV_VAR_MSG_FMT = "Environment variable %s should be set";
+  public static final String GCS_TEST_APPLICATION_DEFAULT_ENABLE =
+      "GCS_TEST_APPLICATION_DEFAULT_ENABLE";
 
   public static GoogleHadoopFileSystem createGhfs(URI path, Configuration config) throws Exception {
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
@@ -48,10 +50,15 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     TestConfiguration testConf = TestConfiguration.getInstance();
     String projectId = checkNotNull(testConf.getProjectId(), ENV_VAR_MSG_FMT, GCS_TEST_PROJECT_ID);
     config.set("fs.gs.project.id", projectId);
+    String appDefaultEnable = System.getenv(GCS_TEST_APPLICATION_DEFAULT_ENABLE);
+
     if (testConf.getServiceAccountJsonKeyFile() != null) {
       config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
       config.set(
           "fs.gs.auth.service.account.json.keyfile", testConf.getServiceAccountJsonKeyFile());
+
+    } else if (appDefaultEnable != null && Boolean.parseBoolean(appDefaultEnable)) {
+      config.setEnum("fs.gs.auth.type", AuthenticationType.APPLICATION_DEFAULT);
     }
 
     config.setBoolean("fs.gs.grpc.directpath.enable", testConf.isDirectPathPreferred());
