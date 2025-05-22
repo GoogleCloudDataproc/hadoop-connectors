@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util.interceptors;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
+import com.google.cloud.hadoop.util.InvocationIdContext;
 import com.google.cloud.hadoop.util.RequestTracker;
 import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
@@ -66,7 +67,7 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
     final String builtURL = request.getUrl().build();
     if (!builtURL.contains(signatureKey)) {
       UUID invocationId = UUID.randomUUID();
-      String invocationEntry = GCCL_INVOCATION_ID_PREFIX + invocationId;
+      String invocationEntry = InvocationIdContext.getInvocationId();
       final String newValue;
       if (existing != null && !existing.isEmpty()) {
         newValue = existing + " " + invocationEntry;
