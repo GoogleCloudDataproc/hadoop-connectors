@@ -101,20 +101,6 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
-//  public static Credentials getCredentials() throws IOException {
-  // String serviceAccountJsonKeyFile =
-  //  TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
-  // if (serviceAccountJsonKeyFile == null) {
-//    return GoogleCredentials.getApplicationDefault();
-  // return // ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
-  // }
-  // try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
-  //   return
-  // //ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
-  // }
-  // }
-//  }
-
   public static final String GCS_TEST_APPLICATION_DEFAULT_ENABLE = "GCS_TEST_APPLICATION_DEFAULT_ENABLE";
   static String appDefaultEnable = System.getenv(GCS_TEST_APPLICATION_DEFAULT_ENABLE);
 
