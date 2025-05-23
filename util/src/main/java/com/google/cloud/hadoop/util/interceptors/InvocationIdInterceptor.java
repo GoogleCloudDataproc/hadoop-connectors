@@ -66,8 +66,11 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
     final String signatureKey = "Signature="; // For V2 and V4 signedURLs
     final String builtURL = request.getUrl().build();
     if (!builtURL.contains(signatureKey)) {
-      UUID invocationId = UUID.randomUUID();
+      // Reuse existing invocationId if present.
       String invocationEntry = InvocationIdContext.getInvocationId();
+      if (invocationEntry.isEmpty()) {
+        invocationEntry = GCCL_INVOCATION_ID_PREFIX + UUID.randomUUID();
+      }
       final String newValue;
       if (existing != null && !existing.isEmpty()) {
         newValue = existing + " " + invocationEntry;
