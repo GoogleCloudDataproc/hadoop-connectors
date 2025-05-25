@@ -23,6 +23,7 @@ import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This class adds a caching layer around a GoogleCloudStorage instance, caching calls that create,
@@ -93,6 +94,23 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     // Remove the deleted objects from cache.
     for (StorageResourceId resourceId : resourceIds) {
       cache.removeItem(resourceId);
+    }
+  }
+
+  @Override
+  public void move(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+    super.move(sourceToDestinationObjectsMap);
+
+    // On success, invalidate cache entries
+    if (cache != null) {
+      for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+          sourceToDestinationObjectsMap.entrySet()) {
+        StorageResourceId srcResourceId = entry.getKey();
+
+        // Invalidate the source item.
+        cache.removeItem(srcResourceId);
+      }
     }
   }
 
