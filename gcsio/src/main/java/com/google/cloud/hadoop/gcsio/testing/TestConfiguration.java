@@ -23,6 +23,9 @@ public abstract class TestConfiguration {
 
   public static final String GCS_TEST_DIRECT_PATH_PREFERRED = "GCS_TEST_DIRECT_PATH_PREFERRED";
 
+  public static final String GCS_TEST_APPLICATION_DEFAULT_ENABLE = "GCS_TEST_APPLICATION_DEFAULT_ENABLE";
+
+
   /** Environment-based test configuration. */
   public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
     @Override
@@ -33,6 +36,14 @@ public abstract class TestConfiguration {
     @Override
     public String getServiceAccountJsonKeyFile() {
       return System.getenv(GCS_TEST_JSON_KEYFILE);
+    }
+
+    @Override
+    public boolean isApplicationDefaultModeEnabled(){
+
+      String applicationDefaultModeEnable = System.getenv(GCS_TEST_APPLICATION_DEFAULT_ENABLE);
+      return (Boolean.parseBoolean(applicationDefaultModeEnable));
+
     }
 
     @Override
@@ -57,6 +68,8 @@ public abstract class TestConfiguration {
   public abstract String getProjectId();
 
   public abstract String getServiceAccountJsonKeyFile();
+
+  public abstract boolean isApplicationDefaultModeEnabled();
 
   public abstract boolean isDirectPathPreferred();
 }

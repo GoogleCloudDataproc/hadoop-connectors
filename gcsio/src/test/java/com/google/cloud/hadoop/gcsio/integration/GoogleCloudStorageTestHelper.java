@@ -49,7 +49,6 @@ import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -71,7 +70,6 @@ import java.util.stream.Collectors;
 /** Helper methods for GCS integration tests. */
 public class GoogleCloudStorageTestHelper {
 
-  public static final String AUTH_MODE_APPLICATION_DEFAULT = "APPLICATION_DEFAULT";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Application name for OAuth.
@@ -101,27 +99,23 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
-  public static final String GCS_TEST_APPLICATION_DEFAULT_ENABLE = "GCS_TEST_APPLICATION_DEFAULT_ENABLE";
-  static String appDefaultEnable = System.getenv(GCS_TEST_APPLICATION_DEFAULT_ENABLE);
 
 
   public static Credentials getCredentials() throws IOException {
     String serviceAccountJsonKeyFile =
             TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
     if (serviceAccountJsonKeyFile == null) {
-      if(Boolean.parseBoolean(appDefaultEnable)){
+      if(TestConfiguration.getInstance().isApplicationDefaultModeEnabled()){
         return GoogleCredentials.getApplicationDefault();
       }
-      else{
+      else {
         return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
       }
-
     }
     try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
       return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
     }
   }
-
 
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
     return GoogleCloudStorageOptions.builder()
