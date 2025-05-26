@@ -80,9 +80,9 @@ public class GoogleCloudStorageTestHelper {
   public static GoogleCloudStorage createGoogleCloudStorage() {
     try {
       return GoogleCloudStorageImpl.builder()
-              .setOptions(getStandardOptionBuilder().build())
-              .setCredentials(getCredentials())
-              .build();
+          .setOptions(getStandardOptionBuilder().build())
+          .setCredentials(getCredentials())
+          .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
     }
@@ -91,24 +91,24 @@ public class GoogleCloudStorageTestHelper {
   public static GoogleCloudStorage createGcsClientImpl() {
     try {
       return GoogleCloudStorageClientImpl.builder()
-              .setOptions(getStandardOptionBuilder().build())
-              .setCredentials(getCredentials())
-              .build();
+          .setOptions(getStandardOptionBuilder().build())
+          .setCredentials(getCredentials())
+          .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
     }
   }
 
-
-
   public static Credentials getCredentials() throws IOException {
     String serviceAccountJsonKeyFile =
-            TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
+        TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
     if (serviceAccountJsonKeyFile == null) {
-      if(TestConfiguration.getInstance().isApplicationDefaultModeEnabled()){
+      Boolean isApplicationDefaultModeEnabled =
+          TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
+
+      if (isApplicationDefaultModeEnabled) {
         return GoogleCredentials.getApplicationDefault();
-      }
-      else {
+      } else {
         return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
       }
     }
@@ -119,10 +119,10 @@ public class GoogleCloudStorageTestHelper {
 
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
     return GoogleCloudStorageOptions.builder()
-            .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
-            .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
-            .setGrpcWriteEnabled(true)
-            .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
+        .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
+        .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
+        .setGrpcWriteEnabled(true)
+        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
   }
 
   /** More efficient version of checking byte arrays than using Assert.assertArrayEquals. */
@@ -138,43 +138,43 @@ public class GoogleCloudStorageTestHelper {
 
     if (expected.length != actual.length) {
       fail(
-              String.format(
-                      "Length mismatch: expected: %d, actual: %d", expected.length, actual.length));
+          String.format(
+              "Length mismatch: expected: %d, actual: %d", expected.length, actual.length));
     }
 
     for (int i = 0; i < expected.length; ++i) {
       if (expected[i] != actual[i]) {
         fail(
-                String.format(
-                        "Mismatch at index %d. expected: 0x%02x, actual: 0x%02x",
-                        i, expected[i], actual[i]));
+            String.format(
+                "Mismatch at index %d. expected: 0x%02x, actual: 0x%02x",
+                i, expected[i], actual[i]));
       }
     }
   }
 
   public static void assertObjectContent(
-          GoogleCloudStorage gcs, StorageResourceId resourceId, byte[] expectedBytes)
-          throws IOException {
+      GoogleCloudStorage gcs, StorageResourceId resourceId, byte[] expectedBytes)
+      throws IOException {
     assertObjectContent(gcs, resourceId, expectedBytes, /* expectedBytesCount= */ 1);
   }
 
   public static void assertObjectContent(
-          GoogleCloudStorage gcs,
-          StorageResourceId resourceId,
-          GoogleCloudStorageReadOptions readOptions,
-          byte[] expectedBytes)
-          throws IOException {
+      GoogleCloudStorage gcs,
+      StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes)
+      throws IOException {
     assertObjectContent(gcs, resourceId, readOptions, expectedBytes, /* expectedBytesCount= */ 1);
   }
 
   public static void assertObjectContent(
-          GoogleCloudStorage gcs,
-          StorageResourceId id,
-          GoogleCloudStorageReadOptions readOptions,
-          byte[] expectedBytes,
-          int expectedBytesCount,
-          int offset)
-          throws IOException {
+      GoogleCloudStorage gcs,
+      StorageResourceId id,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes,
+      int expectedBytesCount,
+      int offset)
+      throws IOException {
     checkArgument(expectedBytesCount > 0, "expectedBytesCount should be greater than 0");
 
     int expectedBytesLength = expectedBytes.length;
@@ -204,20 +204,20 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static void assertObjectContent(
-          GoogleCloudStorage gcs,
-          StorageResourceId id,
-          GoogleCloudStorageReadOptions readOptions,
-          byte[] expectedBytes,
-          int expectedBytesCount)
-          throws IOException {
+      GoogleCloudStorage gcs,
+      StorageResourceId id,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes,
+      int expectedBytesCount)
+      throws IOException {
     assertObjectContent(gcs, id, readOptions, expectedBytes, expectedBytesCount, /* offset= */ 0);
   }
 
   public static void assertObjectContent(
-          GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
-          throws IOException {
+      GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
+      throws IOException {
     assertObjectContent(
-            gcs, id, GoogleCloudStorageReadOptions.DEFAULT, expectedBytes, expectedBytesCount);
+        gcs, id, GoogleCloudStorageReadOptions.DEFAULT, expectedBytes, expectedBytesCount);
   }
 
   private static byte[] getExpectedBytesRead(byte[] expectedBytes, long totalRead, int read) {
@@ -241,18 +241,18 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static byte[] writeObject(
-          GoogleCloudStorage gcs, StorageResourceId resourceId, int objectSize) throws IOException {
+      GoogleCloudStorage gcs, StorageResourceId resourceId, int objectSize) throws IOException {
     return writeObject(gcs, resourceId, objectSize, /* partitionsCount= */ 1);
   }
 
   public static byte[] writeObject(
-          GoogleCloudStorage gcs, StorageResourceId resourceId, int partitionSize, int partitionsCount)
-          throws IOException {
+      GoogleCloudStorage gcs, StorageResourceId resourceId, int partitionSize, int partitionsCount)
+      throws IOException {
     return writeObject(gcs.create(resourceId), partitionSize, partitionsCount);
   }
 
   public static byte[] writeObject(
-          WritableByteChannel channel, int partitionSize, int partitionsCount) throws IOException {
+      WritableByteChannel channel, int partitionSize, int partitionsCount) throws IOException {
     checkArgument(partitionsCount > 0, "partitionsCount should be greater than 0");
 
     byte[] partition = new byte[partitionSize];
@@ -266,15 +266,15 @@ public class GoogleCloudStorageTestHelper {
     }
     long endTime = System.currentTimeMillis();
     logger.atFine().log(
-            "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
+        "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
   }
 
   public static Map<String, byte[]> getDecodedMetadata(Map<String, String> metadata) {
     return metadata.entrySet().stream()
-            .collect(
-                    Collectors.toMap(
-                            entity -> entity.getKey(), entity -> decodeMetadataValues(entity.getValue())));
+        .collect(
+            Collectors.toMap(
+                entity -> entity.getKey(), entity -> decodeMetadataValues(entity.getValue())));
   }
 
   public static byte[] decodeMetadataValues(String value) {
@@ -295,14 +295,14 @@ public class GoogleCloudStorageTestHelper {
   public static StorageObject newStorageObject(String bucketName, String objectName) {
     Random r = new Random();
     return new StorageObject()
-            .setBucket(bucketName)
-            .setName(objectName)
-            .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
-            .setStorageClass("standard")
-            .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
-            .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
-            .setTimeCreated(new DateTime(new Date()))
-            .setUpdated(new DateTime(new Date()));
+        .setBucket(bucketName)
+        .setName(objectName)
+        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
+        .setStorageClass("standard")
+        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setTimeCreated(new DateTime(new Date()))
+        .setUpdated(new DateTime(new Date()));
   }
 
   /** Helper for dealing with buckets in GCS integration tests. */
@@ -313,7 +313,7 @@ public class GoogleCloudStorageTestHelper {
 
     // If bucket created before this time, it considered leaked
     private static final long LEAKED_BUCKETS_CUTOFF_TIME =
-            Instant.now().minus(Duration.ofHours(6)).toEpochMilli();
+        Instant.now().minus(Duration.ofHours(6)).toEpochMilli();
 
     private final String bucketPrefix;
     private final String uniqueBucketPrefix;
@@ -331,8 +331,8 @@ public class GoogleCloudStorageTestHelper {
       this.bucketPrefix = bucketPrefix + DELIMITER;
       this.uniqueBucketPrefix = makeUniqueBucketNamePrefix(bucketPrefix);
       checkState(
-              this.uniqueBucketPrefix.startsWith(this.bucketPrefix),
-              "uniqueBucketPrefix should start with bucketPrefix");
+          this.uniqueBucketPrefix.startsWith(this.bucketPrefix),
+          "uniqueBucketPrefix should start with bucketPrefix");
     }
 
     private static String makeUniqueBucketNamePrefix(String prefix) {
@@ -343,7 +343,7 @@ public class GoogleCloudStorageTestHelper {
       int usernamePrefixLen = min(username.length(), 8);
       username = username.substring(0, usernamePrefixLen);
       String uuidSuffix =
-              UUID.randomUUID().toString().replaceAll("-", "").substring(0, 12 - usernamePrefixLen);
+          UUID.randomUUID().toString().replaceAll("-", "").substring(0, 12 - usernamePrefixLen);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }
 
@@ -354,8 +354,8 @@ public class GoogleCloudStorageTestHelper {
      */
     public String getUniqueBucketName(String suffix) {
       checkArgument(
-              bucketPrefix.length() + suffix.length() <= 48,
-              "bucketPrefix and suffix can have cumulative length upto 48 chars to limit bucket name to 63 chars");
+          bucketPrefix.length() + suffix.length() <= 48,
+          "bucketPrefix and suffix can have cumulative length upto 48 chars to limit bucket name to 63 chars");
       return uniqueBucketPrefix + DELIMITER + suffix;
     }
 
@@ -366,13 +366,13 @@ public class GoogleCloudStorageTestHelper {
     public void cleanup(GoogleCloudStorage storage) throws IOException {
       Stopwatch storageStopwatch = Stopwatch.createStarted();
       logger.atInfo().log(
-              "Cleaning up GCS buckets that start with %s prefix or leaked", uniqueBucketPrefix);
+          "Cleaning up GCS buckets that start with %s prefix or leaked", uniqueBucketPrefix);
 
       List<String> bucketsToDelete = new ArrayList<>();
       for (GoogleCloudStorageItemInfo bucketInfo : storage.listBucketInfo()) {
         String bucketName = bucketInfo.getBucketName();
         if (bucketName.startsWith(bucketPrefix)
-                && (bucketName.startsWith(uniqueBucketPrefix)
+            && (bucketName.startsWith(uniqueBucketPrefix)
                 || bucketInfo.getCreationTime() < LEAKED_BUCKETS_CUTOFF_TIME)) {
           bucketsToDelete.add(bucketName);
         }
@@ -381,40 +381,40 @@ public class GoogleCloudStorageTestHelper {
       Collections.shuffle(bucketsToDelete);
       if (bucketsToDelete.size() > MAX_CLEANUP_BUCKETS) {
         logger.atInfo().log(
-                "GCS has %s buckets to cleanup. It's too many, will cleanup only %s buckets: %s",
-                bucketsToDelete.size(), MAX_CLEANUP_BUCKETS, bucketsToDelete);
+            "GCS has %s buckets to cleanup. It's too many, will cleanup only %s buckets: %s",
+            bucketsToDelete.size(), MAX_CLEANUP_BUCKETS, bucketsToDelete);
         bucketsToDelete = bucketsToDelete.subList(0, MAX_CLEANUP_BUCKETS);
       } else if (bucketsToDelete.size() > 0) {
         logger.atInfo().log(
-                "GCS has %s buckets to cleanup: %s", bucketsToDelete.size(), bucketsToDelete);
+            "GCS has %s buckets to cleanup: %s", bucketsToDelete.size(), bucketsToDelete);
       }
 
       List<GoogleCloudStorageItemInfo> objectsToDelete =
-              bucketsToDelete.parallelStream()
-                      .flatMap(
-                              bucket -> {
-                                try {
-                                  return storage
-                                          .listObjectInfo(
-                                                  bucket,
-                                                  /* objectNamePrefix= */ null,
-                                                  ListObjectOptions.DEFAULT_FLAT_LIST)
-                                          .stream();
-                                } catch (IOException e) {
-                                  throw new RuntimeException(e);
-                                }
-                              })
-                      .collect(toImmutableList());
+          bucketsToDelete.parallelStream()
+              .flatMap(
+                  bucket -> {
+                    try {
+                      return storage
+                          .listObjectInfo(
+                              bucket,
+                              /* objectNamePrefix= */ null,
+                              ListObjectOptions.DEFAULT_FLAT_LIST)
+                          .stream();
+                    } catch (IOException e) {
+                      throw new RuntimeException(e);
+                    }
+                  })
+              .collect(toImmutableList());
       logger.atInfo().log(
-              "GCS has %s objects to cleanup: %s", objectsToDelete.size(), objectsToDelete);
+          "GCS has %s objects to cleanup: %s", objectsToDelete.size(), objectsToDelete);
 
       try {
         storage.deleteObjects(
-                Lists.transform(objectsToDelete, GoogleCloudStorageItemInfo::getResourceId));
+            Lists.transform(objectsToDelete, GoogleCloudStorageItemInfo::getResourceId));
         storage.deleteBuckets(bucketsToDelete);
       } catch (IOException ioe) {
         logger.atWarning().withCause(ioe).log(
-                "Caught exception during GCS (%s) buckets cleanup", storage);
+            "Caught exception during GCS (%s) buckets cleanup", storage);
       }
 
       logger.atInfo().log("GCS cleaned up in %s seconds", storageStopwatch.elapsed().getSeconds());
@@ -434,24 +434,24 @@ public class GoogleCloudStorageTestHelper {
     public final T delegate;
 
     public TrackingStorageWrapper(
-            GoogleCloudStorageOptions options,
-            CheckedFunction2<TrackingHttpRequestInitializer, ImmutableList, T, IOException>
-                    delegateStorageFn,
-            Credentials credentials)
-            throws IOException {
+        GoogleCloudStorageOptions options,
+        CheckedFunction2<TrackingHttpRequestInitializer, ImmutableList, T, IOException>
+            delegateStorageFn,
+        Credentials credentials)
+        throws IOException {
       this.requestsTracker =
-              new TrackingHttpRequestInitializer(
-                      new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
+          new TrackingHttpRequestInitializer(
+              new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
       this.grpcRequestInterceptor = new TrackingGrpcRequestInterceptor();
       this.delegate =
-              delegateStorageFn.apply(this.requestsTracker, ImmutableList.of(grpcRequestInterceptor));
+          delegateStorageFn.apply(this.requestsTracker, ImmutableList.of(grpcRequestInterceptor));
     }
 
     public ImmutableList getAllRequestStrings() {
       return ImmutableList.builder()
-              .addAll(requestsTracker.getAllRequestStrings())
-              .addAll(grpcRequestInterceptor.getAllRequestStrings())
-              .build();
+          .addAll(requestsTracker.getAllRequestStrings())
+          .addAll(grpcRequestInterceptor.getAllRequestStrings())
+          .build();
     }
   }
 }

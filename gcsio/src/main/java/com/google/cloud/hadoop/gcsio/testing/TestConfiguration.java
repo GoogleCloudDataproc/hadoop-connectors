@@ -23,8 +23,8 @@ public abstract class TestConfiguration {
 
   public static final String GCS_TEST_DIRECT_PATH_PREFERRED = "GCS_TEST_DIRECT_PATH_PREFERRED";
 
-  public static final String GCS_TEST_APPLICATION_DEFAULT_ENABLE = "GCS_TEST_APPLICATION_DEFAULT_ENABLE";
-
+  public static final String GCS_TEST_APPLICATION_DEFAULT_ENABLE =
+      "GCS_TEST_APPLICATION_DEFAULT_ENABLE";
 
   /** Environment-based test configuration. */
   public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
@@ -39,11 +39,12 @@ public abstract class TestConfiguration {
     }
 
     @Override
-    public boolean isApplicationDefaultModeEnabled(){
-
+    public boolean isApplicationDefaultModeEnabled() {
       String applicationDefaultModeEnable = System.getenv(GCS_TEST_APPLICATION_DEFAULT_ENABLE);
+      if (applicationDefaultModeEnable == null) {
+        return false;
+      }
       return (Boolean.parseBoolean(applicationDefaultModeEnable));
-
     }
 
     @Override
