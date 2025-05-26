@@ -141,7 +141,8 @@ public abstract class GoogleCloudStorageOptions {
         .setTraceLogTimeThreshold(0)
         .setTraceLogExcludeProperties(ImmutableSet.of())
         .setHnBucketRenameEnabled(SET_HN_BUCKET_CREATE_ENABLED_DEFAULT)
-        .setGrpcWriteEnabled(GRPC_WRITE_DEFAULT);
+        .setGrpcWriteEnabled(GRPC_WRITE_DEFAULT)
+        .setMoveOperationEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -227,6 +228,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract long getTraceLogTimeThreshold();
 
   public abstract ImmutableSet<String> getTraceLogExcludeProperties();
+
+  public abstract boolean isMoveOperationEnabled();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -333,6 +336,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setTraceLogExcludeProperties(ImmutableSet<String> properties);
 
     public abstract Builder setGrpcWriteEnabled(boolean grpcWriteEnabled);
+
+    public abstract Builder setMoveOperationEnabled(boolean moveOperationEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
