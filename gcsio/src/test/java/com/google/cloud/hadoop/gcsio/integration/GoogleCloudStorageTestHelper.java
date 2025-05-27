@@ -69,7 +69,6 @@ import java.util.stream.Collectors;
 
 /** Helper methods for GCS integration tests. */
 public class GoogleCloudStorageTestHelper {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Application name for OAuth.
@@ -105,8 +104,7 @@ public class GoogleCloudStorageTestHelper {
     if (serviceAccountJsonKeyFile == null) {
       Boolean isApplicationDefaultModeEnabled =
           TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
-
-      if (isApplicationDefaultModeEnabled) {
+          if (isApplicationDefaultModeEnabled) {
         return GoogleCredentials.getApplicationDefault();
       } else {
         return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
