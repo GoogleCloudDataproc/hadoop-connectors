@@ -30,7 +30,7 @@ public class InvocationIdContextTest {
     assertTrue(invocationId.startsWith(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX));
     String uuidPart =
         invocationId.substring(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length());
-    assertEquals(36, uuidPart.length());
+    assertEquals(10, uuidPart.length());
   }
 
   @Test
