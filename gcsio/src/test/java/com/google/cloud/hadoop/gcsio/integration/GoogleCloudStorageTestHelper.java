@@ -104,7 +104,7 @@ public class GoogleCloudStorageTestHelper {
     if (serviceAccountJsonKeyFile == null) {
       Boolean isApplicationDefaultModeEnabled =
           TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
-          if (isApplicationDefaultModeEnabled) {
+      if (isApplicationDefaultModeEnabled) {
         return GoogleCredentials.getApplicationDefault();
       } else {
         return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
