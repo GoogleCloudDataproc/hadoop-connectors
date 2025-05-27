@@ -34,7 +34,8 @@ public class InvocationIdContext {
    * {@code GCCL_INVOCATION_ID_PREFIX}.
    */
   public static void setInvocationId() {
-    INVOCATION_ID.set(GCCL_INVOCATION_ID_PREFIX + UUID.randomUUID());
+      String uuid = UUID.randomUUID().toString().substring(0, 8);
+    INVOCATION_ID.set(GCCL_INVOCATION_ID_PREFIX + uuid);
   }
 
   /** Clears the invocation ID for the current thread. */
