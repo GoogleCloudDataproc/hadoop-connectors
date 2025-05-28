@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -166,7 +167,15 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
+    throwIfNotOpen();
+
+    if (dst.remaining() == 0) {
+      return 0;
+    }
     int bytesRead = contentReadChannel.read(dst);
+    if (currentPosition == objectSize) {
+      return -1;
+    }
     if (bytesRead > 0) {
       currentPosition += bytesRead;
     }
@@ -187,11 +196,18 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
 
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
+    throwIfNotOpen();
+
     if (newPosition < 0) {
       throw new IllegalArgumentException("Position cannot be negative");
     }
-    if (newPosition > objectSize) {
-      newPosition = objectSize;
+
+    if (objectSize >= 0 && newPosition >= objectSize) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new EOFException(
+              String.format(
+                      "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
+                      newPosition, objectSize, resourceId));
     }
 
     if (newPosition != currentPosition) {
@@ -219,6 +235,14 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
           throw new IOException("Error closing BlobReadSession: " + e.getMessage());
         }
       }
+    }
+  }
+}
+
+private void throwIfNotOpen() throws IOException {
+    if (!isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new ClosedChannelException();
     }
   }
 }
