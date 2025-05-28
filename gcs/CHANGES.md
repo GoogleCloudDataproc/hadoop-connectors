@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Skip Soft delete using move API during rename
 
 ## 2.2.27 - 2025-05-07
 1. Add AUTO_RANDOM as new fadvise mode.
