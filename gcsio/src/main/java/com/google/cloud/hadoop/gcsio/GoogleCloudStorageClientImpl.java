@@ -1052,12 +1052,21 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    return new GoogleCloudStorageClientReadChannel(
-        storage,
-        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-        readOptions,
-        errorExtractor,
-        storageOptions);
+    if (readOptions.isBidiReadEnabled()) {
+      return new GoogleCloudStorageBidiReadChannel(
+          storage,
+          itemInfo == null ? getItemInfo(resourceId) : itemInfo,
+          readOptions,
+          errorExtractor,
+          storageOptions);
+    } else {
+      return new GoogleCloudStorageBidiReadChannel(
+          storage,
+          itemInfo == null ? getItemInfo(resourceId) : itemInfo,
+          readOptions,
+          errorExtractor,
+          storageOptions);
+    }
   }
 
   @Override

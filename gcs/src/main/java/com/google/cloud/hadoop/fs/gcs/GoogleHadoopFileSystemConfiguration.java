@@ -545,6 +545,10 @@ public class GoogleHadoopFileSystemConfiguration {
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               AsyncWriteChannelOptions.DEFAULT.getPartFileCleanupType());
 
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiApiEnabled());
+
   /**
    * Configuration key to set up the naming strategy of part files created via
    * UploadType.PARALLEL_COMPOSITE_UPLOAD. It is in alignment with configuration of java-storage
@@ -618,7 +622,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
-        .setWriteChannelOptions(getWriteChannelOptions(config));
+        .setWriteChannelOptions(getWriteChannelOptions(config))
+        .setBidiApiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -650,6 +655,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setBidiReadEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

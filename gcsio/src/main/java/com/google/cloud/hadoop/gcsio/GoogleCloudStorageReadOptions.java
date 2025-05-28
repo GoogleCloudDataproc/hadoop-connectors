@@ -55,7 +55,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGzipEncodingSupportEnabled(false)
         .setInplaceSeekLimit(8 * 1024 * 1024)
         .setMinRangeRequestSize(2 * 1024 * 1024)
-        .setReadExactRequestedBytesEnabled(false);
+        .setReadExactRequestedBytesEnabled(false)
+        .setBidiReadEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -104,6 +105,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcReadTimeout(Duration)}. */
   public abstract Duration getGrpcReadMessageTimeout();
+
+  /** See {@link Builder#setBidiReadEnabled}. */
+  public abstract boolean isBidiReadEnabled();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -205,6 +209,8 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
+
+    public abstract Builder setBidiReadEnabled(boolean bidiReadEnabled);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
