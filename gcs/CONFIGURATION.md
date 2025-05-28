@@ -140,6 +140,10 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+*   `fs.gs.operation.move.enable` (default: `false`)
+
+    If set, rename operation uses GCS atomic move API instead of copy+delete.
+
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
