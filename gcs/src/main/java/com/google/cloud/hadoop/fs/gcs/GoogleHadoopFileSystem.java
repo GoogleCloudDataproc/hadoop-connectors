@@ -159,7 +159,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   // Request only object fields that are used in Hadoop FileStatus:
   // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
-  private static final String OBJECT_FIELDS = "bucket,name,size,updated";
+  private static final String OBJECT_FIELDS = "bucket,name,size,updated,generation";
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
   private static final String XATTR_KEY_PREFIX = "GHFS_XATTR_";
