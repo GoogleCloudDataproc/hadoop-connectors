@@ -104,11 +104,9 @@ public class GoogleCloudStorageTestHelper {
     if (serviceAccountJsonKeyFile == null) {
       Boolean isApplicationDefaultModeEnabled =
           TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
-      if (isApplicationDefaultModeEnabled) {
-        return GoogleCredentials.getApplicationDefault();
-      } else {
-        return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
-      }
+      return isApplicationDefaultModeEnabled
+          ? GoogleCredentials.getApplicationDefault()
+          : ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
     }
     try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
       return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
