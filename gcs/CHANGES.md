@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.3 - 2025-05-29
 1. Skip Soft delete using move API during rename
 2. Use Apiary isHnBucket for HNS checks
 
