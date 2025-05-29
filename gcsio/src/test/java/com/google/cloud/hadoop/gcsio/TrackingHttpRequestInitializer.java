@@ -50,11 +50,17 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String GET_BUCKET_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s";
 
+  private static final String GET_BUCKET_STORAGE_LAYOUT_REQUEST_FORMAT =
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/storageLayout";
+
   private static final String POST_REQUEST_FORMAT =
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s";
 
   private static final String POST_COPY_REQUEST_FORMAT =
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/%s/b/%s/o/%s";
+
+  private static final String POST_MOVE_REQUEST_FORMAT =
+      "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/%s/o/%s";
 
   private static final String POST_COPY_REQUEST_WITH_METADATA_FORMAT =
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/%s/b/%s/o/%s?ifGenerationMatch=%s";
@@ -261,6 +267,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(GET_BUCKET_REQUEST_FORMAT, bucketName);
   }
 
+  public static String getBucketStorageLayoutRequestString(String bucketName) {
+    return String.format(GET_BUCKET_STORAGE_LAYOUT_REQUEST_FORMAT, bucketName);
+  }
+
   public static String postRequestString(String bucketName, String object) {
     return String.format(POST_REQUEST_FORMAT, bucketName, urlEncode(object));
   }
@@ -325,6 +335,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
             urlEncode(dstObject),
             replaceGenerationId ? "generationId_" + generationId : generationId);
     return generationId == null ? request.replaceAll("ifGenerationMatch=[^&]+&", "") : request;
+  }
+
+  public static String moveRequestString(
+      String bucket, String srcObject, String dstObject, String requestType) {
+    return String.format(
+        POST_MOVE_REQUEST_FORMAT, bucket, urlEncode(srcObject), requestType, urlEncode(dstObject));
   }
 
   public static String uploadRequestString(String bucketName, String object, Integer generationId) {
