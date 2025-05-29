@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+1. Skip Soft delete using move API during rename
+2. Use Apiary isHnBucket for HNS checks
 
 ## 3.1.2 - 2025-05-06
 1. Upgrade to use cloud-storage libraries-bom
