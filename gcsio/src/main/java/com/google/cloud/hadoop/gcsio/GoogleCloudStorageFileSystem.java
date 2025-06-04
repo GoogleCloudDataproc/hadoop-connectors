@@ -1012,27 +1012,33 @@ public class GoogleCloudStorageFileSystem {
       return;
     }
 
-    String srcBucketName = null;
-    String dstBucketName = null;
-    List<String> srcObjectNames = new ArrayList<>(srcToDstItemNames.size());
-    List<String> dstObjectNames = new ArrayList<>(srcToDstItemNames.size());
+    // String srcBucketName = null;
+    // String dstBucketName = null;
+    // List<String> srcObjectNames = new ArrayList<>(srcToDstItemNames.size());
+    // List<String> dstObjectNames = new ArrayList<>(srcToDstItemNames.size());
+
+    Map<StorageResourceId, StorageResourceId> sourcesToDestinations = new HashMap<>();
 
     // Prepare list of items to copy.
     for (Map.Entry<FileInfo, URI> srcToDstItemName : srcToDstItemNames.entrySet()) {
-      StorageResourceId srcResourceId = srcToDstItemName.getKey().getItemInfo().getResourceId();
-      srcBucketName = srcResourceId.getBucketName();
-      String srcObjectName = srcResourceId.getObjectName();
-      srcObjectNames.add(srcObjectName);
+      GoogleCloudStorageItemInfo itemInfo = srcToDstItemName.getKey().getItemInfo();
+      StorageResourceId srcResourceId =
+          new StorageResourceId(
+              itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
+      logger.atInfo().log("TEST");
+      logger.atInfo().log(
+          "srcResourceId.getGenerationId() Generation ID: %d", srcResourceId.getGenerationId());
+      logger.atInfo().log(
+          "Content Generation ID: %d",
+          srcToDstItemName.getKey().getItemInfo().getContentGeneration());
 
       StorageResourceId dstResourceId =
           StorageResourceId.fromUriPath(srcToDstItemName.getValue(), true);
-      dstBucketName = dstResourceId.getBucketName();
-      String dstObjectName = dstResourceId.getObjectName();
-      dstObjectNames.add(dstObjectName);
+      sourcesToDestinations.put(srcResourceId, dstResourceId);
     }
 
     // Perform copy.
-    gcs.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+    gcs.copy(sourcesToDestinations);
   }
 
   /** Moves items in given map that maps source items to destination items. */
@@ -1045,7 +1051,11 @@ public class GoogleCloudStorageFileSystem {
 
     // Prepare list of items to move.
     for (Map.Entry<FileInfo, URI> srcToDstItemName : srcToDstItemNames.entrySet()) {
-      StorageResourceId srcResourceId = srcToDstItemName.getKey().getItemInfo().getResourceId();
+      GoogleCloudStorageItemInfo itemInfo = srcToDstItemName.getKey().getItemInfo();
+
+      StorageResourceId srcResourceId =
+          new StorageResourceId(
+              itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
 
       StorageResourceId dstResourceId =
           StorageResourceId.fromUriPath(srcToDstItemName.getValue(), true);

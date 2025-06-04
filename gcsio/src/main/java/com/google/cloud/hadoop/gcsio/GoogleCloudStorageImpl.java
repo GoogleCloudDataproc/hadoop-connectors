@@ -1268,6 +1268,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           sourceToDestinationObjectsMap.entrySet()) {
         StorageResourceId srcObject = entry.getKey();
         StorageResourceId dstObject = entry.getValue();
+        // long srcObjectGeneration = srcObject.getGenerationId();
         if (storageOptions.isCopyWithRewriteEnabled()) {
           // Rewrite request has the same effect as Copy, but it can handle moving
           // large objects that may potentially timeout a Copy request.
@@ -1276,6 +1277,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               innerExceptions,
               srcObject.getBucketName(),
               srcObject.getObjectName(),
+              srcObject.getGenerationId(),
               dstObject.getBucketName(),
               dstObject.getObjectName());
         } else {
@@ -1284,6 +1286,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               innerExceptions,
               srcObject.getBucketName(),
               srcObject.getObjectName(),
+              srcObject.getGenerationId(),
               dstObject.getGenerationId(),
               dstObject.getBucketName(),
               dstObject.getObjectName());
@@ -1366,6 +1369,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       final KeySetView<IOException, Boolean> innerExceptions,
       final String srcBucketName,
       final String srcObjectName,
+      final long srcObjectGeneration,
       final String dstBucketName,
       final String dstObjectName)
       throws IOException {
@@ -1377,6 +1381,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             srcBucketName);
     if (storageOptions.getMaxBytesRewrittenPerCall() > 0) {
       rewriteObject.setMaxBytesRewrittenPerCall(storageOptions.getMaxBytesRewrittenPerCall());
+    }
+
+    if (srcObjectGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      rewriteObject.setIfSourceGenerationMatch(srcObjectGeneration);
     }
 
     // TODO(b/79750454) do not batch rewrite requests because they time out in batches.
@@ -1433,12 +1441,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       final KeySetView<IOException, Boolean> innerExceptions,
       final String srcBucketName,
       final String srcObjectName,
+      final long srcContentGeneration,
       final long dstContentGeneration,
       final String dstBucketName,
       final String dstObjectName)
       throws IOException {
     Copy copy =
         storage.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null);
+
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      copy.setIfSourceGenerationMatch(srcContentGeneration);
+    }
 
     if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
       copy.setIfGenerationMatch(dstContentGeneration);
