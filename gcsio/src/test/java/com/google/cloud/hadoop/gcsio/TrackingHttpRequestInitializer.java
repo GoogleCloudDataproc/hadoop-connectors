@@ -42,6 +42,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding"
           + ",md5Hash,crc32c,metadata";
 
+  private static final String SOURCE_GENERATION_MATCH_TOKEN_PARAM_PATTERN =
+      "ifSourceGenerationMatch=[^&]+";
+
   private static final String GET_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s%s";
 
@@ -128,6 +131,14 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     this(/* delegate= */ null);
   }
 
+  private String replaceSourceGenerationMatchWithId(String request, AtomicLong sourceGenerationId) {
+    String idPrefix = "ifSourceGenerationMatch=sourceGenerationId_";
+    return replaceRequestParams
+        ? replaceWithId(
+            request, SOURCE_GENERATION_MATCH_TOKEN_PARAM_PATTERN, idPrefix, sourceGenerationId)
+        : request;
+  }
+
   public TrackingHttpRequestInitializer(HttpRequestInitializer delegate) {
     this(delegate, /* replaceRequestParams= */ true);
   }
@@ -165,6 +176,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong pageTokenId = new AtomicLong();
     AtomicLong rewriteTokenId = new AtomicLong();
     AtomicLong generationMatchId = new AtomicLong();
+    AtomicLong sourceGenerationMatchId = new AtomicLong();
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
@@ -172,6 +184,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .map(r -> replacePageTokenWithId(r, pageTokenId))
         .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
+        .map(r -> replaceSourceGenerationMatchWithId(r, sourceGenerationMatchId))
         .map(r -> replaceResumableUploadIdWithId(r, resumableUploadId))
         .collect(toImmutableList());
   }
@@ -331,6 +344,34 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
             urlEncode(dstObject),
             replaceGenerationId ? "generationId_" + generationId : generationId);
     return generationId == null ? request.replaceAll("ifGenerationMatch=[^&]+&", "") : request;
+  }
+
+  public static String copyRequestString(
+      String srcBucket,
+      String srcObject,
+      String dstBucket,
+      String dstObject,
+      String requestType,
+      long srcContentGenerationID,
+      long dstContentGenerationID) {
+    String baseUrl = copyRequestString(srcBucket, srcObject, dstBucket, dstObject, requestType);
+    return String.format(
+        "%s?ifGenerationMatch=%s&ifSourceGenerationMatch=%s",
+        baseUrl,
+        "generationId_" + dstContentGenerationID,
+        "sourceGenerationId_" + srcContentGenerationID);
+  }
+
+  public static String copyRequestString(
+      String srcBucket,
+      String srcObject,
+      String dstBucket,
+      String dstObject,
+      String requestType,
+      long srcContentGenerationID) {
+    String baseUrl = copyRequestString(srcBucket, srcObject, dstBucket, dstObject, requestType);
+    String sourceGenerationPlaceholder = "sourceGenerationId_" + srcContentGenerationID;
+    return String.format("%s?ifSourceGenerationMatch=%s", baseUrl, sourceGenerationPlaceholder);
   }
 
   public static String moveRequestString(

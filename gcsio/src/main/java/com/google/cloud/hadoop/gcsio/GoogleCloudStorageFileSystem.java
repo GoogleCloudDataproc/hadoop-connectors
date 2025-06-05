@@ -769,7 +769,13 @@ public class GoogleCloudStorageFileSystem {
                     srcInfo.getItemInfo().getContentGeneration()),
                 dstResourceId));
       } else {
-        gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
+        gcs.copy(
+            ImmutableMap.of(
+                new StorageResourceId(
+                    srcInfo.getItemInfo().getBucketName(),
+                    srcInfo.getItemInfo().getObjectName(),
+                    srcInfo.getItemInfo().getContentGeneration()),
+                dstResourceId));
 
         gcs.deleteObjects(
             ImmutableList.of(

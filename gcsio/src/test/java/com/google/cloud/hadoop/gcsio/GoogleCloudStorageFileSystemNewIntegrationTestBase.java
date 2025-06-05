@@ -846,7 +846,8 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 bucketName,
                 dirObject + "/f2",
                 "copyTo",
-                /* generationId= */ 1),
+                /* srcgeneration */ 1L,
+                /* dstgeneration */ 1L),
             deleteRequestString(bucketName, dirObject + "/f1", 2));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
@@ -889,7 +890,8 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 bucketName,
                 dirObject + "/f2",
                 "copyTo",
-                /* generationId= */ 1),
+                /* srcgeneration */ 1L,
+                /* dstgeneration */ 1L),
             deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 2));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
@@ -980,7 +982,6 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 /* includeTrailingDelimiter= */ null,
                 dirObject + "/srcParent/srcDir/",
                 "bucket,name,generation",
-
                 /* pageToken= */ null),
             // Copy file
             copyRequestString(
@@ -988,7 +989,8 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 dirObject + "/srcParent/srcDir/f",
                 bucketName,
                 dirObject + "/dstParent/dstDir/f",
-                "copyTo"),
+                "copyTo",
+                /* sourceGenerationId= */ 1L),
             // Delete src directory and file
             batchRequestString(),
             deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
@@ -1057,7 +1059,8 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 dirObject + "/srcParent/srcDir/f",
                 bucketName,
                 dirObject + "/dstParent/dstDir/f",
-                "copyTo"),
+                "copyTo",
+                /* sourceGenerationId= */ 1L),
             // Delete src directory and file
             batchRequestString(),
             deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
