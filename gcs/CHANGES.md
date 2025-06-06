@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 2.2.28 - 2025-05-28
 1. Skip Soft delete using move API during rename
 
 ## 2.2.27 - 2025-05-07
