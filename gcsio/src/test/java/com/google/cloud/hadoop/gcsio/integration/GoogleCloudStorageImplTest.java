@@ -352,6 +352,112 @@ public class GoogleCloudStorageImplTest {
     trackingGcs.delegate.close();
   }
 
+
+  /**
+   * Tests that a move operation succeeds and uses the ifSourceGenerationMatch precondition
+   * when the provided source object has a generation ID. This test does not add new helper methods.
+   */
+  @Test
+  public void moveObject_withSourceGenerationMatch_successful() throws IOException {
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_dst");
+    String content = "test-content-for-move";
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+
+    try (WritableByteChannel channel = helperGcs.create(srcResourceId)) {
+      channel.write(ByteBuffer.wrap(contentBytes));
+    }
+
+    GoogleCloudStorageItemInfo srcInfo = helperGcs.getItemInfo(srcResourceId);
+    assertThat(srcInfo.exists()).isTrue();
+
+    // Create a new resourceId for the source that includes its specific generation
+    StorageResourceId srcWithGeneration =
+        new StorageResourceId(
+            srcInfo.getResourceId().getBucketName(),
+            srcInfo.getResourceId().getObjectName(),
+            srcInfo.getContentGeneration());
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(
+            getStandardOptionBuilder().setCopyWithRewriteEnabled(false).build());
+
+    // Perform the move using the source object that has a generation ID
+    trackingGcs.delegate.move(ImmutableMap.of(srcWithGeneration, dstResourceId));
+
+    // Assert that the destination object exists and the source does not
+    assertObjectContent(helperGcs, dstResourceId, contentBytes);
+    assertThat(helperGcs.getItemInfo(srcResourceId).exists()).isFalse();
+
+    if (testStorageClientImpl) {
+      List<String> grpcRequests = trackingGcs.grpcRequestInterceptor.getAllRequestStrings();
+      assertThat(grpcRequests).isNotEmpty();
+      String moveRequest = grpcRequests.get(0);
+      assertThat(moveRequest).contains("MoveObject");
+    } else {
+      List<String> httpRequests = trackingGcs.requestsTracker.getAllRequestStrings();
+      String moveRequest =
+          httpRequests.stream()
+              .filter(r -> r.contains("/moveTo/"))
+              .findFirst()
+              .orElse(null);
+
+      assertThat(moveRequest).isNotNull();
+      // Assert it contains the source generation placeholder created by the updated tracker
+      assertThat(moveRequest).contains("ifSourceGenerationMatch=sourceGenerationId_1");
+    }
+
+    trackingGcs.delegate.close();
+  }
+
+  /**
+   * Tests that a move operation fails with Precondition Failed if an incorrect
+   * source generation ID is provided.
+   */
+  @Test
+  public void moveObject_withWrongSourceGenerationMatch_fails() throws IOException {
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_dst");
+
+    try (WritableByteChannel channel = helperGcs.create(srcResourceId)) {
+      channel.write(ByteBuffer.wrap("test-content".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    // Create a resourceId with a deliberately incorrect generation ID
+    long wrongGenerationId = 99999L;
+    StorageResourceId srcWithWrongGeneration =
+        new StorageResourceId(
+            srcResourceId.getBucketName(), srcResourceId.getObjectName(), wrongGenerationId);
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    // Assert that the move operation throws the correct exception
+    IOException thrown =
+        assertThrows(
+            IOException.class,
+            () -> trackingGcs.delegate.move(ImmutableMap.of(srcWithWrongGeneration, dstResourceId)));
+
+    Throwable cause = thrown.getCause();
+    if (testStorageClientImpl) {
+      assertThat(cause).isInstanceOf(StorageException.class);
+      assertThat(((StorageException) cause).getCode()).isEqualTo(412);
+    } else {
+      assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
+      assertThat(((GoogleJsonResponseException) cause).getStatusCode()).isEqualTo(412);
+    }
+
+    // Verify the source object was not moved and the destination was not created
+    assertThat(helperGcs.getItemInfo(srcResourceId).exists()).isTrue();
+    assertThat(helperGcs.getItemInfo(dstResourceId).exists()).isFalse();
+
+    trackingGcs.delegate.close();
+  }
+
   @Test
   public void writeLargeObject_withSmallUploadChunk() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
@@ -582,6 +688,89 @@ public class GoogleCloudStorageImplTest {
                         /* finishWrite */ true))
                 .build()
                 .toArray());
+    trackingGcs.delegate.close();
+  }
+
+  /**
+   * Tests that a copy operation succeeds and uses the ifSourceGenerationMatch precondition
+   * when the provided source object has a generation ID.
+   * This test uses only existing helper methods.
+   */
+  @Test
+  public void copy_withSourceGenerationMatch_successful() throws IOException {
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_dst");
+    String content = "test-content-for-source-generation-match";
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+
+    try (WritableByteChannel channel = helperGcs.create(srcResourceId)) {
+      channel.write(ByteBuffer.wrap(contentBytes));
+    }
+
+    GoogleCloudStorageItemInfo srcInfo = helperGcs.getItemInfo(srcResourceId);
+    assertThat(srcInfo.exists()).isTrue();
+
+    StorageResourceId srcWithGeneration =
+        new StorageResourceId(
+            srcInfo.getResourceId().getBucketName(),
+            srcInfo.getResourceId().getObjectName(),
+            srcInfo.getContentGeneration());
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    trackingGcs.delegate.copy(ImmutableMap.of(srcWithGeneration, dstResourceId));
+
+    assertObjectContent(helperGcs, dstResourceId, contentBytes);
+
+    List<String> httpRequests = trackingGcs.requestsTracker.getAllRequestStrings();
+    String copyRequest =
+          httpRequests.stream()
+              .filter(r -> r.contains("/copyTo/"))
+              .findFirst()
+              .orElse(null);
+
+    assertThat(copyRequest).isNotNull();
+    // Assert it contains the source generation placeholder created by the updated tracker
+    assertThat(copyRequest).contains("ifSourceGenerationMatch=sourceGenerationId_1");
+
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void copy_withWrongSourceGenerationMatch_fails() throws IOException {
+    StorageResourceId srcResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_src");
+    StorageResourceId dstResourceId =
+        new StorageResourceId(testBucket, name.getMethodName() + "_dst");
+
+    try (WritableByteChannel channel = helperGcs.create(srcResourceId)) {
+      channel.write(ByteBuffer.wrap("test-content".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    // Create a resourceId for the source with a deliberately incorrect generation ID
+    long wrongGenerationId = 99999L;
+    StorageResourceId srcWithWrongGeneration =
+        new StorageResourceId(
+            srcResourceId.getBucketName(), srcResourceId.getObjectName(), wrongGenerationId);
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    // Assert that the copy operation throws the correct exception
+    IOException thrown =
+        assertThrows(
+            IOException.class,
+            () -> trackingGcs.delegate.copy(ImmutableMap.of(srcWithWrongGeneration, dstResourceId)));
+
+    Throwable cause = thrown.getCause();
+    assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
+    assertThat(((GoogleJsonResponseException) cause).getStatusCode()).isEqualTo(412);
+
+    assertThat(helperGcs.getItemInfo(dstResourceId).exists()).isFalse();
+
     trackingGcs.delegate.close();
   }
 
