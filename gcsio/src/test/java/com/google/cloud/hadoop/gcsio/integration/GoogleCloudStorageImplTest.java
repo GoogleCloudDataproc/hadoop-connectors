@@ -352,10 +352,9 @@ public class GoogleCloudStorageImplTest {
     trackingGcs.delegate.close();
   }
 
-
   /**
-   * Tests that a move operation succeeds and uses the ifSourceGenerationMatch precondition
-   * when the provided source object has a generation ID. This test does not add new helper methods.
+   * Tests that a move operation succeeds and uses the ifSourceGenerationMatch precondition when the
+   * provided source object has a generation ID. This test does not add new helper methods.
    */
   @Test
   public void moveObject_withSourceGenerationMatch_successful() throws IOException {
@@ -399,10 +398,7 @@ public class GoogleCloudStorageImplTest {
     } else {
       List<String> httpRequests = trackingGcs.requestsTracker.getAllRequestStrings();
       String moveRequest =
-          httpRequests.stream()
-              .filter(r -> r.contains("/moveTo/"))
-              .findFirst()
-              .orElse(null);
+          httpRequests.stream().filter(r -> r.contains("/moveTo/")).findFirst().orElse(null);
 
       assertThat(moveRequest).isNotNull();
       // Assert it contains the source generation placeholder created by the updated tracker
@@ -413,8 +409,8 @@ public class GoogleCloudStorageImplTest {
   }
 
   /**
-   * Tests that a move operation fails with Precondition Failed if an incorrect
-   * source generation ID is provided.
+   * Tests that a move operation fails with Precondition Failed if an incorrect source generation ID
+   * is provided.
    */
   @Test
   public void moveObject_withWrongSourceGenerationMatch_fails() throws IOException {
@@ -440,7 +436,8 @@ public class GoogleCloudStorageImplTest {
     IOException thrown =
         assertThrows(
             IOException.class,
-            () -> trackingGcs.delegate.move(ImmutableMap.of(srcWithWrongGeneration, dstResourceId)));
+            () ->
+                trackingGcs.delegate.move(ImmutableMap.of(srcWithWrongGeneration, dstResourceId)));
 
     Throwable cause = thrown.getCause();
     if (testStorageClientImpl) {
@@ -692,9 +689,8 @@ public class GoogleCloudStorageImplTest {
   }
 
   /**
-   * Tests that a copy operation succeeds and uses the ifSourceGenerationMatch precondition
-   * when the provided source object has a generation ID.
-   * This test uses only existing helper methods.
+   * Tests that a copy operation succeeds and uses the ifSourceGenerationMatch precondition when the
+   * provided source object has a generation ID. This test uses only existing helper methods.
    */
   @Test
   public void copy_withSourceGenerationMatch_successful() throws IOException {
@@ -727,10 +723,7 @@ public class GoogleCloudStorageImplTest {
 
     List<String> httpRequests = trackingGcs.requestsTracker.getAllRequestStrings();
     String copyRequest =
-          httpRequests.stream()
-              .filter(r -> r.contains("/copyTo/"))
-              .findFirst()
-              .orElse(null);
+        httpRequests.stream().filter(r -> r.contains("/copyTo/")).findFirst().orElse(null);
 
     assertThat(copyRequest).isNotNull();
     // Assert it contains the source generation placeholder created by the updated tracker
@@ -763,7 +756,8 @@ public class GoogleCloudStorageImplTest {
     IOException thrown =
         assertThrows(
             IOException.class,
-            () -> trackingGcs.delegate.copy(ImmutableMap.of(srcWithWrongGeneration, dstResourceId)));
+            () ->
+                trackingGcs.delegate.copy(ImmutableMap.of(srcWithWrongGeneration, dstResourceId)));
 
     Throwable cause = thrown.getCause();
     assertThat(cause).isInstanceOf(GoogleJsonResponseException.class);
