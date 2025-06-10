@@ -191,6 +191,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     logger.atFiner().log("create(%s)", resourceId);
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
     // Update resourceId if generationId is missing
     StorageResourceId resourceIdWithGeneration = resourceId;
     if (!resourceId.hasGenerationId()) {
@@ -201,8 +202,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    return new GoogleCloudStorageClientWriteChannel(
-        storage, storageOptions, resourceIdWithGeneration, options);
+    String locationType = storage.get(resourceId.getBucketName()).getLocationType();
+
+    if (locationType.equals("zone")) {
+      return new GoogleCloudStorageBidiWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    } else {
+      return new GoogleCloudStorageClientWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    }
   }
 
   /**
@@ -1052,7 +1060,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    if (readOptions.isBidiReadEnabled()) {
+
+    String locationType = storage.get(itemInfo.getBucketName()).getLocationType();
+
+    System.out.println("Location: " + locationType);
+    if (locationType.equals("zone")) {
       return new GoogleCloudStorageBidiReadChannel(
           storage,
           itemInfo == null ? getItemInfo(resourceId) : itemInfo,
@@ -1060,7 +1072,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           errorExtractor,
           storageOptions);
     } else {
-      return new GoogleCloudStorageBidiReadChannel(
+      return new GoogleCloudStorageClientReadChannel(
           storage,
           itemInfo == null ? getItemInfo(resourceId) : itemInfo,
           readOptions,

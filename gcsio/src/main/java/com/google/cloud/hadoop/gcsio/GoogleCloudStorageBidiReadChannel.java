@@ -19,6 +19,8 @@ import static com.google.common.base.Preconditions.*;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.*;
 
+import java.nio.charset.Charset;         // The main class for representing a charset
+import java.nio.charset.StandardCharsets; // For predefined standard charsets
 import com.google.api.core.ApiFuture;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
@@ -54,13 +56,15 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
   private long objectSize;
   private final ErrorTypeExtractor errorExtractor;
   private BlobReadSession blobReadSession;
-  private SeekableByteChannel contentReadChannel;
+  @VisibleForTesting
+  public SeekableByteChannel contentReadChannel;
   private boolean gzipEncoded = false;
   private boolean open = true;
 
   // Current position in this channel, it could be different from contentChannelCurrentPosition if
   // position(long) method calls were made without calls to read(ByteBuffer) method.
-  private long currentPosition = 0;
+  @VisibleForTesting
+  public long currentPosition = 0;
 
   /**
    * @param storage The GCS Storage client to use for operations.
@@ -133,12 +137,12 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
   protected void initMetadata(@Nullable String encoding, long sizeFromMetadata) throws IOException {
     // Not handling gzipEncoding for now.
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
-    if (gzipEncoded) {
+    if (gzipEncoded & !readOptions.isGzipEncodingSupportEnabled()) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           "Cannot read GZIP encoded files - content encoding support is disabled.");
     }
-    objectSize = sizeFromMetadata;
+    objectSize = gzipEncoded ? Long.MAX_VALUE : sizeFromMetadata;
   }
 
   @Override
@@ -173,6 +177,12 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
       return 0;
     }
     int bytesRead = contentReadChannel.read(dst);
+//    System.out.println("Dst");
+//    Charset charset = StandardCharsets.UTF_8;
+//    String decodedString1 = charset.decode(dst).toString();
+//    System.out.println("Decoded String (using Charset.decode()): " + decodedString1);
+//    System.out.println("BytesRead");
+//    System.out.println(bytesRead);
     if (currentPosition == objectSize) {
       return -1;
     }
@@ -196,6 +206,7 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
 
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
+    System.out.println("Position function is called");
     throwIfNotOpen();
 
     if (newPosition < 0) {
@@ -205,13 +216,17 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
     if (objectSize >= 0 && newPosition >= objectSize) {
       GoogleCloudStorageEventBus.postOnException();
       throw new EOFException(
-              String.format(
-                      "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
-                      newPosition, objectSize, resourceId));
+          String.format(
+              "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
+              newPosition, objectSize, resourceId));
     }
 
     if (newPosition != currentPosition) {
-      contentReadChannel.position(newPosition);
+      System.out.println("New Position");
+      System.out.println(newPosition);
+      this.contentReadChannel.position(newPosition);
+      System.out.println("Content Read Channel Position");
+      System.out.println(contentReadChannel.position());
       this.currentPosition = newPosition;
     }
     return this;
@@ -237,9 +252,8 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
       }
     }
   }
-}
 
-private void throwIfNotOpen() throws IOException {
+  private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
       GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();

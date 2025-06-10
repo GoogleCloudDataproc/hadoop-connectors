@@ -547,7 +547,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.operation.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiApiEnabled());
+          "fs.gs.operation.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiReadEnabled());
 
   /**
    * Configuration key to set up the naming strategy of part files created via
@@ -622,8 +622,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
-        .setWriteChannelOptions(getWriteChannelOptions(config))
-        .setBidiApiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean));
+        .setWriteChannelOptions(getWriteChannelOptions(config));
   }
 
   @VisibleForTesting
