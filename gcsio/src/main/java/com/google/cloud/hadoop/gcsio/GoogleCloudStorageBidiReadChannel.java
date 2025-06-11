@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.*;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.*;
 
+import java.nio.Buffer;
 import java.nio.charset.Charset;         // The main class for representing a charset
 import java.nio.charset.StandardCharsets; // For predefined standard charsets
 import com.google.api.core.ApiFuture;
@@ -177,6 +178,8 @@ class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel {
       return 0;
     }
     int bytesRead = contentReadChannel.read(dst);
+    ByteBuffer temp = ByteBuffer.allocate((int) readOptions.getMinRangeRequestSize());
+
 //    System.out.println("Dst");
 //    Charset charset = StandardCharsets.UTF_8;
 //    String decodedString1 = charset.decode(dst).toString();
