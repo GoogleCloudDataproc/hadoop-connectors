@@ -84,6 +84,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
     this.totalLength = 0;
     this.cumulativeCrc32c = Hashing.crc32c().newHasher();
     this.actualCrc32c = "";
+    System.out.println("In GoogleCloudStorageWriteChannel constructor");
   }
 
   @Override
@@ -111,6 +112,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
 
   @Override
   public void close() throws IOException {
+    System.out.println("In GoogleCloudStorageWriteChannel , closing channel");
     if (super.isOpen()) {
       super.close();
       closeInteral();
@@ -135,6 +137,8 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
 
   @Override
   public void startUpload(InputStream pipeSource) throws IOException {
+
+    System.out.println("In GoogleCloudStorageWriteChannel , starting upload");
     // Connect pipe-source to the stream used by uploader.
     InputStreamContent objectContentStream =
         new InputStreamContent(getContentType(), pipeSource)

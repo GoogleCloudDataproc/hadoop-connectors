@@ -647,6 +647,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
 
           checkOpen();
+          System.out.println("create fs output stream in Google hadoop FS");
 
           logger.atFiner().log(
               "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
@@ -1985,6 +1986,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     @Override
     public void write(DataOutput out) throws IOException {
+      System.out.println("Writing the file output");
       out.write(bytes);
     }
 
