@@ -26,10 +26,14 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS. */
@@ -46,6 +50,11 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   private final ClientRequestHelper<StorageObject> clientRequestHelper;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
+
+  private final Hasher cumulativeCrc32c;
+  private long totalLength;
+
+  private String actualCrc32c;
 
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
@@ -72,6 +81,56 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
+    this.totalLength = 0;
+    this.cumulativeCrc32c = Hashing.crc32c().newHasher();
+    this.actualCrc32c = "";
+  }
+
+  @Override
+  public int write(ByteBuffer src) throws IOException {
+    ByteBuffer dup = src.duplicate();
+    int written = super.write(src);
+    hash(dup, written);
+    return written;
+  }
+
+  private long hash(ByteBuffer src, long written) {
+    ByteBuffer buffer = src.slice();
+    int remaining = buffer.remaining();
+    int consumed = remaining;
+    if (written < remaining) {
+      int intExact = Math.toIntExact(written);
+      buffer.limit(intExact);
+      consumed = intExact;
+    }
+    totalLength += remaining;
+    cumulativeCrc32c.putBytes(buffer);
+    src.position(src.position() + consumed);
+    return consumed;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (super.isOpen()) {
+      super.close();
+      closeInteral();
+    }
+  }
+
+  private void closeInteral() throws IOException {
+    try {
+      String srcCrc = cumulativeCrc32c.toString();
+      String destCrc = uploadOperation.get().getCrc32c();
+
+      System.out.println("Src CRC32 = " + srcCrc + "Destination CRC32 = " + destCrc);
+      if (srcCrc != destCrc) {
+        throw new IOException("");
+      }
+    } catch (InterruptedException e) {
+      throw new IOException(e.getCause());
+    } catch (ExecutionException e) {
+      throw new IOException(e.getCause());
+    }
   }
 
   @Override
