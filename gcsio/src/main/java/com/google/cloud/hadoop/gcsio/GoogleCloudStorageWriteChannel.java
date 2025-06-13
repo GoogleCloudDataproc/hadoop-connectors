@@ -53,7 +53,6 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   private final Hasher cumulativeCrc32c;
-  private long totalLength;
 
   private String actualCrc32c;
 
@@ -86,7 +85,6 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
-    this.totalLength = 0;
     this.cumulativeCrc32c = Hashing.crc32c().newHasher();
     this.actualCrc32c = "";
     this.storageOptions = options;
@@ -111,7 +109,6 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       buffer.limit(intExact);
       consumed = intExact;
     }
-    totalLength += remaining;
     cumulativeCrc32c.putBytes(buffer);
     src.position(src.position() + consumed);
     return consumed;
