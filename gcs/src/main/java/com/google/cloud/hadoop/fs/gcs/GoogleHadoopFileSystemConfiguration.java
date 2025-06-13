@@ -113,7 +113,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * response.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_CHECKSUM_WRITE_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.hierarchical.checksum.write.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.operation.checksum.write.enable", false);
 
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
@@ -641,11 +641,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
-<<<<<<< checksum-json-api-3.0
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
         .setChecksumWriteEnabled(GCS_CHECKSUM_WRITE_ENABLE.get(config, config::getBoolean));
-=======
-        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
->>>>>>> branch-3.0.x
   }
 
   @VisibleForTesting
