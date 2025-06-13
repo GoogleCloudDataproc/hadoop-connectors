@@ -26,9 +26,20 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+import com.google.common.io.BaseEncoding;
+import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.charset.Charset;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
@@ -46,6 +57,13 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   private final ClientRequestHelper<StorageObject> clientRequestHelper;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
+
+  private final Hasher cumulativeCrc32c;
+  private long totalLength;
+
+  private static String actualCrc32c;
+
+  private GoogleCloudStorage gcsimpl;
 
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
@@ -65,17 +83,154 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       AsyncWriteChannelOptions channelOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
-      ObjectWriteConditions writeConditions) {
+      ObjectWriteConditions writeConditions,
+      GoogleCloudStorage gcsimpl) {
     super(uploadThreadPool, channelOptions);
     this.clientRequestHelper = requestHelper;
     this.gcs = gcs;
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
+    this.totalLength = 0;
+    this.cumulativeCrc32c = Hashing.crc32c().newHasher();
+    this.actualCrc32c = "";
+    this.gcsimpl = gcsimpl;
+    System.out.println("In GoogleCloudStorageWriteChannel constructor");
   }
 
   @Override
+  public synchronized int write(ByteBuffer src) throws IOException {
+    System.out.println("Animesh: write call");
+    System.out.println(src.toString().length());
+    ByteBuffer dup = src.duplicate();
+    int written = super.write(src);
+    hash(dup, written);
+    return written;
+  }
+
+  private long hash(ByteBuffer src, long written) {
+    ByteBuffer buffer = src.slice();
+    int remaining = buffer.remaining();
+    int consumed = remaining;
+    if (written < remaining) {
+      int intExact = Math.toIntExact(written);
+      buffer.limit(intExact);
+      consumed = intExact;
+    }
+    totalLength += remaining;
+    cumulativeCrc32c.putBytes(buffer);
+    src.position(src.position() + consumed);
+    return consumed;
+  }
+
+  @Override
+  public void close() throws IOException {
+    System.out.println("In GoogleCloudStorageWriteChannel , closing channel");
+    if (super.isOpen()) {
+      super.close();
+      closeInteral();
+    }
+  }
+
+  private void closeInteral() throws IOException {
+    // String srcCrc = cumulativeCrc32c.hash().toString();
+    String srcCrc = BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32c.hash().asInt()));
+    // String srcCrc = Base64.getEncoder().encodeToString(cumulativeCrc32c.hash().asBytes());
+    String destCrc = this.actualCrc32c;
+
+    // byte[] srcbytes = cumulativeCrc32c.hash().asBytes();
+    // byte[] destbytes = hexStringToByteArray(this.actualCrc32c);
+
+    logger.atSevere().log("Src CRC32: '%s'. dest CRC32: %s", srcCrc, destCrc);
+    if (srcCrc.equals(destCrc)) {
+      System.out.println("Restoring object...");
+      deleteOrRestoreObject();
+      throw new IOException("");
+    }
+  }
+
+  private void deleteOrRestoreObject() {
+    // GoogleCloudStorageImpl gcsUtil = new
+    // GoogleCloudStorageImpl(options.getCloudStorageOptions());
+    // GoogleCloudStorageImpl gcsUtil = GoogleCloudStorageImpl.builder()
+    //     .setOptions(options.getCloudStorageOptions())
+    //     .setCredentials(credentials)
+    //     .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+    //     .build();
+    try {
+
+      SeekableByteChannel readchannel = this.gcsimpl.open(this.resourceId);
+      byte[] buffer = new byte[8000]; // 8KB
+      readchannel.read(ByteBuffer.wrap(buffer));
+      System.out.println(
+          ".....File before restore: " + new String(buffer, Charset.defaultCharset()));
+
+      ListObjectOptions options = ListObjectOptions.builder().setVersionEnabled(true).build();
+      List<GoogleCloudStorageItemInfo> itemList =
+          this.gcsimpl.listObjectInfo(
+              this.resourceId.getBucketName(), this.resourceId.getObjectName(), options);
+
+      System.out.println(".....version count: " + itemList.size());
+
+      GoogleCloudStorageItemInfo last = null;
+      GoogleCloudStorageItemInfo secondToLast = null;
+      int len = itemList.size();
+      if (len >= 1) {
+        last = itemList.get(len - 1);
+      }
+      if (len >= 2) {
+        secondToLast = itemList.get(len - 2);
+      }
+      List<StorageResourceId> objectsTodelete = new ArrayList<StorageResourceId>();
+
+      if (secondToLast != null && last != null) {
+
+        StorageResourceId src = secondToLast.getResourceId();
+        StorageResourceId dest = last.getResourceId();
+
+        Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>(1);
+        sourceToDestinationObjectsMap.put(src, dest);
+
+        this.gcsimpl.copy(sourceToDestinationObjectsMap);
+
+        objectsTodelete.add(secondToLast.getResourceId());
+        this.gcsimpl.deleteObjects(objectsTodelete);
+
+        // reading after restore
+        readchannel = this.gcsimpl.open(this.resourceId);
+        buffer = new byte[8000]; // 8KB
+        readchannel.read(ByteBuffer.wrap(buffer));
+        System.out.println(
+            ".....File after restore: " + new String(buffer, Charset.defaultCharset()));
+
+      } else if (last != null) {
+        // deleting last object as it was the only one
+        objectsTodelete.add(last.getResourceId());
+        this.gcsimpl.deleteObjects(objectsTodelete);
+        System.out.println(
+            ".....File after delete: " + new String(buffer, Charset.defaultCharset()));
+      }
+
+    } catch (Exception e) {
+      System.out.println("Failed to restore. Possible corrupt state " + e.getMessage());
+    }
+  }
+
+  // public static byte[] hexStringToByteArray(String s) {
+  //   int len = s.length();
+  //   byte[] data = new byte[len / 2];
+  //   for (int i = 0; i < len; i += 2) {
+  //     data[i / 2] =
+  //         (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1),
+  // 16));
+  //   }
+  //   return data;
+  // }
+
+  @Override
   public void startUpload(InputStream pipeSource) throws IOException {
+
+    System.out.println("In GoogleCloudStorageWriteChannel , starting upload 1");
     // Connect pipe-source to the stream used by uploader.
     InputStreamContent objectContentStream =
         new InputStreamContent(getContentType(), pipeSource)
@@ -172,7 +327,10 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
-        return uploadObject.execute();
+        StorageObject resp = uploadObject.execute();
+        actualCrc32c = resp.getCrc32c();
+        System.out.println("crc from server" + resp.getCrc32c());
+        return resp;
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();
         StorageObject response = createResponseFromException(e);
