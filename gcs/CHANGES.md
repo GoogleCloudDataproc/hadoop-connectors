@@ -1,6 +1,15 @@
 # Release Notes
 
 ## Next
+1. Skip Soft delete using move API during rename
+2. Use Apiary isHnBucket for HNS checks
+
+## 3.0.7 - 2025-05-06
+1. Optimize channel creation in vectoredRead
+1. Update GhfsThreadLocalStats with read vectored metrices
+
+## 3.0.6 - 2025-04-02
+1. Add AUTO_RANDOM as new fadvise mode.
 
 ## 3.0.5 - 2025-02-26
 1. PR #1274 - Upgrade google-cloud-storage to 2.44.1

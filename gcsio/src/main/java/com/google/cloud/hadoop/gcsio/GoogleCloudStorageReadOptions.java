@@ -32,7 +32,8 @@ public abstract class GoogleCloudStorageReadOptions {
   public enum Fadvise {
     AUTO,
     RANDOM,
-    SEQUENTIAL
+    SEQUENTIAL,
+    AUTO_RANDOM
   }
 
   // Default builder should be initialized after default values,
@@ -54,7 +55,10 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGrpcReadZeroCopyEnabled(true)
         .setGzipEncodingSupportEnabled(false)
         .setInplaceSeekLimit(8 * 1024 * 1024)
-        .setMinRangeRequestSize(2 * 1024 * 1024);
+        .setMinRangeRequestSize(2 * 1024 * 1024)
+        .setBlockSize(64 * 1024 * 1024)
+        .setFadviseRequestTrackCount(3)
+        .setReadExactRequestedBytesEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -92,6 +96,9 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean isGrpcChecksumsEnabled();
 
+  /** See {@link Builder#setReadExactRequestedBytesEnabled}. */
+  public abstract boolean isReadExactRequestedBytesEnabled();
+
   /** See {@link Builder#setGrpcReadTimeout}. */
   public abstract Duration getGrpcReadTimeout();
 
@@ -100,6 +107,10 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcReadTimeout(Duration)}. */
   public abstract Duration getGrpcReadMessageTimeout();
+
+  public abstract long getBlockSize();
+
+  public abstract int getFadviseRequestTrackCount();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -168,6 +179,9 @@ public abstract class GoogleCloudStorageReadOptions {
      * <ul>
      *   <li>{@code AUTO} - automatically switches to {@code RANDOM} mode if backward read or
      *       forward read for more than {@link #setInplaceSeekLimit} bytes is detected.
+     *   <li>{@code AUTO_RANDOM} - Uses {@code RANDOM} to start with and automatically switches to
+     *       {@code SEQUENTIAL} mode if more than 2 requests fall within {@link
+     *       #setInplaceSeekLimit} limits.
      *   <li>{@code RANDOM} - sends HTTP requests with {@code Range} header set to greater of
      *       provided reade buffer by user.
      *   <li>{@code SEQUENTIAL} - sends HTTP requests with unbounded {@code Range} header.
@@ -190,6 +204,9 @@ public abstract class GoogleCloudStorageReadOptions {
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
+    public abstract Builder setReadExactRequestedBytesEnabled(
+        boolean readExactRequestedBytesEnabled);
+
     /** Sets the property to override the default GCS gRPC read stream timeout. */
     public abstract Builder setGrpcReadTimeout(Duration grpcReadTimeout);
 
@@ -198,6 +215,10 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
+
+    public abstract Builder setBlockSize(long blockSize);
+
+    public abstract Builder setFadviseRequestTrackCount(int requestTrackCount);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

@@ -231,6 +231,13 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.batch.threads", GoogleCloudStorageOptions.DEFAULT.getBatchThreads());
 
   /**
+   * Configuration key for number of request to track for adapting the access pattern i.e. fadvise:
+   * AUTO & AUTO_RANDOM.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_FADVISE_REQUEST_TRACK_COUNT =
+      new HadoopConfigurationProperty<>("fs.gs.fadvise.request.track.count", 3);
+
+  /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
    * has the same effect as Copy request, but it can handle moving large objects that may
    * potentially time out a Copy request.
@@ -565,6 +572,12 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
           AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
+  /** Configuration key for enabling move operation in gcs instead of copy+delete. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_MOVE_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.move.enable",
+          GoogleCloudStorageOptions.DEFAULT.isMoveOperationEnabled());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -628,7 +641,11 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
+<<<<<<< checksum-json-api-3.0
         .setChecksumWriteEnabled(GCS_CHECKSUM_WRITE_ENABLE.get(config, config::getBoolean));
+=======
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
+>>>>>>> branch-3.0.x
   }
 
   @VisibleForTesting
@@ -660,6 +677,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .build();
   }
 
