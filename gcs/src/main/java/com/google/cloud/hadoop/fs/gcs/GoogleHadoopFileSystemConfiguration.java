@@ -106,6 +106,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_HIERARCHICAL_NAMESPACE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", false);
 
+  /**
+   * Configuration key for checksum writes
+   *
+   * <p>If this is enabled, write channel will calculate rolling checksum and compare it from server
+   * response.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_CHECKSUM_WRITE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.hierarchical.checksum.write.enable", false);
+
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
@@ -618,7 +627,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
-        .setWriteChannelOptions(getWriteChannelOptions(config));
+        .setWriteChannelOptions(getWriteChannelOptions(config))
+        .setChecksumWriteEnabled(GCS_CHECKSUM_WRITE_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting

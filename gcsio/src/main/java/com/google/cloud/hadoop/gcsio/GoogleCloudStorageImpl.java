@@ -439,7 +439,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             storageOptions.getWriteChannelOptions(),
             resourceId,
             options,
-            writeConditions) {
+            writeConditions,
+            storageOptions) {
           @Override
           public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
               throws IOException {
