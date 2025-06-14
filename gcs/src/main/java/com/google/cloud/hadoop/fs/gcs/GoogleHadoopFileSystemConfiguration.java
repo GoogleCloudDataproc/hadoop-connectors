@@ -296,10 +296,10 @@ public class GoogleHadoopFileSystemConfiguration {
           (long) AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize());
 
   /**
-   * Configuration key for rolling checksum on writes
+   * Configuration key for rolling checksum on writes.
    *
-   * <p>If this is enabled, write channel will calculate rolling checksum and compare it from server
-   * response.
+   * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
+   * server response.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
       new HadoopConfigurationProperty<>(

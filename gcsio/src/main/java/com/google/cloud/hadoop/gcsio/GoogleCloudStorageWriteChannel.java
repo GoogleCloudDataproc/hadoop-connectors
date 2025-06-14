@@ -172,9 +172,9 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
-        StorageObject resp = uploadObject.execute();
-        serverProvidedCrc32c = resp.getCrc32c();
-        return resp;
+        StorageObject response = uploadObject.execute();
+        serverProvidedCrc32c = response.getCrc32c();
+        return response;
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();
         StorageObject response = createResponseFromException(e);

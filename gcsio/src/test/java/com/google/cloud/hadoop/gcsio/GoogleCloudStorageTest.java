@@ -289,9 +289,9 @@ public class GoogleCloudStorageTest {
 
     Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
     testCrc32cHasher.putBytes(ByteBuffer.wrap(testData));
-
     String testCrc32c =
         BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     AsyncWriteChannelOptions writeOptions =
         AsyncWriteChannelOptions.builder().setRollingChecksumEnabled(true).build();
 
@@ -321,13 +321,13 @@ public class GoogleCloudStorageTest {
   @Test
   public void testCreateObjectThrowsExceptionOnChecksumMismatch() throws Exception {
     byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09, 0x10};
+    String mockCrc32c = "FFFFFF==";
 
     Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
     testCrc32cHasher.putBytes(ByteBuffer.wrap(testData));
-
-    String mockCrc32c = "FFFFFF==";
     String testCrc32c =
         BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     AsyncWriteChannelOptions writeOptions =
         AsyncWriteChannelOptions.builder().setRollingChecksumEnabled(true).build();
 
