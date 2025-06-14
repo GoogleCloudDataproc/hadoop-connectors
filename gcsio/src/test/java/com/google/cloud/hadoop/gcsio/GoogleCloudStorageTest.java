@@ -345,8 +345,9 @@ public class GoogleCloudStorageTest {
             transport,
             trackingRequestInitializerWithRetries);
 
-    try (WritableByteChannel writeChannel =
-        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, 1))) {
+    StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, OBJECT_NAME, 1);
+
+    try (WritableByteChannel writeChannel = gcs.create(resourceId)) {
       assertThat(writeChannel.isOpen()).isTrue();
       writeChannel.write(ByteBuffer.wrap(testData));
       IOException thrown = assertThrows(IOException.class, writeChannel::close);
@@ -354,9 +355,9 @@ public class GoogleCloudStorageTest {
           .hasMessageThat()
           .isEqualTo(
               String.format(
-                  "Data integrity check failed for resource 'gs://foo-bucket/bar-object'."
+                  "Data integrity check failed for resource '%s'."
                       + " Client-calculated CRC32C (%s) did not match server-provided CRC32C (%s).",
-                  testCrc32c, mockCrc32c));
+                  resourceId.toString(), testCrc32c, mockCrc32c));
     }
   }
 

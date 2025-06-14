@@ -66,6 +66,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private final Hasher cumulativeCrc32c;
 
+  // To avoid duplicate calculation in case of reuploadHash was called.
   private boolean isChecksumComputed = false;
 
   protected String serverProvidedCrc32c = "";
@@ -129,14 +130,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       uploadCache = null;
     }
     try {
-      int originalPos = buffer.position();
-      int written = pipeSink.write(buffer);
+      int originalPosition = buffer.position();
+      int writtenBytes = pipeSink.write(buffer);
       if (this.channelOptions.isRollingChecksumEnabled() && !this.isChecksumComputed) {
-        ByteBuffer dup = buffer.duplicate();
-        dup.position(originalPos);
-        hash(dup, written);
+        ByteBuffer duplicateBuffer = buffer.duplicate();
+        duplicateBuffer.position(originalPosition);
+        addToCumulativeChecksum(duplicateBuffer, writtenBytes);
       }
-      return written;
+      return writtenBytes;
     } catch (IOException e) {
       throw new IOException(
           String.format(
@@ -145,18 +146,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     }
   }
 
-  private long hash(ByteBuffer src, long written) {
+  private void addToCumulativeChecksum(ByteBuffer src, long writtenBytes) {
     ByteBuffer buffer = src.slice();
     int remaining = buffer.remaining();
-    int consumed = remaining;
-    if (written < remaining) {
-      int intExact = Math.toIntExact(written);
+    if (writtenBytes < remaining) {
+      int intExact = Math.toIntExact(writtenBytes);
       buffer.limit(intExact);
-      consumed = intExact;
     }
     cumulativeCrc32c.putBytes(buffer);
-    src.position(src.position() + consumed);
-    return consumed;
   }
 
   /**

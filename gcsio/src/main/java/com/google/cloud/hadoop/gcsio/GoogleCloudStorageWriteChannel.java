@@ -119,6 +119,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   @Override
   public void handleResponse(StorageObject response) {
     completedItemInfo = GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
+    serverProvidedCrc32c = response.getCrc32c();
   }
 
   /**
@@ -172,9 +173,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
-        StorageObject response = uploadObject.execute();
-        serverProvidedCrc32c = response.getCrc32c();
-        return response;
+        return uploadObject.execute();
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();
         StorageObject response = createResponseFromException(e);
