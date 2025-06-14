@@ -355,7 +355,7 @@ public class GoogleCloudStorageTest {
           .isEqualTo(
               String.format(
                   "Data integrity check failed for resource 'gs://foo-bucket/bar-object'."
-                      + " Client-calculated CRC32C (%s) does not match server-provided CRC32C (%s).",
+                      + " Client-calculated CRC32C (%s) did not match server-provided CRC32C (%s).",
                   testCrc32c, mockCrc32c));
     }
   }

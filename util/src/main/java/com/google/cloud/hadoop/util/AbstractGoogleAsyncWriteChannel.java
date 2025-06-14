@@ -205,8 +205,12 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     if (!srcCrc.equals(this.serverProvidedCrc32c)) {
       throw new IOException(
           String.format(
-              "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) does not match server-provided CRC32C (%s).",
+              "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) did not match server-provided CRC32C (%s).",
               getResourceString(), srcCrc, this.serverProvidedCrc32c));
+    } else {
+      logger.atFine().log(
+          "Data integrity check passed for resource '%s'. Client-calculated CRC32C (%s) matched the server-provided CRC32C (%s).",
+          getResourceString(), srcCrc, this.serverProvidedCrc32c);
     }
   }
 
