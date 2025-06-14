@@ -291,12 +291,8 @@ public class GoogleCloudStorageTest {
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
                     newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                        .setSize(BigInteger.valueOf(testData.length)))
-                .addHeader("x-goog-generation", "1")
-                .addHeader("x-goog-metageneration", "1")
-                .addHeader("x-goog-stored-content-length", "7")
-                .addHeader("x-goog-stored-content-encoding", "identity")
-                .addHeader("x-goog-hash", "crc32c=FFFFFF=="));
+                        .setSize(BigInteger.valueOf(testData.length))
+                        .setCrc32c("FFFFFF==")));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(
