@@ -66,7 +66,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private final Hasher cumulativeCrc32cHasher;
 
-  // To avoid duplicate calculation in case of reuploadFromCache was called.
+  // To avoid duplicate calculations in case of reuploadFromCache.
   private boolean reuploadFromCacheInitiated = false;
 
   protected String serverProvidedCrc32c = "";
