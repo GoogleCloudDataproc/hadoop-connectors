@@ -26,13 +26,8 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.Hashing;
-import com.google.common.io.BaseEncoding;
-import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -52,13 +47,6 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
-  private final Hasher cumulativeCrc32c;
-
-  private String actualCrc32c;
-
-  // Configuration values for this instance
-  private final GoogleCloudStorageOptions storageOptions;
-
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
    *
@@ -77,61 +65,13 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       AsyncWriteChannelOptions channelOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
-      ObjectWriteConditions writeConditions,
-      GoogleCloudStorageOptions options) {
+      ObjectWriteConditions writeConditions) {
     super(uploadThreadPool, channelOptions);
     this.clientRequestHelper = requestHelper;
     this.gcs = gcs;
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
-    this.cumulativeCrc32c = Hashing.crc32c().newHasher();
-    this.actualCrc32c = "";
-    this.storageOptions = options;
-  }
-
-  @Override
-  public synchronized int write(ByteBuffer src) throws IOException {
-    ByteBuffer dup = src.duplicate();
-    int written = super.write(src);
-    if (this.storageOptions.isChecksumWriteEnabled()) {
-      hash(dup, written);
-    }
-    return written;
-  }
-
-  private long hash(ByteBuffer src, long written) {
-    ByteBuffer buffer = src.slice();
-    int remaining = buffer.remaining();
-    int consumed = remaining;
-    if (written < remaining) {
-      int intExact = Math.toIntExact(written);
-      buffer.limit(intExact);
-      consumed = intExact;
-    }
-    cumulativeCrc32c.putBytes(buffer);
-    src.position(src.position() + consumed);
-    return consumed;
-  }
-
-  @Override
-  public void close() throws IOException {
-    if (super.isOpen()) {
-      super.close();
-      if (this.storageOptions.isChecksumWriteEnabled()) {
-        compareChecksums();
-      }
-    }
-  }
-
-  private void compareChecksums() throws IOException {
-    String srcCrc = BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32c.hash().asInt()));
-    if (!srcCrc.equals(this.actualCrc32c)) {
-      throw new IOException(
-          String.format(
-              "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) does not match server-provided CRC32C (%s).",
-              getResourceString(), srcCrc, this.actualCrc32c));
-    }
   }
 
   @Override

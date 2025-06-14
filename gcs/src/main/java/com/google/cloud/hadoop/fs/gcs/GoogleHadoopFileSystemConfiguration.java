@@ -106,15 +106,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_HIERARCHICAL_NAMESPACE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", false);
 
-  /**
-   * Configuration key for checksum writes
-   *
-   * <p>If this is enabled, write channel will calculate rolling checksum and compare it from server
-   * response.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_CHECKSUM_WRITE_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.operation.checksum.write.enable", false);
-
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
@@ -303,6 +294,17 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.outputstream.pipe.buffer.size",
           (long) AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize());
+
+  /**
+   * Configuration key for rolling checksum on writes
+   *
+   * <p>If this is enabled, write channel will calculate rolling checksum and compare it from server
+   * response.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.outputstream.rolling.checksum.enable",
+          AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
 
   /** Configuration key for setting pipe type. */
   public static final HadoopConfigurationProperty<PipeType> GCS_OUTPUT_STREAM_PIPE_TYPE =
@@ -641,8 +643,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
-        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
-        .setChecksumWriteEnabled(GCS_CHECKSUM_WRITE_ENABLE.get(config, config::getBoolean));
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -704,6 +705,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
         .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setRollingChecksumEnabled(
+            GCS_WRITE_ROLLING_CHECKSUM_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

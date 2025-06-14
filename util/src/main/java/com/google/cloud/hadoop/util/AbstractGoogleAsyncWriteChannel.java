@@ -19,6 +19,10 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+import com.google.common.io.BaseEncoding;
+import com.google.common.primitives.Ints;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,11 +64,18 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private ByteBuffer uploadCache = null;
 
+  private final Hasher cumulativeCrc32c;
+
+  private boolean isChecksumComputed = false;
+
+  protected String actualCrc32c = "";
+
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
       ExecutorService threadPool, AsyncWriteChannelOptions channelOptions) {
     this.threadPool = threadPool;
     this.channelOptions = channelOptions;
+    this.cumulativeCrc32c = Hashing.crc32c().newHasher();
     if (channelOptions.getUploadCacheSize() > 0) {
       this.uploadCache = ByteBuffer.allocate(channelOptions.getUploadCacheSize());
     }
@@ -117,15 +128,33 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     } else {
       uploadCache = null;
     }
-
     try {
-      return pipeSink.write(buffer);
+      int written = pipeSink.write(buffer);
+      if (this.channelOptions.isRollingChecksumEnabled() && !this.isChecksumComputed) {
+        ByteBuffer dup = buffer.duplicate();
+        hash(dup, written);
+      }
+      return written;
     } catch (IOException e) {
       throw new IOException(
           String.format(
               "Failed to write %d bytes in '%s'", buffer.remaining(), getResourceString()),
           e);
     }
+  }
+
+  private long hash(ByteBuffer src, long written) {
+    ByteBuffer buffer = src.slice();
+    int remaining = buffer.remaining();
+    int consumed = remaining;
+    if (written < remaining) {
+      int intExact = Math.toIntExact(written);
+      buffer.limit(intExact);
+      consumed = intExact;
+    }
+    cumulativeCrc32c.putBytes(buffer);
+    src.position(src.position() + consumed);
+    return consumed;
   }
 
   /**
@@ -164,6 +193,19 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     } finally {
       closeInternal();
     }
+    if (this.channelOptions.isRollingChecksumEnabled() && this.isChecksumComputed) {
+      compareChecksums();
+    }
+  }
+
+  private void compareChecksums() throws IOException {
+    String srcCrc = BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32c.hash().asInt()));
+    if (!srcCrc.equals(this.actualCrc32c)) {
+      throw new IOException(
+          String.format(
+              "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) does not match server-provided CRC32C (%s).",
+              getResourceString(), srcCrc, this.actualCrc32c));
+    }
   }
 
   private void reuploadFromCache() throws IOException {
@@ -187,6 +229,9 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private void closeInternal() {
     pipeSink = null;
+    if (this.channelOptions.isRollingChecksumEnabled()) {
+      this.isChecksumComputed = true;
+    }
     if (uploadOperation != null && !uploadOperation.isDone()) {
       uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
     }

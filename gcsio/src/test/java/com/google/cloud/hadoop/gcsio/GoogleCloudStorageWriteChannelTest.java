@@ -49,8 +49,7 @@ public class GoogleCloudStorageWriteChannelTest {
             AsyncWriteChannelOptions.DEFAULT,
             new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
             CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setKmsKeyName(kmsKeyName).build(),
-            ObjectWriteConditions.NONE,
-            GoogleCloudStorageOptions.builder().build());
+            ObjectWriteConditions.NONE);
 
     Storage.Objects.Insert request =
         writeChannel.createRequest(
