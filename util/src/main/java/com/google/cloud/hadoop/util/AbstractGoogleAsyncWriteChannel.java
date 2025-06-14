@@ -129,9 +129,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       uploadCache = null;
     }
     try {
+      int originalPos = buffer.position();
       int written = pipeSink.write(buffer);
       if (this.channelOptions.isRollingChecksumEnabled() && !this.isChecksumComputed) {
         ByteBuffer dup = buffer.duplicate();
+        dup.position(originalPos);
         hash(dup, written);
       }
       return written;
