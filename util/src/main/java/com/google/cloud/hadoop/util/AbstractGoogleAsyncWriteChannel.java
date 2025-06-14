@@ -64,10 +64,10 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private ByteBuffer uploadCache = null;
 
-  private final Hasher cumulativeCrc32c;
+  private final Hasher cumulativeCrc32cHasher;
 
-  // To avoid duplicate calculation in case of reuploadHash was called.
-  private boolean isChecksumComputed = false;
+  // To avoid duplicate calculation in case of reuploadFromCache was called.
+  private boolean reuploadFromCacheInitiated = false;
 
   protected String serverProvidedCrc32c = "";
 
@@ -76,7 +76,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       ExecutorService threadPool, AsyncWriteChannelOptions channelOptions) {
     this.threadPool = threadPool;
     this.channelOptions = channelOptions;
-    this.cumulativeCrc32c = Hashing.crc32c().newHasher();
+    this.cumulativeCrc32cHasher = Hashing.crc32c().newHasher();
     if (channelOptions.getUploadCacheSize() > 0) {
       this.uploadCache = ByteBuffer.allocate(channelOptions.getUploadCacheSize());
     }
@@ -132,10 +132,12 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     try {
       int originalPosition = buffer.position();
       int writtenBytes = pipeSink.write(buffer);
-      if (this.channelOptions.isRollingChecksumEnabled() && !this.isChecksumComputed) {
+      if (this.channelOptions.isRollingChecksumEnabled() && !this.reuploadFromCacheInitiated) {
         ByteBuffer duplicateBuffer = buffer.duplicate();
         duplicateBuffer.position(originalPosition);
-        addToCumulativeChecksum(duplicateBuffer, writtenBytes);
+        // Only calculate hash for written bytes.
+        duplicateBuffer.limit(writtenBytes);
+        cumulativeCrc32cHasher.putBytes(duplicateBuffer);
       }
       return writtenBytes;
     } catch (IOException e) {
@@ -144,16 +146,6 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
               "Failed to write %d bytes in '%s'", buffer.remaining(), getResourceString()),
           e);
     }
-  }
-
-  private void addToCumulativeChecksum(ByteBuffer src, long writtenBytes) {
-    ByteBuffer buffer = src.slice();
-    int remaining = buffer.remaining();
-    if (writtenBytes < remaining) {
-      int intExact = Math.toIntExact(writtenBytes);
-      buffer.limit(intExact);
-    }
-    cumulativeCrc32c.putBytes(buffer);
   }
 
   /**
@@ -192,13 +184,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     } finally {
       closeInternal();
     }
-    if (this.channelOptions.isRollingChecksumEnabled() && this.isChecksumComputed) {
+    if (this.channelOptions.isRollingChecksumEnabled()) {
       compareChecksums();
     }
   }
 
   private void compareChecksums() throws IOException {
-    String srcCrc = BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32c.hash().asInt()));
+    String srcCrc =
+        BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
     if (!srcCrc.equals(this.serverProvidedCrc32c)) {
       throw new IOException(
           String.format(
@@ -212,6 +205,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
   }
 
   private void reuploadFromCache() throws IOException {
+    this.reuploadFromCacheInitiated = true;
     closeInternal();
     initialized = false;
 
@@ -232,9 +226,6 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private void closeInternal() {
     pipeSink = null;
-    if (this.channelOptions.isRollingChecksumEnabled()) {
-      this.isChecksumComputed = true;
-    }
     if (uploadOperation != null && !uploadOperation.isDone()) {
       uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
     }
