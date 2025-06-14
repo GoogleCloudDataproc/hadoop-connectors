@@ -295,17 +295,6 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.outputstream.pipe.buffer.size",
           (long) AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize());
 
-  /**
-   * Configuration key for rolling checksum on writes.
-   *
-   * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
-   * server response.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.outputstream.rolling.checksum.enable",
-          AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
-
   /** Configuration key for setting pipe type. */
   public static final HadoopConfigurationProperty<PipeType> GCS_OUTPUT_STREAM_PIPE_TYPE =
       new HadoopConfigurationProperty<>(
@@ -573,6 +562,17 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
           AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
+
+  /**
+   * Configuration key for rolling checksum on writes.
+   *
+   * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
+   * server response.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.rolling.checksum.enable",
+          AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
 
   /** Configuration key for enabling move operation in gcs instead of copy+delete. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_MOVE_ENABLE =
