@@ -290,9 +290,9 @@ public class GoogleCloudStorageTest {
         mockTransport(
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
-                    newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                        .setSize(BigInteger.valueOf(testData.length))
-                        .setCrc32c("FFFFFF==")));
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c("FFFFFF==")));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(
