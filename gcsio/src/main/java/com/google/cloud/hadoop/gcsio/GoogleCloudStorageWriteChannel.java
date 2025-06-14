@@ -173,7 +173,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
         StorageObject resp = uploadObject.execute();
-        actualCrc32c = resp.getCrc32c();
+        serverProvidedCrc32c = resp.getCrc32c();
         return resp;
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();

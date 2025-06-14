@@ -68,7 +68,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private boolean isChecksumComputed = false;
 
-  protected String actualCrc32c = "";
+  protected String serverProvidedCrc32c = "";
 
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
@@ -200,11 +200,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private void compareChecksums() throws IOException {
     String srcCrc = BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32c.hash().asInt()));
-    if (!srcCrc.equals(this.actualCrc32c)) {
+    if (!srcCrc.equals(this.serverProvidedCrc32c)) {
       throw new IOException(
           String.format(
               "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) does not match server-provided CRC32C (%s).",
-              getResourceString(), srcCrc, this.actualCrc32c));
+              getResourceString(), srcCrc, this.serverProvidedCrc32c));
     }
   }
 

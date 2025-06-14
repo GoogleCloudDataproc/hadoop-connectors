@@ -278,6 +278,45 @@ public class GoogleCloudStorageTest {
     }
   }
 
+  /** Test failed operation of GoogleCloudStorage.create(2) with checksum compare. */
+  @Test
+  public void testCreateObjectThrowsExceptionOnChecksumMismtahc() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09, 0x10};
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder().setRollingChecksumEnabled(true).build();
+
+    MockHttpTransport transport =
+        mockTransport(
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                    newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                        .setSize(BigInteger.valueOf(testData.length)))
+                .addHeader("x-goog-generation", "1")
+                .addHeader("x-goog-metageneration", "1")
+                .addHeader("x-goog-stored-content-length", "7")
+                .addHeader("x-goog-stored-content-encoding", "identity")
+                .addHeader("x-goog-hash", "crc32c=FFFFFF=="));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
+
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, 1))) {
+      assertThat(writeChannel.isOpen()).isTrue();
+      writeChannel.write(ByteBuffer.wrap(testData));
+      IOException thrown = assertThrows(IOException.class, writeChannel::close);
+      assertThat(thrown)
+          .hasMessageThat()
+          .isEqualTo(
+              "Data integrity check failed for resource 'gs://foo-bucket/bar-object'."
+                  + " Client-calculated CRC32C (AAAAAA==) does not match server-provided CRC32C (FFFFFF==).");
+    }
+  }
+
   /**
    * Test handling of various types of exceptions thrown during JSON API call for
    * GoogleCloudStorage.create(2).
