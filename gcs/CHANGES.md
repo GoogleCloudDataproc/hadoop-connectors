@@ -1,10 +1,11 @@
 # Release Notes
 
 ## Next
+1. Add checksum verification in upload
 
 ## 3.0.8 - 2025-05-28
 1. Skip Soft delete using move API during rename
-2. Use Apiary isHnBucket for HNS checks
+1. Use Apiary isHnBucket for HNS checks
 
 ## 3.0.7 - 2025-05-06
 1. Optimize channel creation in vectoredRead
