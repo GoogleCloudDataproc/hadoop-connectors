@@ -556,6 +556,17 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
           AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
+  /**
+   * Configuration key for rolling checksum on writes.
+   *
+   * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
+   * server response.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.rolling.checksum.enable",
+          AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
+
   /** Configuration key for enabling move operation in gcs instead of copy+delete. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_MOVE_ENABLE =
       new HadoopConfigurationProperty<>(
@@ -683,6 +694,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
         .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setRollingChecksumEnabled(
+            GCS_WRITE_ROLLING_CHECKSUM_ENABLE.get(config, config::getBoolean))
         .build();
   }
 
