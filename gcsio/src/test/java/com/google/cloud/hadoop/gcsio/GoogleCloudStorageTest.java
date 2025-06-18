@@ -322,7 +322,7 @@ public class GoogleCloudStorageTest {
    * moved.
    */
   @Test
-  public void testCreateObjectWithChecksumMatchSeekingbuffer() throws Exception {
+  public void testCreateObjectWithChecksumMatchSeekingBuffer() throws Exception {
     byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09, 0x10, 0x05, 0x02, 0x01};
 
     ByteBuffer buf = ByteBuffer.wrap(testData);
@@ -333,7 +333,7 @@ public class GoogleCloudStorageTest {
     testCrc32cHasher.putBytes(buf);
     String testCrc32c =
         BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
-    // reset the position to 1.
+    // reset the position to 1 after putBytes.
     buf.position(1);
 
     AsyncWriteChannelOptions writeOptions =
@@ -356,7 +356,6 @@ public class GoogleCloudStorageTest {
     try (WritableByteChannel writeChannel =
         gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, 1))) {
       assertThat(writeChannel.isOpen()).isTrue();
-      System.out.println(buf.remaining());
       int totalBytesWritten = writeChannel.write(buf);
       assertThat(totalBytesWritten).isEqualTo(testData.length - 1);
     }
