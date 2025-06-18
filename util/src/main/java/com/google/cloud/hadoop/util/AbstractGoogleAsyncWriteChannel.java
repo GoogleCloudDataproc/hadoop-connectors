@@ -145,7 +145,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     ByteBuffer duplicateBuffer = src.duplicate();
     duplicateBuffer.position(originalPosition);
     // Only calculate hash for written bytes.
-    duplicateBuffer.limit(writtenBytes);
+    duplicateBuffer.limit(originalPosition + writtenBytes);
     cumulativeCrc32cHasher.putBytes(duplicateBuffer);
   }
 
