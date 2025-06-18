@@ -556,6 +556,23 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
           AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
+  /**
+   * Configuration key for rolling checksum on writes.
+   *
+   * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
+   * server response.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.rolling.checksum.enable",
+          AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
+
+  /** Configuration key for enabling move operation in gcs instead of copy+delete. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_MOVE_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.move.enable",
+          GoogleCloudStorageOptions.DEFAULT.isMoveOperationEnabled());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -618,7 +635,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
-        .setWriteChannelOptions(getWriteChannelOptions(config));
+        .setWriteChannelOptions(getWriteChannelOptions(config))
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -676,6 +694,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
         .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setRollingChecksumEnabled(
+            GCS_WRITE_ROLLING_CHECKSUM_ENABLE.get(config, config::getBoolean))
         .build();
   }
 
