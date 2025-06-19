@@ -517,6 +517,79 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
+  //   /**
+  //    * See {@link GoogleCloudStorage#getFolderInfo(StorageResourceId)} for details about expected
+  //    * behavior.
+  //    */
+  //   @Override
+  //   public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws
+  // IOException {
+  //     logger.atFiner().log("getFolderInfo(%s)", resourceId);
+  //     checkArgument(resourceId.isFolder(), "Expected a folder resourceId, got %s", resourceId);
+  //
+  //     GetFolderRequest request =
+  //         GetFolderRequest.newBuilder()
+  //             .setName(
+  //                 FolderName.of("_", resourceId.getBucketName(), resourceId.getObjectName())
+  //                     .toString())
+  //             .build();
+  //     try {
+  //       StorageControlClient client = lazyGetStorageControlClient();
+  //       Folder folder = client.getFolderMe;
+  //       // You would need a new method to convert a Folder resource to a
+  // GoogleCloudStorageItemInfo
+  //       return createItemInfoForFolder(resourceId, folder);
+  //     // } catch (NotFoundException e) {
+  //     //   logger.atFiner().withCause(e).log("getFolderInfo(%s): not found", resourceId);
+  //     //   return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+  //     } catch (IOException e) {
+  //       GoogleCloudStorageEventBus.postOnException();
+  //       throw new IOException("Error getting folder " + resourceId, e);
+  //     }
+  //   }
+  //
+  //   // Helper method to convert a 'Folder' to 'GoogleCloudStorageItemInfo'
+  // // This would be similar to 'createItemInfoForBucket' or 'createItemInfoForStorageObject'
+  //   public static GoogleCloudStorageItemInfo createItemInfoForFolder(
+  //       StorageResourceId resourceId, Folder folder) {
+  //     // Logic to convert Folder object to GoogleCloudStorageItemInfo
+  //     // For example:
+  //     return GoogleCloudStorageItemInfo.createFolder(
+  //         resourceId,
+  //         folder.getCreateTime().getSeconds() * 1000, // Convert to millis
+  //         folder.getUpdateTime().getSeconds() * 1000, // Convert to millis
+  //         folder.getMetageneration());
+  //   }
+
+  /**
+   * See {@link GoogleCloudStorage#createFolder(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void createFolder(StorageResourceId resourceId) throws IOException {
+    logger.atFiner().log("createFolder(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    String bucketName = resourceId.getBucketName();
+
+    // 2. Format the bucket name into the fully-qualified resource name
+    //    that the StorageControlClient API requires.
+    String parentResourceName = String.format("projects/_/buckets/%s", bucketName);
+
+    // 3. Build the request with the correctly formatted parent name.
+    CreateFolderRequest request =
+        CreateFolderRequest.newBuilder()
+            .setFolderId(resourceId.getObjectName())
+            .setParent(parentResourceName) // CORRECTED
+            .build();
+    StorageControlClient client = lazyGetStorageControlClient();
+
+    Folder newFolder = client.createFolder(request);
+
+    System.out.printf("Created folder: %s%n", newFolder.getName());
+  }
+
   @Override
   public void createEmptyObject(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
@@ -1267,6 +1340,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Performs copy operation using GCS Copy requests
    *
+   * @see GoogleCloudStorage#copy(String, List, String, List)
    * @see GoogleCloudStorage#copy(String, List, String, List)
    */
   private void copyInternal(

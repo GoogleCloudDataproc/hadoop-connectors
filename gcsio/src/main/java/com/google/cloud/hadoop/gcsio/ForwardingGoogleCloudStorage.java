@@ -239,6 +239,12 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public void createFolder(StorageResourceId resourceId) throws IOException {
+    logger.atFiner().log("createFolder(%s)", resourceId);
+    delegate.createFolder(resourceId);
+  }
+
+  @Override
   public void compose(
       String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {

@@ -385,7 +385,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    repairImplicitDirectory(parentInfoFuture);
+    repairImplicitDirectory(path, parentInfoFuture);
   }
 
   /**
@@ -514,10 +514,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     logger.atFiner().log("mkdirs(path: %s)", path);
     checkNotNull(path, "path should not be null");
 
-    mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
+    mkdirsInternal(path, StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
   }
 
-  private void mkdirsInternal(StorageResourceId resourceId) throws IOException {
+  private void mkdirsInternal(URI path, StorageResourceId resourceId) throws IOException {
     if (resourceId.isRoot()) {
       // GCS_ROOT directory always exists, no need to go through the rest of the method.
       return;
@@ -545,9 +545,14 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     }
 
     // Create only a leaf directory because subdirectories will be inferred
-    // if leaf directory exists
+    // if leaf directory eximkdirsInternalsts
     try {
-      gcs.createEmptyObject(resourceId);
+      if (this.options.getCloudStorageOptions().isHnBucketRenameEnabled()
+          && this.gcs.isHnBucket(path)) {
+        gcs.createFolder(resourceId);
+      } else {
+        gcs.createEmptyObject(resourceId);
+      }
     } catch (FileAlreadyExistsException e) {
       GoogleCloudStorageEventBus.postOnException();
       // This means that directory object already exist, and we do not need to do anything.
@@ -636,7 +641,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    repairImplicitDirectory(srcParentInfoFuture);
+    repairImplicitDirectory(src, srcParentInfoFuture);
   }
 
   private URI getDstUri(FileInfo srcInfo, FileInfo dstInfo, @Nullable FileInfo dstParentInfo)
@@ -875,7 +880,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * Attempts to create the directory object explicitly for provided {@code infoFuture} if it
    * doesn't already exist as a directory object.
    */
-  private void repairImplicitDirectory(Future<GoogleCloudStorageItemInfo> infoFuture)
+  private void repairImplicitDirectory(URI path, Future<GoogleCloudStorageItemInfo> infoFuture)
       throws IOException {
     if (infoFuture == null) {
       return;
@@ -899,7 +904,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     checkState(resourceId.isDirectory(), "'%s' should be a directory", resourceId);
 
     try {
-      gcs.createEmptyObject(resourceId);
+      if (this.options.getCloudStorageOptions().isHnBucketRenameEnabled()
+          && this.gcs.isHnBucket(path)) {
+        gcs.createFolder(resourceId);
+      } else {
+        gcs.createEmptyObject(resourceId);
+      }
       logger.atInfo().log("Successfully repaired '%s' directory.", resourceId);
     } catch (IOException e) {
       GoogleCloudStorageEventBus.postOnException();
@@ -1178,8 +1188,13 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // Ensure that the path looks like a directory path.
     resourceId = resourceId.toDirectoryId();
 
-    // Not a top-level directory, create 0 sized object.
-    gcs.createEmptyObject(resourceId);
+    if (this.options.getCloudStorageOptions().isHnBucketRenameEnabled()
+        && this.gcs.isHnBucket(path)) {
+      gcs.createFolder(resourceId);
+    } else {
+      // Not a top-level directory, create 0 sized object.
+      gcs.createEmptyObject(resourceId);
+    }
   }
 
   private void checkNoFilesConflictingWithDirs(StorageResourceId resourceId) throws IOException {

@@ -457,6 +457,21 @@ public interface GoogleCloudStorage {
   List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
       throws IOException;
 
+  // /**
+  //  * Gets the metadata for a single folder.
+  //  */
+  // GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException;
+
+  /**
+   * Creates HNS folder. The bucket must already exist. If the object already exists, it is
+   * overwritten. See {@link #create(StorageResourceId)} for the behavior if
+   * StorageResourceId.getGenerationId() is explicitly set.
+   *
+   * @param resourceId identifies a StorageObject
+   * @throws IOException on IO error
+   */
+  void createFolder(StorageResourceId resourceId) throws IOException;
+
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object, if already present,
