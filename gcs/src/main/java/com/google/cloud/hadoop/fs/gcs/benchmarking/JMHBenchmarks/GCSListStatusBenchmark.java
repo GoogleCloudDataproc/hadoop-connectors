@@ -35,7 +35,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -120,21 +119,15 @@ public class GCSListStatusBenchmark {
    * @throws IOException if the benchmark runner fails to execute.
    */
   public static void runBenchmark(Path hadoopPath) throws IOException {
-//    String resultFile = "jmh-listStatus-results.json";
 
     try {
       Options opt =
           new OptionsBuilder()
               .include(GCSListStatusBenchmark.class.getSimpleName() + ".listStatus_Operation")
               .param("pathString", hadoopPath.toString())
-              // A good practice for production is to save results to a machine-readable format.
-//              .resultFormat(ResultFormatType.JSON)
-//              .result(resultFile)
               .build();
 
       new Runner(opt).run();
-
-//      System.out.println("JMH benchmark results for listStatus saved to: " + resultFile);
 
     } catch (RunnerException e) {
       throw new IOException("Failed to run JMH benchmark for listStatus", e);
