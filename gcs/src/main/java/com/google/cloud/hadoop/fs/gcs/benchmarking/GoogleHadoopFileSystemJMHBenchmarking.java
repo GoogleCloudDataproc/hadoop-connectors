@@ -52,4 +52,12 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     System.out.println("\nBenchmark complete. Now performing the actual 'listStatus' operation...");
     return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
   }
+
+  @Override
+  public boolean rename(Path src, Path dst) throws IOException {
+    runBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
+
+    System.out.println("\nBenchmark complete. Now performing the actual 'rename' operation...");
+    return super.rename(src, dst);
+  }
 }
