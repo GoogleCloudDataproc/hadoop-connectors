@@ -19,6 +19,8 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,11 +62,17 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
 
   private ByteBuffer uploadCache = null;
 
+  protected final Hasher cumulativeCrc32cHasher;
+
+  // To avoid duplicate calculations in case of reuploadFromCache.
+  private boolean reuploadFromCacheInitiated = false;
+
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
       ExecutorService threadPool, AsyncWriteChannelOptions channelOptions) {
     this.threadPool = threadPool;
     this.channelOptions = channelOptions;
+    this.cumulativeCrc32cHasher = Hashing.crc32c().newHasher();
     if (channelOptions.getUploadCacheSize() > 0) {
       this.uploadCache = ByteBuffer.allocate(channelOptions.getUploadCacheSize());
     }
@@ -74,11 +82,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
    * Handle the API response.
    *
    * <p>This method is invoked after the upload has completed on the same thread that invokes
-   * close().
+   * close(). It can throw IOException if checksum matching is enabled and mismatched.
    *
    * @param response The API response object.
    */
-  public void handleResponse(T response) {}
+  public void handleResponse(T response) throws IOException {}
 
   /** Returns true if direct media uploads are enabled. */
   public boolean isDirectUploadEnabled() {
@@ -117,15 +125,28 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     } else {
       uploadCache = null;
     }
-
     try {
-      return pipeSink.write(buffer);
+      int originalPosition = buffer.position();
+      int writtenBytes = pipeSink.write(buffer);
+      if (channelOptions.isRollingChecksumEnabled() && !reuploadFromCacheInitiated) {
+        addBytesToCumulativeChecksum(buffer, writtenBytes, originalPosition);
+      }
+      return writtenBytes;
     } catch (IOException e) {
       throw new IOException(
           String.format(
               "Failed to write %d bytes in '%s'", buffer.remaining(), getResourceString()),
           e);
     }
+  }
+
+  private void addBytesToCumulativeChecksum(
+      ByteBuffer src, int writtenBytes, int originalPosition) {
+    ByteBuffer duplicateBuffer = src.duplicate();
+    duplicateBuffer.position(originalPosition);
+    // Only calculate hash for written bytes offset from the original position.
+    duplicateBuffer.limit(originalPosition + writtenBytes);
+    cumulativeCrc32cHasher.putBytes(duplicateBuffer);
   }
 
   /**
@@ -167,6 +188,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
   }
 
   private void reuploadFromCache() throws IOException {
+    reuploadFromCacheInitiated = true;
     closeInternal();
     initialized = false;
 
