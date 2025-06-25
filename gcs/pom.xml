@@ -108,6 +108,18 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-client-api</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-core</artifactId>
+      <version>1.37</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-generator-annprocess</artifactId>
+      <version>1.37</version>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
@@ -160,6 +172,27 @@
         </configuration>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.10.1</version> <configuration>
+        <annotationProcessorPaths>
+          <path>
+            <groupId>com.google.auto.value</groupId>
+            <artifactId>auto-value</artifactId>
+            <version>1.10.4</version> </path>
+          <path>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_core</artifactId>
+            <version>2.16</version> </path>
+          <path>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>1.37</version>
+          </path>
+        </annotationProcessorPaths>
+      </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
@@ -170,11 +203,15 @@
             <configuration>
               <transformers>
                 <transformer
-                    implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                 <transformer
-                    implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer"/>
+                        implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer"/>
                 <transformer
-                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                  <resource>META-INF/BenchmarkList</resource>
+                </transformer>
               </transformers>
               <filters>
                 <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
@@ -234,6 +271,7 @@
                   <include>io.perfmark</include>
                   <include>org.apache.httpcomponents</include>
                   <include>org.threeten:threetenbp</include>
+                  <include>org.openjdk.jmh:*</include>
                 </includes>
               </artifactSet>
               <minimizeJar>true</minimizeJar>
@@ -287,6 +325,9 @@
                     <include>org.apache.http.**</include>
                     <include>org.threeten.**</include>
                   </includes>
+                  <excludes>
+                    <exclude>org.openjdk.jmh.**</exclude>
+                  </excludes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package
                      io.grpc.netty.shaded.io.grpc.netty, which will cause the
