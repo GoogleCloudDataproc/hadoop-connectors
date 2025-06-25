@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSListStatusBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSRenameBenchmark;
 import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -51,5 +52,13 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     runBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
     System.out.println("\nBenchmark complete. Now performing the actual 'listStatus' operation...");
     return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
+  }
+
+  @Override
+  public boolean rename(Path src, Path dst) throws IOException {
+    runBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
+
+    System.out.println("\nBenchmark complete. Now performing the actual 'rename' operation...");
+    return super.rename(src, dst);
   }
 }
