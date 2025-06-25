@@ -125,7 +125,7 @@ public class GCSRenameBenchmark {
    */
   @Benchmark
   @OperationsPerInvocation(2) // This tells JMH this benchmark performs TWO operations.
-  public void rename_Alternating(Blackhole bh) throws IOException {
+  public void rename_operation(Blackhole bh) throws IOException {
     boolean success1 = ghfs.rename(srcPath, dstPath);
     boolean success2 = ghfs.rename(dstPath, srcPath);
     bh.consume(success1);
@@ -144,7 +144,7 @@ public class GCSRenameBenchmark {
     try {
       Options opt =
           new OptionsBuilder()
-              .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_Alternating")
+              .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_operation")
               .param("srcPathString", srcPath.toString())
               .param("dstPathString", dstPath.toString())
               .build();
