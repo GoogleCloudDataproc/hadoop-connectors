@@ -1,7 +1,11 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.*;
 import java.io.IOException;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
+
 /**
  * A wrapper around {@link GoogleHadoopFileSystem} that intercepts Hadoop FS commands and routes
  * them to the appropriate JMH benchmarks.
@@ -40,6 +44,13 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
             System.out.println(String.format("  %-50s", endMessage));
             System.out.println("======================================================");
         }
+    }
+
+    @Override
+    public FileStatus[] listStatus(Path hadoopPath) throws IOException {
+        runBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
+        System.out.println("\nBenchmark complete. Now performing the actual 'listStatus' operation...");
+        return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
     }
 
 }
