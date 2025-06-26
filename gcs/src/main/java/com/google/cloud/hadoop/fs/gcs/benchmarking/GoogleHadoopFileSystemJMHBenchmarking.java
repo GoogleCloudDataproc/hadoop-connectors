@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSListStatusBenchmark;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -11,6 +12,8 @@ import org.apache.hadoop.fs.Path;
  * them to the appropriate JMH benchmarks.
  */
 public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSystem {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /** A functional interface for a benchmark action that can throw an Exception. */
   @FunctionalInterface
@@ -26,30 +29,31 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
    * @throws IOException if the benchmark fails.
    */
   private void runBenchmarkAndLog(String operationName, BenchmarkAction action) throws IOException {
+    String banner = "======================================================";
     String startMessage = String.format("JMH BENCHMARK TRIGGERED FOR %s OPERATION!", operationName);
     String endMessage = String.format("JMH BENCHMARK FINISHED FOR %s.", operationName);
 
-    System.out.println("======================================================");
-    System.out.println(String.format("  %-50s", startMessage));
-    System.out.println("======================================================");
+    // Use Flogger's formatted logging to avoid compile-time constant errors.
+    logger.atInfo().log("%s", banner);
+    logger.atInfo().log("  %s", startMessage);
+    logger.atInfo().log("%s", banner);
 
     try {
       action.run();
     } catch (Exception e) {
-      System.err.println(
-          "JMH benchmark failed to run for " + operationName + ": " + e.getMessage());
+      logger.atWarning().withCause(e).log("JMH benchmark failed to run for %s", operationName);
       throw new IOException("Failed to run JMH benchmark for " + operationName, e);
     } finally {
-      System.out.println("======================================================");
-      System.out.println(String.format("  %-50s", endMessage));
-      System.out.println("======================================================");
+      logger.atInfo().log("%s", banner);
+      logger.atInfo().log("  %s", endMessage);
+      logger.atInfo().log("%s", banner);
     }
   }
 
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
     runBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
-    System.out.println("\nBenchmark complete. Now performing the actual 'listStatus' operation...");
+    logger.atInfo().log("Benchmark complete. Now performing the actual 'listStatus' operation...");
     return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
   }
 }

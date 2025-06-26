@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
@@ -52,6 +53,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSListStatusBenchmark {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   // The GCS path to the directory whose contents will be listed.
   // This is populated by the JMH runner via the OptionsBuilder.
   @Param({"_path_not_set_"})
@@ -82,7 +85,7 @@ public class GCSListStatusBenchmark {
     this.ghfs = new GoogleHadoopFileSystem();
     this.ghfs.initialize(this.pathToList.toUri(), conf);
 
-    System.out.println("Benchmark Setup: Ready to list contents of " + pathToList);
+    logger.atInfo().log("Benchmark Setup: Ready to list contents of %s", pathToList);
   }
 
   /**
@@ -95,7 +98,7 @@ public class GCSListStatusBenchmark {
   public void tearDown() throws IOException {
     if (this.ghfs != null) {
       this.ghfs.close();
-      System.out.println("Benchmark TearDown: Closed GCS filesystem instance.");
+      logger.atInfo().log("Benchmark TearDown: Closed GCS filesystem instance.");
     }
   }
 
@@ -119,7 +122,6 @@ public class GCSListStatusBenchmark {
    * @throws IOException if the benchmark runner fails to execute.
    */
   public static void runBenchmark(Path hadoopPath) throws IOException {
-
     try {
       Options opt =
           new OptionsBuilder()
