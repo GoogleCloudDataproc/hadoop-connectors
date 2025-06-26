@@ -111,13 +111,13 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
-      <version>1.37</version>
+      <version>${jmh.version}</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-generator-annprocess</artifactId>
-      <version>1.37</version>
+      <version>${jmh.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -187,7 +187,7 @@
           <path>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-generator-annprocess</artifactId>
-            <version>1.37</version>
+            <version>${jmh.version}</version>
           </path>
         </annotationProcessorPaths>
       </configuration>
