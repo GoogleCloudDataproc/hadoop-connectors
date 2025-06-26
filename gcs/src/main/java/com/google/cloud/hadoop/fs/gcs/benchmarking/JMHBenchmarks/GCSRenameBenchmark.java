@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
@@ -58,6 +59,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSRenameBenchmark {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   @Param({"_path_not_set_"})
   private String srcPathString;
 
@@ -96,12 +99,9 @@ public class GCSRenameBenchmark {
     // Ensure the destination path is clear before we start the alternating benchmark.
     ghfs.delete(dstPath, false);
 
-    System.out.println(
-        "Benchmark Setup: Verified source "
-            + srcPath
-            + " exists and destination "
-            + dstPath
-            + " is clear.");
+    logger.atInfo().log(
+        "Benchmark Setup: Verified source %s exists and destination %s is clear.",
+        srcPath, dstPath);
   }
 
   /**
@@ -112,7 +112,7 @@ public class GCSRenameBenchmark {
   public void tearDown() throws IOException {
     if (this.ghfs != null) {
       this.ghfs.close();
-      System.out.println("Benchmark TearDown: Closed GCS filesystem instance.");
+      logger.atInfo().log("Benchmark TearDown: Closed GCS filesystem instance.");
     }
   }
 
