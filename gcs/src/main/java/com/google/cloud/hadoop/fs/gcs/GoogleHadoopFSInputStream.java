@@ -92,7 +92,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFiner().log("create(gcsPath: %s)", gcsPath);
+    logger.atInfo().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
@@ -130,7 +130,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFiner().log("create(fileInfo: %s)", fileInfo);
+    logger.atInfo().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
@@ -143,7 +143,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       FileInfo fileInfo,
       SeekableByteChannel channel,
       FileSystem.Statistics statistics) {
-    logger.atFiner().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
+    logger.atInfo().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
     this.gcsPath = gcsPath;
     this.channel = channel;
     this.fileInfo = fileInfo;
@@ -248,7 +248,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         () -> {
           long startTimeNs = System.nanoTime();
           checkNotClosed();
-          logger.atFiner().log("seek(%d)", pos);
+          logger.atInfo().log("seek(%d)", pos);
           long curPos = getPos();
           long diff = pos - curPos;
           if (diff > 0) {
@@ -283,10 +283,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           if (!closed) {
             closed = true;
             try {
-              logger.atFiner().log("close(): %s", gcsPath);
+              logger.atInfo().log("close(): %s", gcsPath);
               try {
                 if (channel != null) {
-                  logger.atFiner().log(
+                  logger.atInfo().log(
                       "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
                   channel.close();
                 }
@@ -335,7 +335,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   public synchronized long getPos() throws IOException {
     checkNotClosed();
     long pos = channel.position();
-    logger.atFiner().log("getPos(): %d", pos);
+    logger.atInfo().log("getPos(): %d", pos);
     return pos;
   }
 
@@ -346,7 +346,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   @Override
   public boolean seekToNewSource(long targetPos) {
-    logger.atFiner().log("seekToNewSource(%d): false", targetPos);
+    logger.atInfo().log("seekToNewSource(%d): false", targetPos);
     return false;
   }
 

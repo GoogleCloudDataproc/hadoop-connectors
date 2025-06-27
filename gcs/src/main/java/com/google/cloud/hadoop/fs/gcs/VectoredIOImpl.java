@@ -126,7 +126,7 @@ public class VectoredIOImpl implements Closeable {
         long startTimer = System.currentTimeMillis();
         boundedThreadPool.submit(
             () -> {
-              logger.atFiner().log("Submitting range %s for execution.", sortedRange);
+              logger.atInfo().log("Submitting range %s for execution.", sortedRange);
               readSingleRange(sortedRange, allocate, channelProvider);
               long endTimer = System.currentTimeMillis();
               storageStatistics.updateStats(
@@ -145,7 +145,7 @@ public class VectoredIOImpl implements Closeable {
         long startTimer = System.currentTimeMillis();
         boundedThreadPool.submit(
             () -> {
-              logger.atFiner().log("Submitting combinedRange %s for execution.", combinedFileRange);
+              logger.atInfo().log("Submitting combinedRange %s for execution.", combinedFileRange);
               readCombinedRange(combinedFileRange, allocate, channelProvider);
               long endTimer = System.currentTimeMillis();
               storageStatistics.updateStats(
@@ -195,7 +195,7 @@ public class VectoredIOImpl implements Closeable {
 
       // making it ready for reading
       readContent.flip();
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Read combinedFileRange completed from range: %s, path: %s, readBytes: %d",
           combinedFileRange, channelProvider.gcsPath, numRead);
       if (numRead < 0) {
@@ -210,10 +210,10 @@ public class VectoredIOImpl implements Closeable {
       long totalBytesRead = 0;
       // Note: child ranges will be sorted as well, given Range merge was called on sortedList
       for (FileRange child : combinedFileRange.getUnderlying()) {
-        logger.atFiner().log(
+        logger.atInfo().log(
             "Populating childRange: %s from combinedRange:%s", child, combinedFileRange);
         int discardedBytes = (int) (child.getOffset() - currentPosition);
-        logger.atFiner().log(
+        logger.atInfo().log(
             "Discarding %d bytes at offset: %d from read combinedRange %s while updating childRange: %s",
             discardedBytes, currentPosition, combinedFileRange, child);
         totalBytesRead += discardedBytes + child.getLength();
@@ -251,7 +251,7 @@ public class VectoredIOImpl implements Closeable {
   private void completeExceptionally(CombinedFileRange combinedFileRange, Throwable e) {
     for (FileRange child : combinedFileRange.getUnderlying()) {
       if (!child.getData().isDone()) {
-        logger.atFiner().withCause(e).log(
+        logger.atInfo().withCause(e).log(
             "Marking child:%s as `completeExceptionally` of combinedRange:%s",
             child, combinedFileRange);
         child
@@ -286,7 +286,7 @@ public class VectoredIOImpl implements Closeable {
       }
       range.getData().complete(dst);
       updateBytesRead(range.getLength());
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Read single range completed from range: %s, path: %s", range, channelProvider.gcsPath);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log(

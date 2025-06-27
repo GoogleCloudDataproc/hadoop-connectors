@@ -457,10 +457,8 @@ public interface GoogleCloudStorage {
   List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
       throws IOException;
 
-  // /**
-  //  * Gets the metadata for a single folder.
-  //  */
-  // GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException;
+  /** Gets the metadata for a single folder. */
+  GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException;
 
   /**
    * Creates HNS folder. The bucket must already exist. If the object already exists, it is

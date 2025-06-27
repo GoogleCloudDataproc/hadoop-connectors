@@ -76,12 +76,19 @@ public final class StringPaths {
    * @param allowEmptyObjectName If true, a missing object name is not considered invalid.
    */
   static String validateObjectName(String objectName, boolean allowEmptyObjectName) {
-    logger.atFiner().log("validateObjectName('%s', %s)", objectName, allowEmptyObjectName);
+    logger.atInfo().log("validateObjectName('%s', %s)", objectName, allowEmptyObjectName);
+
+    logger.atInfo().log("[TEST] %s", objectName);
 
     if (isNullOrEmpty(objectName) || objectName.equals(PATH_DELIMITER)) {
+      logger.atInfo().log(
+          "[TEST] in isNullOrEmpty(objectName) || objectName.equals(PATH_DELIMITER) ");
+
       if (allowEmptyObjectName) {
         objectName = "";
+        logger.atInfo().log("[TEST] condition 1 ");
       } else {
+        logger.atInfo().log("[TEST] condition 2 ");
         throw new IllegalArgumentException(
             String.format(
                 "GCS path must include non-empty object name [objectName='%s',"
@@ -102,9 +109,10 @@ public final class StringPaths {
     // Remove leading '/' if it exists.
     if (objectName.startsWith(PATH_DELIMITER)) {
       objectName = objectName.substring(1);
+      logger.atInfo().log("[TEST] %s ", objectName);
     }
 
-    logger.atFiner().log("validateObjectName -> '%s'", objectName);
+    logger.atInfo().log("validateObjectName -> '%s'", objectName);
     return objectName;
   }
 

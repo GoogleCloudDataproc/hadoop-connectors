@@ -101,7 +101,7 @@ public class HttpTransportFactory {
       @Nullable RedactedString proxyPassword,
       @Nullable Duration readTimeout)
       throws IOException {
-    logger.atFiner().log(
+    logger.atInfo().log(
         "createHttpTransport(%s, %s, %s, %s)",
         proxyAddress, proxyUsername, proxyPassword, readTimeout);
     checkArgument(

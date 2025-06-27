@@ -281,7 +281,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       return 0;
     }
 
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Reading %d bytes at %d position from '%s'",
         buffer.remaining(), currentPosition, resourceId);
 
@@ -485,7 +485,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    */
   protected void closeContentChannel() {
     if (contentChannel != null) {
-      logger.atFiner().log("Closing internal contentChannel for '%s'", resourceId);
+      logger.atInfo().log("Closing internal contentChannel for '%s'", resourceId);
       try {
         contentChannel.close();
       } catch (Exception e) {
@@ -509,10 +509,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @Override
   public void close() {
     if (!channelIsOpen) {
-      logger.atFiner().log("Ignoring close: channel for '%s' is not open.", resourceId);
+      logger.atInfo().log("Ignoring close: channel for '%s' is not open.", resourceId);
       return;
     }
-    logger.atFiner().log("Closing channel for '%s'", resourceId);
+    logger.atInfo().log("Closing channel for '%s'", resourceId);
     channelIsOpen = false;
     closeContentChannel();
   }
@@ -550,7 +550,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
 
     validatePosition(newPosition);
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Seek from %s to %s position for '%s'", currentPosition, newPosition, resourceId);
     currentPosition = newPosition;
     return this;
@@ -696,7 +696,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       return;
     }
 
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Performing lazySeek from %s to %s position with %s bytesToRead for '%s'",
         contentChannelPosition, currentPosition, bytesToRead, resourceId);
 
@@ -709,7 +709,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         // Always skip in place gzip-encoded files, because they do not support range reads.
         && (gzipEncoded || seekDistance <= readOptions.getInplaceSeekLimit())
         && currentPosition < contentChannelEnd) {
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Seeking forward %d bytes (inplaceSeekLimit: %d) in-place to position %d for '%s'",
           seekDistance, readOptions.getInplaceSeekLimit(), currentPosition, resourceId);
       skipInPlace(seekDistance);
@@ -811,7 +811,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     metadataInitialized = true;
 
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Initialized metadata (gzipEncoded=%s, size=%s, randomAccess=%s, generation=%s) for '%s'",
         gzipEncoded, size, randomAccess, resourceId.getGenerationId(), resourceId);
   }
@@ -844,7 +844,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       footerContent = null;
       throw e;
     }
-    logger.atFiner().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
+    logger.atInfo().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
   }
 
   /**
@@ -855,7 +855,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     contentChannelPosition = currentPosition;
     int offset = toIntExact(currentPosition - (size - footerContent.length));
     int length = footerContent.length - offset;
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Opened stream (prefetched footer) from %d position for '%s'", currentPosition, resourceId);
     return new ByteArrayInputStream(footerContent, offset, length);
   }
@@ -1045,18 +1045,18 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     try {
       InputStream contentStream = response.getContent();
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Opened stream from %d position with %s range and %d bytesToRead for '%s'",
           currentPosition, rangeHeader, bytesToRead, resourceId);
 
       if (contentChannelPosition < currentPosition) {
         long bytesToSkip = currentPosition - contentChannelPosition;
-        logger.atFiner().log(
+        logger.atInfo().log(
             "Skipping %d bytes from %d position to %d position for '%s'",
             bytesToSkip, contentChannelPosition, currentPosition, resourceId);
         while (bytesToSkip > 0) {
           long skippedBytes = contentStream.skip(bytesToSkip);
-          logger.atFiner().log(
+          logger.atInfo().log(
               "Skipped %d bytes from %d position for '%s'",
               skippedBytes, contentChannelPosition, resourceId);
           bytesToSkip -= skippedBytes;

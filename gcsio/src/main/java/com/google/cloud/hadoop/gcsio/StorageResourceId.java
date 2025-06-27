@@ -289,7 +289,7 @@ public class StorageResourceId {
    */
   public static StorageResourceId fromUriPath(
       URI path, boolean allowEmptyObjectName, long generationId) {
-    logger.atFiner().log("fromUriPath('%s', %s)", path, allowEmptyObjectName);
+    logger.atInfo().log("fromUriPath('%s', %s)", path, allowEmptyObjectName);
     checkNotNull(path);
 
     if (!GoogleCloudStorageFileSystem.SCHEME.equals(path.getScheme())) {
@@ -306,6 +306,7 @@ public class StorageResourceId {
     String bucketName = StringPaths.validateBucketName(path.getAuthority());
     // Note that we're using getPath here instead of rawPath, etc. This is because it is assumed
     // that the path was properly encoded in getPath (or another similar method):
+    logger.atInfo().log("TEST path pased in StorageResouceID#fromUriPath %s ", path.getPath());
     String objectName = StringPaths.validateObjectName(path.getPath(), allowEmptyObjectName);
 
     return isNullOrEmpty(objectName)

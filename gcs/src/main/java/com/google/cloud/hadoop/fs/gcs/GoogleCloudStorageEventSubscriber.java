@@ -58,7 +58,7 @@ public class GoogleCloudStorageEventSubscriber {
   public static synchronized GoogleCloudStorageEventSubscriber getInstance(
       @Nonnull GhfsGlobalStorageStatistics storageStatistics) {
     if (INSTANCE == null) {
-      logger.atFiner().log("Subscriber class invoked for first time");
+      logger.atInfo().log("Subscriber class invoked for first time");
       INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);
     }
     return INSTANCE;

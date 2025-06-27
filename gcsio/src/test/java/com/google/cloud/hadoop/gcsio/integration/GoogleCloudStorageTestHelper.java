@@ -98,6 +98,7 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static Credentials getCredentials() throws IOException {
+    // return GoogleCredentials.getApplicationDefault();
     String serviceAccountJsonKeyFile =
         TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
     if (serviceAccountJsonKeyFile == null) {
