@@ -62,9 +62,9 @@ public class GoogleHadoopFileSystemJavaStorageClientIntegrationTest
   @Test
   public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() {}
 
-  @Ignore
-  @Test
-  public void testRenameWithMoveOperation() {}
+  // @Ignore
+  // @Test
+  // public void testRenameWithMoveOperation() {}
 
   @Ignore
   @Test

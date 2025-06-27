@@ -96,8 +96,10 @@ import com.google.common.primitives.Ints;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1171,6 +1173,74 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     TestUtils.verifyCounter(
         (GhfsGlobalStorageStatistics) stats, INVOCATION_COPY_FROM_LOCAL_FILE, 1);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  /**
+   * Validates that listStatus() returns a FileStatus object containing the correct, fully populated
+   * metadata, including generation. This test uses reflection to access the underlying ItemInfo.
+   */
+  @Test
+  public void listStatus_returnsFileStatusWithGeneration()
+      throws IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    // Create a test file with known content.
+    Path testDir = new Path(ghfs.getWorkingDirectory(), "listStatus-generation-test/");
+    ghfs.mkdirs(testDir);
+    Path testFile = new Path(testDir, "file-to-list.txt");
+    byte[] testData = "test-data".getBytes(StandardCharsets.UTF_8);
+    ghfsHelper.writeFile(testFile, testData, 1, true);
+
+    // Get the authoritative metadata immediately after creation to have expected values.
+    FileStatus initialStatus = ghfs.getFileStatus(testFile);
+    long expectedModificationTime = initialStatus.getModificationTime();
+
+    // Call listStatus() on the parent directory. This is the method that
+    //  must now fetch all the required fields due to the fix in OBJECT_FIELDS.
+    FileStatus[] statuses = ghfs.listStatus(testDir);
+
+    assertThat(statuses).hasLength(1);
+    FileStatus listedFileStatus = statuses[0];
+
+    // Use reflection to access the internal 'itemInfo' which is normally package-private.
+    // This allows us to verify fields that are not exposed by the public FileStatus API.
+    assertThat(listedFileStatus).isInstanceOf(GoogleHadoopFileStatus.class);
+    GoogleHadoopFileStatus ghfsStatus = (GoogleHadoopFileStatus) listedFileStatus;
+
+    java.lang.reflect.Method getFileInfoMethod =
+        GoogleHadoopFileStatus.class.getDeclaredMethod("getFileInfo");
+    getFileInfoMethod.setAccessible(true);
+    com.google.cloud.hadoop.gcsio.FileInfo fileInfo =
+        (com.google.cloud.hadoop.gcsio.FileInfo) getFileInfoMethod.invoke(ghfsStatus);
+
+    // Now, use reflection to get the internal GoogleCloudStorageItemInfo from FileInfo.
+    java.lang.reflect.Method getItemInfoMethod =
+        com.google.cloud.hadoop.gcsio.FileInfo.class.getDeclaredMethod("getItemInfo");
+    getItemInfoMethod.setAccessible(true);
+    com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo itemInfo =
+        (com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo)
+            getItemInfoMethod.invoke(fileInfo);
+
+    // Verify that all the fields in OBJECT_FIELDS were retrieved by the listStatus call.
+    assertWithMessage("Bucket name should be populated")
+        .that(itemInfo.getBucketName())
+        .isEqualTo(ghfs.getUri().getAuthority());
+
+    assertWithMessage("Object name should be populated")
+        .that(itemInfo.getObjectName())
+        .isEqualTo(testFile.toUri().getPath().substring(1));
+
+    assertWithMessage("Size should be populated and correct")
+        .that(itemInfo.getSize())
+        .isEqualTo(testData.length);
+
+    assertWithMessage("Modification time should be populated")
+        .that(itemInfo.getModificationTime())
+        .isEqualTo(expectedModificationTime);
+
+    assertWithMessage("Generation should be populated and a positive number")
+        .that(itemInfo.getContentGeneration())
+        .isGreaterThan(0L);
+
+    ghfs.delete(testDir, /* recursive= */ true);
   }
 
   @Test
