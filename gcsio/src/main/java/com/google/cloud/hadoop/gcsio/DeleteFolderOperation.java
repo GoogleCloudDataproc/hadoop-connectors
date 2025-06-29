@@ -114,7 +114,13 @@ class DeleteFolderOperation {
   /** Gets the head from the blocking queue */
   public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
-      return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+      FolderInfo folderInfo = folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
+      if (folderInfo == null) {
+        // Throwing an InterruptedException here because client side timeouts can cause folderInfo
+        // to be null.
+        throw new InterruptedException("Timed out while getting an folder from blocking queue.");
+      }
+      return folderInfo;
     } catch (InterruptedException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
