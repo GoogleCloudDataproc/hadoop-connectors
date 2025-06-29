@@ -116,8 +116,9 @@ class DeleteFolderOperation {
     try {
       FolderInfo folderInfo = folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
       if (folderInfo == null) {
-        // Throwing an exception here because client side timeouts can cause
-        throw new InterruptedException("Timed out while getting an folder from blocking queue");
+        // Throwing an InterruptedException here because client side timeouts can cause folderInfo
+        // to be null.
+        throw new InterruptedException("Timed out while getting an folder from blocking queue.");
       }
       return folderInfo;
     } catch (Exception e) {

@@ -14,10 +14,13 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.storage.control.v2.StorageControlClient;
+import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,11 +28,22 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 public class DeleteFolderOperationTest {
 
   private static final String BUCKET_NAME = "foo-bucket";
+  @Mock private BlockingQueue<FolderInfo> mockFolderDeleteBlockingQueue;
+
+  @Before
+  public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
+  }
 
   @Test
   public void checkDeletionOrderForHnBucketBalancedFolders() throws InterruptedException {
@@ -85,6 +99,32 @@ public class DeleteFolderOperationTest {
       FolderInfo cur = orderOfDeletion.get(i);
       assertThat(prev.getParentFolderName()).isEqualTo(cur.getFolderName());
     }
+  }
+
+  @Test
+  public void checkExceptionTypeWhenPollTimesOut() throws Exception {
+    List<FolderInfo> foldersToDelete = new LinkedList<>();
+    addFolders(foldersToDelete, "test-folder");
+
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+    setMockFolderDeleteBlockingQueue(deleteFolderOperation);
+
+    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
+
+    InterruptedException exception =
+        assertThrows(
+            InterruptedException.class, () -> deleteFolderOperation.getElementFromBlockingQueue());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo("Timed out while getting an folder from blocking queue.");
+  }
+
+  private void setMockFolderDeleteBlockingQueue(DeleteFolderOperation deleteFolderOperation)
+      throws Exception {
+    Field queueField = DeleteFolderOperation.class.getDeclaredField("folderDeleteBlockingQueue");
+    queueField.setAccessible(true);
+    queueField.set(deleteFolderOperation, mockFolderDeleteBlockingQueue);
   }
 
   private void addFolders(List<FolderInfo> foldersToDelete, String curFolderName) {
