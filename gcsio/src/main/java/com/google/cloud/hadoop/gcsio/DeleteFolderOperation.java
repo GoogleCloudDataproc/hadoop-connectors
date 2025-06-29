@@ -121,7 +121,7 @@ class DeleteFolderOperation {
         throw new InterruptedException("Timed out while getting an folder from blocking queue.");
       }
       return folderInfo;
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
       throw e;
