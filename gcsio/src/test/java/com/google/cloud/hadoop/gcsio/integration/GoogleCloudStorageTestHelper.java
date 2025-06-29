@@ -29,6 +29,7 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
@@ -101,7 +102,11 @@ public class GoogleCloudStorageTestHelper {
     String serviceAccountJsonKeyFile =
         TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
     if (serviceAccountJsonKeyFile == null) {
-      return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
+      Boolean isApplicationDefaultModeEnabled =
+          TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
+      return isApplicationDefaultModeEnabled
+          ? GoogleCredentials.getApplicationDefault()
+          : ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
     }
     try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
       return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
