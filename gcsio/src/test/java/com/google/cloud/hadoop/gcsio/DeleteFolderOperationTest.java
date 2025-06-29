@@ -121,7 +121,7 @@ public class DeleteFolderOperationTest {
   }
 
   private void setMockFolderDeleteBlockingQueue(DeleteFolderOperation deleteFolderOperation)
-      throws Exception {
+      throws NoSuchFieldException, IllegalAccessException {
     Field queueField = DeleteFolderOperation.class.getDeclaredField("folderDeleteBlockingQueue");
     queueField.setAccessible(true);
     queueField.set(deleteFolderOperation, mockFolderDeleteBlockingQueue);
