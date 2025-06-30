@@ -29,7 +29,7 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
    * @param action The lambda expression containing the benchmark logic to execute.
    * @throws IOException if the benchmark fails.
    */
-  private void runBenchmarkAndLog(String operationName, BenchmarkAction action) throws IOException {
+  private void runJMHBenchmarkAndLog(String operationName, BenchmarkAction action) throws IOException {
     String banner = "======================================================";
     String startMessage = String.format("JMH BENCHMARK TRIGGERED FOR %s OPERATION!", operationName);
     String endMessage = String.format("JMH BENCHMARK FINISHED FOR %s.", operationName);
@@ -53,14 +53,14 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
 
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
-    runBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
+    runJMHBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'listStatus' operation...");
     return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    runBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
+    runJMHBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'rename' operation...");
     return super.rename(src, dst);
   }
