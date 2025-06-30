@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
+package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -34,97 +35,86 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /**
- * A JMH benchmark for a single, direct {@code delete} operation. This uses SingleShotTime to
- * measure the end-to-end latency of deleting the actual file or folder provided by the user
- * command.
+ * A JMH benchmark to measure the performance of the {@code getFileStatus} operation on a single,
+ * real Google Cloud Storage path provided by the user command.
  */
 @State(Scope.Benchmark)
-@BenchmarkMode(Mode.SingleShotTime)
-@Warmup(iterations = 0)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@BenchmarkMode(Mode.AverageTime)
+@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-public class GCSDeleteBenchmark {
+public class GCSGetFileStatusBenchmark {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   @Param({"_path_not_set_"})
-  private String pathString; // The exact path to delete, passed by the runner.
-
-  @Param({"false"}) // The recursive flag, passed by the runner.
-  private boolean recursive;
+  private String pathString; // The exact GCS path to check, passed by the runner.
 
   private GoogleHadoopFileSystem ghfs;
-  private Path pathToDelete;
+  private Path pathToGetStatus;
 
   /**
-   * Sets up the benchmark trial. Initializes the GCS client and verifies the target path exists.
+   * Sets up the benchmark trial. Initializes the GCS filesystem and verifies the target path
+   * exists. It does NOT create any temporary files.
    */
   @Setup(Level.Trial)
   public void setup() throws IOException {
     if ("_path_not_set_".equals(pathString)) {
       throw new IllegalArgumentException(
-          "File path must be provided via JMH parameter 'pathString'.");
+          "GCS path must be provided via the 'pathString' benchmark parameter.");
     }
-    this.pathToDelete = new Path(pathString);
+    this.pathToGetStatus = new Path(pathString);
 
     Configuration conf = new Configuration();
     conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
 
     this.ghfs = new GoogleHadoopFileSystem();
-    this.ghfs.initialize(pathToDelete.toUri(), conf);
+    this.ghfs.initialize(this.pathToGetStatus.toUri(), conf);
 
-    // Verify the path to be deleted exists before we start the measurement.
-    if (!ghfs.exists(pathToDelete)) {
+    // This benchmark operates on the assumption that the source path already exists.
+    // We verify it here to fail fast if it doesn't.
+    if (!ghfs.exists(pathToGetStatus)) {
       throw new IOException(
-          "Benchmark setup failed: Path to delete does not exist: " + pathToDelete);
+          "Benchmark setup failed: The path '" + pathToGetStatus + "' does not exist.");
     }
-    logger.atInfo().log("Trial Setup: Ready to delete '%s'", pathToDelete);
+
+    logger.atInfo().log("Trial Setup: Ready to get status of '%s'", pathToGetStatus);
   }
 
-  /** Cleans up resources after the trial run by closing the filesystem client. */
+  /** Cleans up resources by closing the GCS filesystem client. */
   @TearDown(Level.Trial)
   public void tearDown() throws IOException {
     if (this.ghfs != null) {
       this.ghfs.close();
       logger.atInfo().log("Trial TearDown: Closed GCS filesystem instance.");
     }
+    this.ghfs = null;
   }
 
-  /**
-   * The core benchmark. It deletes the actual file/folder specified by the user's command.
-   *
-   * @return The boolean result of the delete operation.
-   * @throws IOException if the delete operation fails.
-   */
+  /** The core benchmark. It gets the status of the file and consumes the result. */
   @Benchmark
-  public boolean delete_operation() throws IOException {
-    return ghfs.delete(pathToDelete, recursive);
+  public void getFileStatus_operation(Blackhole bh) throws IOException {
+    FileStatus fileStatus = ghfs.getFileStatus(pathToGetStatus);
+    bh.consume(fileStatus);
   }
 
-  /**
-   * A static entry point to programmatically run this benchmark.
-   *
-   * @param hadoopPath The exact GCS path to be deleted.
-   * @param recursive The 'recursive' flag from the original command.
-   * @throws IOException if the benchmark runner fails to execute.
-   */
-  public static void runBenchmark(Path hadoopPath, boolean recursive) throws IOException {
+  /** Static entry point to run the benchmark from the wrapper class. */
+  public static void runBenchmark(Path hadoopPath) throws IOException {
     try {
-      int warmupIterations = 0;
-      int measurementIterations = 1;
-
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 5);
+      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 10);
       Options opt =
           new OptionsBuilder()
-              .include(GCSDeleteBenchmark.class.getSimpleName() + ".delete_operation")
+              .include(GCSGetFileStatusBenchmark.class.getSimpleName() + ".getFileStatus_operation")
               .param("pathString", hadoopPath.toString())
-              .param("recursive", String.valueOf(recursive))
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
               .build();
@@ -132,7 +122,7 @@ public class GCSDeleteBenchmark {
       new Runner(opt).run();
 
     } catch (RunnerException e) {
-      throw new IOException("Failed to run JMH benchmark for direct delete", e);
+      throw new IOException("Failed to run JMH benchmark for getFileStatus", e);
     }
   }
 }
