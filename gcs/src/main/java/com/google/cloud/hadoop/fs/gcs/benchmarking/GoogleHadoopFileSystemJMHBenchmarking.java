@@ -1,8 +1,8 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSListStatusBenchmark;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSRenameBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSListStatusBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;

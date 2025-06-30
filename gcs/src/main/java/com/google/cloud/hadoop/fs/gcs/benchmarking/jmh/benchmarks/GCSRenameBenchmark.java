@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
+package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.common.flogger.GoogleLogger;
@@ -114,6 +114,7 @@ public class GCSRenameBenchmark {
       this.ghfs.close();
       logger.atInfo().log("Benchmark TearDown: Closed GCS filesystem instance.");
     }
+    this.ghfs = null;
   }
 
   /**
