@@ -29,7 +29,7 @@ public abstract class ListFileOptions {
   public static final ListFileOptions DEFAULT = builder().build();
 
   public static Builder builder() {
-    return new AutoValue_ListFileOptions.Builder().setFields(OBJECT_FIELDS);
+    return new AutoValue_ListFileOptions.Builder().setFields(OBJECT_FIELDS).setMaxResults(-1);
   }
 
   public abstract Builder toBuilder();
@@ -44,10 +44,14 @@ public abstract class ListFileOptions {
   @Nullable
   public abstract String getFields();
 
+  public abstract long getMaxResults();
+
   /** Builder for {@link ListFileOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setFields(String delimiter);
+
+    public abstract Builder setMaxResults(long max);
 
     public abstract ListFileOptions build();
   }

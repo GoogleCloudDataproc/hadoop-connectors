@@ -52,7 +52,6 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -313,16 +312,90 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
   @Override
   public void delete(URI path, boolean recursive) throws IOException {
+    // checkNotNull(path, "path should not be null");
+    // checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
+    // logger.atInfo().log("delete(path: %s, recursive: %b)", path, recursive);
+    //
+    // FileInfo fileInfo = getFileInfo(path);
+    // if (!fileInfo.exists()) {
+    //   GoogleCloudStorageEventBus.postOnException();
+    //   throw new FileNotFoundException("Item not found: " + path);
+    // }
+    //
+    // Future<GoogleCloudStorageItemInfo> parentInfoFuture = null;
+    // if (options.getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled()) {
+    //   StorageResourceId parentId =
+    //       StorageResourceId.fromUriPath(UriPaths.getParentPath(path), true);
+    //   parentInfoFuture =
+    //       cachedExecutor.submit(
+    //           () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
+    // }
+    //
+    // boolean isHnBucket =
+    //     (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() &&
+    // gcs.isHnBucket(path));
+    // List<FolderInfo> listOfFolders = new LinkedList<>();
+    // List<FileInfo> itemsToDelete;
+    // // Delete sub-items if it is a directory.
+    // if (fileInfo.isDirectory()) {
+    //   itemsToDelete =
+    //       recursive
+    //           ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
+    //           // TODO: optimize by listing just one object instead of whole page
+    //           //  (up to 1024 objects now)
+    //           : listFileInfoForPrefixPage(
+    //                   fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+    //               .getItems();
+    //
+    //   /*TODO : making listing of folder and object resources in parallel*/
+    //   if (isHnBucket) {
+    //     /**
+    //      * Get list of folders if the bucket is HN enabled bucket For recursive delete, get all
+    //      * folder resources. For non-recursive delete, delete the folder directly if it is a
+    //      * directory and do not do anything if the path points to a bucket.
+    //      */
+    //     String bucketName = getBucketName(path);
+    //     String folderName = getFolderName(path);
+    //     listOfFolders =
+    //         recursive
+    //             ? listFoldersInfoForPrefixPage(
+    //                     fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
+    //                 .getItems()
+    //             // will not delete for a bucket
+    //             : (folderName.equals("")
+    //                 ? new LinkedList<>()
+    //                 : Arrays.asList(
+    //                     new FolderInfo(FolderInfo.createFolderInfoObject(bucketName,
+    // folderName))));
+    //
+    //     logger.atInfo().log(
+    //         "Encountered HN enabled bucket with %s number of folder in path : %s",
+    //         listOfFolders.size(), path);
+    //   }
+    //
+    //   if (!itemsToDelete.isEmpty() && !recursive) {
+    //     GoogleCloudStorageEventBus.postOnException();
+    //     throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
+    //   }
+    // } else {
+    //   itemsToDelete = new ArrayList<>();
+    // }
+    //
+    // List<FileInfo> bucketsToDelete = new ArrayList<>();
+    // (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
+    //
+    // deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
+
     checkNotNull(path, "path should not be null");
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
-    logger.atInfo().log("delete(path: %s, recursive: %b)", path, recursive);
+    logger.atFiner().log("delete(path: %s, recursive: %b)", path, recursive);
 
     FileInfo fileInfo = getFileInfo(path);
     if (!fileInfo.exists()) {
-      GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
 
+    // This check remains for backward compatibility with non-HNS implicit directories.
     Future<GoogleCloudStorageItemInfo> parentInfoFuture = null;
     if (options.getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled()) {
       StorageResourceId parentId =
@@ -334,56 +407,55 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     boolean isHnBucket =
         (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
-    List<FolderInfo> listOfFolders = new LinkedList<>();
-    List<FileInfo> itemsToDelete;
-    // Delete sub-items if it is a directory.
+
     if (fileInfo.isDirectory()) {
-      itemsToDelete =
-          recursive
-              ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
-              // TODO: optimize by listing just one object instead of whole page
-              //  (up to 1024 objects now)
-              : listFileInfoForPrefixPage(
-                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+      if (recursive) {
+        // --- OPTIMIZATION FOR HNS RECURSIVE DELETE ---
+        // List both objects and native HNS folders to ensure complete deletion.
+        List<FileInfo> itemsToDelete =
+            listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS);
+        List<FolderInfo> foldersToDelete = new LinkedList<>();
+        if (isHnBucket) {
+          // Use the new HNS-specific folder listing.
+          foldersToDelete =
+              listFoldersInfoForPrefixPage(
+                      fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
                   .getItems();
+        }
 
-      /*TODO : making listing of folder and object resources in parallel*/
-      if (isHnBucket) {
-        /**
-         * Get list of folders if the bucket is HN enabled bucket For recursive delete, get all
-         * folder resources. For non-recursive delete, delete the folder directly if it is a
-         * directory and do not do anything if the path points to a bucket.
-         */
-        String bucketName = getBucketName(path);
-        String folderName = getFolderName(path);
-        listOfFolders =
-            recursive
-                ? listFoldersInfoForPrefixPage(
-                        fileInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToken= */ null)
-                    .getItems()
-                // will not delete for a bucket
-                : (folderName.equals("")
-                    ? new LinkedList<>()
-                    : Arrays.asList(
-                        new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName))));
+        // Add the directory itself to the list of objects to be deleted.
+        itemsToDelete.add(fileInfo);
+        deleteInternalWithFolders(itemsToDelete, foldersToDelete, new ArrayList<>());
 
-        logger.atInfo().log(
-            "Encountered HN enabled bucket with %s number of folder in path : %s",
-            listOfFolders.size(), path);
-      }
+      } else {
+        // --- OPTIMIZATION FOR NON-RECURSIVE EMPTINESS CHECK ---
+        // Use a more efficient, delimited list to check for children.
+        // This is faster than a full recursive list.
+        List<FileInfo> children =
+            listFileInfo(path, ListFileOptions.DEFAULT.toBuilder().setMaxResults(1).build());
 
-      if (!itemsToDelete.isEmpty() && !recursive) {
-        GoogleCloudStorageEventBus.postOnException();
-        throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
+        if (!children.isEmpty()) {
+          throw new DirectoryNotEmptyException("Cannot delete a non-empty directory: " + path);
+        }
+
+        // The directory is empty, proceed with deletion.
+        List<FolderInfo> foldersToDelete = new LinkedList<>();
+        if (isHnBucket) {
+          // For HNS, we can directly add the folder to the delete list.
+          String bucketName = getBucketName(path);
+          String folderName = getFolderName(path);
+          foldersToDelete.add(
+              new FolderInfo(FolderInfo.createFolderInfoObject(bucketName, folderName)));
+        }
+
+        // The fileInfo for the directory itself is added to itemsToDelete.
+        deleteInternalWithFolders(
+            Collections.singletonList(fileInfo), foldersToDelete, new ArrayList<>());
       }
     } else {
-      itemsToDelete = new ArrayList<>();
+      // It's a single file.
+      deleteInternal(Collections.singletonList(fileInfo), new ArrayList<>());
     }
-
-    List<FileInfo> bucketsToDelete = new ArrayList<>();
-    (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
-
-    deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
     repairImplicitDirectory(path, parentInfoFuture);
   }
@@ -1439,7 +1511,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
   private static ListObjectOptions updateListObjectOptions(
       ListObjectOptions listObjectOptions, ListFileOptions listFileOptions) {
-    return listObjectOptions.toBuilder().setFields(listFileOptions.getFields()).build();
+    return listObjectOptions.toBuilder()
+        .setFields(listFileOptions.getFields())
+        .setMaxResults(listFileOptions.getMaxResults())
+        .build();
   }
 
   @Override
