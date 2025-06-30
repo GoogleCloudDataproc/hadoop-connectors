@@ -142,11 +142,15 @@ public class GCSRenameBenchmark {
   public static void runBenchmark(Path srcPath, Path dstPath) throws IOException {
 
     try {
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 3);
+      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 5);
       Options opt =
           new OptionsBuilder()
               .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_operation")
               .param("srcPathString", srcPath.toString())
               .param("dstPathString", dstPath.toString())
+              .warmupIterations(warmupIterations)
+              .measurementIterations(measurementIterations)
               .build();
 
       new Runner(opt).run();
