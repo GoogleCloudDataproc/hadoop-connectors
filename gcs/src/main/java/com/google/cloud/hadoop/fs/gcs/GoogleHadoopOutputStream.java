@@ -148,7 +148,7 @@ class GoogleHadoopOutputStream extends OutputStream
       CreateFileOptions createFileOptions,
       FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFiner().log(
+    logger.atInfo().log(
         "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)",
         dstGcsPath, createFileOptions);
     this.ghfs = ghfs;
@@ -284,7 +284,7 @@ class GoogleHadoopOutputStream extends OutputStream
         dstGcsPath,
         traceFactory,
         () -> {
-          logger.atFiner().log("hflush(): %s", dstGcsPath);
+          logger.atInfo().log("hflush(): %s", dstGcsPath);
 
           long startMs = System.currentTimeMillis();
           throwIfNotOpen();
@@ -311,12 +311,12 @@ class GoogleHadoopOutputStream extends OutputStream
         dstGcsPath,
         traceFactory,
         () -> {
-          logger.atFiner().log("hsync(): %s", dstGcsPath);
+          logger.atInfo().log("hsync(): %s", dstGcsPath);
 
           long startMs = System.currentTimeMillis();
           throwIfNotOpen();
           if (syncRateLimiter != null) {
-            logger.atFiner().log(
+            logger.atInfo().log(
                 "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
                 syncRateLimiter, dstGcsPath);
             syncRateLimiter.acquire();
@@ -328,7 +328,7 @@ class GoogleHadoopOutputStream extends OutputStream
 
   /** Internal implementation of hsync, can be reused by hflush() as well. */
   private void hsyncInternal(long startMs) throws IOException {
-    logger.atFiner().log(
+    logger.atInfo().log(
         "hsyncInternal(): Committing tail file %s to final destination %s", tmpGcsPath, dstGcsPath);
     commitTempFile();
 
@@ -337,12 +337,12 @@ class GoogleHadoopOutputStream extends OutputStream
     ++tmpIndex;
     tmpGcsPath = getNextTmpPath();
 
-    logger.atFiner().log(
+    logger.atInfo().log(
         "hsync(): Opening next temporary tail file %s at %d index", tmpGcsPath, tmpIndex);
     tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
 
     long finishMs = System.currentTimeMillis();
-    logger.atFiner().log("Took %dms to sync() for %s", finishMs - startMs, dstGcsPath);
+    logger.atInfo().log("Took %dms to sync() for %s", finishMs - startMs, dstGcsPath);
   }
 
   private void commitTempFile() throws IOException {
@@ -353,7 +353,7 @@ class GoogleHadoopOutputStream extends OutputStream
         tmpOut instanceof GoogleCloudStorageItemInfo.Provider
             ? ((GoogleCloudStorageItemInfo.Provider) tmpOut).getItemInfo().getContentGeneration()
             : StorageResourceId.UNKNOWN_GENERATION_ID;
-    logger.atFiner().log(
+    logger.atInfo().log(
         "tmpOut is an instance of %s; expected generationId %d.",
         tmpOut.getClass(), tmpGenerationId);
 
@@ -410,11 +410,11 @@ class GoogleHadoopOutputStream extends OutputStream
         dstGcsPath,
         traceFactory,
         () -> {
-          logger.atFiner().log(
+          logger.atInfo().log(
               "close(): temp tail file: %s final destination: %s", tmpGcsPath, dstGcsPath);
 
           if (tmpOut == null) {
-            logger.atFiner().log("close(): Ignoring; stream already closed.");
+            logger.atInfo().log("close(): Ignoring; stream already closed.");
             return null;
           }
 
@@ -428,7 +428,7 @@ class GoogleHadoopOutputStream extends OutputStream
           tmpGcsPath = null;
           tmpIndex = -1;
 
-          logger.atFiner().log("close(): Awaiting %s deletionFutures", tmpDeletionFutures.size());
+          logger.atInfo().log("close(): Awaiting %s deletionFutures", tmpDeletionFutures.size());
           for (Future<?> deletion : tmpDeletionFutures) {
             try {
               deletion.get();

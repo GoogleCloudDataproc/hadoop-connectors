@@ -89,14 +89,14 @@ public class GcsDelegationTokens extends AbstractService {
     super.serviceStart();
     tokenBinding.start();
     bindToAnyDelegationToken();
-    logger.atFiner().log(
+    logger.atInfo().log(
         "GCS Delegation support token %s with %s",
         isBoundToDT() ? getBoundDT().decodeIdentifier() : "none", tokenBinding.getService());
   }
 
   @Override
   protected void serviceStop() throws Exception {
-    logger.atFiner().log("Stopping GCS delegation tokens");
+    logger.atInfo().log("Stopping GCS delegation tokens");
     try {
       super.serviceStop();
     } finally {
@@ -121,7 +121,7 @@ public class GcsDelegationTokens extends AbstractService {
    */
   public AccessTokenProvider deployUnbonded() throws IOException {
     checkState(!isBoundToDT(), "Already Bound to a delegation token");
-    logger.atFiner().log("No delegation tokens present: using direct authentication");
+    logger.atInfo().log("No delegation tokens present: using direct authentication");
     accessTokenProvider = tokenBinding.deployUnbonded();
     return accessTokenProvider;
   }
@@ -231,7 +231,7 @@ public class GcsDelegationTokens extends AbstractService {
    * @throws IOException if one cannot be created
    */
   public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
-    logger.atFiner().log("Delegation token requested");
+    logger.atInfo().log("Delegation token requested");
     if (isBoundToDT()) {
       // the FS was created on startup with a token, so return it.
       logger.atFine().log("Returning current token");
@@ -285,7 +285,7 @@ public class GcsDelegationTokens extends AbstractService {
   @SuppressWarnings("unchecked") // safe by contract of lookupToken()
   private static Token<DelegationTokenIdentifier> lookupToken(
       Credentials credentials, Text service, Text kind) throws DelegationTokenIOException {
-    logger.atFiner().log("Looking for token for service %s in credentials", service);
+    logger.atInfo().log("Looking for token for service %s in credentials", service);
     Token<?> token = credentials.getToken(service);
     if (token != null) {
       Text tokenKind = token.getKind();
@@ -299,7 +299,7 @@ public class GcsDelegationTokens extends AbstractService {
       throw DelegationTokenIOException.tokenMismatch(service, kind, tokenKind);
     }
     // A token for the service was not found
-    logger.atFiner().log("No token found for %s", service);
+    logger.atInfo().log("No token found for %s", service);
     return null;
   }
 

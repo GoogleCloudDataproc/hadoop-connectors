@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.auto.value.AutoValue;
+import javax.annotation.Nullable;
 
 /**
  * Options that can be specified when listing Folders in the {@link GoogleCloudStorage} and is valid
@@ -32,6 +33,12 @@ public abstract class ListFolderOptions {
 
   public abstract Builder toBuilder();
 
+  @Nullable
+  public abstract String getDelimiter();
+
+  @Nullable
+  public abstract String getPrefix();
+
   /** Maximum folder resources in a single page */
   public abstract int getPageSize();
 
@@ -40,6 +47,10 @@ public abstract class ListFolderOptions {
   public abstract static class Builder {
 
     public abstract Builder setPageSize(int pageSize);
+
+    public abstract Builder setDelimiter(@Nullable String delimiter);
+
+    public abstract Builder setPrefix(@Nullable String prefix);
 
     public abstract ListFolderOptions build();
   }

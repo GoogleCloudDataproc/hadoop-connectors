@@ -205,7 +205,7 @@ class DeleteFolderOperation {
     return new FutureCallback<Void>() {
       @Override
       public void onSuccess(Void result) {
-        logger.atFiner().log("Successfully deleted folder %s", resourceId.toString());
+        logger.atInfo().log("Successfully deleted folder %s", resourceId.toString());
         successfullDeletionOfFolderResource(resourceId);
       }
 
@@ -219,7 +219,7 @@ class DeleteFolderOperation {
           // receives the request but we get a retry-able error before we get a response.
           // During a retry, we no longer find the item because the server had deleted
           // it already.
-          logger.atFiner().log(
+          logger.atInfo().log(
               "Delete folder '%s' not found: %s", resourceId, throwable.getMessage());
           successfullDeletionOfFolderResource(resourceId);
         } else if (isErrorType(throwable, ErrorType.FAILED_PRECONDITION)
