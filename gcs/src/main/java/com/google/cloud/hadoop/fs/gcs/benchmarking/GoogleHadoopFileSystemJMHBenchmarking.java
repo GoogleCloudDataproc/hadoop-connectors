@@ -1,6 +1,8 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSDeleteBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSGetFileStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSListStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
@@ -63,5 +65,25 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     runBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'rename' operation...");
     return super.rename(src, dst);
+  }
+
+  @Override
+  public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
+    // Run the single-shot benchmark, which will delete the actual file/folder.
+    runBenchmarkAndLog("DELETE", () -> GCSDeleteBenchmark.runBenchmark(hadoopPath, recursive));
+
+    // IMPORTANT: Because the benchmark itself performs the final delete, we DO NOT call
+    // super.delete() here. We simply return true to indicate the user's command succeeded.
+    logger.atInfo().log(
+        "Benchmark complete. The path '%s' was deleted as part of the benchmark run.", hadoopPath);
+    return true;
+  }
+
+  @Override
+  public FileStatus getFileStatus(Path hadoopPath) throws IOException {
+    runBenchmarkAndLog("GETFILESTATUS", () -> GCSGetFileStatusBenchmark.runBenchmark(hadoopPath));
+    logger.atInfo().log(
+        "Benchmark complete. Now performing the actual 'getFileStatus' operation...");
+    return super.getFileStatus(hadoopPath);
   }
 }
