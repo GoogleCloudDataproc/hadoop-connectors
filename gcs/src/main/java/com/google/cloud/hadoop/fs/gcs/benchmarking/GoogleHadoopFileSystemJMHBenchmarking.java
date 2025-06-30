@@ -74,7 +74,7 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     // IMPORTANT: Because the benchmark itself performs the final delete, we DO NOT call
     // super.delete() here. We simply return true to indicate the user's command succeeded.
     logger.atInfo().log(
-        "Benchmark complete. The path '%s' was deleted as part of the benchmark run.", hadoopPath);
+            "Benchmark complete. The path '%s' was deleted as part of the benchmark run.", hadoopPath);
     return true;
   }
 }

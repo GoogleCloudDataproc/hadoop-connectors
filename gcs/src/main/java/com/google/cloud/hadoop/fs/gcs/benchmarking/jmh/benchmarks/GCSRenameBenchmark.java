@@ -114,6 +114,7 @@ public class GCSRenameBenchmark {
       this.ghfs.close();
       logger.atInfo().log("Benchmark TearDown: Closed GCS filesystem instance.");
     }
+    this.ghfs = null;
   }
 
   /**
