@@ -1,10 +1,9 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSDeleteBenchmark;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSGetFileStatusBenchmark;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSListStatusBenchmark;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks.GCSRenameBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSDeleteBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSListStatusBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;
@@ -77,13 +76,5 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     logger.atInfo().log(
         "Benchmark complete. The path '%s' was deleted as part of the benchmark run.", hadoopPath);
     return true;
-  }
-
-  @Override
-  public FileStatus getFileStatus(Path hadoopPath) throws IOException {
-    runBenchmarkAndLog("GETFILESTATUS", () -> GCSGetFileStatusBenchmark.runBenchmark(hadoopPath));
-    logger.atInfo().log(
-        "Benchmark complete. Now performing the actual 'getFileStatus' operation...");
-    return super.getFileStatus(hadoopPath);
   }
 }

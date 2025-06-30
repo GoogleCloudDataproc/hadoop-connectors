@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
+package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.common.flogger.GoogleLogger;
@@ -123,10 +123,14 @@ public class GCSListStatusBenchmark {
    */
   public static void runBenchmark(Path hadoopPath) throws IOException {
     try {
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 5);
+      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 10);
       Options opt =
           new OptionsBuilder()
               .include(GCSListStatusBenchmark.class.getSimpleName() + ".listStatus_Operation")
               .param("pathString", hadoopPath.toString())
+              .warmupIterations(warmupIterations)
+              .measurementIterations(measurementIterations)
               .build();
 
       new Runner(opt).run();

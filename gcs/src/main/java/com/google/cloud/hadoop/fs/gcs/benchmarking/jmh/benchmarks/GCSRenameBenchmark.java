@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
+package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.common.flogger.GoogleLogger;
@@ -142,11 +142,15 @@ public class GCSRenameBenchmark {
   public static void runBenchmark(Path srcPath, Path dstPath) throws IOException {
 
     try {
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 3);
+      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 5);
       Options opt =
           new OptionsBuilder()
               .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_operation")
               .param("srcPathString", srcPath.toString())
               .param("dstPathString", dstPath.toString())
+              .warmupIterations(warmupIterations)
+              .measurementIterations(measurementIterations)
               .build();
 
       new Runner(opt).run();
