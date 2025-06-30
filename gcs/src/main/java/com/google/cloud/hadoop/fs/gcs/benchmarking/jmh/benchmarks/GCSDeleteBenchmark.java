@@ -95,6 +95,7 @@ public class GCSDeleteBenchmark {
       this.ghfs.close();
       logger.atInfo().log("Trial TearDown: Closed GCS filesystem instance.");
     }
+    this.ghfs = null;
   }
 
   /**
