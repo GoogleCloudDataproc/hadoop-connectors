@@ -57,13 +57,17 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
     runJMHBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'listStatus' operation...");
-    return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
+
+    // Run actual listStatus Operation after benchmarking it.
+    return super.listStatus(hadoopPath);
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
     runJMHBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'rename' operation...");
+
+    // Run actual rename Operation after benchmarking it.
     return super.rename(src, dst);
   }
 
@@ -71,10 +75,13 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     // Run the single-shot benchmark, which will delete the actual file/folder.
     runJMHBenchmarkAndLog("DELETE", () -> GCSDeleteBenchmark.runBenchmark(hadoopPath, recursive));
+
     // IMPORTANT: Because the benchmark itself performs the final delete, we DO NOT call
     // super.delete() here. We simply return true to indicate the user's command succeeded.
     logger.atInfo().log(
         "Benchmark complete. The path '%s' was deleted as part of the benchmark run.", hadoopPath);
+    // This line is only reached if the benchmarked delete operation was successful.
+    // A failure would have thrown an IOException, exiting this method prematurely.
     return true;
   }
 }

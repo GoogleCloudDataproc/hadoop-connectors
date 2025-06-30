@@ -46,13 +46,22 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.SingleShotTime)
-@Warmup(iterations = 0)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(
+    iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(
+    iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSDeleteBenchmark {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  public static final int DEFAULT_WARMUP_ITERATIONS = 0;
+  public static final int DEFAULT_MEASUREMENT_ITERATIONS = 1;
 
   @Param({"_path_not_set_"})
   private String pathString; // The exact path to delete, passed by the runner.
@@ -75,6 +84,7 @@ public class GCSDeleteBenchmark {
     this.pathToDelete = new Path(pathString);
 
     Configuration conf = new Configuration();
+    // Set the real GCS filesystem implementation to prevent an infinite recursive loop.
     conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
 
     this.ghfs = new GoogleHadoopFileSystem();

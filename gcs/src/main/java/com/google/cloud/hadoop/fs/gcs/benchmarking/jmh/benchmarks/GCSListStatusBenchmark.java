@@ -47,13 +47,21 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
-@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(
+    iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(
+    iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSListStatusBenchmark {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  public static final int DEFAULT_WARMUP_ITERATIONS = 5;
+  public static final int DEFAULT_MEASUREMENT_ITERATIONS = 10;
 
   // The GCS path to the directory whose contents will be listed.
   // This is populated by the JMH runner via the OptionsBuilder.
@@ -78,8 +86,8 @@ public class GCSListStatusBenchmark {
     this.pathToList = new Path(pathString);
 
     Configuration conf = new Configuration();
-    // Use the real GoogleHadoopFileSystem implementation for the benchmark.
-    // The wrapper class will have already intercepted this call.
+
+    // Set the real GCS filesystem implementation to prevent an infinite recursive loop.
     conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
 
     this.ghfs = new GoogleHadoopFileSystem();
@@ -124,8 +132,12 @@ public class GCSListStatusBenchmark {
    */
   public static void runBenchmark(Path hadoopPath) throws IOException {
     try {
-      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 5);
-      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 10);
+      // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
+      // If the properties are not set, fall back to the default constant values defined for this
+      // benchmark.
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
+      int measurementIterations =
+          Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
       Options opt =
           new OptionsBuilder()
               .include(GCSListStatusBenchmark.class.getSimpleName() + ".listStatus_Operation")
