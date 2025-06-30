@@ -130,6 +130,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
           put("fs.gs.operation.move.enable", false);
           put("fs.gs.write.rolling.checksum.enable", false);
+          put("fs.gs.storage.client.caching.enable", false);
         }
       };
 
