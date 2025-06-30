@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs.benchmarking.JMHBenchmarks;
+package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
-import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSDeleteBenchmark;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -49,13 +48,13 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(
-        iterations = GCSDeleteBenchmark.DEFAULT_WARMUP_ITERATIONS,
-        time = 1,
-        timeUnit = TimeUnit.MILLISECONDS)
+    iterations = GCSGetFileStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(
-        iterations = GCSDeleteBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
-        time = 1,
-        timeUnit = TimeUnit.MILLISECONDS)
+    iterations = GCSGetFileStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSGetFileStatusBenchmark {
@@ -64,6 +63,7 @@ public class GCSGetFileStatusBenchmark {
 
   public static final int DEFAULT_WARMUP_ITERATIONS = 5;
   public static final int DEFAULT_MEASUREMENT_ITERATIONS = 10;
+
   @Param({"_path_not_set_"})
   private String pathString;
 
@@ -106,11 +106,12 @@ public class GCSGetFileStatusBenchmark {
       this.ghfs.close();
       logger.atInfo().log("Trial TearDown: Closed GCS filesystem instance.");
     }
+    this.ghfs = null;
   }
 
   /** The core benchmark. It gets the status of the file and consumes the result. */
   @Benchmark
-  public void getFileStatus_operation(Blackhole bh) throws IOException {
+  public void getFileStatus_Operation(Blackhole bh) throws IOException {
     FileStatus fileStatus = ghfs.getFileStatus(pathToGetStatus);
     bh.consume(fileStatus);
   }
@@ -118,11 +119,16 @@ public class GCSGetFileStatusBenchmark {
   /** Static entry point to run the benchmark from the wrapper class. */
   public static void runBenchmark(Path hadoopPath) throws IOException {
     try {
-      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 5);
-      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 10);
+      // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
+      // If the properties are not set, fall back to the default constant values defined for this
+      // benchmark.
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
+      int measurementIterations =
+          Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
+
       Options opt =
           new OptionsBuilder()
-              .include(GCSGetFileStatusBenchmark.class.getSimpleName() + ".getFileStatus_operation")
+              .include(GCSGetFileStatusBenchmark.class.getSimpleName() + ".getFileStatus_Operation")
               .param("pathString", hadoopPath.toString())
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
