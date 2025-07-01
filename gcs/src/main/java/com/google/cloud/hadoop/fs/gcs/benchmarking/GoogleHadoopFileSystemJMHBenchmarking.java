@@ -72,7 +72,6 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     // Run the single-shot benchmark, which will delete the actual file/folder.
     runJMHBenchmarkAndLog("DELETE", () -> GCSDeleteBenchmark.runBenchmark(hadoopPath, recursive));
-
     // IMPORTANT: Because the benchmark itself performs the final delete, we DO NOT call
     // super.delete() here. We simply return true to indicate the user's command succeeded.
     logger.atInfo().log(
