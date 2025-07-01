@@ -48,10 +48,17 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     TestConfiguration testConf = TestConfiguration.getInstance();
     String projectId = checkNotNull(testConf.getProjectId(), ENV_VAR_MSG_FMT, GCS_TEST_PROJECT_ID);
     config.set("fs.gs.project.id", projectId);
+
+    Boolean isApplicationDefaultModeEnabled =
+        TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
+
     if (testConf.getServiceAccountJsonKeyFile() != null) {
       config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
       config.set(
           "fs.gs.auth.service.account.json.keyfile", testConf.getServiceAccountJsonKeyFile());
+
+    } else if (isApplicationDefaultModeEnabled) {
+      config.setEnum("fs.gs.auth.type", AuthenticationType.APPLICATION_DEFAULT);
     }
 
     config.setBoolean("fs.gs.grpc.directpath.enable", testConf.isDirectPathPreferred());
