@@ -29,7 +29,8 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
    * @param action The lambda expression containing the benchmark logic to execute.
    * @throws IOException if the benchmark fails.
    */
-  private void runJMHBenchmarkAndLog(String operationName, BenchmarkAction action) throws IOException {
+  private void runJMHBenchmarkAndLog(String operationName, BenchmarkAction action)
+      throws IOException {
     String banner = "======================================================";
     String startMessage = String.format("JMH BENCHMARK TRIGGERED FOR %s OPERATION!", operationName);
     String endMessage = String.format("JMH BENCHMARK FINISHED FOR %s.", operationName);
