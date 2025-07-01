@@ -95,8 +95,8 @@ public class GCSGetFileStatusBenchmark {
     if (this.ghfs != null) {
       this.ghfs.close();
       logger.atInfo().log("Trial TearDown: Closed GCS filesystem instance.");
+      this.ghfs = null;
     }
-    this.ghfs = null;
   }
 
   /** The core benchmark. It gets the status of the file and consumes the result. */
