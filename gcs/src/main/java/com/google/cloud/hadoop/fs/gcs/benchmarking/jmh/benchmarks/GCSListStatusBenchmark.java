@@ -99,8 +99,8 @@ public class GCSListStatusBenchmark {
     if (this.ghfs != null) {
       this.ghfs.close();
       logger.atInfo().log("Benchmark TearDown: Closed GCS filesystem instance.");
+      this.ghfs = null;
     }
-    this.ghfs = null;
   }
 
   /**
