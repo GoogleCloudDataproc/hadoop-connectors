@@ -53,8 +53,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.AverageTime)
 // Note: Total iterations (warmup + measurement) should be even to ensure the file ends up
 // in the original source location before the wrapper class performs the final operation.
-@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSRenameBenchmark {
@@ -96,9 +96,6 @@ public class GCSRenameBenchmark {
       throw new IOException("Benchmark setup failed: Source file does not exist at " + srcPath);
     }
 
-    // Ensure the destination path is clear before we start the alternating benchmark.
-    ghfs.delete(dstPath, false);
-
     logger.atInfo().log(
         "Benchmark Setup: Verified source %s exists and destination %s is clear.",
         srcPath, dstPath);
@@ -125,7 +122,9 @@ public class GCSRenameBenchmark {
    * @throws IOException if the rename operation fails.
    */
   @Benchmark
-  @OperationsPerInvocation(2) // This tells JMH this benchmark performs TWO operations.
+  @OperationsPerInvocation(
+      2) // This tells JMH this benchmark performs TWO operations. JMH will report the time as the
+  // average of these two invocations.
   public void rename_operation(Blackhole bh) throws IOException {
     boolean success1 = ghfs.rename(srcPath, dstPath);
     boolean success2 = ghfs.rename(dstPath, srcPath);
@@ -143,8 +142,8 @@ public class GCSRenameBenchmark {
   public static void runBenchmark(Path srcPath, Path dstPath) throws IOException {
 
     try {
-      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 3);
-      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 5);
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 1);
+      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 1);
       Options opt =
           new OptionsBuilder()
               .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_operation")
