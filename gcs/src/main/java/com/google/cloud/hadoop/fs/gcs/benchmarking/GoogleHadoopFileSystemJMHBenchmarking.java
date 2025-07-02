@@ -4,11 +4,13 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSDeleteBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSGetFileStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSListStatusBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSMkdirsBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 
 /**
  * A wrapper around {@link GoogleHadoopFileSystem} that intercepts Hadoop FS commands and routes
@@ -95,5 +97,14 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
 
     // Run actual getFileStatus Operation after benchmarking it.
     return super.getFileStatus(hadoopPath);
+  }
+
+  @Override
+  public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
+    runJMHBenchmarkAndLog("MKDIRS", () -> GCSMkdirsBenchmark.runBenchmark(hadoopPath, permission));
+    logger.atInfo().log("Benchmark complete. Now performing the actual 'mkdirs' operation...");
+    // Call the super method to ensure the actual mkdirs operation is performed,
+    // as the benchmark's TearDown will clean up the directory created during benchmarking.
+    return super.mkdirs(hadoopPath, permission);
   }
 }
