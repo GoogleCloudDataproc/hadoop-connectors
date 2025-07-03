@@ -77,17 +77,26 @@ class DeleteFolderOperation {
   }
 
   /** Helper function that performs the deletion process for folder resources */
-  public void performDeleteOperation() throws InterruptedException {
+  public void performDeleteOperation() throws IOException {
     int folderSize = folders.size();
     computeChildrenForFolderResource();
 
-    // this will avoid infinite loop when all folders are deleted
-    while (folderSize != 0 && encounteredNoExceptions()) {
-      FolderInfo folderToDelete = getElementFromBlockingQueue();
-      folderSize--;
+    try {
+      // this will avoid infinite loop when all folders are deleted
+      while (folderSize != 0 && encounteredNoExceptions()) {
+        FolderInfo folderToDelete = getElementFromBlockingQueue();
+        folderSize--;
 
-      // Queue the deletion request
-      queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+        // Queue the deletion request
+        queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+      }
+    } catch (InterruptedException | IllegalStateException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          String.format(
+              "Recieved thread interruption exception while deletion of folder resource : %s",
+              e.getMessage()),
+          e);
     }
     batchExecutorShutdown();
   }
@@ -112,16 +121,17 @@ class DeleteFolderOperation {
   }
 
   /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
+  public FolderInfo getElementFromBlockingQueue()
+      throws InterruptedException, IllegalStateException {
     try {
       FolderInfo folderInfo = folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
       if (folderInfo == null) {
-        // Throwing an InterruptedException here because client side timeouts can cause folderInfo
+        // Throwing an IllegalStateException here because client side timeouts can cause folderInfo
         // to be null.
-        throw new InterruptedException("Timed out while getting an folder from blocking queue.");
+        throw new IllegalStateException("Timed out while getting an folder from blocking queue.");
       }
       return folderInfo;
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | IllegalStateException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
       throw e;

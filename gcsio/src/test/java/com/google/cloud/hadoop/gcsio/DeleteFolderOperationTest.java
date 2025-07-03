@@ -20,6 +20,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.storage.control.v2.StorageControlClient;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -46,7 +47,7 @@ public class DeleteFolderOperationTest {
   }
 
   @Test
-  public void checkDeletionOrderForHnBucketBalancedFolders() throws InterruptedException {
+  public void checkDeletionOrderForHnBucketBalancedFolders() throws IOException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
 
@@ -77,7 +78,7 @@ public class DeleteFolderOperationTest {
   }
 
   @Test
-  public void checkDeletionOrderForHnBucketSkewedFolders() throws InterruptedException {
+  public void checkDeletionOrderForHnBucketSkewedFolders() throws IOException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
 
@@ -112,9 +113,9 @@ public class DeleteFolderOperationTest {
 
     when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
 
-    InterruptedException exception =
+    IllegalStateException exception =
         assertThrows(
-            InterruptedException.class, () -> deleteFolderOperation.getElementFromBlockingQueue());
+            IllegalStateException.class, () -> deleteFolderOperation.getElementFromBlockingQueue());
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo("Timed out while getting an folder from blocking queue.");
