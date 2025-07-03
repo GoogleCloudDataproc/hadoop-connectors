@@ -126,10 +126,10 @@ public class GCSRenameBenchmark {
       2) // This tells JMH this benchmark performs TWO operations. JMH will report the time as the
   // average of these two invocations.
   public void rename_operation(Blackhole bh) throws IOException {
-    boolean success1 = ghfs.rename(srcPath, dstPath);
-    boolean success2 = ghfs.rename(dstPath, srcPath);
-    bh.consume(success1);
-    bh.consume(success2);
+    boolean renameForwardSuccess = ghfs.rename(srcPath, dstPath);
+    boolean renameBackwardSuccess = ghfs.rename(dstPath, srcPath);
+    bh.consume(renameForwardSuccess);
+    bh.consume(renameBackwardSuccess);
   }
 
   /**
