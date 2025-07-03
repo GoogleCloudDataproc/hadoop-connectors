@@ -94,8 +94,7 @@ class DeleteFolderOperation {
       Thread.currentThread().interrupt();
       throw new IOException(
           String.format(
-              "Recieved thread interruption exception while deletion of folder resource : %s",
-              e.getMessage()),
+              "Received exception while deletion of folder resource : %s", e.getMessage()),
           e);
     }
     batchExecutorShutdown();
@@ -128,7 +127,7 @@ class DeleteFolderOperation {
       if (folderInfo == null) {
         // Throwing an IllegalStateException here because client side timeouts can cause folderInfo
         // to be null.
-        throw new IllegalStateException("Timed out while getting an folder from blocking queue.");
+        throw new IllegalStateException("Timed out while getting a folder from blocking queue.");
       }
       return folderInfo;
     } catch (InterruptedException | IllegalStateException e) {

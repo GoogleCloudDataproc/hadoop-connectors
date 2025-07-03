@@ -103,7 +103,7 @@ public class DeleteFolderOperationTest {
   }
 
   @Test
-  public void checkExceptionTypeWhenPollTimesOut() throws Exception {
+  public void checkExceptionTypeWhenPollTimesOutForGetElementFromBlockingQueue() throws Exception {
     List<FolderInfo> foldersToDelete = new LinkedList<>();
     addFolders(foldersToDelete, "test-folder");
 
@@ -118,7 +118,26 @@ public class DeleteFolderOperationTest {
             IllegalStateException.class, () -> deleteFolderOperation.getElementFromBlockingQueue());
     assertThat(exception)
         .hasMessageThat()
-        .isEqualTo("Timed out while getting an folder from blocking queue.");
+        .isEqualTo("Timed out while getting a folder from blocking queue.");
+  }
+
+  @Test
+  public void checkExceptionTypeWhenPollTimesOutForPerformDeleteOperation() throws Exception {
+    List<FolderInfo> foldersToDelete = new LinkedList<>();
+    addFolders(foldersToDelete, "test-folder");
+
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+    setMockFolderDeleteBlockingQueue(deleteFolderOperation);
+
+    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
+
+    IOException exception =
+        assertThrows(IOException.class, () -> deleteFolderOperation.performDeleteOperation());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            "Received exception while deletion of folder resource : Timed out while getting a folder from blocking queue.");
   }
 
   private void setMockFolderDeleteBlockingQueue(DeleteFolderOperation deleteFolderOperation)
