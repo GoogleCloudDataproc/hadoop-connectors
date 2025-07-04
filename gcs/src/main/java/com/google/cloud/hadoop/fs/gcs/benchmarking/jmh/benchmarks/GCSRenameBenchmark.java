@@ -51,16 +51,22 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
-// Note: Total iterations (warmup + measurement) should be even to ensure the file ends up
-// in the original source location before the wrapper class performs the final operation.
-@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(
+        iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+        time = 1,
+        timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(
+        iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+        time = 1,
+        timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSRenameBenchmark {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  public static final int DEFAULT_WARMUP_ITERATIONS = 1;
+  public static final int DEFAULT_MEASUREMENT_ITERATIONS = 1;
   @Param({"_path_not_set_"})
   private String srcPathString;
 
@@ -85,16 +91,11 @@ public class GCSRenameBenchmark {
     this.dstPath = new Path(dstPathString);
 
     Configuration conf = new Configuration();
+    // Set the real GCS filesystem implementation to prevent an infinite recursive loop.
     conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
 
     this.ghfs = new GoogleHadoopFileSystem();
     this.ghfs.initialize(this.srcPath.toUri(), conf);
-
-    // This benchmark operates on the assumption that the source file already exists,
-    // as provided by the user's 'hadoop fs -mv' command. We verify it here.
-    if (!ghfs.exists(srcPath)) {
-      throw new IOException("Benchmark setup failed: Source file does not exist at " + srcPath);
-    }
 
     logger.atInfo().log(
         "Benchmark Setup: Verified source %s exists and destination %s is clear.",
@@ -122,10 +123,10 @@ public class GCSRenameBenchmark {
    * @throws IOException if the rename operation fails.
    */
   @Benchmark
-  @OperationsPerInvocation(
-      2) // This tells JMH this benchmark performs TWO operations. JMH will report the time as the
+  // This tells JMH this benchmark performs TWO operations. JMH will report the time as the
   // average of these two invocations.
-  public void rename_operation(Blackhole bh) throws IOException {
+  @OperationsPerInvocation(2)
+  public void rename_Operation(Blackhole bh) throws IOException {
     boolean renameForwardSuccess = ghfs.rename(srcPath, dstPath);
     boolean renameBackwardSuccess = ghfs.rename(dstPath, srcPath);
     bh.consume(renameForwardSuccess);
@@ -142,11 +143,11 @@ public class GCSRenameBenchmark {
   public static void runBenchmark(Path srcPath, Path dstPath) throws IOException {
 
     try {
-      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 1);
-      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 1);
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
+      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
       Options opt =
           new OptionsBuilder()
-              .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_operation")
+              .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_Operation")
               .param("srcPathString", srcPath.toString())
               .param("dstPathString", dstPath.toString())
               .warmupIterations(warmupIterations)

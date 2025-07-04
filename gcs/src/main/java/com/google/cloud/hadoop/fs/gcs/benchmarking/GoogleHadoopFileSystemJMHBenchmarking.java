@@ -65,6 +65,8 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public boolean rename(Path src, Path dst) throws IOException {
     runJMHBenchmarkAndLog("RENAME", () -> GCSRenameBenchmark.runBenchmark(src, dst));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'rename' operation...");
+
+    // Run actual rename Operation after benchmarking it.
     return super.rename(src, dst);
   }
 }
