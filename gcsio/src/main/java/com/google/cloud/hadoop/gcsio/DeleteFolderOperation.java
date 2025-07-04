@@ -77,17 +77,30 @@ class DeleteFolderOperation {
   }
 
   /** Helper function that performs the deletion process for folder resources */
-  public void performDeleteOperation() throws InterruptedException {
+  public void performDeleteOperation() throws IOException {
     int folderSize = folders.size();
     computeChildrenForFolderResource();
 
-    // this will avoid infinite loop when all folders are deleted
-    while (folderSize != 0 && encounteredNoExceptions()) {
-      FolderInfo folderToDelete = getElementFromBlockingQueue();
-      folderSize--;
+    try {
+      // this will avoid infinite loop when all folders are deleted
+      while (folderSize != 0 && encounteredNoExceptions()) {
+        FolderInfo folderToDelete = getElementFromBlockingQueue();
+        if (folderToDelete == null) {
+          // Throwing an IllegalStateException here because client side timeouts can cause
+          // folderToDelete to be null.
+          throw new IllegalStateException("Timed out while getting a folder from blocking queue.");
+        }
+        folderSize--;
 
-      // Queue the deletion request
-      queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+        // Queue the deletion request
+        queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+      }
+    } catch (InterruptedException | IllegalStateException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          String.format(
+              "Received exception while deletion of folder resource : %s", e.getMessage()),
+          e);
     }
     batchExecutorShutdown();
   }
@@ -112,7 +125,7 @@ class DeleteFolderOperation {
   }
 
   /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
+  private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
       return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
     } catch (InterruptedException e) {
