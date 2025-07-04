@@ -85,6 +85,11 @@ class DeleteFolderOperation {
       // this will avoid infinite loop when all folders are deleted
       while (folderSize != 0 && encounteredNoExceptions()) {
         FolderInfo folderToDelete = getElementFromBlockingQueue();
+        if (folderToDelete == null) {
+          // Throwing an IllegalStateException here because client side timeouts can cause
+          // folderToDelete to be null.
+          throw new IllegalStateException("Timed out while getting a folder from blocking queue.");
+        }
         folderSize--;
 
         // Queue the deletion request
@@ -120,16 +125,10 @@ class DeleteFolderOperation {
   }
 
   /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue()
+  private FolderInfo getElementFromBlockingQueue()
       throws InterruptedException, IllegalStateException {
     try {
-      FolderInfo folderInfo = folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
-      if (folderInfo == null) {
-        // Throwing an IllegalStateException here because client side timeouts can cause folderInfo
-        // to be null.
-        throw new IllegalStateException("Timed out while getting a folder from blocking queue.");
-      }
-      return folderInfo;
+      return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
     } catch (InterruptedException | IllegalStateException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);

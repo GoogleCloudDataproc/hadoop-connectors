@@ -103,25 +103,6 @@ public class DeleteFolderOperationTest {
   }
 
   @Test
-  public void checkExceptionTypeWhenPollTimesOutForGetElementFromBlockingQueue() throws Exception {
-    List<FolderInfo> foldersToDelete = new LinkedList<>();
-    addFolders(foldersToDelete, "test-folder");
-
-    DeleteFolderOperation deleteFolderOperation =
-        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
-    setMockFolderDeleteBlockingQueue(deleteFolderOperation);
-
-    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
-
-    IllegalStateException exception =
-        assertThrows(
-            IllegalStateException.class, () -> deleteFolderOperation.getElementFromBlockingQueue());
-    assertThat(exception)
-        .hasMessageThat()
-        .isEqualTo("Timed out while getting a folder from blocking queue.");
-  }
-
-  @Test
   public void checkExceptionTypeWhenPollTimesOutForPerformDeleteOperation() throws Exception {
     List<FolderInfo> foldersToDelete = new LinkedList<>();
     addFolders(foldersToDelete, "test-folder");
