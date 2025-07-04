@@ -52,13 +52,13 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(
-        iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
-        time = 1,
-        timeUnit = TimeUnit.MILLISECONDS)
+    iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(
-        iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
-        time = 1,
-        timeUnit = TimeUnit.MILLISECONDS)
+    iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSRenameBenchmark {
@@ -67,6 +67,7 @@ public class GCSRenameBenchmark {
 
   public static final int DEFAULT_WARMUP_ITERATIONS = 1;
   public static final int DEFAULT_MEASUREMENT_ITERATIONS = 1;
+
   @Param({"_path_not_set_"})
   private String srcPathString;
 
@@ -144,7 +145,8 @@ public class GCSRenameBenchmark {
 
     try {
       int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
-      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
+      int measurementIterations =
+          Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
       Options opt =
           new OptionsBuilder()
               .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_Operation")
