@@ -125,11 +125,10 @@ class DeleteFolderOperation {
   }
 
   /** Gets the head from the blocking queue */
-  private FolderInfo getElementFromBlockingQueue()
-      throws InterruptedException, IllegalStateException {
+  private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
       return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
-    } catch (InterruptedException | IllegalStateException e) {
+    } catch (InterruptedException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
       throw e;
