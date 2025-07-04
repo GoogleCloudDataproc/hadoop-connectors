@@ -56,7 +56,9 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
     runJMHBenchmarkAndLog("LISTSTATUS", () -> GCSListStatusBenchmark.runBenchmark(hadoopPath));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'listStatus' operation...");
-    return super.listStatus(hadoopPath); // Run actual listStatus Operation after benchmarking it.
+
+    // Run actual listStatus Operation after benchmarking it.
+    return super.listStatus(hadoopPath);
   }
 
   @Override
