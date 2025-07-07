@@ -360,20 +360,33 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
                 "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
                 finalGcsPath, curGcsPath));
       }
-      GoogleCloudStorageItemInfo composedObject =
-          ghfs.getGcsFs()
-              .getGcs()
-              .composeObjects(
-                  ImmutableList.of(destResourceId, tempResourceId),
-                  destResourceId,
-                  GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions));
-      curDestGenerationId = composedObject.getContentGeneration();
-      deletionFutures.add(
-          cleanupThreadpool.submit(
-              () -> {
-                ghfs.getGcsFs().getGcs().deleteObjects(ImmutableList.of(tempResourceId));
-                return null;
-              }));
+      try {
+        GoogleCloudStorageItemInfo composedObject =
+            ghfs.getGcsFs()
+                .getGcs()
+                .composeObjects(
+                    ImmutableList.of(destResourceId, tempResourceId),
+                    destResourceId,
+                    GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions));
+
+        if (composedObject != null) {
+          curDestGenerationId = composedObject.getContentGeneration();
+          deletionFutures.add(
+              cleanupThreadpool.submit(
+                  () -> {
+                    ghfs.getGcsFs().getGcs().deleteObjects(ImmutableList.of(tempResourceId));
+                    return null;
+                  }));
+        } else {
+          logger.atWarning().log("Composed object is null for destination: %s", finalGcsPath);
+        }
+      } catch (IOException e) {
+        logger.atSevere().log(
+            "Failed to compose objects for destination: %s, error: %s",
+            finalGcsPath, e.getMessage());
+        GoogleCloudStorageEventBus.postOnException();
+        throw e;
+      }
     } else {
       // First commit was direct to the destination; the generationId of the object we just
       // committed will be used as the destination generation id for future compose calls.
