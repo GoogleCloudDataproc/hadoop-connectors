@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSDeleteBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSGetFileStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSListStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
@@ -83,5 +84,16 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     // This line is only reached if the benchmarked delete operation was successful.
     // A failure would have thrown an IOException, exiting this method prematurely.
     return true;
+  }
+
+  @Override
+  public FileStatus getFileStatus(Path hadoopPath) throws IOException {
+    runJMHBenchmarkAndLog(
+        "GETFILESTATUS", () -> GCSGetFileStatusBenchmark.runBenchmark(hadoopPath));
+    logger.atInfo().log(
+        "Benchmark complete. Now performing the actual 'getFileStatus' operation...");
+
+    // Run actual getFileStatus Operation after benchmarking it.
+    return super.getFileStatus(hadoopPath);
   }
 }
