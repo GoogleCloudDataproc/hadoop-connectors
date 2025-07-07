@@ -47,11 +47,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.SingleShotTime)
 @Warmup(
-    iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    iterations = GCSDeleteBenchmark.DEFAULT_WARMUP_ITERATIONS,
     time = 1,
     timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(
-    iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    iterations = GCSDeleteBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
     time = 1,
     timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
@@ -64,9 +64,9 @@ public class GCSDeleteBenchmark {
   public static final int DEFAULT_MEASUREMENT_ITERATIONS = 1;
 
   @Param({"_path_not_set_"})
-  private String pathString; // The exact path to delete, passed by the runner.
+  private String pathString;
 
-  @Param({"false"}) // The recursive flag, passed by the runner.
+  @Param({"false"})
   private boolean recursive;
 
   private GoogleHadoopFileSystem ghfs;
@@ -115,7 +115,7 @@ public class GCSDeleteBenchmark {
    * @throws IOException if the delete operation fails.
    */
   @Benchmark
-  public boolean delete_operation() throws IOException {
+  public boolean delete_Operation() throws IOException {
     return ghfs.delete(pathToDelete, recursive);
   }
 
@@ -128,16 +128,15 @@ public class GCSDeleteBenchmark {
    */
   public static void runBenchmark(Path hadoopPath, boolean recursive) throws IOException {
     try {
-      int warmupIterations = 0;
-      int measurementIterations = 1;
-
+      // This is a SingleShotTime benchmark for a destructive operation (delete),
+      // so iterations are fixed to 1 measurement and 0 warmups.
       Options opt =
           new OptionsBuilder()
-              .include(GCSDeleteBenchmark.class.getSimpleName() + ".delete_operation")
+              .include(GCSDeleteBenchmark.class.getSimpleName() + ".delete_Operation")
               .param("pathString", hadoopPath.toString())
               .param("recursive", String.valueOf(recursive))
-              .warmupIterations(warmupIterations)
-              .measurementIterations(measurementIterations)
+              .warmupIterations(DEFAULT_WARMUP_ITERATIONS)
+              .measurementIterations(DEFAULT_MEASUREMENT_ITERATIONS)
               .build();
 
       new Runner(opt).run();

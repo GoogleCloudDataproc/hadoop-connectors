@@ -52,11 +52,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(
-    iterations = GCSListStatusBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    iterations = GCSRenameBenchmark.DEFAULT_WARMUP_ITERATIONS,
     time = 1,
     timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(
-    iterations = GCSListStatusBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    iterations = GCSRenameBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
     time = 1,
     timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
@@ -144,6 +144,9 @@ public class GCSRenameBenchmark {
   public static void runBenchmark(Path srcPath, Path dstPath) throws IOException {
 
     try {
+      // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
+      // If the properties are not set, fall back to the default constant values defined for this
+      // benchmark.
       int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
       int measurementIterations =
           Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
