@@ -69,7 +69,7 @@ public class GCSMkdirsBenchmark {
 
   // The FsPermission for the new directory, represented as an octal string.
   // This is populated by the JMH runner via the OptionsBuilder.
-  @Param({"777"})
+  @Param({"755"})
   private String permissionOctalString;
 
   private GoogleHadoopFileSystem ghfs;
