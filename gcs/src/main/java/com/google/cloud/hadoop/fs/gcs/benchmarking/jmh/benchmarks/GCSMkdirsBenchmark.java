@@ -47,22 +47,29 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
-@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(
+    iterations = GCSMkdirsBenchmark.DEFAULT_WARMUP_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(
+    iterations = GCSMkdirsBenchmark.DEFAULT_MEASUREMENT_ITERATIONS,
+    time = 1,
+    timeUnit = TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class GCSMkdirsBenchmark {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // The GCS path to the directory that will be created.
-  // This is populated by the JMH runner via the OptionsBuilder.
+  public static final int DEFAULT_WARMUP_ITERATIONS = 5;
+  public static final int DEFAULT_MEASUREMENT_ITERATIONS = 10;
+
   @Param({"_path_not_set_"})
   private String pathString;
 
   // The FsPermission for the new directory, represented as an octal string.
   // This is populated by the JMH runner via the OptionsBuilder.
-  @Param({"777"}) // Default octal permission for demonstration
+  @Param({"777"})
   private String permissionOctalString;
 
   private GoogleHadoopFileSystem ghfs;
@@ -155,13 +162,19 @@ public class GCSMkdirsBenchmark {
    */
   public static void runBenchmark(Path hadoopPath, FsPermission permission) throws IOException {
     try {
-      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", 5);
-      int measurementIterations = Integer.getInteger("jmh.measurement.iterations", 10);
+      // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
+      // If the properties are not set, fall back to the default constant values defined for this
+      // benchmark.
+      int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
+      int measurementIterations =
+          Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
       Options opt =
           new OptionsBuilder()
               .include(GCSMkdirsBenchmark.class.getSimpleName() + ".mkdirs_Operation")
               .param("pathString", hadoopPath.toString())
-              .param("permissionOctalString", Integer.toOctalString(permission.toShort())) // Converts permission flags (e.g., rwxrwxrwx) to their octal string representation (e.g., "777")
+              // Converts permission flags (e.g., rwxrwxrwx) to their octal string representation
+              // (e.g., "777")
+              .param("permissionOctalString", Integer.toOctalString(permission.toShort()))
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
               .build();
