@@ -1,5 +1,7 @@
 package com.google.cloud.hadoop.util;
 
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
@@ -21,6 +23,9 @@ public class LoggingFormatter extends Formatter {
   public String format(LogRecord record) {
     String invocationId = InvocationIdContext.getInvocationId();
     String message = record.getMessage();
+    // Return the message unchanged if the invocation ID is empty or the message is JSON.
+    // Prefixing JSON logs would break their structure; some JSON logs like traces already
+    // include the invocation ID.
     if (invocationId.isEmpty() || isJson(message)) {
       return String.format("%s%n", message);
     }
@@ -47,7 +52,15 @@ public class LoggingFormatter extends Formatter {
    * @return true if the message is in JSON format, false otherwise
    */
   private boolean isJson(String message) {
-    // Check if the message is a trace log.
-    return message != null && (message.startsWith("{") || message.startsWith("["));
+    // Check if the message is a JSON string.
+    if (message == null) {
+      return false;
+    }
+    try {
+      JsonParser.parseString(message);
+      return true; // If parsing succeeds, it's valid JSON.
+    } catch (JsonSyntaxException e) {
+      return false;
+    }
   }
 }
