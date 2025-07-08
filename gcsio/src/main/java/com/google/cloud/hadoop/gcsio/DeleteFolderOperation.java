@@ -95,11 +95,18 @@ class DeleteFolderOperation {
         // Queue the deletion request
         queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
       }
-    } catch (InterruptedException | IllegalStateException e) {
+    } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException(
           String.format(
-              "Received exception while deletion of folder resource : %s", e.getMessage()),
+              "Received InterruptedException while deletion of folder resource : %s",
+              e.getMessage()),
+          e);
+    } catch (IllegalStateException e) {
+      throw new IOException(
+          String.format(
+              "Received IllegalStateException while deletion of folder resource : %s",
+              e.getMessage()),
           e);
     }
     batchExecutorShutdown();

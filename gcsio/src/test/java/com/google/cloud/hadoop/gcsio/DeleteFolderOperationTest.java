@@ -118,7 +118,7 @@ public class DeleteFolderOperationTest {
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo(
-            "Received exception while deletion of folder resource : Timed out while getting a folder from blocking queue.");
+            "Received IllegalStateException while deletion of folder resource : Timed out while getting a folder from blocking queue.");
   }
 
   private void setMockFolderDeleteBlockingQueue(DeleteFolderOperation deleteFolderOperation)
