@@ -1145,7 +1145,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     Storage.Objects.Get getData =
         storageRequestFactory.objectsGetData(
             resourceId.getBucketName(), resourceId.getObjectName());
-    if (resourceId.hasGenerationId()) {
+    if (resourceId.hasGenerationId() && resourceId.getGenerationId() > 0) {
       getData.setGeneration(resourceId.getGenerationId());
     }
     return getData;
