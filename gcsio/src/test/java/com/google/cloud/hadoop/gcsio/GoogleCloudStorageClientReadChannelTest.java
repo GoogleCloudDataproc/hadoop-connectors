@@ -248,7 +248,8 @@ public class GoogleCloudStorageClientReadChannelTest {
         ArgumentCaptor.forClass(BlobSourceOption.class);
     verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
 
-    assertThat(optionsCaptor.getAllValues()).contains(BlobSourceOption.generationMatch(generation));
+    assertThat(optionsCaptor.getAllValues())
+        .doesNotContain(BlobSourceOption.generationMatch(generation));
   }
 
   @Test

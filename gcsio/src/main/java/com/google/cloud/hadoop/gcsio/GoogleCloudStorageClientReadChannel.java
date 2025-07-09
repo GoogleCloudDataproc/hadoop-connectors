@@ -577,7 +577,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // To get decoded content
       blobReadOptions.add(BlobSourceOption.shouldReturnRawInputStream(false));
 
-      if (blobId.getGeneration() != null) {
+      if (blobId.getGeneration() != null && blobId.getGeneration() > 0) {
         blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
       }
       if (storageOptions.getEncryptionKey() != null) {
