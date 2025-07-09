@@ -226,7 +226,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
-  public void read_withZeroGeneration_usesGenerationMatchPrecondition() throws IOException {
+  public void read_withZeroGeneration_doesNotUseGenerationMatchPrecondition() throws IOException {
     long generation = 0L;
     GoogleCloudStorageItemInfo itemInfo =
         GoogleCloudStorageItemInfo.createObject(
