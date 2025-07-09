@@ -18,6 +18,8 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPLICATION_NAME_SUFFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
@@ -58,6 +60,7 @@ import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenPr
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.TraceFactory;
+import com.google.cloud.hadoop.util.interceptors.LoggingInterceptor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
@@ -93,6 +96,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.conf.Configuration;
@@ -294,6 +298,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     // be sufficient (and is required) for the delegation token binding initialization.
     setConf(config);
 
+    if (GCS_CLOUD_LOGGING_ENABLE.get(getConf(), getConf()::getBoolean)) {
+      initializeCloudLogger(config);
+    }
+
     globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
@@ -414,6 +422,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private void initializeGcsFs(GoogleCloudStorageFileSystem gcsFs) {
     gcsFsSupplier = Suppliers.ofInstance(gcsFs);
     gcsFsInitialized = true;
+  }
+
+  private void initializeCloudLogger(Configuration config) throws IOException {
+    GoogleCredentials credentials = getCredentials(config);
+    String suffix = GCS_APPLICATION_NAME_SUFFIX.get(getConf(), getConf()::get);
+    LoggingInterceptor loggingInterceptor = new LoggingInterceptor(credentials, suffix);
+    // Add the LoggingInterceptor to the root logger
+    Logger rootLogger = Logger.getLogger("");
+    rootLogger.addHandler(loggingInterceptor);
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
