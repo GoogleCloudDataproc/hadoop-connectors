@@ -317,6 +317,50 @@ public class GoogleCloudStorageTest {
     }
   }
 
+  /**
+   * Test success operation of GoogleCloudStorage.create(2) with checksum compare when the buffer is
+   * moved.
+   */
+  @Test
+  public void testCreateObjectWithChecksumMatchSeekingBuffer() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09, 0x10, 0x05, 0x02, 0x01};
+
+    ByteBuffer buf = ByteBuffer.wrap(testData);
+    // moving the buffer position.
+    buf.position(1);
+
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(buf);
+    String testCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+    // reset the position to 1 after putBytes.
+    buf.position(1);
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder().setRollingChecksumEnabled(true).build();
+
+    MockHttpTransport transport =
+        mockTransport(
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length - 1))
+                    .setCrc32c(testCrc32c)));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
+
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, 1))) {
+      assertThat(writeChannel.isOpen()).isTrue();
+      int totalBytesWritten = writeChannel.write(buf);
+      assertThat(totalBytesWritten).isEqualTo(testData.length - 1);
+    }
+  }
+
   /** Test failed operation of GoogleCloudStorage.create(2) with checksum compare. */
   @Test
   public void testCreateObjectThrowsExceptionOnChecksumMismatch() throws Exception {
