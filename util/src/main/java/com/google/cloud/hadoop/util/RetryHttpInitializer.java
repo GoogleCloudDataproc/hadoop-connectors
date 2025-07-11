@@ -94,7 +94,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
     HttpHeaders headers = request.getHeaders();
     if (isNullOrEmpty(headers.getUserAgent()) && !isNullOrEmpty(options.getDefaultUserAgent())) {
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Request is missing a user-agent header, adding default value of '%s'",
           options.getDefaultUserAgent());
       headers.setUserAgent(options.getDefaultUserAgent());

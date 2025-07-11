@@ -322,6 +322,16 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
+  public void createFolder(StorageResourceId resourceId) throws IOException {
+    throw new IOException("Not implemented");
+  }
+
+  @Override
   public void deleteFolders(List<FolderInfo> folders) throws IOException {
     throw new IOException("Not implemented");
   }
