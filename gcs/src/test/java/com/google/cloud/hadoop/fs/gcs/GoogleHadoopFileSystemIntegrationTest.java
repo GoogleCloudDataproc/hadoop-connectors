@@ -381,7 +381,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   @Test
-  public void open_throwsExceptionWhenHadoopPathNull() throws IOException {
+  public void open_throwsExceptionWhenHadoopPathNull() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> myGhfs.open((Path) null, 1));
