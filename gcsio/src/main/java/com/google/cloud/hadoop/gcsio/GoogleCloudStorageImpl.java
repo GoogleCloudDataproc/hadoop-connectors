@@ -86,6 +86,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -109,6 +110,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -1786,6 +1788,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return new ListPage<>(listedFolders, nextPageToken);
+  }
+
+  @Override
+  public VectoredIOMetrics readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, URI gcsPath)
+      throws IOException {
+    throw new UnsupportedOperationException("Not Implemented");
   }
 
   private ListFoldersRequest.Builder createFolderListRequest(

@@ -18,15 +18,18 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.api.core.BetaApi;
 import com.google.api.services.storage.model.Folder;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.IntFunction;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -425,6 +428,19 @@ public interface GoogleCloudStorage {
       String folderNamePrefix,
       ListFolderOptions listFolderOptions,
       String pageToken)
+      throws IOException;
+
+  /**
+   * Reads data from Google Cloud Storage using vectored I/O operations.
+   *
+   * @param {@link VectoredIORange} List of ranges to be read.
+   * @param allocate Function to allocate ByteBuffer for reading.
+   * @return {@link VectoredIOMetrics} Result of the vectored I/O operation.
+   * @throws IOException on IO error
+   */
+  @BetaApi
+  VectoredIOMetrics readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, URI gcsPath)
       throws IOException;
 
   /**
