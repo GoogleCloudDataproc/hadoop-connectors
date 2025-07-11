@@ -18,15 +18,21 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.api.core.BetaApi;
 import com.google.api.services.storage.model.Folder;
+import com.google.cloud.storage.BlobId;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import java.util.function.IntFunction;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -426,6 +432,23 @@ public interface GoogleCloudStorage {
       ListFolderOptions listFolderOptions,
       String pageToken)
       throws IOException;
+
+  /**
+   * Reads data from Google Cloud Storage using vectored I/O operations.
+   *
+   * @param {@link VectoredIORange} List of ranges to be read.
+   * @param allocate Function to allocate ByteBuffer for reading.
+   * @param blobId Id of the blob to be read.
+   * @return {@link VectoredIOResult} Result of the vectored I/O operation.
+   * @throws IOException on IO error
+   * @throws ExecutionException if the get computation threw an exception
+   * @throws InterruptedException if the current thread was interrupted while waiting for get
+   * @throws TimeoutException if the wait timed out
+   */
+  @BetaApi
+  VectoredIOResult readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, BlobId blobId)
+      throws IOException, ExecutionException, InterruptedException, TimeoutException;
 
   /**
    * Gets information about an object or a bucket.

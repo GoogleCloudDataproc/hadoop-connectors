@@ -18,13 +18,18 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.cloud.storage.BlobId;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import java.util.function.IntFunction;
 
 /** A class that wraps a {@link GoogleCloudStorage} object, delegating all calls to it. */
 public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
@@ -210,6 +215,13 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
       throws IOException {
     return delegate.listFolderInfoForPrefixPage(
         bucketName, folderNamePrefix, listFolderOptions, pageToken);
+  }
+
+  @Override
+  public VectoredIOResult readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, BlobId blobId)
+      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    return delegate.readVectored(ranges, allocate, blobId);
   }
 
   @Override

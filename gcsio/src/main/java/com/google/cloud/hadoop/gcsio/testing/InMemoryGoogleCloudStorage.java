@@ -35,6 +35,9 @@ import com.google.cloud.hadoop.gcsio.ListFolderOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
+import com.google.cloud.hadoop.gcsio.VectoredIORange;
+import com.google.cloud.hadoop.gcsio.VectoredIOResult;
+import com.google.cloud.storage.BlobId;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -49,6 +52,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 /**
@@ -479,6 +485,13 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       String pageToken)
       throws IOException {
     throw new IOException("Not implemented");
+  }
+
+  @Override
+  public VectoredIOResult readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, BlobId blobId)
+      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    throw new UnsupportedOperationException("Not Implemented");
   }
 
   @Override
