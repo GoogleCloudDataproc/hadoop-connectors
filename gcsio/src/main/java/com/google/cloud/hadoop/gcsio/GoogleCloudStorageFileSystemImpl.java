@@ -1056,16 +1056,32 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     StorageResourceId dirId = pathId.toDirectoryId();
 
+    // Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
+    //     (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
+    //         .submit(
+    //             () ->
+    //                 dirId.isRoot()
+    //                     ? gcs.listBucketInfo()
+    //                     : gcs.listObjectInfo(
+    //                         dirId.getBucketName(),
+    //                         dirId.getObjectName(),
+    //                         updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
+    ExecutorService executor = options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor;
+
+    // Define the listing task as a callable
+    Callable<List<GoogleCloudStorageItemInfo>> listTask =
+        () ->
+            dirId.isRoot()
+                ? gcs.listBucketInfo()
+                : gcs.listObjectInfo(
+                    dirId.getBucketName(),
+                    dirId.getObjectName(),
+                    updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions));
+
+    // <-- SOLUTION: Use runFuture to propagate the trace context.
+    String traceName = dirId.isRoot() ? "gcs.listBucketInfo" : "gcs.listObjectInfo";
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
-        (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
-            .submit(
-                () ->
-                    dirId.isRoot()
-                        ? gcs.listBucketInfo()
-                        : gcs.listObjectInfo(
-                            dirId.getBucketName(),
-                            dirId.getObjectName(),
-                            updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
+        runFuture(executor, listTask, traceName);
 
     if (!pathId.isDirectory()) {
       try {
@@ -1304,18 +1320,34 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     }
 
     StorageResourceId dirId = resourceId.toDirectoryId();
+    // Future<List<GoogleCloudStorageItemInfo>> listDirFuture =
+    //     (options.isStatusParallelEnabled() && pathTypeHint != PathTypeHint.FILE
+    //             ? cachedExecutor
+    //             : lazyExecutor)
+    //         .submit(
+    //             () ->
+    //                 inferImplicitDirectories
+    //                     ? gcs.listObjectInfo(
+    //                         dirId.getBucketName(),
+    //                         dirId.getObjectName(),
+    //                         GET_FILE_INFO_LIST_OPTIONS)
+    //                     : ImmutableList.of(gcs.getItemInfo(dirId)));
+    ExecutorService executor =
+        (options.isStatusParallelEnabled() && pathTypeHint != PathTypeHint.FILE)
+            ? cachedExecutor
+            : lazyExecutor;
+
+    // Define the task as a callable
+    Callable<List<GoogleCloudStorageItemInfo>> listTask =
+        () ->
+            inferImplicitDirectories
+                ? gcs.listObjectInfo(
+                    dirId.getBucketName(), dirId.getObjectName(), GET_FILE_INFO_LIST_OPTIONS)
+                : ImmutableList.of(gcs.getItemInfo(dirId));
+
+    // <-- SOLUTION: Use runFuture to propagate the trace context.
     Future<List<GoogleCloudStorageItemInfo>> listDirFuture =
-        (options.isStatusParallelEnabled() && pathTypeHint != PathTypeHint.FILE
-                ? cachedExecutor
-                : lazyExecutor)
-            .submit(
-                () ->
-                    inferImplicitDirectories
-                        ? gcs.listObjectInfo(
-                            dirId.getBucketName(),
-                            dirId.getObjectName(),
-                            GET_FILE_INFO_LIST_OPTIONS)
-                        : ImmutableList.of(gcs.getItemInfo(dirId)));
+        runFuture(executor, listTask, "gcs.listObjectInfo");
 
     if (!resourceId.isDirectory()) {
       try {

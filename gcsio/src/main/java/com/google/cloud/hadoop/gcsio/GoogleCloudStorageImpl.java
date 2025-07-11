@@ -562,9 +562,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // Set project to "_" to signify globally scoped bucket
             .setName(FolderName.format("_", resourceId.getBucketName(), resourceId.getObjectName()))
             .build();
-    StorageControlClient client = lazyGetStorageControlClient();
-    try {
-      Folder folder = client.getFolder(request);
+    // StorageControlClient client = lazyGetStorageControlClient();
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.get")) {
+      Folder folder = lazyGetStorageControlClient().getFolder(request);
       logger.atInfo().log("[TEST] logging %s", folder.getName());
       logger.atInfo().log("[TEST] folder %s", folder.toString());
       return createItemInfoForFolder(resourceId, folder);
@@ -620,11 +620,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setFolderId(resourceId.getObjectName())
             .setParent(parentResourceName) // CORRECTED
             .build();
-    StorageControlClient client = lazyGetStorageControlClient();
-
-    Folder newFolder = client.createFolder(request);
-
-    System.out.printf("Created folder: %s%n", newFolder.getName());
+    // Add the tracing wrapper here
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.create")) {
+      StorageControlClient client = lazyGetStorageControlClient();
+      Folder newFolder = client.createFolder(request);
+      logger.atFine().log("Created folder: %s%n", newFolder.getName());
+    }
   }
 
   @Override
