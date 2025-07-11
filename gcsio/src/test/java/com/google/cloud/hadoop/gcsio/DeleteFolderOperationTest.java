@@ -111,14 +111,16 @@ public class DeleteFolderOperationTest {
         new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
     setMockFolderDeleteBlockingQueue(deleteFolderOperation);
 
-    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
+    when(mockFolderDeleteBlockingQueue.poll(200, TimeUnit.MILLISECONDS)).thenReturn(null);
 
     IOException exception =
         assertThrows(IOException.class, () -> deleteFolderOperation.performDeleteOperation());
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo(
-            "Received IllegalStateException while deletion of folder resource : Timed out while getting a folder from blocking queue.");
+            String.format(
+                "Received IllegalStateException while deletion of folder resource : Deletion stalled: No active threads, but %d folders remain.",
+                foldersToDelete.size()));
   }
 
   private void setMockFolderDeleteBlockingQueue(DeleteFolderOperation deleteFolderOperation)
@@ -164,7 +166,7 @@ public class DeleteFolderOperationTest {
     }
 
     public void queueSingleFolderDelete(final FolderInfo folder, final int attempt) {
-      addToToBatchExecutorQueue(() -> null, getDeletionCallback(folder));
+      addToBatchExecutorQueue(() -> null, getDeletionCallback(folder));
     }
 
     private synchronized void addToOrderOfDeletion(FolderInfo folderDeleted) {
