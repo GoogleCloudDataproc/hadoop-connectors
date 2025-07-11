@@ -11,9 +11,10 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.core.ApiFutures;
-import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -35,14 +36,15 @@ public class GoogleCloudStorageClientTest {
 
   @Test
   public void readVectored_successfulRead()
-      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+      throws IOException, ExecutionException, InterruptedException, TimeoutException,
+          URISyntaxException {
     GoogleCloudStorageClientImpl gcsClientImpl = getMockedGcsClientImpl(false);
     IntFunction<ByteBuffer> allocator = (length) -> ByteBuffer.allocateDirect(length);
     List<VectoredIORange> ranges = getListOfVectoredIORange();
 
-    VectoredIOResult result =
+    VectoredIOMetrics result =
         gcsClientImpl.readVectored(
-            ranges, allocator, BlobId.of(TEST_BUCKET_NAME, TEST_OBJECT_NAME));
+            ranges, allocator, new URI("gs://" + TEST_BUCKET_NAME + "/" + TEST_OBJECT_NAME));
 
     assertEquals(getReadVectoredData(ranges.get(0)), FakeBlobReadSession.SUBSTRING_20_10);
     assertEquals(getReadVectoredData(ranges.get(1)), FakeBlobReadSession.SUBSTRING_50_7);
@@ -53,15 +55,14 @@ public class GoogleCloudStorageClientTest {
   }
 
   @Test
-  public void readVectored_returnsClientDuration()
-      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+  public void readVectored_returnsClientDuration() throws IOException, URISyntaxException {
     GoogleCloudStorageClientImpl gcsClientImpl = getMockedGcsClientImpl(true);
     IntFunction<ByteBuffer> allocator = (length) -> ByteBuffer.allocateDirect(length);
     List<VectoredIORange> ranges = getListOfVectoredIORange();
 
-    VectoredIOResult result =
+    VectoredIOMetrics result =
         gcsClientImpl.readVectored(
-            ranges, allocator, BlobId.of(TEST_BUCKET_NAME, TEST_OBJECT_NAME));
+            ranges, allocator, new URI("gs://" + TEST_BUCKET_NAME + "/" + TEST_OBJECT_NAME));
 
     assertThat(result.getClientInitializationDuration()).isLessThan(5100L);
     assertThat(result.getClientInitializationDuration()).isGreaterThan(4999L);

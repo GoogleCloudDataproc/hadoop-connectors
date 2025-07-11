@@ -546,9 +546,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   @Override
-  public VectoredIOResult readVectored(
-      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, BlobId blobId)
-      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+  public VectoredIOMetrics readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, URI gcsPath)
+      throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
+    BlobId blobId =
+        BlobId.of(
+            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long clientInitializationDurationStartTime = System.currentTimeMillis();
     AtomicInteger totalBytesRead = new AtomicInteger();
@@ -584,11 +589,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       ApiFutures.allAsList(transformFutures).get(30, TimeUnit.SECONDS);
       long rangedReadTime = System.currentTimeMillis() - rangedReadStartTime;
       logger.atFiner().log("Ranged read successful in %d", rangedReadTime);
-      return VectoredIOResult.builder()
+      return VectoredIOMetrics.builder()
           .setReadBytes(totalBytesRead.get())
           .setReadDuration(rangedReadTime)
           .setClientInitializationDuration(clientInitializationDuration)
           .build();
+    } catch (IOException | ExecutionException | InterruptedException | TimeoutException e) {
+      throw new IOException(e);
     }
   }
 

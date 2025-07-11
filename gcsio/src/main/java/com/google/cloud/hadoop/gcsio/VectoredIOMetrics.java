@@ -5,16 +5,16 @@ import javax.annotation.Nullable;
 
 @AutoValue
 /** Result of the complete vectoredIO read operation. */
-public abstract class VectoredIOResult {
+public abstract class VectoredIOMetrics {
 
   public static Builder builder() {
-    return new AutoValue_VectoredIOResult.Builder()
+    return new AutoValue_VectoredIOMetrics.Builder()
         .setReadBytes(null)
         .setReadDuration(null)
         .setClientInitializationDuration(null);
   }
 
-  public abstract VectoredIOResult.Builder toBuilder();
+  public abstract VectoredIOMetrics.Builder toBuilder();
 
   @Nullable
   /** Total bytes read across all ranges. */
@@ -31,17 +31,17 @@ public abstract class VectoredIOResult {
   @AutoValue.Builder
   public abstract static class Builder {
 
-    public abstract VectoredIOResult.Builder setReadBytes(Integer readBytes);
+    public abstract VectoredIOMetrics.Builder setReadBytes(Integer readBytes);
 
-    public abstract VectoredIOResult.Builder setClientInitializationDuration(
+    public abstract VectoredIOMetrics.Builder setClientInitializationDuration(
         Long clientInitializationDuration);
 
-    public abstract VectoredIOResult.Builder setReadDuration(Long readDuration);
+    public abstract VectoredIOMetrics.Builder setReadDuration(Long readDuration);
 
-    abstract VectoredIOResult autoBuild();
+    abstract VectoredIOMetrics autoBuild();
 
-    public VectoredIOResult build() {
-      VectoredIOResult result = autoBuild();
+    public VectoredIOMetrics build() {
+      VectoredIOMetrics result = autoBuild();
       return result;
     }
   }

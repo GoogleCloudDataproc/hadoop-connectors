@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.core.BetaApi;
 import com.google.api.services.storage.model.Folder;
-import com.google.cloud.storage.BlobId;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -30,8 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
 
 /**
@@ -438,17 +435,13 @@ public interface GoogleCloudStorage {
    *
    * @param {@link VectoredIORange} List of ranges to be read.
    * @param allocate Function to allocate ByteBuffer for reading.
-   * @param blobId Id of the blob to be read.
-   * @return {@link VectoredIOResult} Result of the vectored I/O operation.
+   * @return {@link VectoredIOMetrics} Result of the vectored I/O operation.
    * @throws IOException on IO error
-   * @throws ExecutionException if the get computation threw an exception
-   * @throws InterruptedException if the current thread was interrupted while waiting for get
-   * @throws TimeoutException if the wait timed out
    */
   @BetaApi
-  VectoredIOResult readVectored(
-      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, BlobId blobId)
-      throws IOException, ExecutionException, InterruptedException, TimeoutException;
+  VectoredIOMetrics readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, URI gcsPath)
+      throws IOException;
 
   /**
    * Gets information about an object or a bucket.

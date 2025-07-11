@@ -22,16 +22,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import com.google.cloud.storage.BlobId;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
 import org.junit.After;
 import org.junit.Before;
@@ -351,18 +350,13 @@ public class ForwardingGoogleCloudStorageTest {
   }
 
   @Test
-  public void readVectored_callsBlobReadSession()
-      throws IOException, ExecutionException, InterruptedException, TimeoutException {
-    gcs.readVectored(
-        List.of(getRange(), getRange()),
-        getAllocator(),
-        BlobId.of(TEST_STRING, TEST_STRING, TEST_LONG));
+  public void readVectored_callsBlobReadSession() throws IOException, URISyntaxException {
+    URI uri = new URI(TEST_STRING);
+    VectoredIORange range1 = getRange();
+    VectoredIORange range2 = getRange();
+    gcs.readVectored(List.of(range1, range2), getAllocator(), uri);
 
-    verify(mockGcsDelegate)
-        .readVectored(
-            eq(List.of(getRange(), getRange())),
-            eq(getAllocator()),
-            eq(BlobId.of(TEST_STRING, TEST_STRING, TEST_LONG)));
+    verify(mockGcsDelegate).readVectored(eq(List.of(range1, range2)), eq(getAllocator()), eq(uri));
   }
 
   private IntFunction<ByteBuffer> getAllocator() {

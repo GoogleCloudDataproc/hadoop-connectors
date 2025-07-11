@@ -68,7 +68,6 @@ import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.TraceOperation;
-import com.google.cloud.storage.BlobId;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
@@ -105,13 +104,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -1794,9 +1791,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Override
-  public VectoredIOResult readVectored(
-      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, BlobId blobId)
-      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+  public VectoredIOMetrics readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, URI gcsPath)
+      throws IOException {
     throw new UnsupportedOperationException("Not Implemented");
   }
 
