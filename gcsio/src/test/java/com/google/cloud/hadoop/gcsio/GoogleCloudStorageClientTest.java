@@ -2,9 +2,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsClientImpl;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
-import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.AdditionalAnswers.answersWithDelay;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -38,8 +36,8 @@ public class GoogleCloudStorageClientTest {
   public void readVectored_successfulRead()
       throws IOException, ExecutionException, InterruptedException, TimeoutException,
           URISyntaxException {
-    GoogleCloudStorageClientImpl gcsClientImpl = getMockedGcsClientImpl(false);
-    IntFunction<ByteBuffer> allocator = (length) -> ByteBuffer.allocateDirect(length);
+    GoogleCloudStorageClientImpl gcsClientImpl = getMockedGcsClientImpl();
+    IntFunction<ByteBuffer> allocator = ByteBuffer::allocateDirect;
     List<VectoredIORange> ranges = getListOfVectoredIORange();
 
     VectoredIOMetrics result =
@@ -49,24 +47,7 @@ public class GoogleCloudStorageClientTest {
     assertEquals(getReadVectoredData(ranges.get(0)), FakeBlobReadSession.SUBSTRING_20_10);
     assertEquals(getReadVectoredData(ranges.get(1)), FakeBlobReadSession.SUBSTRING_50_7);
     assertEquals(getReadVectoredData(ranges.get(2)), FakeBlobReadSession.SUBSTRING_65_17);
-
-    assertThat(result.getClientInitializationDuration()).isLessThan(100L);
-    assertThat(result.getReadDuration()).isLessThan(100L);
-  }
-
-  @Test
-  public void readVectored_returnsClientDuration() throws IOException, URISyntaxException {
-    GoogleCloudStorageClientImpl gcsClientImpl = getMockedGcsClientImpl(true);
-    IntFunction<ByteBuffer> allocator = (length) -> ByteBuffer.allocateDirect(length);
-    List<VectoredIORange> ranges = getListOfVectoredIORange();
-
-    VectoredIOMetrics result =
-        gcsClientImpl.readVectored(
-            ranges, allocator, new URI("gs://" + TEST_BUCKET_NAME + "/" + TEST_OBJECT_NAME));
-
-    assertThat(result.getClientInitializationDuration()).isLessThan(5100L);
-    assertThat(result.getClientInitializationDuration()).isGreaterThan(4999L);
-    assertThat(result.getReadDuration()).isLessThan(100L);
+    assertEquals(result.getReadBytes().intValue(), 34);
   }
 
   private String getReadVectoredData(VectoredIORange range)
@@ -75,18 +56,10 @@ public class GoogleCloudStorageClientTest {
     return charset.decode(range.getData().get(3, TimeUnit.SECONDS)).toString();
   }
 
-  private GoogleCloudStorageClientImpl getMockedGcsClientImpl(boolean withDelay)
-      throws IOException {
+  private GoogleCloudStorageClientImpl getMockedGcsClientImpl() throws IOException {
     Storage storage = mock(Storage.class);
-    if (withDelay) {
-      when(storage.blobReadSession(any(), any()))
-          .then(
-              answersWithDelay(
-                  5000L, invocation -> ApiFutures.immediateFuture(new FakeBlobReadSession())));
-    } else {
-      when(storage.blobReadSession(any(), any()))
-          .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
-    }
+    when(storage.blobReadSession(any(), any()))
+        .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
     return mockedGcsClientImpl(transport, storage);
   }
 

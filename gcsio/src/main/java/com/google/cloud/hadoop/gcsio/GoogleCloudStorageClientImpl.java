@@ -54,6 +54,7 @@ import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.Storage.MoveBlobRequest;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
+import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
@@ -63,6 +64,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
 import java.net.URI;
@@ -557,33 +559,29 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long clientInitializationDurationStartTime = System.currentTimeMillis();
     AtomicInteger totalBytesRead = new AtomicInteger();
-    try (BlobReadSession blobReadSession =
-        storage.blobReadSession(blobId).get(30, TimeUnit.SECONDS)) {
+    // start opening the BlobReadSession
+    ApiFuture<BlobReadSession> sessionFuture = storage.blobReadSession(blobId);
+    try (BlobReadSession blobReadSession = sessionFuture.get(30, TimeUnit.SECONDS)) {
       long clientInitializationDuration =
           System.currentTimeMillis() - clientInitializationDurationStartTime;
       logger.atFiner().log("Client Initialization successful in %d", clientInitializationDuration);
-      Map<VectoredIORange, ApiFuture<byte[]>> futures =
-          ranges.stream()
-              .collect(
-                  Collectors.toMap(
-                      Function.identity(),
-                      range ->
-                          blobReadSession.readAs(
-                              ReadProjectionConfigs.asFutureBytes()
-                                  .withRangeSpec(
-                                      RangeSpec.of(range.getOffset(), range.getLength())))));
-      List<ApiFuture<Void>> transformFutures = new ArrayList<>(futures.size());
-      futures.forEach(
-          (range, future) ->
-              transformFutures.add(
-                  ApiFutures.transform(
-                      future,
-                      result -> {
-                        totalBytesRead.addAndGet(populateFileRangeFuture(result, allocate, range));
-                        return null;
-                      },
-                      boundedThreadPool)));
       long rangedReadStartTime = System.currentTimeMillis();
+      List<ApiFuture<?>> transformFutures =
+          ranges.stream()
+              .map(
+                  range -> {
+                    ApiFuture<DisposableByteString> futureBytes =
+                        blobReadSession.readAs(
+                            ReadProjectionConfigs.asFutureByteString()
+                                .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
+                    return ApiFutures.transform(
+                        futureBytes,
+                        disposableByteString ->
+                            processBytesAndCompleteRange(
+                                disposableByteString, totalBytesRead, range),
+                        boundedThreadPool);
+                  })
+              .collect(Collectors.toList());
       // We need to wait for the futures before exiting the try-with-resources in order to avoid
       // parent stream closed exception.
       ApiFutures.allAsList(transformFutures).get(30, TimeUnit.SECONDS);
@@ -599,13 +597,29 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
-  private <V> int populateFileRangeFuture(
-      byte[] result, IntFunction<ByteBuffer> allocate, VectoredIORange range) {
-    ByteBuffer dst = allocate.apply(result.length);
-    dst.put(result);
-    dst.flip();
-    range.getData().complete(dst);
-    return result.length;
+  private Void processBytesAndCompleteRange(
+      DisposableByteString disposableByteString,
+      AtomicInteger totalBytesRead,
+      VectoredIORange range) {
+    // try-with-resources ensures the DisposableByteString is closed, releasing its memory
+    try (DisposableByteString dbs = disposableByteString) {
+      ByteString byteString = dbs.byteString();
+      int size = byteString.size();
+      ByteBuffer buf = ByteBuffer.allocate(size);
+
+      // This loop efficiently copies data without creating intermediate byte arrays on the heap
+      for (ByteBuffer b : byteString.asReadOnlyByteBufferList()) {
+        buf.put(b);
+      }
+
+      buf.flip(); // Prepare buffer for reading
+      totalBytesRead.addAndGet(size);
+      range.getData().complete(buf);
+
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public static Builder builder() {

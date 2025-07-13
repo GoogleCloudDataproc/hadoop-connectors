@@ -6,8 +6,10 @@ import com.google.api.core.ApiFutures;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.RangeSpec;
-import com.google.cloud.storage.ReadAsFutureBytes;
+import com.google.cloud.storage.ReadAsFutureByteString;
 import com.google.cloud.storage.ReadProjectionConfig;
+import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -27,15 +29,25 @@ public class FakeBlobReadSession implements BlobReadSession {
 
   @Override
   public <Projection> Projection readAs(ReadProjectionConfig<Projection> readProjectionConfig) {
-    assertThat(readProjectionConfig).isInstanceOf(ReadAsFutureBytes.class);
-    RangeSpec range = ((ReadAsFutureBytes) readProjectionConfig).getRange();
+    assertThat(readProjectionConfig).isInstanceOf(ReadAsFutureByteString.class);
+    RangeSpec range = ((ReadAsFutureByteString) readProjectionConfig).getRange();
     return (Projection)
-        ApiFutures.immediateFuture(getSubString(range).getBytes(StandardCharsets.UTF_8));
+        ApiFutures.immediateFuture(
+            new DisposableByteString() {
+              @Override
+              public ByteString byteString() {
+                return ByteString.copyFrom(getSubString(range).getBytes(StandardCharsets.UTF_8));
+              }
+
+              @Override
+              public void close() throws IOException {}
+            });
   }
 
   private String getSubString(RangeSpec range) {
     return TEST_STRING.substring(
-        (int) range.begin(), (int) (range.begin() + range.maxLength().getAsLong()));
+        Math.toIntExact(range.begin()),
+        Math.toIntExact(range.begin() + range.maxLength().getAsLong()));
   }
 
   @Override
