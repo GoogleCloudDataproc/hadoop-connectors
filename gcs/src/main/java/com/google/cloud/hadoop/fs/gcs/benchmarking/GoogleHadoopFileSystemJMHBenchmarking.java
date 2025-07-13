@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSCreateBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSDeleteBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSGetFileStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSListStatusBenchmark;
@@ -8,9 +9,11 @@ import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSMkdirsBench
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Progressable;
 
 /**
  * A wrapper around {@link GoogleHadoopFileSystem} that intercepts Hadoop FS commands and routes
@@ -103,8 +106,25 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
     runJMHBenchmarkAndLog("MKDIRS", () -> GCSMkdirsBenchmark.runBenchmark(hadoopPath, permission));
     logger.atInfo().log("Benchmark complete. Now performing the actual 'mkdirs' operation...");
-    // Call the super method to ensure the actual mkdirs operation is performed,
-    // as the benchmark's TearDown will clean up the directory created during benchmarking.
+    // Run actual mkdirs Operation after benchmarking it.
     return super.mkdirs(hadoopPath, permission);
+  }
+
+  @Override
+  public FSDataOutputStream create(
+      Path hadoopPath,
+      FsPermission permission,
+      boolean overwrite,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress)
+      throws IOException {
+    runJMHBenchmarkAndLog(
+        "CREATE", () -> GCSCreateBenchmark.runBenchmark(hadoopPath, overwrite, permission));
+    logger.atInfo().log("Benchmark complete. Now performing the actual Create operation...");
+    // Run actual create operation after benchmarking it.
+    return super.create(
+        hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
   }
 }
