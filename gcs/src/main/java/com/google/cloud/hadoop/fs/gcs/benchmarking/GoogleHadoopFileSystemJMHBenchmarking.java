@@ -134,7 +134,7 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
     runJMHBenchmarkAndLog("OPEN", () -> GCSOpenBenchmark.runBenchmark(hadoopPath));
     logger.atInfo().log("Benchmark complete. Now performing the actual Open operation...");
-    // Run actual create operation after benchmarking it.
+    // Run actual open operation after benchmarking it.
     return super.open(hadoopPath, bufferSize);
   }
 }
