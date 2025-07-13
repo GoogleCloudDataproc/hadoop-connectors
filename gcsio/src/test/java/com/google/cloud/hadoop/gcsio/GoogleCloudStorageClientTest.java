@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsClientImpl;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -48,6 +49,8 @@ public class GoogleCloudStorageClientTest {
     assertEquals(getReadVectoredData(ranges.get(1)), FakeBlobReadSession.SUBSTRING_50_7);
     assertEquals(getReadVectoredData(ranges.get(2)), FakeBlobReadSession.SUBSTRING_65_17);
     assertEquals(result.getReadBytes().intValue(), 34);
+    assertThat(result.getReadDuration()).isGreaterThan(0);
+    assertThat(result.getClientInitializationDuration()).isGreaterThan(0);
   }
 
   private String getReadVectoredData(VectoredIORange range)
