@@ -339,7 +339,6 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-              <shadedClassifierName>shaded-without-conscrypt</shadedClassifierName>
               <transformers>
                 <transformer
                     implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
@@ -413,6 +412,36 @@
                 <relocation>
                   <pattern>com</pattern>
                   <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.com</shadedPattern>
+                  <includes>
+                    <include>com.google.api.**</include>
+                    <include>com.google.api.gax.**</include>
+                    <include>com.google.auth.**</include>
+                    <include>com.google.cloud.*</include>
+                    <include>com.google.cloud.audit.**</include>
+                    <include>com.google.cloud.grpc.**</include>
+                    <include>com.google.cloud.hadoop.gcsio.**</include>
+                    <include>com.google.cloud.hadoop.util.**</include>
+                    <include>com.google.cloud.http.**</include>
+                    <include>com.google.cloud.monitoring.**</include>
+                    <include>com.google.cloud.opentelemetry.**</include>
+                    <include>com.google.cloud.spi.**</include>
+                    <include>com.google.cloud.storage.**</include>
+                    <include>com.google.common.**</include>
+                    <include>com.google.geo.**</include>
+                    <include>com.google.gson.**</include>
+                    <include>com.google.google.storage.**</include>
+                    <include>com.google.iam.**</include>
+                    <include>com.google.logging.**</include>
+                    <include>com.google.longrunning.**</include>
+                    <include>com.google.monitoring.**</include>
+                    <include>com.google.protobuf.**</include>
+                    <include>com.google.re2j.**</include>
+                    <include>com.google.rpc.**</include>
+                    <include>com.google.storage.**</include>
+                    <include>com.google.thirdparty.**</include>
+                    <include>com.google.type.**</include>
+                    <include>com.lmax.disruptor.**</include>
+                  </includes>
                   <excludes>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
@@ -430,9 +459,36 @@
                     <include>org.threeten.**</include>
                   </includes>
                 </relocation>
+                <!-- Take special care of grpc-netty-shaded, it uses the package
+                     io.grpc.netty.shaded.io.grpc.netty, which will cause the
+                     ServicesResourceTransformer to replace both occurrences of io.grpc -->
+                <relocation>
+                  <pattern>io.grpc.netty.shaded</pattern>
+                  <shadedPattern>
+                    com.google.cloud.hadoop.repackaged.gcs.io.grpc.netty.shaded
+                  </shadedPattern>
+                </relocation>
                 <relocation>
                   <pattern>io</pattern>
                   <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.io</shadedPattern>
+                  <includes>
+                    <include>io.grpc.**</include>
+                    <include>io.opencensus.**</include>
+                    <include>io.opentelemetry.**</include>
+                    <include>io.perfmark.**</include>
+                  </includes>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/io_grpc_netty_shaded_</pattern>
+                  <shadedPattern>
+                    META-INF/native/com_google_cloud_hadoop_repackaged_gcs_io_grpc_netty_shaded_
+                  </shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/libio_grpc_netty_shaded_</pattern>
+                  <shadedPattern>
+                    META-INF/native/libcom_google_cloud_hadoop_repackaged_gcs_io_grpc_netty_shaded_
+                  </shadedPattern>
                 </relocation>
               </relocations>
               <shadedArtifactAttached>true</shadedArtifactAttached>
