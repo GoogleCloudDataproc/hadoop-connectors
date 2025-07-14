@@ -381,9 +381,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
           logger.atWarning().log("Composed object is null for destination: %s", finalGcsPath);
         }
       } catch (IOException e) {
-        logger.atSevere().log(
-            "Failed to compose objects for destination: %s, error: %s",
-            finalGcsPath, e.getMessage());
+        logger.atSevere().withCause(e).log(
+            "Failed to compose objects for destination: %s", finalGcsPath);
         GoogleCloudStorageEventBus.postOnException();
         throw e;
       }

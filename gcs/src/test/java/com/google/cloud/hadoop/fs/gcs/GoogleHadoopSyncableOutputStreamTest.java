@@ -19,6 +19,10 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -278,17 +282,9 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
     // Mock composeObjects to throw IOException
     com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem mockGcsFs =
-        org.mockito.Mockito.mock(
-            com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.class,
-            org.mockito.Mockito.RETURNS_DEEP_STUBS);
-    org.mockito.Mockito.doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
-    org.mockito.Mockito.when(
-            mockGcsFs
-                .getGcs()
-                .composeObjects(
-                    org.mockito.ArgumentMatchers.anyList(),
-                    org.mockito.ArgumentMatchers.any(),
-                    org.mockito.ArgumentMatchers.any()))
+        mock(com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.class, RETURNS_DEEP_STUBS);
+    doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
+    when(mockGcsFs.getGcs().composeObjects(anyList(), any(), any()))
         .thenThrow(new IOException("compose failed"));
 
     // Write again to trigger compose on sync
@@ -318,18 +314,9 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
     // Mock composeObjects to return null
     com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem mockGcsFs =
-        org.mockito.Mockito.mock(
-            com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.class,
-            org.mockito.Mockito.RETURNS_DEEP_STUBS);
-    org.mockito.Mockito.doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
-    org.mockito.Mockito.when(
-            mockGcsFs
-                .getGcs()
-                .composeObjects(
-                    org.mockito.ArgumentMatchers.anyList(),
-                    org.mockito.ArgumentMatchers.any(),
-                    org.mockito.ArgumentMatchers.any()))
-        .thenReturn(null);
+        mock(com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.class, RETURNS_DEEP_STUBS);
+    doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
+    when(mockGcsFs.getGcs().composeObjects(anyList(), any(), any())).thenReturn(null);
 
     // Write again to trigger compose on sync, should not throw
     fout.write(new byte[] {0x02}, 0, 1);
