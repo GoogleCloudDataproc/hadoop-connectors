@@ -794,15 +794,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new DeleteFolderOperation(folders, storageOptions, lazyGetStorageControlClient());
     try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
       deleteFolderOperation.performDeleteOperation();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException(
-          String.format(
-              "Recieved thread interruption exception while deletion of folder resource : %s",
-              e.getMessage()),
-          e);
     }
-
     if (!deleteFolderOperation.encounteredNoExceptions()) {
       GoogleCloudStorageEventBus.postOnException();
       throw GoogleCloudStorageExceptions.createCompositeException(
