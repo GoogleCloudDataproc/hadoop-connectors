@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.util.JMHArgs;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -154,13 +155,22 @@ public class GCSOpenBenchmark {
    */
   public static void runBenchmark(Path hadoopPath) throws IOException {
     try {
+      // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
+      // If the properties are not set, fall back to the default constant values defined for this
+      // benchmark.
       int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
       int measurementIterations =
           Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
+
+      // Append the operation's name to the session name or create a new session name if it does not
+      // exist already.
+      String[] jvmArgs = JMHArgs.fromEnv(GCSOpenBenchmark.class.getSimpleName());
+
       Options opt =
           new OptionsBuilder()
               .include(GCSOpenBenchmark.class.getSimpleName() + ".open_Operation")
               .param("pathString", hadoopPath.toString())
+              .jvmArgs(jvmArgs)
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
               .build();
@@ -170,25 +180,5 @@ public class GCSOpenBenchmark {
     } catch (RunnerException e) {
       throw new IOException("Failed to run JMH benchmark for open", e);
     }
-  }
-
-  /**
-   * Main method to allow direct execution of the benchmark from the command line.
-   *
-   * <p>Example usage: `java -jar benchmarks.jar
-   * com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSOpenBenchmark -p
-   * pathString=gs://your-bucket/existing-file.txt`
-   *
-   * @param args Command-line arguments. Expected to contain at least the GCS path.
-   * @throws IOException if the benchmark runner fails.
-   */
-  public static void main(String[] args) throws IOException {
-    if (args.length < 1) {
-      System.err.println(
-          "Usage: java " + GCSOpenBenchmark.class.getName() + " <gcs-path-to-existing-file>");
-      System.exit(1);
-    }
-    Path testPath = new Path(args[0]);
-    runBenchmark(testPath);
   }
 }

@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.util.JMHArgs;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -126,12 +127,17 @@ public class GCSGetFileStatusBenchmark {
       int measurementIterations =
           Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
 
+      // Append the operation's name to the session name or create a new session name if it does not
+      // exist already.
+      String[] jvmArgs = JMHArgs.fromEnv(GCSGetFileStatusBenchmark.class.getSimpleName());
+
       Options opt =
           new OptionsBuilder()
               .include(GCSGetFileStatusBenchmark.class.getSimpleName() + ".getFileStatus_Operation")
               .param("pathString", hadoopPath.toString())
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
+              .jvmArgs(jvmArgs)
               .build();
 
       new Runner(opt).run();

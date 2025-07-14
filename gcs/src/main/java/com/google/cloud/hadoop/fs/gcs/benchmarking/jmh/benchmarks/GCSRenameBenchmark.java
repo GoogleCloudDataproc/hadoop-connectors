@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.util.JMHArgs;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -150,11 +151,17 @@ public class GCSRenameBenchmark {
       int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
       int measurementIterations =
           Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
+
+      // Append the operation's name to the session name or create a new session name if it does not
+      // exist already.
+      String[] jvmArgs = JMHArgs.fromEnv(GCSRenameBenchmark.class.getSimpleName());
+
       Options opt =
           new OptionsBuilder()
               .include(GCSRenameBenchmark.class.getSimpleName() + ".rename_Operation")
               .param("srcPathString", srcPath.toString())
               .param("dstPathString", dstPath.toString())
+              .jvmArgs(jvmArgs)
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
               .build();
