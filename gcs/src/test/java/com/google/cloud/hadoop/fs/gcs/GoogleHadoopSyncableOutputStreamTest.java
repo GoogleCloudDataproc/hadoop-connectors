@@ -291,7 +291,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
     fout.write(new byte[] {0x02}, 0, 1);
 
     IOException thrown = assertThrows(IOException.class, fout::sync);
-    assertThat(thrown).hasMessageThat().contains("compose failed");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("compose failed");
   }
 
   @Test
