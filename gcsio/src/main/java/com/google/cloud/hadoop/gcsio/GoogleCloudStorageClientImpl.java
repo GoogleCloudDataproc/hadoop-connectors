@@ -116,7 +116,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
-  private final Storage storage;
+  @VisibleForTesting final StorageWrapper storage;
 
   private static final StorageProvider storageProvider = new StorageProvider();
 
@@ -183,7 +183,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 gRPCInterceptors,
                 pCUExecutorService,
                 downscopedAccessTokenFn)
-            : clientLibraryStorage;
+            : new StorageWrapper(clientLibraryStorage, storageProvider);
   }
 
   @Override
@@ -207,7 +207,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
 
     return new GoogleCloudStorageClientWriteChannel(
-        storage, storageOptions, resourceIdWithGeneration, options);
+        storage.getStorage(), storageOptions, resourceIdWithGeneration, options);
   }
 
   /**
@@ -238,7 +238,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                       .build())));
     }
     try {
-      storage.create(bucketInfoBuilder.build());
+      storage.getStorage().create(bucketInfoBuilder.build());
     } catch (StorageException e) {
       GoogleCloudStorageEventBus.postOnException();
       if (errorExtractor.bucketAlreadyExists(e)) {
@@ -394,13 +394,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    storage.create(
-        BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-            .setMetadata(rewrittenMetadata)
-            .setContentEncoding(createObjectOptions.getContentEncoding())
-            .setContentType(createObjectOptions.getContentType())
-            .build(),
-        blobTargetOptions.toArray(BlobTargetOption[]::new));
+    storage
+        .getStorage()
+        .create(
+            BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                .setMetadata(rewrittenMetadata)
+                .setContentEncoding(createObjectOptions.getContentEncoding())
+                .setContentType(createObjectOptions.getContentType())
+                .build(),
+            blobTargetOptions.toArray(BlobTargetOption[]::new));
   }
 
   /**
@@ -551,7 +553,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
             String dstString = StringPaths.fromComponents(srcBucketName, dstObjectName);
 
-            Blob movedBlob = storage.moveBlob(moveRequestBuilder.build());
+            Blob movedBlob = storage.getStorage().moveBlob(moveRequestBuilder.build());
             if (movedBlob != null) {
               logger.atFiner().log("Successfully moved %s to %s", srcString, dstString);
             }
@@ -656,7 +658,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
             String dstString = StringPaths.fromComponents(dstBucketName, dstObjectName);
 
-            CopyWriter copyWriter = storage.copy(copyRequestBuilder.build());
+            CopyWriter copyWriter = storage.getStorage().copy(copyRequestBuilder.build());
             while (!copyWriter.isDone()) {
               copyWriter.copyChunk();
               logger.atFinest().log(
@@ -753,13 +755,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     List<Bucket> allBuckets = new ArrayList<>();
     try {
       Page<Bucket> buckets =
-          storage.list(
-              BucketListOption.pageSize(storageOptions.getMaxListItemsPerCall()),
-              BucketListOption.fields(
-                  BucketField.LOCATION,
-                  BucketField.STORAGE_CLASS,
-                  BucketField.TIME_CREATED,
-                  BucketField.UPDATED));
+          storage
+              .getStorage()
+              .list(
+                  BucketListOption.pageSize(storageOptions.getMaxListItemsPerCall()),
+                  BucketListOption.fields(
+                      BucketField.LOCATION,
+                      BucketField.STORAGE_CLASS,
+                      BucketField.TIME_CREATED,
+                      BucketField.UPDATED));
 
       // Loop to fetch all the items.
       for (Bucket bucket : buckets.iterateAll()) {
@@ -839,9 +843,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     if (resourceId.hasGenerationId()) {
       batchExecutor.queue(
           () ->
-              storage.delete(
-                  BlobId.of(bucketName, objectName),
-                  BlobSourceOption.generationMatch(resourceId.getGenerationId())),
+              storage
+                  .getStorage()
+                  .delete(
+                      BlobId.of(bucketName, objectName),
+                      BlobSourceOption.generationMatch(resourceId.getGenerationId())),
           getObjectDeletionCallback(
               resourceId, innerExceptions, batchExecutor, attempt, resourceId.getGenerationId()));
 
@@ -850,8 +856,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       // version of the object.
       batchExecutor.queue(
           () ->
-              storage.get(
-                  BlobId.of(bucketName, objectName), BlobGetOption.fields(BlobField.GENERATION)),
+              storage
+                  .getStorage()
+                  .get(
+                      BlobId.of(bucketName, objectName),
+                      BlobGetOption.fields(BlobField.GENERATION)),
           new FutureCallback<>() {
             @Override
             public void onSuccess(Blob blob) {
@@ -865,9 +874,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               long generation = checkNotNull(blob.getGeneration(), "generation can not be null");
               batchExecutor.queue(
                   () ->
-                      storage.delete(
-                          BlobId.of(bucketName, objectName),
-                          BlobSourceOption.generationMatch(generation)),
+                      storage
+                          .getStorage()
+                          .delete(
+                              BlobId.of(bucketName, objectName),
+                              BlobSourceOption.generationMatch(generation)),
                   getObjectDeletionCallback(
                       resourceId, innerExceptions, batchExecutor, attempt, generation));
             }
@@ -940,7 +951,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     for (String bucketName : bucketNames) {
       try {
-        boolean isDeleted = storage.delete(bucketName);
+        boolean isDeleted = storage.getStorage().delete(bucketName);
         if (!isDeleted) {
           innerExceptions.add(createFileNotFoundException(bucketName, null, null));
         }
@@ -1121,7 +1132,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     logger.atFiner().log("getBucket(%s)", bucketName);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     try {
-      return storage.get(bucketName);
+      return storage.getStorage().get(bucketName);
     } catch (StorageException e) {
       GoogleCloudStorageEventBus.postOnException();
       if (errorExtractor.getErrorType(e) == ErrorType.NOT_FOUND) {
@@ -1147,9 +1158,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     Blob blob;
     try {
       blob =
-          storage.get(
-              BlobId.of(bucketName, objectName),
-              BlobGetOption.fields(BLOB_FIELDS.toArray(new BlobField[0])));
+          storage
+              .getStorage()
+              .get(
+                  BlobId.of(bucketName, objectName),
+                  BlobGetOption.fields(BLOB_FIELDS.toArray(new BlobField[0])));
     } catch (StorageException e) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Error accessing " + resourceId, e);
@@ -1184,7 +1197,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     return new GoogleCloudStorageClientReadChannel(
-        storage,
+        storage.getStorage(),
         itemInfo == null ? getItemInfo(resourceId) : itemInfo,
         readOptions,
         errorExtractor,
@@ -1241,7 +1254,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             BlobInfo.newBuilder(bucketName, blobName).setMetadata(rewrittenMetadata).build();
 
         executor.queue(
-            () -> storage.update(blobUpdate),
+            () -> storage.getStorage().update(blobUpdate),
             new FutureCallback<>() {
               @Override
               public void onSuccess(Blob blob) {
@@ -1357,7 +1370,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     Blob composedBlob;
     try {
-      composedBlob = storage.compose(request);
+      composedBlob = storage.getStorage().compose(request);
     } catch (StorageException e) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException(e);

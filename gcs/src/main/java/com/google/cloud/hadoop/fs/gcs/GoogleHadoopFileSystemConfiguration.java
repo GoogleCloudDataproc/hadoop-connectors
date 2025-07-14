@@ -517,6 +517,15 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.storage.client.caching.enable",
           GoogleCloudStorageOptions.DEFAULT.isStorageClientCachingEnabled());
 
+  /** Configuration key for maximum number of gRPC storage clients to cache. */
+  public static final HadoopConfigurationProperty<Integer> GCS_STORAGE_CLIENT_CACHE_MAX_SIZE =
+      new HadoopConfigurationProperty<>("fs.gs.storage.client.cache.maxSize", 10);
+
+  /** Configuration key for gRPC storage client cache expiry time. */
+  public static final HadoopConfigurationProperty<Long> GCS_STORAGE_CLIENT_CACHE_TIME =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.storage.client.cache.time", 1_800_000L); // 30 minutes
+
   /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
    * uploads will be parked at default location pointed by java-storage client. This will only be
@@ -650,7 +659,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
-        .setStorageClientCachingEnabled(GCS_STORAGE_CLIENT_CACHING.get(config, config::getBoolean));
+        .setStorageClientCachingEnabled(GCS_STORAGE_CLIENT_CACHING.get(config, config::getBoolean))
+        .setStorageClientCacheMaxSize(GCS_STORAGE_CLIENT_CACHE_MAX_SIZE.get(config, config::getInt))
+        .setStorageClientCacheExpiryTime(GCS_STORAGE_CLIENT_CACHE_TIME.getTimeDuration(config));
   }
 
   @VisibleForTesting

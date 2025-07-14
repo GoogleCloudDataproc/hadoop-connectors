@@ -243,6 +243,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * will be set up with config settings when initialize() is called.
    */
   public GoogleHadoopFileSystem() {
+
+    logger.atInfo().log("shruti Creating GoogleHadoopFileSystem");
     StorageStatistics globalStats =
         GlobalStorageStatistics.INSTANCE.put(
             GhfsGlobalStorageStatistics.NAME, () -> new GhfsGlobalStorageStatistics());
