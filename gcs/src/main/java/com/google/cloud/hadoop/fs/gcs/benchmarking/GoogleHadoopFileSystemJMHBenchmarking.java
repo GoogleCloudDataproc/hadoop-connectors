@@ -6,9 +6,11 @@ import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSDeleteBench
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSGetFileStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSListStatusBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSMkdirsBenchmark;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSOpenBenchmark;
 import com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks.GCSRenameBenchmark;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -126,5 +128,13 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
     // Run actual create operation after benchmarking it.
     return super.create(
         hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
+  }
+
+  @Override
+  public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
+    runJMHBenchmarkAndLog("OPEN", () -> GCSOpenBenchmark.runBenchmark(hadoopPath));
+    logger.atInfo().log("Benchmark complete. Now performing the actual Open operation...");
+    // Run actual open operation after benchmarking it.
+    return super.open(hadoopPath, bufferSize);
   }
 }
