@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.util.JMHArgs;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -168,6 +169,11 @@ public class GCSMkdirsBenchmark {
       int warmupIterations = Integer.getInteger("jmh.warmup.iterations", DEFAULT_WARMUP_ITERATIONS);
       int measurementIterations =
           Integer.getInteger("jmh.measurement.iterations", DEFAULT_MEASUREMENT_ITERATIONS);
+
+      // Append the operation's name to the session name or create a new session name if it does not
+      // exist already.
+      String[] jvmArgs = JMHArgs.fromEnv(GCSMkdirsBenchmark.class.getSimpleName());
+
       Options opt =
           new OptionsBuilder()
               .include(GCSMkdirsBenchmark.class.getSimpleName() + ".mkdirs_Operation")
@@ -175,6 +181,7 @@ public class GCSMkdirsBenchmark {
               // Converts permission flags (e.g., rwxrwxrwx) to their octal string representation
               // (e.g., "777")
               .param("permissionOctalString", Integer.toOctalString(permission.toShort()))
+              .jvmArgs(jvmArgs)
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
               .build();

@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs.benchmarking.jmh.benchmarks;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.benchmarking.util.JMHArgs;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -130,11 +131,17 @@ public class GCSDeleteBenchmark {
     try {
       // This is a SingleShotTime benchmark for a destructive operation (delete),
       // so iterations are fixed to 1 measurement and 0 warmups.
+
+      // Append the operation's name to the session name or create a new session name if it does not
+      // exist already.
+      String[] jvmArgs = JMHArgs.fromEnv(GCSDeleteBenchmark.class.getSimpleName());
+
       Options opt =
           new OptionsBuilder()
               .include(GCSDeleteBenchmark.class.getSimpleName() + ".delete_Operation")
               .param("pathString", hadoopPath.toString())
               .param("recursive", String.valueOf(recursive))
+              .jvmArgs(jvmArgs)
               .warmupIterations(DEFAULT_WARMUP_ITERATIONS)
               .measurementIterations(DEFAULT_MEASUREMENT_ITERATIONS)
               .build();
