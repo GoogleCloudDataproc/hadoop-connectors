@@ -292,6 +292,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
     IOException thrown = assertThrows(IOException.class, fout::sync);
     assertThat(thrown).hasCauseThat().hasMessageThat().contains("compose failed");
+
+    verify(mockExecutorService).submit(any(Callable.class));
   }
 
   @Test
@@ -321,6 +323,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
     // Write again to trigger compose on sync, should not throw
     fout.write(new byte[] {0x02}, 0, 1);
     fout.sync(); // Should not throw NPE even if composedObject is null
+
+    verify(mockExecutorService).submit(any(Callable.class));
   }
 
   private byte[] readFile(Path objectPath) throws IOException {
