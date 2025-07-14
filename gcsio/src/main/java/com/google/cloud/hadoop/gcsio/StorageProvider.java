@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
@@ -30,56 +31,82 @@ import java.util.stream.Collectors;
  */
 public class StorageProvider {
 
-  // TODO: Replace Storage with a StorageWrapper which does not expose the close method. The
-  //  dependants of this provider should not be able to close the storage accidentally. It should
-  //  always be managed through this provider.
-  @VisibleForTesting
-  final Cache<StorageProviderCacheKey, Storage> cache =
-      CacheBuilder.newBuilder().recordStats().build();
+  @VisibleForTesting volatile Cache<StorageProviderCacheKey, StorageWrapper> cache;
 
   /**
    * Tracks the number of times a storage client is used. Used to determine when a storage can be
    * closed.
    */
   @VisibleForTesting
-  final Map<Storage, Integer> storageClientToReferenceMap = new ConcurrentHashMap<>();
+  final Map<StorageWrapper, Integer> storageClientToReferenceMap = new ConcurrentHashMap<>();
 
   /** Reverse map for storage reference to cache keys. */
-  final Map<Storage, StorageProviderCacheKey> storageToCacheKeyMap = new ConcurrentHashMap<>();
+  final Map<StorageWrapper, StorageProviderCacheKey> storageToCacheKeyMap =
+      new ConcurrentHashMap<>();
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  synchronized Storage getStorage(
+  StorageWrapper getStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
+    logger.atInfo().log("Credentials: %s", credentials);
     if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
       logger.atInfo().log("Ignoring storage object cache.");
-      return createStorage(
-          credentials, storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn);
+      return new StorageWrapper(
+          createStorage(
+              credentials,
+              storageOptions,
+              interceptors,
+              pCUExecutorService,
+              downscopedAccessTokenFn),
+          this);
+    }
+    if (cache == null) {
+      synchronized (this) {
+        if (cache == null) {
+          cache =
+              CacheBuilder.newBuilder()
+                  .maximumSize(storageOptions.getStorageClientCacheMaxSize())
+                  .expireAfterWrite(storageOptions.getStorageClientCacheExpiryTime())
+                  .recordStats()
+                  .build();
+        }
+      }
     }
     StorageProviderCacheKey key =
         computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
-    Storage storage = cache.getIfPresent(key);
+    logger.atInfo().log("Key: %s", key);
+    StorageWrapper storage = cache.getIfPresent(key);
     if (storage == null) {
-      storage = createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn);
-      cache.put(key, storage);
-      storageToCacheKeyMap.put(storage, key);
-      logger.atInfo().log(
-          "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate : %.2f",
-          key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
+      synchronized (this) {
+        storage = cache.getIfPresent(key);
+        if (storage == null) {
+          storage =
+              new StorageWrapper(
+                  createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn),
+                  this);
+          cache.put(key, storage);
+          storageToCacheKeyMap.put(storage, key);
+          logger.atInfo().log(
+              "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate : %.2f",
+              key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
+        } else {
+          logger.atInfo().log(
+              "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
+              key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
+        }
+      }
     } else {
-      logger.atFine().log(
+      logger.atInfo().log(
           "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
           key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
     }
-    logger.atFine().log("Cache stats. size: %d", cache.size());
     // Increment the reference count of the storage object.
-    storageClientToReferenceMap.put(
-        storage, storageClientToReferenceMap.getOrDefault(storage, 0) + 1);
+    storageClientToReferenceMap.compute(storage, (k, v) -> v == null ? 1 : v + 1);
     return storage;
   }
 
@@ -87,9 +114,9 @@ public class StorageProvider {
    * Signal the storage object to be closed. The resources held by the storage object will be freed
    * only if the instance is closed by all the objects sharing this storage reference.
    */
-  synchronized void close(Storage storage) {
+  synchronized void close(StorageWrapper storage) {
     if (!storageClientToReferenceMap.containsKey(storage)) {
-      closeStorage(storage);
+      closeStorage(storage.getStorage());
       logger.atInfo().log("close() called on storage object outside cache.");
       return;
     }
@@ -101,7 +128,7 @@ public class StorageProvider {
       cache.invalidate(key);
       storageToCacheKeyMap.remove(storage);
       storageClientToReferenceMap.remove(storage);
-      closeStorage(storage);
+      closeStorage(storage.getStorage());
     }
   }
 
@@ -111,7 +138,7 @@ public class StorageProvider {
       GoogleCloudStorageOptions storageOptions,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     return StorageProviderCacheKey.builder()
-        .setCredentials(credentials)
+        .setCredentialsKey(getCredentialsCacheKey(credentials))
         .setHttpHeaders(storageOptions.getHttpRequestHeaders())
         .setIsDirectPathPreferred(storageOptions.isDirectPathPreferred())
         .setIsDownScopingEnabled(downscopedAccessTokenFn != null)
@@ -121,12 +148,58 @@ public class StorageProvider {
         .build();
   }
 
+  /**
+   * Creates a stable cache key for a given Credentials object. This is necessary because many
+   * Credentials implementations do not have a stable equals/hashCode implementation, which makes
+   * them unsuitable for use as cache keys. This method extracts stable identifiers (like client
+   * email) where possible.
+   */
+  private static List<Object> getCredentialsCacheKey(Credentials credentials) {
+
+    if (credentials == null) {
+      return null;
+    }
+    List<Object> keyParts = new ArrayList<>();
+    Credentials current = credentials;
+    while (current != null) {
+      if (current instanceof com.google.auth.oauth2.ServiceAccountCredentials) {
+        keyParts.add(((com.google.auth.oauth2.ServiceAccountCredentials) current).getClientEmail());
+        break;
+      }
+      if (current instanceof com.google.auth.oauth2.UserCredentials) {
+        keyParts.add(((com.google.auth.oauth2.UserCredentials) current).getClientId());
+        break;
+      }
+      if (current instanceof com.google.auth.oauth2.ComputeEngineCredentials) {
+        keyParts.add(com.google.auth.oauth2.ComputeEngineCredentials.class);
+        break;
+      }
+      if (current
+          instanceof
+          com.google.cloud.hadoop.util.HadoopCredentialsConfiguration
+              .AccessTokenProviderCredentials) {
+        keyParts.add(
+            com.google.cloud.hadoop.util.HadoopCredentialsConfiguration
+                .AccessTokenProviderCredentials.class);
+        break;
+      }
+      if (current instanceof com.google.auth.oauth2.ImpersonatedCredentials) {
+        Credentials wrapped =
+            ((com.google.auth.oauth2.ImpersonatedCredentials) current).getSourceCredentials();
+        current = (wrapped == current) ? null : wrapped;
+      } else {
+        keyParts.add(current.getClass());
+        current = null;
+      }
+    }
+    return keyParts;
+  }
+
   /** Determines if the storage instance can be served from the cache. */
   private static boolean canCache(
       GoogleCloudStorageOptions options,
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService) {
-
     return options.isStorageClientCachingEnabled()
         // These values are currently passed while creating the storage client, but they are
         // currently not configurable by the FS options so skipping caching.
@@ -162,7 +235,7 @@ public class StorageProvider {
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     List<ClientInterceptor> list = new ArrayList<>();
     if (interceptors != null && !interceptors.isEmpty()) {
-      list.addAll(interceptors.stream().filter(x -> x != null).collect(Collectors.toList()));
+      list.addAll(interceptors.stream().filter(Objects::nonNull).collect(Collectors.toList()));
     }
     if (storageOptions.isTraceLogEnabled()) {
       list.add(new GoogleCloudStorageClientGrpcTracingInterceptor());

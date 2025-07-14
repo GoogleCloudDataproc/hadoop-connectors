@@ -1,9 +1,9 @@
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.auth.Credentials;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import javax.annotation.Nullable;
 
 @AutoValue
@@ -16,9 +16,8 @@ public abstract class StorageProviderCacheKey {
   /** Whether tracing is requested. */
   public abstract boolean getIsTracingEnabled();
 
-  /** Credentials to use for the GCS client, otherwise null. */
   @Nullable
-  public abstract Credentials getCredentials();
+  public abstract List<Object> getCredentialsKey();
 
   /** Whether downscoped tokens are used for authenticating with the GCS backend. */
   public abstract boolean getIsDownScopingEnabled();
@@ -41,7 +40,7 @@ public abstract class StorageProviderCacheKey {
 
     public abstract Builder setIsTracingEnabled(boolean value);
 
-    public abstract Builder setCredentials(Credentials value);
+    public abstract Builder setCredentialsKey(List<Object> value);
 
     public abstract Builder setIsDownScopingEnabled(boolean value);
 
