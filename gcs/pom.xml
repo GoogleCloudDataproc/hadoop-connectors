@@ -241,6 +241,7 @@
                   <include>io.opentelemetry.semconv</include>
                   <include>io.perfmark</include>
                   <include>org.apache.httpcomponents</include>
+                  <include>org.conscrypt:conscrypt-openjdk-uber</include>
                   <include>org.threeten:threetenbp</include>
                 </includes>
               </artifactSet>
