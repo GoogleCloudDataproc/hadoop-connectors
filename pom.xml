@@ -101,6 +101,7 @@
     <google.protobuf.version>3.25.3</google.protobuf.version>
     <grpc.version>1.68.0</grpc.version>
     <hadoop.version>3.3.6</hadoop.version>
+    <conscrypt.version>2.5.2</conscrypt.version>
     <opencensus.version>0.31.1</opencensus.version>
 
     <!-- Test dependencies -->
@@ -478,6 +479,11 @@
         <artifactId>hadoop-client-runtime</artifactId>
         <version>${hadoop.version}</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.conscrypt</groupId>
+        <artifactId>conscrypt-openjdk-uber</artifactId>
+        <version>${conscrypt.version}</version>
       </dependency>
       <dependency>
         <groupId>org.assertj</groupId>
