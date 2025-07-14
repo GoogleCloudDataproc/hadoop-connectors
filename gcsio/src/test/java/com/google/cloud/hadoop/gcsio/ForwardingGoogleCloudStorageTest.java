@@ -25,9 +25,13 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,6 +45,12 @@ public class ForwardingGoogleCloudStorageTest {
 
   /** Sample string. */
   private static final String TEST_STRING = "test";
+
+  /** Sample long. */
+  private static final long TEST_LONG = 1L;
+
+  /** Sample int. */
+  private static final int TEST_INT = 1;
 
   /** Sample list of strings. */
   private static final List<String> TEST_STRINGS = Lists.newArrayList(TEST_STRING);
@@ -337,5 +347,23 @@ public class ForwardingGoogleCloudStorageTest {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> new ForwardingGoogleCloudStorage(null));
     assertThat(exception).hasMessageThat().startsWith("delegate must not be null");
+  }
+
+  @Test
+  public void readVectored_callsBlobReadSession() throws IOException, URISyntaxException {
+    URI uri = new URI(TEST_STRING);
+    VectoredIORange range1 = getRange();
+    VectoredIORange range2 = getRange();
+    gcs.readVectored(List.of(range1, range2), getAllocator(), uri);
+
+    verify(mockGcsDelegate).readVectored(eq(List.of(range1, range2)), eq(getAllocator()), eq(uri));
+  }
+
+  private IntFunction<ByteBuffer> getAllocator() {
+    return length -> ByteBuffer.allocateDirect(length);
+  }
+
+  private VectoredIORange getRange() {
+    return VectoredIORange.builder().setOffset(TEST_LONG).setLength(TEST_INT).build();
   }
 }

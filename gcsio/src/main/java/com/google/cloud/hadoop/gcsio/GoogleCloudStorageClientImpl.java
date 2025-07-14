@@ -24,6 +24,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.core.ApiFuture;
+import com.google.api.core.ApiFutures;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -37,18 +39,22 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.ExecutorSupplier;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
+import com.google.cloud.storage.RangeSpec;
+import com.google.cloud.storage.ReadProjectionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.Storage.MoveBlobRequest;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
+import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
@@ -58,9 +64,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -68,11 +76,19 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -100,6 +116,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
+
+  private ExecutorService boundedThreadPool;
+
+  private final BlockingQueue taskQueue = new LinkedBlockingQueue<Runnable>();
+
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
@@ -128,6 +149,18 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             ? createStorage(
                 credentials, options, gRPCInterceptors, downscopedAccessTokenFn, pCUExecutorService)
             : clientLibraryStorage;
+    // TODO(shreyassinha): Replace hard coded values with flag parameter.
+    this.boundedThreadPool =
+        new ThreadPoolExecutor(
+            16,
+            16,
+            0L,
+            TimeUnit.MILLISECONDS,
+            taskQueue,
+            new ThreadFactoryBuilder()
+                .setNameFormat("vectoredRead-range-pool-%d")
+                .setDaemon(true)
+                .build());
   }
 
   @Override
@@ -512,6 +545,81 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return pCUExecutorService == null
         ? ExecutorSupplier.cachedPool()
         : ExecutorSupplier.useExecutor(pCUExecutorService);
+  }
+
+  @Override
+  public VectoredIOMetrics readVectored(
+      List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate, URI gcsPath)
+      throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
+    BlobId blobId =
+        BlobId.of(
+            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
+    logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
+    long clientInitializationDurationStartTime = System.currentTimeMillis();
+    AtomicInteger totalBytesRead = new AtomicInteger();
+    // start opening the BlobReadSession
+    ApiFuture<BlobReadSession> sessionFuture = storage.blobReadSession(blobId);
+    try (BlobReadSession blobReadSession = sessionFuture.get(30, TimeUnit.SECONDS)) {
+      long clientInitializationDuration =
+          System.currentTimeMillis() - clientInitializationDurationStartTime;
+      logger.atFiner().log("Client Initialization successful in %d", clientInitializationDuration);
+      long rangedReadStartTime = System.currentTimeMillis();
+      List<ApiFuture<?>> transformFutures =
+          ranges.stream()
+              .map(
+                  range -> {
+                    ApiFuture<DisposableByteString> futureBytes =
+                        blobReadSession.readAs(
+                            ReadProjectionConfigs.asFutureByteString()
+                                .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
+                    return ApiFutures.transform(
+                        futureBytes,
+                        disposableByteString ->
+                            processBytesAndCompleteRange(
+                                disposableByteString, totalBytesRead, range),
+                        boundedThreadPool);
+                  })
+              .collect(Collectors.toList());
+      // We need to wait for the futures before exiting the try-with-resources in order to avoid
+      // parent stream closed exception.
+      ApiFutures.allAsList(transformFutures).get(30, TimeUnit.SECONDS);
+      long rangedReadTime = System.currentTimeMillis() - rangedReadStartTime;
+      logger.atFiner().log("Ranged read successful in %d", rangedReadTime);
+      return VectoredIOMetrics.builder()
+          .setReadBytes(totalBytesRead.get())
+          .setReadDuration(rangedReadTime)
+          .setClientInitializationDuration(clientInitializationDuration)
+          .build();
+    } catch (IOException | ExecutionException | InterruptedException | TimeoutException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private Void processBytesAndCompleteRange(
+      DisposableByteString disposableByteString,
+      AtomicInteger totalBytesRead,
+      VectoredIORange range) {
+    // try-with-resources ensures the DisposableByteString is closed, releasing its memory
+    try (DisposableByteString dbs = disposableByteString) {
+      ByteString byteString = dbs.byteString();
+      int size = byteString.size();
+      ByteBuffer buf = ByteBuffer.allocate(size);
+
+      // This loop efficiently copies data without creating intermediate byte arrays on the heap
+      for (ByteBuffer b : byteString.asReadOnlyByteBufferList()) {
+        buf.put(b);
+      }
+
+      buf.flip(); // Prepare buffer for reading
+      totalBytesRead.addAndGet(size);
+      range.getData().complete(buf);
+
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public static Builder builder() {
