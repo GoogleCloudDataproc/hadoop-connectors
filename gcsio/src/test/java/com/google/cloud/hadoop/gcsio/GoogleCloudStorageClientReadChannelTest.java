@@ -47,6 +47,9 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 
+import com.google.cloud.storage.StorageException;
+import org.mockito.stubbing.Answer;
+
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageClientReadChannelTest {
 
@@ -478,6 +481,98 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
     verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  private static int readCount = 0;
+  @Test
+  public void read_whenPartialReadFails_createsDataGapOnRetry() throws IOException {
+    //Setup
+     final int PARTIAL_READ_SIZE = 512;
+     final int TOTAL_OBJECT_SIZE = 1024;
+
+     Storage mockStorage;
+     ReadChannel mockReadChannel;
+    GoogleCloudStorageClientReadChannel channel;
+
+    mockStorage = mock(Storage.class);
+    mockReadChannel = mock(ReadChannel.class);
+    GoogleCloudStorageItemInfo itemInfo = // DEFAULT_ITEM_INFO;
+        GoogleCloudStorageItemInfo.createObject(
+            new StorageResourceId("BUCKET_NAME", OBJECT_NAME),
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ TOTAL_OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+
+    // Configure the mock storage to return our mock ReadChannel
+    when(mockStorage.reader(any(), any())).thenReturn(mockReadChannel);
+
+    channel =
+        new GoogleCloudStorageClientReadChannel(
+            mockStorage,
+            itemInfo,
+            GoogleCloudStorageReadOptions.DEFAULT,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // 1. Configure the mock to simulate a partial read followed by an exception.
+    // This is the key to reproducing the bug.
+    when(mockReadChannel.read(any(ByteBuffer.class)))
+        .thenAnswer(
+            (Answer<Integer>)
+                invocation -> {
+                 readCount++;
+
+                  ByteBuffer buffer = invocation.getArgument(0);
+
+                  buffer.put(new byte[PARTIAL_READ_SIZE]); // Simulate partial read
+
+                  if (readCount == 1) {
+                    // Failing on second error.
+                    throw new StorageException(408, "Request timed out.");
+                  }
+                  return PARTIAL_READ_SIZE;
+                });
+
+    // 2. Attempt the first read, which is expected to fail.
+    ByteBuffer buffer = ByteBuffer.allocate(TOTAL_OBJECT_SIZE);
+    // System.out.printf("remaining bytes = %d \n", buffer.remaining());
+    IOException thrown = assertThrows(IOException.class, () -> channel.read(buffer));
+    assertThat(thrown).hasCauseThat().isInstanceOf(StorageException.class);
+
+    // 3. Verify the state after the failed read. This confirms the bug's premise.
+    // The buffer position advanced, indicating the partial read was committed.
+    assertThat(buffer.position()).isEqualTo(PARTIAL_READ_SIZE);
+    // The channel's internal position was also advanced despite the failure.
+    assertThat(channel.position()).isEqualTo(PARTIAL_READ_SIZE);
+
+
+    // 4. Configure the mock for a successful read on the next attempt (the retry).
+    // Let's say the retry reads another 512 bytes successfully.
+    when(mockReadChannel.read(any(ByteBuffer.class)))
+        .thenAnswer(
+            (Answer<Integer>)
+                invocation -> {
+                  ByteBuffer successfulBuffer = invocation.getArgument(0);
+                  int bytesToRead = 512;
+                  successfulBuffer.put(new byte[bytesToRead]);
+                  return bytesToRead;
+                });
+
+    // 5. Perform the "retry" read.
+    // buffer.clear();
+    int bytesReadOnRetry = channel.read(buffer);
+
+    // 6. Final verification: Channel should read the complete data clearing the original buffer.
+    assertThat(bytesReadOnRetry).isEqualTo(PARTIAL_READ_SIZE);
+    // The channel position is now at 1024 (512 from failed read + 512 from retry),
+    // proving a 512-byte gap was created in the stream delivered to the client.
+    assertThat(channel.position()).isEqualTo(PARTIAL_READ_SIZE + bytesReadOnRetry);
   }
 
   @Test
