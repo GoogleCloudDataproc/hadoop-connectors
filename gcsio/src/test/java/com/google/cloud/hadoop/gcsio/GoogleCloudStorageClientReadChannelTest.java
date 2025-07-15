@@ -570,6 +570,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     // 6. Final verification: Channel should read the complete data clearing the original buffer.
     assertThat(bytesReadOnRetry).isEqualTo(PARTIAL_READ_SIZE);
+
     // The channel position is now at 1024 (512 from failed read + 512 from retry),
     // proving a 512-byte gap was created in the stream delivered to the client.
     assertThat(channel.position()).isEqualTo(PARTIAL_READ_SIZE + bytesReadOnRetry);
