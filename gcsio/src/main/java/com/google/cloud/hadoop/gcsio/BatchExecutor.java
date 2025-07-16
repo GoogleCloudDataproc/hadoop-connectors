@@ -103,8 +103,8 @@ class BatchExecutor {
   }
 
   /**
-   * Checks if the underlying executor has any active or queued tasks. This is used to detect if the
-   * deletion process has stalled.
+   * Checks if the underlying executor has any active or queued tasks. This is used to detect
+   * stalling issues in the jobs.
    */
   public boolean isIdle() {
     if (requestsExecutor instanceof ThreadPoolExecutor) {
@@ -112,7 +112,8 @@ class BatchExecutor {
       // Thread's idle if no threads are active and the work queue is empty.
       return executor.getActiveCount() == 0 && executor.getQueue().isEmpty();
     }
-    // The executor is a DirectExecutorService, it is always idle because there are no child
+    // The executor is the instance of a DirectExecutorService, it is always idle because there are
+    // no child
     // threads.
     return true;
   }

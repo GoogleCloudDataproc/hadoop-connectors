@@ -81,13 +81,13 @@ class DeleteFolderOperation {
     computeChildrenForFolderResource();
 
     try {
-      // this will avoid infinite loop when all folders are deleted
       while (!countOfChildren.isEmpty() && encounteredNoExceptions()) {
         FolderInfo folderToDelete = getElementFromBlockingQueue();
         if (folderToDelete != null) {
-          // Queue the deletion request
+          // Queue the deletion request.
           queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
         } else if (batchExecutor.isIdle()) {
+          // Checking the count again as folders could have been deleted by now.
           if (countOfChildren.isEmpty()) {
             break;
           }
@@ -138,7 +138,8 @@ class DeleteFolderOperation {
   /** Gets the head from the blocking queue */
   private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
-      // Average latency of DeleteFolder is around 200 ms.
+      // P50 latency of DeleteFolder is a little below 200 ms. So it is highly likely
+      // to find a folder to delete within 200 ms.
       return folderDeleteBlockingQueue.poll(200, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       logger.atSevere().log(
