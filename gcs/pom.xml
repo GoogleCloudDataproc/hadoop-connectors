@@ -234,7 +234,6 @@
                   <include>com.google.storage.v2</include>
                   <include>com.lmax</include>
                   <include>io.grpc</include>
-                  <include>org.conscrypt</include>
                   <include>io.opencensus</include>
                   <include>io.opentelemetry</include>
                   <include>io.opentelemetry.contrib</include>
@@ -340,6 +339,7 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <shadedClassifierName>shaded-without-conscrypt</shadedClassifierName>
               <transformers>
                 <transformer
                     implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
