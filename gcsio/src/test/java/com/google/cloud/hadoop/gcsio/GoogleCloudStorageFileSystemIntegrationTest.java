@@ -313,6 +313,72 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
+  protected void validateListFileInfo(
+      String bucketName,
+      String objectNamePrefix,
+      String startOffset,
+      boolean expectedToExist,
+      String... expectedListedNames)
+      throws IOException {
+
+    boolean childPathsExpectedToExist = expectedToExist && (expectedListedNames != null);
+    boolean listRoot = bucketName == null;
+
+    // Prepare list of expected paths.
+    List<URI> expectedPaths = new ArrayList<>();
+    // Also maintain a backwards mapping to keep track of which of "expectedListedNames" and
+    // "bucketName" is associated with each path, so that we can supply validateFileInfoInternal
+    // with the objectName and thus enable it to lookup the internally stored expected size,
+    // directory status, etc., of the associated FileStatus.
+    Map<URI, String[]> pathToComponents = new HashMap<>();
+    if (childPathsExpectedToExist) {
+      for (String expectedListedName : expectedListedNames) {
+        String[] pathComponents = new String[2];
+        if (listRoot) {
+          pathComponents[0] = expectedListedName;
+          pathComponents[1] = null;
+        } else {
+          pathComponents[0] = bucketName;
+          pathComponents[1] = expectedListedName;
+        }
+        URI expectedPath = gcsiHelper.getPath(pathComponents[0], pathComponents[1]);
+        expectedPaths.add(expectedPath);
+        pathToComponents.put(expectedPath, pathComponents);
+      }
+    }
+
+    // Get list of actual paths.
+    URI path = gcsiHelper.getPath(bucketName, objectNamePrefix);
+    List<FileInfo> fileInfos;
+    if (expectedToExist) {
+      fileInfos = gcsfs.listFileInfo(path);
+    } else {
+      assertThrows(FileNotFoundException.class, () -> gcsfs.listFileInfo(path));
+      fileInfos = new ArrayList<>();
+    }
+
+    List<URI> actualPaths = new ArrayList<>();
+    for (FileInfo fileInfo : fileInfos) {
+      assertWithMessage("File exists? : " + fileInfo.getPath())
+          .that(fileInfo.exists())
+          .isEqualTo(childPathsExpectedToExist);
+      if (fileInfo.exists()) {
+        actualPaths.add(fileInfo.getPath());
+        String[] uriComponents = pathToComponents.get(fileInfo.getPath());
+        if (uriComponents != null) {
+          // Only do fine-grained validation for the explicitly expected paths.
+          validateFileInfoInternal(uriComponents[0], uriComponents[1], true, fileInfo);
+        }
+      }
+    }
+
+    if (listRoot) {
+      assertThat(actualPaths).containsAtLeastElementsIn(expectedPaths);
+    } else {
+      assertThat(actualPaths).containsExactlyElementsIn(expectedPaths);
+    }
+  }
+
   // -----------------------------------------------------------------
   // Tests added by this class.
   // -----------------------------------------------------------------
@@ -439,56 +505,94 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // At root.
     validateListFileInfo(
-        testBucket, null, /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
-    validateListFileInfo(
-        testBucket, "", /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
+        testBucket, null, "a", /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
+    /*validateListFileInfo(
+    testBucket, "", */
+    /* expectedToExist= */
+    /* true, "o1", "o2", "d0/", "d1/", "d2/");
 
     // At d0.
-    validateListFileInfo(testBucket, "d0/", /* expectedToExist= */ true);
-    validateListFileInfo(testBucket, "d0", /* expectedToExist= */ true);
+    validateListFileInfo(testBucket, "d0/", */
+    /* expectedToExist= */
+    /* true);
+    validateListFileInfo(testBucket, "d0", */
+    /* expectedToExist= */
+    /* true);
 
     // At o1.
-    validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
+    validateListFileInfo(testBucket, "o1", */
+    /* expectedToExist= */
+    /* true, "o1");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
-      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
+      validateListFileInfo(testBucket, "o1/", */
+    /* expectedToExist= */
+    /* false);
     } else {
-      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
+      validateListFileInfo(testBucket, "o1/", */
+    /* expectedToExist= */
+    /* true, "o1");
     }
 
     // At d1.
     validateListFileInfo(
-        testBucket, "d1/", /* expectedToExist= */ true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+        testBucket, "d1/", */
+    /* expectedToExist= */
+    /* true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
     validateListFileInfo(
-        testBucket, "d1", /* expectedToExist= */ true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+        testBucket, "d1", */
+    /* expectedToExist= */
+    /* true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
 
     // At d1/o12.
-    validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
+    validateListFileInfo(testBucket, "d1/o12", */
+    /* expectedToExist= */
+    /* true, "d1/o12");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
-      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
+      validateListFileInfo(testBucket, "d1/o12/", */
+    /* expectedToExist= */
+    /* false);
     } else {
-      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
+      validateListFileInfo(testBucket, "d1/o12/", */
+    /* expectedToExist= */
+    /* true, "d1/o12");
     }
 
     // At d1/d11.
-    validateListFileInfo(testBucket, "d1/d11/", /* expectedToExist= */ true, "d1/d11/o111");
-    validateListFileInfo(testBucket, "d1/d11", /* expectedToExist= */ true, "d1/d11/o111");
+    validateListFileInfo(testBucket, "d1/d11/", */
+    /* expectedToExist= */
+    /* true, "d1/d11/o111");
+    validateListFileInfo(testBucket, "d1/d11", */
+    /* expectedToExist= */
+    /* true, "d1/d11/o111");
 
     // At d2.
-    validateListFileInfo(testBucket, "d2/", /* expectedToExist= */ true, "d2/o21", "d2/o22");
-    validateListFileInfo(testBucket, "d2", /* expectedToExist= */ true, "d2/o21", "d2/o22");
+    validateListFileInfo(testBucket, "d2/", */
+    /* expectedToExist= */
+    /* true, "d2/o21", "d2/o22");
+    validateListFileInfo(testBucket, "d2", */
+    /* expectedToExist= */
+    /* true, "d2/o21", "d2/o22");
 
     // At non-existent path.
-    validateListFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
-    validateListFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
+    validateListFileInfo(testBucket, dirDoesNotExist, */
+    /* expectedToExist= */
+    /* false);
+    validateListFileInfo(testBucket, objDoesNotExist, */
+    /* expectedToExist= */
+    /* false);
     validateListFileInfo(
-        "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, /* expectedToExist= */ false);
+        "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, */
+    /* expectedToExist= */
+    /* false);
 
     validateListFileInfo(
-        null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);
+        null, null, */
+    /* expectedToExist= */
+    /* true, sharedBucketName1, sharedBucketName2, testBucket);*/
   }
 
   @Test

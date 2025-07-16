@@ -243,6 +243,10 @@ public interface GoogleCloudStorageFileSystem {
     return listFileInfo(path, ListFileOptions.DEFAULT);
   }
 
+  default List<FileInfo> listFileInfo(URI path, URI startOffset) throws IOException {
+    return listFileInfo(path, startOffset, ListFileOptions.DEFAULT);
+  }
+
   /**
    * If the given path points to a directory then the information about its children is returned,
    * otherwise information about the given file is returned.
@@ -252,6 +256,9 @@ public interface GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    */
   List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException;
+
+  List<FileInfo> listFileInfo(URI path, URI startOffset, ListFileOptions listOptions)
+      throws IOException;
 
   /**
    * Returns the list of folder resources in the prefix. It lists all the folder resources

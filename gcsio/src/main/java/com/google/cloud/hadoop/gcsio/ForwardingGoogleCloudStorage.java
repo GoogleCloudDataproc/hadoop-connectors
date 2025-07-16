@@ -192,6 +192,18 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName,
+      String startOffset,
+      String endOffset,
+      String objectNamePrefix,
+      ListObjectOptions listOptions)
+      throws IOException {
+    return delegate.listObjectInfo(
+        bucketName, startOffset, endOffset, objectNamePrefix, listOptions);
+  }
+
+  @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {

@@ -1000,6 +1000,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      Thread.currentThread().interrupt();
       GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
@@ -1010,6 +1011,50 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
     fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
+    return fileInfos;
+  }
+
+  @Override
+  public List<FileInfo> listFileInfo(URI path, URI startOffset, ListFileOptions listOptions)
+      throws IOException {
+
+    checkNotNull(path, "path can not be null");
+    logger.atFiner().log("listFileInfo(path: %s)", path);
+
+    StorageResourceId pathId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
+    StorageResourceId dirId = pathId.toDirectoryId();
+    StorageResourceId startOffsetId =
+        StorageResourceId.fromUriPath(startOffset, /* allowEmptyObjectName= */ true);
+
+    List<GoogleCloudStorageItemInfo> dirItemInfos =
+        gcs.listObjectInfo(
+            dirId.getBucketName(),
+            startOffsetId.getObjectName(),
+            /* endOffset */ null,
+            dirId.getObjectName(),
+            updateListObjectOptions(
+                ListObjectOptions.builder()
+                    .setMaxResults(options.getCloudStorageOptions().getMaxListItemsPerCall())
+                    .setDelimiter(null)
+                    .build(),
+                listOptions));
+
+    if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new FileNotFoundException("Item not found: " + path);
+    }
+
+    if (!dirItemInfos.isEmpty() && Objects.equals(dirItemInfos.get(0).getResourceId(), dirId)) {
+      // TODO: this leads to array copy not efficient
+      dirItemInfos.remove(0);
+    }
+
+    List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
+    // fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
+    for (FileInfo info : fileInfos) {
+      logger.atFiner().log("%s", info.getPath());
+    }
     return fileInfos;
   }
 

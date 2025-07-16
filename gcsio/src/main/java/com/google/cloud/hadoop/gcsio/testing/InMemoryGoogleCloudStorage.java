@@ -509,6 +509,17 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return listedInfo;
   }
 
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName,
+      String startOffset,
+      String endOffset,
+      String objectNamePrefix,
+      ListObjectOptions listOptions)
+      throws IOException {
+    throw new IOException("Not implemented");
+  }
+
   public void renameHnFolder(URI src, URI dst) throws IOException {
     throw new IOException("Not implemented");
   }

@@ -379,6 +379,14 @@ public interface GoogleCloudStorage {
   List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions) throws IOException;
 
+  List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName,
+      String startOffset,
+      String endOffset,
+      String objectNamePrefix,
+      ListObjectOptions listOptions)
+      throws IOException;
+
   /**
    * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
    * (1 page).

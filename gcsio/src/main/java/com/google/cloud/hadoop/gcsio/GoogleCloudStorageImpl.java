@@ -80,8 +80,13 @@ import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.storage.control.v2.*;
+import com.google.storage.control.v2.Folder;
+import com.google.storage.control.v2.FolderName;
+import com.google.storage.control.v2.ListFoldersRequest;
+import com.google.storage.control.v2.RenameFolderRequest;
+import com.google.storage.control.v2.StorageControlClient;
 import com.google.storage.control.v2.StorageControlClient.ListFoldersPagedResponse;
+import com.google.storage.control.v2.StorageControlSettings;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -1501,6 +1506,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   private void listStorageObjectsAndPrefixes(
       String bucketName,
+      String startOffset,
+      String endOffset,
       String objectNamePrefix,
       ListObjectOptions listOptions,
       List<StorageObject> listedObjects,
@@ -1541,6 +1548,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createListRequest(
             bucketName,
             objectNamePrefix,
+            startOffset,
+            endOffset,
             listOptions.getFields(),
             listOptions.getDelimiter(),
             maxResults);
@@ -1661,6 +1670,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private Storage.Objects.List createListRequest(
       String bucketName,
       String objectNamePrefix,
+      String startOffset,
+      String endOffset,
       String objectFields,
       String delimiter,
       long maxResults)
@@ -1672,7 +1683,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     Storage.Objects.List listObject =
         initializeRequest(
-            storage.objects().list(bucketName).setPrefix(emptyToNull(objectNamePrefix)),
+            storage
+                .objects()
+                .list(bucketName)
+                .setStartOffset(emptyToNull(startOffset))
+                .setEndOffset(emptyToNull(endOffset))
+                .setPrefix(emptyToNull(objectNamePrefix)),
             bucketName);
 
     // Set delimiter if supplied.
@@ -1704,6 +1720,31 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return maxResults - numResults;
   }
 
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName,
+      String startOffset,
+      String endOffset,
+      String objectNamePrefix,
+      ListObjectOptions listOptions)
+      throws IOException {
+
+    // Helper will handle going through pages of list results and accumulating them.
+    List<StorageObject> listedObjects = new ArrayList<>();
+    List<String> listedPrefixes = new ArrayList<>();
+    listStorageObjectsAndPrefixes(
+        bucketName,
+        startOffset,
+        endOffset,
+        objectNamePrefix,
+        listOptions,
+        listedObjects,
+        listedPrefixes);
+
+    return getGoogleCloudStorageItemInfos(
+        bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
+  }
+
   /**
    * @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions)
    */
@@ -1717,7 +1758,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<StorageObject> listedObjects = new ArrayList<>();
     List<String> listedPrefixes = new ArrayList<>();
     listStorageObjectsAndPrefixes(
-        bucketName, objectNamePrefix, listOptions, listedObjects, listedPrefixes);
+        bucketName, null, null, objectNamePrefix, listOptions, listedObjects, listedPrefixes);
 
     return getGoogleCloudStorageItemInfos(
         bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
@@ -1741,6 +1782,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Storage.Objects.List listObject =
         createListRequest(
             bucketName,
+            null,
+            null,
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
