@@ -602,7 +602,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    InvocationIdContext.setInvocationId();
     return trackDurationWithTracing(
         instrumentation,
         globalStorageStatistics,
@@ -621,7 +620,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   /** This is an experimental API and can change without notice. */
   public FSDataInputStream open(FileStatus status) throws IOException {
-    InvocationIdContext.setInvocationId();
     logger.atFine().log("openWithStatus(%s)", status);
 
     if (!GoogleHadoopFileStatus.class.isAssignableFrom(status.getClass())) {

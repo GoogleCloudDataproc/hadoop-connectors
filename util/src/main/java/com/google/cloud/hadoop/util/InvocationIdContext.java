@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.UUID;
 
 /**
@@ -39,6 +40,7 @@ public class InvocationIdContext {
   }
 
   /** Clears the invocation ID for the current thread. */
+  @VisibleForTesting
   public static void clear() {
     INVOCATION_ID.remove();
   }

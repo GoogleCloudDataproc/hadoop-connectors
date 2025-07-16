@@ -25,7 +25,6 @@ import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.UUID;
 
 /**
  * HTTP request interceptor to attach unique identifier i.e. invocationId to each new request and
@@ -69,7 +68,8 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
       // Reuse existing invocationId if present.
       String invocationEntry = InvocationIdContext.getInvocationId();
       if (invocationEntry.isEmpty()) {
-        invocationEntry = GCCL_INVOCATION_ID_PREFIX + UUID.randomUUID();
+        InvocationIdContext.setInvocationId();
+        invocationEntry = InvocationIdContext.getInvocationId();
       }
       final String newValue;
       if (existing != null && !existing.isEmpty()) {
