@@ -113,6 +113,7 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
+  private static final String LOCATION_TYPE_ZONAL = "zone";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -1180,12 +1181,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    return new GoogleCloudStorageClientReadChannel(
-        storage,
-        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-        readOptions,
-        errorExtractor,
-        storageOptions);
+    GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
+    String locationType = storage.get(gcsItemInfo.getBucketName()).getLocationType();
+    if (locationType.equals(LOCATION_TYPE_ZONAL)) {
+      return new GoogleCloudStorageBidiReadChannel(storage, gcsItemInfo);
+    } else {
+      return new GoogleCloudStorageClientReadChannel(
+          storage, gcsItemInfo, readOptions, errorExtractor, storageOptions);
+    }
   }
 
   @Override
