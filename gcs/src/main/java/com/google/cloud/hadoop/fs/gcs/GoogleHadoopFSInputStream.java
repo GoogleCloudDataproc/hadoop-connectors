@@ -197,7 +197,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                 allocate);
           } else {
             long startTimeNs = System.nanoTime();
-            vectoredIOSupplier.get().readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath);
+            vectoredIOSupplier
+                .get()
+                .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
             statistics.incrementReadOps(1);
             vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
           }
