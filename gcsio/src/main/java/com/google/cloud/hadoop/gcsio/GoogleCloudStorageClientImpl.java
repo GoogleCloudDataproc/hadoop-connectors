@@ -113,7 +113,6 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
-  private static final String LOCATION_TYPE_ZONAL = "zone";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -1182,9 +1181,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
-    String locationType = storage.get(gcsItemInfo.getBucketName()).getLocationType();
-    if (locationType.equals(LOCATION_TYPE_ZONAL)) {
-      return new GoogleCloudStorageBidiReadChannel(storage, gcsItemInfo);
+    // TODO(dhritichorpa) Microbenchmark the latency of using
+    // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
+    if (readOptions.isBidiEnabled()) {
+      return new GoogleCloudStorageBidiReadChannel(storage, gcsItemInfo, readOptions);
     } else {
       return new GoogleCloudStorageClientReadChannel(
           storage, gcsItemInfo, readOptions, errorExtractor, storageOptions);

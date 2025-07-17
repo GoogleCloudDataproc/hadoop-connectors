@@ -28,13 +28,17 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
   private final Storage storage;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
+  private final GoogleCloudStorageReadOptions readOptions;
   private BlobReadSession blobReadSession;
 
   private ExecutorService boundedThreadPool;
 
   private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
 
-  public GoogleCloudStorageBidiReadChannel(Storage storage, GoogleCloudStorageItemInfo itemInfo)
+  public GoogleCloudStorageBidiReadChannel(
+      Storage storage,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     this.storage = storage;
     this.resourceId =
@@ -43,12 +47,13 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
     this.blobId =
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
+    this.readOptions = readOptions;
     initializeBlobReadSession();
     // TODO(shreyassinha): Replace hard coded values with flag parameter.
     this.boundedThreadPool =
         new ThreadPoolExecutor(
-            16,
-            16,
+            readOptions.getBidiThreadCount(),
+            readOptions.getBidiThreadCount(),
             0L,
             TimeUnit.MILLISECONDS,
             taskQueue,

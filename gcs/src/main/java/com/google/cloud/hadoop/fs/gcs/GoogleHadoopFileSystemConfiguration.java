@@ -577,6 +577,19 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.operation.move.enable",
           GoogleCloudStorageOptions.DEFAULT.isMoveOperationEnabled());
 
+  /** Flag to enable the bidirectional Rapid Storage API. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiEnabled());
+
+  /**
+   * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
+   * individual range and populate the buffer.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_THREAD_COUNT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.bidi.thread.count", GoogleCloudStorageReadOptions.DEFAULT.getBidiThreadCount());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -672,6 +685,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
+        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

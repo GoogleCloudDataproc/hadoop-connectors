@@ -71,7 +71,8 @@ public class GoogleCloudStorageBidiReadChannelTest {
     Storage storage = mock(Storage.class);
     when(storage.blobReadSession(any(), any()))
         .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
-    return new GoogleCloudStorageBidiReadChannel(storage, DEFAULT_ITEM_INFO);
+    return new GoogleCloudStorageBidiReadChannel(
+        storage, DEFAULT_ITEM_INFO, GoogleCloudStorageReadOptions.builder().build());
   }
 
   private List<VectoredIORange> getListOfVectoredIORange() {
