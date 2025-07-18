@@ -25,6 +25,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
@@ -189,9 +190,11 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
     FSDataOutputStream fsos = ghfs.append(hadoopPath, 20, /* progress= */ () -> {});
     fsos.write("_append-1".getBytes(UTF_8));
 
-    assertThrows(GoogleJsonResponseException.class, fsos::hsync);
+    IOException thrown = assertThrows(IOException.class, fsos::hsync);
+    assertThat(thrown).hasMessageThat().contains("Failed to compose objects");
+    assertThat(thrown.getCause()).isInstanceOf(GoogleJsonResponseException.class);
 
-    assertThrows(NullPointerException.class, fsos::close);
+    fsos.close();
 
     // Validate that file wasn't created
     assertThat(ghfs.exists(hadoopPath)).isFalse();
