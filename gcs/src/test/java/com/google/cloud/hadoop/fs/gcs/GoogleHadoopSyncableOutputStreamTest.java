@@ -320,9 +320,10 @@ public class GoogleHadoopSyncableOutputStreamTest {
     doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
     when(mockGcsFs.getGcs().composeObjects(anyList(), any(), any())).thenReturn(null);
 
-    // Write again to trigger compose on sync, should not throw
+    // Write again to trigger compose on sync, should throw IOException
     fout.write(new byte[] {0x02}, 0, 1);
-    fout.sync(); // Should not throw NPE even if composedObject is null
+    IOException thrown = assertThrows(IOException.class, fout::sync);
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Compose operation returned null");
 
     verify(mockExecutorService).submit(any(Callable.class));
   }

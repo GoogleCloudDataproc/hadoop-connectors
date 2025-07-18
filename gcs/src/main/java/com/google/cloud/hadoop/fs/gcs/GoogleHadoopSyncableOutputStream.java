@@ -403,7 +403,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         if (composedObject != null) {
           curDestGenerationId = composedObject.getContentGeneration();
         } else {
-          logger.atWarning().log("Composed object is null for destination: %s", finalGcsPath);
+          throw new IOException("Compose operation returned null");
         }
       } catch (IOException e) {
         logger.atSevere().withCause(e).log(
