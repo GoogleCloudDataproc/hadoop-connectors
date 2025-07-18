@@ -29,8 +29,7 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final GoogleCloudStorageReadOptions readOptions;
-  private BlobReadSession blobReadSession;
-
+  private final BlobReadSession blobReadSession;
   private ExecutorService boundedThreadPool;
 
   private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
@@ -38,7 +37,8 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
       GoogleCloudStorageItemInfo itemInfo,
-      GoogleCloudStorageReadOptions readOptions)
+      GoogleCloudStorageReadOptions readOptions,
+      ExecutorService boundedThreadPool)
       throws IOException {
     this.storage = storage;
     this.resourceId =
@@ -48,27 +48,17 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
-    initializeBlobReadSession();
-    // TODO(shreyassinha): Replace hard coded values with flag parameter.
-    this.boundedThreadPool =
-        new ThreadPoolExecutor(
-            readOptions.getBidiThreadCount(),
-            readOptions.getBidiThreadCount(),
-            0L,
-            TimeUnit.MILLISECONDS,
-            taskQueue,
-            new ThreadFactoryBuilder()
-                .setNameFormat("vectoredRead-range-pool-%d")
-                .setDaemon(true)
-                .build());
+    this.blobReadSession = initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
+    this.boundedThreadPool = boundedThreadPool;
   }
 
-  private void initializeBlobReadSession() throws IOException {
+  private BlobReadSession initializeBlobReadSession(Storage storage, BlobId blobId, int clientTimeout)
+      throws IOException {
     try {
-      this.blobReadSession = storage.blobReadSession(blobId).get(30, TimeUnit.SECONDS);
+      return storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      throw new IOException(e);
-    }
+        throw new IOException(e);
+      }
   }
 
   @Override
@@ -131,8 +121,9 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
               disposableByteString -> {
                 try {
                   return processBytesAndCompleteRange(disposableByteString, range, allocate);
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
+                } catch (Throwable t) {
+                  range.getData().completeExceptionally(t);
+                  return null;
                 }
               },
               boundedThreadPool);

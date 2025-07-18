@@ -17,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
@@ -72,7 +74,8 @@ public class GoogleCloudStorageBidiReadChannelTest {
     when(storage.blobReadSession(any(), any()))
         .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
     return new GoogleCloudStorageBidiReadChannel(
-        storage, DEFAULT_ITEM_INFO, GoogleCloudStorageReadOptions.builder().build());
+        storage, DEFAULT_ITEM_INFO, GoogleCloudStorageReadOptions.builder().build(),
+        Executors.newSingleThreadExecutor());
   }
 
   private List<VectoredIORange> getListOfVectoredIORange() {

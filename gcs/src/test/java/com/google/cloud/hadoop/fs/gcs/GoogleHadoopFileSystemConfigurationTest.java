@@ -132,6 +132,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.write.rolling.checksum.enable", false);
           put("fs.gs.operation.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
+          put("fs.gs.bidi.client.timeout", 30);
         }
       };
 

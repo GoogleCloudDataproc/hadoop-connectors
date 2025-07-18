@@ -57,7 +57,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setMinRangeRequestSize(2 * 1024 * 1024)
         .setReadExactRequestedBytesEnabled(false)
         .setBidiEnabled(false)
-        .setBidiThreadCount(16);
+        .setBidiThreadCount(16)
+        .setBidiClientTimeout(30);
   }
 
   public abstract Builder toBuilder();
@@ -112,6 +113,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setBidiThreadCount(int)}. */
   public abstract int getBidiThreadCount();
+
+  /** See {@link Builder#setBidiClientTimeout(int)}. */
+  public abstract int getBidiClientTimeout();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -214,14 +218,19 @@ public abstract class GoogleCloudStorageReadOptions {
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
 
-    /** If true, read will use the bidirectional Rapid Storage Api. */
+    /** Sets the property to use the bidirectional Rapid Storage Api. */
     public abstract Builder setBidiEnabled(boolean bidiEnabled);
 
     /**
-     * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
+     * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
      * individual range and populate the buffer.
      */
     public abstract Builder setBidiThreadCount(int bidiThreadCount);
+
+    /**
+     * Sets the total amount of time, we would wait for bidi client initialization.
+     */
+    public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

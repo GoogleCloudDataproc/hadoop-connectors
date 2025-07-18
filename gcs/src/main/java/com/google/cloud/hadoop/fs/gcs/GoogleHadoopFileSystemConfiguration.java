@@ -590,6 +590,13 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.bidi.thread.count", GoogleCloudStorageReadOptions.DEFAULT.getBidiThreadCount());
 
+  /**
+   * Sets the total amount of time, we would wait for bidi client initialization.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.bidi.client.timeout", GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -687,6 +694,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
+        .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .build();
   }
 
