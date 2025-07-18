@@ -1193,7 +1193,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
     if (readOptions.isBidiEnabled()) {
-      return new GoogleCloudStorageBidiReadChannel(storage, gcsItemInfo, readOptions, getBoundedThreadPool(readOptions.getBidiThreadCount()));
+      return new GoogleCloudStorageBidiReadChannel(
+          storage,
+          gcsItemInfo,
+          readOptions,
+          getBoundedThreadPool(readOptions.getBidiThreadCount()));
     } else {
       return new GoogleCloudStorageClientReadChannel(
           storage, gcsItemInfo, readOptions, errorExtractor, storageOptions);
@@ -1201,7 +1205,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
-    if(boundedThreadPool == null){
+    if (boundedThreadPool == null) {
       new ThreadPoolExecutor(
           bidiThreadCount,
           bidiThreadCount,
@@ -1228,7 +1232,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         super.close();
       } finally {
         backgroundTasksThreadPool.shutdown();
-        if(boundedThreadPool != null){
+        if (boundedThreadPool != null) {
           boundedThreadPool.shutdown();
         }
       }

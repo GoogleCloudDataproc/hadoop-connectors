@@ -8,7 +8,6 @@ import com.google.cloud.storage.RangeSpec;
 import com.google.cloud.storage.ReadProjectionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,7 +17,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
@@ -48,17 +46,18 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
-    this.blobReadSession = initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
+    this.blobReadSession =
+        initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
     this.boundedThreadPool = boundedThreadPool;
   }
 
-  private BlobReadSession initializeBlobReadSession(Storage storage, BlobId blobId, int clientTimeout)
-      throws IOException {
+  private BlobReadSession initializeBlobReadSession(
+      Storage storage, BlobId blobId, int clientTimeout) throws IOException {
     try {
       return storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
-        throw new IOException(e);
-      }
+      throw new IOException(e);
+    }
   }
 
   @Override

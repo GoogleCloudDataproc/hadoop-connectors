@@ -590,12 +590,11 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.bidi.thread.count", GoogleCloudStorageReadOptions.DEFAULT.getBidiThreadCount());
 
-  /**
-   * Sets the total amount of time, we would wait for bidi client initialization.
-   */
+  /** Sets the total amount of time, we would wait for bidi client initialization. */
   public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT =
       new HadoopConfigurationProperty<>(
-          "fs.gs.bidi.client.timeout", GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
+          "fs.gs.bidi.client.timeout",
+          GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()

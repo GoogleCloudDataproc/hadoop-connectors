@@ -222,14 +222,12 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setBidiEnabled(boolean bidiEnabled);
 
     /**
-     * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
-     * individual range and populate the buffer.
+     * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used
+     * to read individual range and populate the buffer.
      */
     public abstract Builder setBidiThreadCount(int bidiThreadCount);
 
-    /**
-     * Sets the total amount of time, we would wait for bidi client initialization.
-     */
+    /** Sets the total amount of time, we would wait for bidi client initialization. */
     public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
