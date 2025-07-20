@@ -14,10 +14,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
@@ -121,6 +119,7 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
                 public void onFailure(Throwable t) {
                   range.getData().completeExceptionally(t);
                 }
+
                 @Override
                 public void onSuccess(DisposableByteString disposableByteString) {
                   try {

@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -60,6 +61,27 @@ public class GoogleCloudStorageBidiReadChannelTest {
     assertEquals(getReadVectoredData(ranges.get(0)), FakeBlobReadSession.SUBSTRING_20_10);
     assertEquals(getReadVectoredData(ranges.get(1)), FakeBlobReadSession.SUBSTRING_50_7);
     assertEquals(getReadVectoredData(ranges.get(2)), FakeBlobReadSession.SUBSTRING_65_17);
+  }
+
+  @Test
+  public void write_unsupportedOperationException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> bidiReadChannel.write(ByteBuffer.allocateDirect(0)));
+  }
+
+  // TODO(dhritichopra) Dummy test to complete coverage, remove with actual test once we have these
+  // implemented.
+  @Test
+  public void readPath_dummyImplementation() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    assertEquals(bidiReadChannel.read(ByteBuffer.allocateDirect(0)), 0);
+    assertEquals(bidiReadChannel.position(), 0);
+    assertEquals(bidiReadChannel.position(12), null);
+    assertEquals(bidiReadChannel.size(), 0);
+    assertEquals(bidiReadChannel.truncate(12), null);
+    assertEquals(bidiReadChannel.isOpen(), false);
   }
 
   private String getReadVectoredData(VectoredIORange range)
