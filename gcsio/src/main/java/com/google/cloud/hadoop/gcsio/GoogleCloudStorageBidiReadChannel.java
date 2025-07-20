@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.core.ApiFuture;
+import com.google.api.core.ApiFutureCallback;
 import com.google.api.core.ApiFutures;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobReadSession;
@@ -30,8 +31,6 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
   private final BlobReadSession blobReadSession;
   private ExecutorService boundedThreadPool;
 
-  private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
-
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
       GoogleCloudStorageItemInfo itemInfo,
@@ -51,7 +50,7 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
     this.boundedThreadPool = boundedThreadPool;
   }
 
-  private BlobReadSession initializeBlobReadSession(
+  private static BlobReadSession initializeBlobReadSession(
       Storage storage, BlobId blobId, int clientTimeout) throws IOException {
     try {
       return storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
@@ -115,14 +114,20 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
               blobReadSession.readAs(
                   ReadProjectionConfigs.asFutureByteString()
                       .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
-          ApiFutures.transform(
+          ApiFutures.addCallback(
               futureBytes,
-              disposableByteString -> {
-                try {
-                  return processBytesAndCompleteRange(disposableByteString, range, allocate);
-                } catch (Throwable t) {
+              new ApiFutureCallback<>() {
+                @Override
+                public void onFailure(Throwable t) {
                   range.getData().completeExceptionally(t);
-                  return null;
+                }
+                @Override
+                public void onSuccess(DisposableByteString disposableByteString) {
+                  try {
+                    processBytesAndCompleteRange(disposableByteString, range, allocate);
+                  } catch (Throwable t) {
+                    range.getData().completeExceptionally(t);
+                  }
                 }
               },
               boundedThreadPool);
