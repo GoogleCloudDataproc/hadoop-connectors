@@ -219,6 +219,44 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
           helper);
     } finally {
       googleHadoopFileSystem.delete(new Path(initUri));
+      googleHadoopFileSystem.close();
+    }
+  }
+
+  @Test
+  public void testRenameWithMoveOperation() throws Exception {
+    String bucketName = this.gcsiHelper.getUniqueBucketName("move");
+    GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
+
+    URI initUri = new URI("gs://" + bucketName);
+    Configuration config = loadConfig();
+    config.setBoolean("fs.gs.operation.move.enable", true);
+    googleHadoopFileSystem.initialize(initUri, config);
+
+    GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
+    theGcs.createBucket(bucketName);
+
+    try {
+      GoogleCloudStorageFileSystemIntegrationHelper helper =
+          new HadoopFileSystemIntegrationHelper(googleHadoopFileSystem);
+
+      renameHelper(
+          new HdfsBehavior() {
+            /**
+             * Returns the MethodOutcome of trying to rename an existing file into the root
+             * directory.
+             */
+            @Override
+            public MethodOutcome renameFileIntoRootOutcome() {
+              return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+            }
+          },
+          bucketName,
+          bucketName,
+          helper);
+    } finally {
+      googleHadoopFileSystem.delete(new Path(initUri));
+      googleHadoopFileSystem.close();
     }
   }
 
@@ -338,6 +376,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     fs.initialize(new URI("gs://test/init-uri"), config);
 
     assertThat(fs.getCanonicalServiceName()).isEqualTo(fs.delegationTokens.getService().toString());
+
+    fs.close();
   }
 
   @Test
@@ -905,6 +945,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertThat(fs.getDefaultBlockSize()).isEqualTo(blockSize);
     assertThat(fs.initUri).isEqualTo(initUri);
     assertThat(fs.getWorkingDirectory().toUri().getAuthority()).isEqualTo(rootBucketName);
+
+    fs.close();
   }
 
   @Test
@@ -915,7 +957,10 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     config.unset("fs.gs.project.id");
 
     URI gsUri = new Path("gs://foo").toUri();
-    new GoogleHadoopFileSystem().initialize(gsUri, config);
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gsUri, config);
+
+    ghfs.close();
   }
 
   @Test
@@ -1026,6 +1071,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertThat(fs.initUri).isEqualTo(initUri);
 
     assertThat(fs.getWorkingDirectory().toUri().getAuthority()).isEqualTo(initUri.getAuthority());
+
+    fs.close();
   }
 
   /** Validates success path when there is a root bucket but no system bucket is specified. */
@@ -1045,6 +1092,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     // Verify that config settings were set correctly.
     assertThat(fs.initUri).isEqualTo(initUri);
+
+    fs.close();
   }
 
   @Test
@@ -1597,6 +1646,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+
+    myGhfs.close();
   }
 
   /** Test getFileStatus() uses the user reported by UGI */
@@ -1619,6 +1670,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, true)).isTrue();
+
+    myGhfs.close();
   }
 
   @Test
@@ -2129,6 +2182,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     } else {
       assertThat(thrown).hasCauseThat().hasMessageThat().contains("Invalid Credentials");
     }
+
+    ghfs.close();
   }
 
   @Test
@@ -2148,6 +2203,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
     HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
     assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
+
+    ghfs.close();
   }
 
   @Test
@@ -2170,6 +2227,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
     HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
     assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
+
+    ghfs.close();
   }
 
   @Test
@@ -2192,6 +2251,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
     HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
     assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
+
+    ghfs.close();
   }
 
   @Test
@@ -2218,6 +2279,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
     HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
     assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
+
+    ghfs.close();
   }
 
   @Test
@@ -2245,6 +2308,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
     HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
     assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
+
+    ghfs.close();
   }
 
   @Test
@@ -2261,6 +2326,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     URI gsUri = new URI("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
     ghfs.initialize(gsUri, config);
+
+    ghfs.close();
   }
 
   @Test
@@ -2351,6 +2418,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(0);
     } finally {
       googleHadoopFileSystem.delete(new Path(bucketPath));
+      googleHadoopFileSystem.close();
     }
   }
 
@@ -2380,6 +2448,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
         "The specified bucket does not exist : " + bucketPath,
         com.google.api.gax.rpc.NotFoundException.class,
         () -> assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath)).isEqualTo(0));
+
+    googleHadoopFileSystem.close();
   }
 
   @Test
@@ -2408,6 +2478,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/B/")).isEqualTo(1);
     } finally {
       googleHadoopFileSystem.delete(new Path(bucketPath));
+      googleHadoopFileSystem.close();
     }
   }
 
@@ -2443,6 +2514,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath + "/A/")).isEqualTo(0);
     } finally {
       googleHadoopFileSystem.delete(new Path(bucketPath));
+      googleHadoopFileSystem.close();
     }
   }
 
@@ -2628,6 +2700,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             .build();
 
     verifyMetrics(stats, expected, stopwatch.elapsed().toMillis());
+
+    myghfs.close();
   }
 
   @Test
@@ -2651,6 +2725,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     // tracked.
     // It will be fixed in a separate change
     runTest(subdirPath, myghfs, stats);
+
+    myghfs.close();
   }
 
   @Test
@@ -2671,9 +2747,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
         .parallel()
         .forEach(
             i -> {
-              try {
+              try (GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem()) {
                 Path subdirPath = new Path(parentPath, "foo-subdir" + i);
-                GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem();
                 myghfs.initialize(subdirPath.toUri(), config);
                 runTest(subdirPath, myghfs, stats);
               } catch (IOException e) {
@@ -2866,6 +2941,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     Set<String> metrics = getDurationConnectorMetrics(stats);
 
     assertEquals(EXPECTED_DURATION_METRICS, metrics);
+
+    myghfs.close();
   }
 
   private Set<String> getDurationConnectorMetrics(GhfsGlobalStorageStatistics stats) {

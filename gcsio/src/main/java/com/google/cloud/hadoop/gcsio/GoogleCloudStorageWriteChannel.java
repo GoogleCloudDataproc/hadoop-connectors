@@ -26,6 +26,8 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
+import com.google.common.io.BaseEncoding;
+import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -117,8 +119,26 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   }
 
   @Override
-  public void handleResponse(StorageObject response) {
+  public void handleResponse(StorageObject response) throws IOException {
     completedItemInfo = GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
+    if (channelOptions.isRollingChecksumEnabled()) {
+      verifyChecksums(response.getCrc32c());
+    }
+  }
+
+  private void verifyChecksums(String serverProvidedCrc32c) throws IOException {
+    String srcCrc =
+        BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
+    if (!srcCrc.equals(serverProvidedCrc32c)) {
+      throw new IOException(
+          String.format(
+              "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) did not match server-provided CRC32C (%s).",
+              getResourceString(), srcCrc, serverProvidedCrc32c));
+    } else {
+      logger.atFine().log(
+          "Data integrity check passed for resource '%s'. Client-calculated CRC32C (%s) matched the server-provided CRC32C (%s).",
+          getResourceString(), srcCrc, serverProvidedCrc32c);
+    }
   }
 
   /**
