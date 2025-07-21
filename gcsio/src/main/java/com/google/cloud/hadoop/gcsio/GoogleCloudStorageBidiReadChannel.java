@@ -133,7 +133,7 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
         });
   }
 
-  private Void processBytesAndCompleteRange(
+  private void processBytesAndCompleteRange(
       DisposableByteString disposableByteString,
       VectoredIORange range,
       IntFunction<ByteBuffer> allocate)
@@ -149,7 +149,6 @@ public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, R
       }
       buf.flip(); // Prepare buffer for reading
       range.getData().complete(buf);
-      return null;
     }
   }
 }
