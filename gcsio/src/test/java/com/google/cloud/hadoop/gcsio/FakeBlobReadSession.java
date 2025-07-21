@@ -18,6 +18,7 @@ public class FakeBlobReadSession implements BlobReadSession {
   private static final String TEST_STRING =
       "Lorem ipsum dolor sit amet. Qui esse voluptatum qui tempora quia quo maiores galisum. Et officia cum";
 
+  // The following are substring used in Test cases following the format SUBSTRING_{Offset}_{Length}
   public static final String SUBSTRING_20_10 = TEST_STRING.substring(20, 30);
   public static final String SUBSTRING_50_7 = TEST_STRING.substring(50, 57);
   public static final String SUBSTRING_65_17 = TEST_STRING.substring(65, 82);

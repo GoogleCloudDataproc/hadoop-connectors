@@ -54,6 +54,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
           URISyntaxException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
     IntFunction<ByteBuffer> allocator = ByteBuffer::allocateDirect;
+    // Returns 3 ranges, with the following {Offset, Length}: {20, 10}, {50, 7}, {65, 17}
     List<VectoredIORange> ranges = getListOfVectoredIORange();
 
     bidiReadChannel.readVectored(ranges, allocator);

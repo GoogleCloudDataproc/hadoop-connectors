@@ -580,7 +580,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Flag to enable the bidirectional Rapid Storage API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.operation.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiEnabled());
+          "fs.gs.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiEnabled());
 
   /**
    * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
