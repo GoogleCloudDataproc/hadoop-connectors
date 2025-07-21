@@ -13,6 +13,9 @@ import java.util.logging.Logger;
  */
 public class LoggingFormatter extends Formatter {
 
+  /** The base package for all loggers in this repository that should be formatted. */
+  private static final String GCS_CONNECTOR_LOGGER_PREFIX = "com.google.cloud.hadoop";
+
   /**
    * Formats the given log record by prefixing it with the invocation ID.
    *
@@ -23,10 +26,14 @@ public class LoggingFormatter extends Formatter {
   public String format(LogRecord record) {
     String invocationId = InvocationIdContext.getInvocationId();
     String message = record.getMessage();
-    // Return the message unchanged if the invocation ID is empty or the message is JSON.
+    String loggerName = record.getLoggerName();
+    // Return the message unchanged if the log did not originate from GCS Connector or invocation ID
+    // is empty or the message is JSON.
     // Prefixing JSON logs would break their structure; some JSON logs like traces already
     // include the invocation ID.
-    if (invocationId.isEmpty() || isJson(message)) {
+    if (!loggerName.startsWith(GCS_CONNECTOR_LOGGER_PREFIX)
+        || invocationId.isEmpty()
+        || isJson(message)) {
       return String.format("%s%n", message);
     }
     // Prefix the invocation ID to the log message
