@@ -413,8 +413,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                       new VectoredIOImpl(
                           GoogleHadoopFileSystemConfiguration.getVectoredReadOptionBuilder(config)
                               .build(),
-                          globalStorageStatistics,
-                          statistics);
+                          globalStorageStatistics);
                   vectoredIOInitialized = true;
                   return vectoredIO;
                 } catch (Exception e) {
