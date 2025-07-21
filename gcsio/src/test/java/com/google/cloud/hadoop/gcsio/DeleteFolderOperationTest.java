@@ -111,7 +111,7 @@ public class DeleteFolderOperationTest {
         new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
     setMockFolderDeleteBlockingQueue(deleteFolderOperation);
 
-    when(mockFolderDeleteBlockingQueue.poll(200, TimeUnit.MILLISECONDS)).thenReturn(null);
+    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
 
     IOException exception =
         assertThrows(IOException.class, () -> deleteFolderOperation.performDeleteOperation());

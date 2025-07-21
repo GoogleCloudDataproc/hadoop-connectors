@@ -79,18 +79,16 @@ class DeleteFolderOperation {
   /** Helper function that performs the deletion process for folder resources */
   public void performDeleteOperation() throws IOException {
     computeChildrenForFolderResource();
+    int foldersRemaining = folders.size();
 
     try {
-      while (!countOfChildren.isEmpty() && encounteredNoExceptions()) {
+      while (foldersRemaining != 0 && encounteredNoExceptions()) {
         FolderInfo folderToDelete = getElementFromBlockingQueue();
         if (folderToDelete != null) {
           // Queue the deletion request.
           queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+          foldersRemaining--;
         } else if (batchExecutor.isIdle()) {
-          // Checking the count again as folders could have been deleted by now.
-          if (countOfChildren.isEmpty()) {
-            break;
-          }
           // Throwing an IllegalStateException here because some folders remained undeleted
           // even though threads are waiting idle.
           throw new IllegalStateException(
@@ -112,8 +110,9 @@ class DeleteFolderOperation {
               "Received IllegalStateException while deletion of folder resource : %s",
               e.getMessage()),
           e);
+    } finally {
+      batchExecutorShutdown();
     }
-    batchExecutorShutdown();
   }
 
   /** Shutting down batch executor and flushing any remaining requests */
@@ -138,9 +137,7 @@ class DeleteFolderOperation {
   /** Gets the head from the blocking queue */
   private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
-      // P50 latency of DeleteFolder is a little below 200 ms. So it is highly likely
-      // to find a folder to delete within 200 ms.
-      return folderDeleteBlockingQueue.poll(200, TimeUnit.MILLISECONDS);
+      return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
     } catch (InterruptedException e) {
       logger.atSevere().log(
           "Encountered exception while getting an element from queue in HN enabled bucket : %s", e);
@@ -154,7 +151,7 @@ class DeleteFolderOperation {
   }
 
   /** Computes the number of children for each folder resource */
-  public void computeChildrenForFolderResource() {
+  private void computeChildrenForFolderResource() {
     for (FolderInfo currentFolder : folders) {
       if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
         countOfChildren.put(currentFolder.getFolderName(), 0L);
