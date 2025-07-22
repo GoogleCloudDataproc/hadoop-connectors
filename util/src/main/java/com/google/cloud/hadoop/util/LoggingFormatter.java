@@ -31,7 +31,8 @@ public class LoggingFormatter extends Formatter {
     // is empty or the message is JSON.
     // Prefixing JSON logs would break their structure; some JSON logs like traces already
     // include the invocation ID.
-    if (!loggerName.startsWith(GCS_CONNECTOR_LOGGER_PREFIX)
+    if (loggerName == null
+        || !loggerName.startsWith(GCS_CONNECTOR_LOGGER_PREFIX)
         || invocationId.isEmpty()
         || isJson(message)) {
       return String.format("%s%n", message);
