@@ -60,6 +60,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
           put("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
+          put("fs.gs.cloud.logging.enable", false);
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
@@ -128,6 +129,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
           put("fs.gs.operation.move.enable", false);
+          put("fs.gs.write.rolling.checksum.enable", false);
         }
       };
 
