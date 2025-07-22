@@ -22,6 +22,7 @@ public class LoggingFormatterTest {
   @Test
   public void testFormat_withInvocationId() {
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");
+
     String formattedMessage = formatter.format(record);
 
     assertEquals("[" + invocationId + "]: Test log message\n", formattedMessage);
@@ -30,6 +31,7 @@ public class LoggingFormatterTest {
   @Test
   public void testFormat_withJsonMessage() {
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "{\"key\":\"value\"}");
+
     String formattedMessage = formatter.format(record);
 
     assertEquals("{\"key\":\"value\"}\n", formattedMessage);
@@ -40,6 +42,7 @@ public class LoggingFormatterTest {
     InvocationIdContext.clear();
     invocationId = InvocationIdContext.getInvocationId();
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");
+
     String formattedMessage = formatter.format(record);
 
     assertEquals("Test log message\n", formattedMessage);
@@ -48,6 +51,7 @@ public class LoggingFormatterTest {
   @Test
   public void testAddFormatter() {
     Logger logger = Logger.getLogger("testLogger");
+
     LoggingFormatter.addFormatter(logger);
 
     // Verify that the formatter is added to all handlers

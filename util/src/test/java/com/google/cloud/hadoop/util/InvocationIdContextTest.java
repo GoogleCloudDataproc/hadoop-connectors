@@ -24,12 +24,15 @@ public class InvocationIdContextTest {
   public void testSetInvocationId() {
     // Set a new invocation ID and verify it is not empty
     InvocationIdContext.setInvocationId();
+
     String invocationId = InvocationIdContext.getInvocationId();
+    String uuidPart =
+        invocationId.substring(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length());
+
+    // Verify that the invocation ID is not empty
     assertNotEquals("", invocationId);
     // Verify the format of the invocation ID
     assertTrue(invocationId.startsWith(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX));
-    String uuidPart =
-        invocationId.substring(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length());
     assertEquals(8, uuidPart.length());
   }
 
@@ -37,7 +40,9 @@ public class InvocationIdContextTest {
   public void testClearInvocationId() {
     // Set an invocation ID, clear it, and verify it is reset to an empty string
     InvocationIdContext.setInvocationId();
+
     InvocationIdContext.clear();
+
     assertEquals("", InvocationIdContext.getInvocationId());
   }
 
