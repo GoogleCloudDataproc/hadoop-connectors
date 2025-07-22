@@ -20,7 +20,10 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,6 +55,54 @@ public class BatchExecutorTest {
     assertThat(e)
         .hasMessageThat()
         .startsWith("requestExecutor should not be terminated to queue request");
+  }
+
+  @Test
+  public void isIdle_forThreadPoolExecutor_returnsTrueBeforeExecution() throws Exception {
+    BatchExecutor batchExecutor = new BatchExecutor(/* numThreads= */ 1);
+
+    assertThat(batchExecutor.isIdle()).isTrue();
+  }
+
+  @Test
+  public void isIdle_forThreadPoolExecutor_returnsCorrectState() throws Exception {
+    BatchExecutor batchExecutor = new BatchExecutor(/* numThreads= */ 1);
+
+    // Create mock tasks and finish in one second.
+    SettableFuture<Void> taskStarted = SettableFuture.create();
+    SettableFuture<Void> taskShouldFinish = SettableFuture.create();
+    Callable<Void> longRunningTask =
+        () -> {
+          taskStarted.set(null);
+          // Wait until the test signals to finish.
+          taskShouldFinish.get(1, TimeUnit.SECONDS);
+          return null;
+        };
+
+    // Queueing the tasks to BatchExecuter.
+    batchExecutor.queue(longRunningTask, null);
+    taskStarted.get(1, TimeUnit.SECONDS);
+
+    assertThat(batchExecutor.isIdle()).isFalse();
+
+    // Shutting down the BatchExecuter.
+    taskShouldFinish.set(null);
+    batchExecutor.shutdown();
+
+    assertThat(batchExecutor.isIdle()).isTrue();
+  }
+
+  @Test
+  public void isIdle_forDirectExecutorService_isAlwaysTrue() throws Exception {
+    BatchExecutor batchExecutor = new BatchExecutor(/* numThreads= */ 0);
+
+    assertThat(batchExecutor.isIdle()).isTrue();
+
+    batchExecutor.queue(() -> null, null);
+
+    assertThat(batchExecutor.isIdle()).isTrue();
+
+    batchExecutor.shutdown();
   }
 
   private FutureCallback<Boolean> assertCallBack() {
