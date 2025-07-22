@@ -113,8 +113,7 @@ class BatchExecutor {
       return executor.getActiveCount() == 0 && executor.getQueue().isEmpty();
     }
     // The executor is the instance of a DirectExecutorService, it is always idle because there are
-    // no child
-    // threads.
+    // no child threads.
     return true;
   }
 

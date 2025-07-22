@@ -139,7 +139,6 @@ public class DeleteFolderOperationTest {
     CustomDeleteFolderOperationTest deleteFolderOperation =
         new CustomDeleteFolderOperationTest(
             foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
-
     deleteFolderOperation.performDeleteOperation();
 
     assertThat(deleteFolderOperation.orderOfDeletion.size()).isEqualTo(2);

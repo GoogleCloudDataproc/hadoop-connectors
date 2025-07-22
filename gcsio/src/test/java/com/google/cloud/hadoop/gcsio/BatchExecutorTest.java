@@ -58,11 +58,17 @@ public class BatchExecutorTest {
   }
 
   @Test
-  public void isIdle_forThreadPoolExecutor_returnsCorrectState() throws Exception {
+  public void isIdle_forThreadPoolExecutor_returnsTrueBeforeExecution() throws Exception {
     BatchExecutor batchExecutor = new BatchExecutor(/* numThreads= */ 1);
 
     assertThat(batchExecutor.isIdle()).isTrue();
+  }
 
+  @Test
+  public void isIdle_forThreadPoolExecutor_returnsCorrectState() throws Exception {
+    BatchExecutor batchExecutor = new BatchExecutor(/* numThreads= */ 1);
+
+    // Create mock tasks and finish in one second.
     SettableFuture<Void> taskStarted = SettableFuture.create();
     SettableFuture<Void> taskShouldFinish = SettableFuture.create();
     Callable<Void> longRunningTask =
@@ -73,14 +79,14 @@ public class BatchExecutorTest {
           return null;
         };
 
+    // Queueing the tasks to BatchExecuter.
     batchExecutor.queue(longRunningTask, null);
-
     taskStarted.get(1, TimeUnit.SECONDS);
 
     assertThat(batchExecutor.isIdle()).isFalse();
 
+    // Shutting down the BatchExecuter.
     taskShouldFinish.set(null);
-
     batchExecutor.shutdown();
 
     assertThat(batchExecutor.isIdle()).isTrue();
