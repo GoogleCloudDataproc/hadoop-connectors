@@ -3,20 +3,12 @@
   <parent>
     <artifactId>bigdataoss-parent</artifactId>
     <groupId>com.google.cloud.bigdataoss</groupId>
-<<<<<<< Updated upstream
     <version>3.1.4-SNAPSHOT</version>
-=======
-    <version>3.0.0-SNAPSHOT</version>
->>>>>>> Stashed changes
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>gcs-connector</artifactId>
   <name>gcs-connector</name>
-<<<<<<< Updated upstream
   <version>3.1.4-SNAPSHOT</version>
-=======
-  <version>3.0.0-SNAPSHOT</version>
->>>>>>> Stashed changes
   <description>An implementation of org.apache.hadoop.fs.FileSystem targeting Google Cloud Storage</description>
   <build>
     <plugins>
@@ -95,10 +87,7 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.opentelemetry</include>
-<<<<<<< Updated upstream
                   <include>io.opentelemetry.api</include>
-=======
->>>>>>> Stashed changes
                   <include>io.opentelemetry.contrib</include>
                   <include>io.opentelemetry.semconv</include>
                   <include>io.perfmark</include>
@@ -387,11 +376,7 @@
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcsio</artifactId>
-<<<<<<< Updated upstream
       <version>3.1.4-SNAPSHOT</version>
-=======
-      <version>3.0.0-SNAPSHOT</version>
->>>>>>> Stashed changes
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
