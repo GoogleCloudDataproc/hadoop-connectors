@@ -78,8 +78,8 @@ class DeleteFolderOperation {
 
   /** Helper function that performs the deletion process for folder resources */
   public void performDeleteOperation() throws IOException {
-    computeChildrenForFolderResource();
     int foldersRemaining = folders.size();
+    computeChildrenForFolderResource();
 
     try {
       while (foldersRemaining != 0 && encounteredNoExceptions()) {
