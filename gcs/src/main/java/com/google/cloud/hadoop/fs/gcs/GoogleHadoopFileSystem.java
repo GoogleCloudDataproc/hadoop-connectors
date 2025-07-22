@@ -180,7 +180,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   static {
     // Add formatter to root logger.
-    LoggingFormatter.addFormatter(Logger.getLogger("com.google.cloud.hadoop"));
+    LoggingFormatter.addFormatter(Logger.getLogger(""));
     VERSION =
         PropertyUtil.getPropertyOrDefault(
             GoogleHadoopFileSystem.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
