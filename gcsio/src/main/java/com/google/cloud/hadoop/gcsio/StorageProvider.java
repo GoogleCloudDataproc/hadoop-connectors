@@ -53,9 +53,10 @@ public class StorageProvider {
       ExecutorService pCUExecutorService,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    logger.atInfo().log("Credentials: %s", credentials);
     if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
-      logger.atInfo().log("Ignoring storage object cache.");
+      logger.atFiner().log(
+          "Ignoring storage object cache because caching is disabled or custom components are"
+              + " used.");
       return new StorageWrapper(
           createStorage(
               credentials,
@@ -65,6 +66,14 @@ public class StorageProvider {
               downscopedAccessTokenFn),
           this);
     }
+    StorageProviderCacheKey key =
+        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
+    if (key == null) {
+      // When a stable key cannot be generated for the credentials, do not cache.
+      return new StorageWrapper(
+          createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn), this);
+    }
+
     if (cache == null) {
       synchronized (this) {
         if (cache == null) {
@@ -77,9 +86,7 @@ public class StorageProvider {
         }
       }
     }
-    StorageProviderCacheKey key =
-        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
-    logger.atInfo().log("Key: %s", key);
+    logger.atFinest().log("Key: %s", key);
     StorageWrapper storage = cache.getIfPresent(key);
     if (storage == null) {
       synchronized (this) {
@@ -91,18 +98,21 @@ public class StorageProvider {
                   this);
           cache.put(key, storage);
           storageToCacheKeyMap.put(storage, key);
-          logger.atInfo().log(
-              "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate : %.2f",
+          logger.atFinest().log(
+              "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate"
+                  + " : %.2f",
               key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
         } else {
           logger.atInfo().log(
-              "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
+              "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate"
+                  + " : %.2f",
               key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
         }
       }
     } else {
       logger.atInfo().log(
-          "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate : %.2f",
+          "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate :"
+              + " %.2f",
           key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
     }
     // Increment the reference count of the storage object.
@@ -117,13 +127,13 @@ public class StorageProvider {
   synchronized void close(StorageWrapper storage) {
     if (!storageClientToReferenceMap.containsKey(storage)) {
       closeStorage(storage.getStorage());
-      logger.atInfo().log("close() called on storage object outside cache.");
+      logger.atFinest().log("close() called on storage object outside cache.");
       return;
     }
     // Decrement the reference count of the object.
     storageClientToReferenceMap.put(storage, storageClientToReferenceMap.get(storage) - 1);
     if (storageClientToReferenceMap.get(storage) == 0) {
-      logger.atInfo().log("close() called on storage object inside cache.");
+      logger.atFinest().log("close() called on storage object inside cache.");
       StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
       cache.invalidate(key);
       storageToCacheKeyMap.remove(storage);
@@ -137,8 +147,12 @@ public class StorageProvider {
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+    List<Object> credentialsKey = getCredentialsCacheKey(credentials);
+    if (credentialsKey == null) {
+      return null;
+    }
     return StorageProviderCacheKey.builder()
-        .setCredentialsKey(getCredentialsCacheKey(credentials))
+        .setCredentialsKey(credentialsKey)
         .setHttpHeaders(storageOptions.getHttpRequestHeaders())
         .setIsDirectPathPreferred(storageOptions.isDirectPathPreferred())
         .setIsDownScopingEnabled(downscopedAccessTokenFn != null)
@@ -153,11 +167,14 @@ public class StorageProvider {
    * Credentials implementations do not have a stable equals/hashCode implementation, which makes
    * them unsuitable for use as cache keys. This method extracts stable identifiers (like client
    * email) where possible.
+   *
+   * @return A list of objects forming the cache key, or {@code null} if a stable key cannot be
+   *     created.
    */
   private static List<Object> getCredentialsCacheKey(Credentials credentials) {
 
     if (credentials == null) {
-      return null;
+      return ImmutableList.of("null_credentials");
     }
     List<Object> keyParts = new ArrayList<>();
     Credentials current = credentials;
@@ -174,22 +191,19 @@ public class StorageProvider {
         keyParts.add(com.google.auth.oauth2.ComputeEngineCredentials.class);
         break;
       }
-      if (current
-          instanceof
-          com.google.cloud.hadoop.util.HadoopCredentialsConfiguration
-              .AccessTokenProviderCredentials) {
-        keyParts.add(
-            com.google.cloud.hadoop.util.HadoopCredentialsConfiguration
-                .AccessTokenProviderCredentials.class);
-        break;
-      }
       if (current instanceof com.google.auth.oauth2.ImpersonatedCredentials) {
         Credentials wrapped =
             ((com.google.auth.oauth2.ImpersonatedCredentials) current).getSourceCredentials();
         current = (wrapped == current) ? null : wrapped;
       } else {
-        keyParts.add(current.getClass());
-        current = null;
+        // This is an unknown credential type.
+        // Return null to indicate that a stable key cannot be created, and this
+        // storage client should not be cached.
+        logger.atWarning().log(
+            "Unable to generate a stable cache key for credentials of type %s."
+                + " A new storage client will be created and not cached.",
+            current.getClass().getName());
+        return null;
       }
     }
     return keyParts;

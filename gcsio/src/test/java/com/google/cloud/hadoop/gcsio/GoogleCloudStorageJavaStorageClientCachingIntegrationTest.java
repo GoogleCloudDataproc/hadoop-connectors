@@ -12,12 +12,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Tests for GoogleCloudStorageClientImpl caching experiment. */
+/** Tests for GoogleCloudStorageClientImpl caching. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
 
   @Test
-  public void reusesCachedStorageClient_experimentEnabled() throws IOException {
+  public void reusesCachedStorageClient_enabled() throws IOException {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(null, true);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, true);
 
@@ -25,7 +25,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
   }
 
   @Test
-  public void createsNewClient_experimentEnabled() throws IOException {
+  public void createsNewClient_enabled() throws IOException {
     GoogleCloudStorageOptions.Builder testOptionsBuilder =
         getStandardOptionBuilder()
             .setTraceLogEnabled(true)
@@ -37,7 +37,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
   }
 
   @Test
-  public void createsNewClient_experimentDisabled() throws IOException {
+  public void createsNewClient_disabled() throws IOException {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(null, false);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, false);
 
@@ -45,12 +45,12 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
   }
 
   private GoogleCloudStorageClientImpl createGcsClient(
-      @Nullable GoogleCloudStorageOptions.Builder optionsBuilder, boolean enableCachingExperiment)
+      @Nullable GoogleCloudStorageOptions.Builder optionsBuilder, boolean enableCaching)
       throws IOException {
     if (optionsBuilder == null) {
       optionsBuilder = getStandardOptionBuilder();
     }
-    optionsBuilder.setStorageClientCachingEnabled(enableCachingExperiment);
+    optionsBuilder.setStorageClientCachingEnabled(enableCaching);
     return GoogleCloudStorageClientImpl.builder()
         .setOptions(optionsBuilder.build())
         .setCredentials(getCredentials())

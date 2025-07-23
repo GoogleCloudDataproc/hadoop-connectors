@@ -523,8 +523,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for gRPC storage client cache expiry time. */
   public static final HadoopConfigurationProperty<Long> GCS_STORAGE_CLIENT_CACHE_TIME =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.storage.client.cache.time", 1_800_000L); // 30 minutes
+      new HadoopConfigurationProperty<>("fs.gs.storage.client.cache.time", 6_00_000L); // 10 minutes
 
   /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
