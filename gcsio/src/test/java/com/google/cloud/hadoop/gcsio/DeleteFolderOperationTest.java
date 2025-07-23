@@ -14,10 +14,14 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.storage.control.v2.StorageControlClient;
+import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,14 +29,26 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 public class DeleteFolderOperationTest {
 
   private static final String BUCKET_NAME = "foo-bucket";
+  @Mock private BlockingQueue<FolderInfo> mockFolderDeleteBlockingQueue;
+
+  @Before
+  public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
+  }
 
   @Test
-  public void checkDeletionOrderForHnBucketBalancedFolders() throws InterruptedException {
+  public void checkDeletionOrderForHnBucketBalancedFolders() throws IOException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
 
@@ -63,7 +79,7 @@ public class DeleteFolderOperationTest {
   }
 
   @Test
-  public void checkDeletionOrderForHnBucketSkewedFolders() throws InterruptedException {
+  public void checkDeletionOrderForHnBucketSkewedFolders() throws IOException {
     String folderString = "test-folder-start/";
     List<FolderInfo> foldersToDelete = new LinkedList<>();
 
@@ -85,6 +101,54 @@ public class DeleteFolderOperationTest {
       FolderInfo cur = orderOfDeletion.get(i);
       assertThat(prev.getParentFolderName()).isEqualTo(cur.getFolderName());
     }
+  }
+
+  @Test
+  public void checkExceptionTypeWhenPollAlwaysTimesOutForPerformDeleteOperation() throws Exception {
+    List<FolderInfo> foldersToDelete = new LinkedList<>();
+    addFolders(foldersToDelete, "test-folder");
+
+    DeleteFolderOperation deleteFolderOperation =
+        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+    setMockFolderDeleteBlockingQueue(deleteFolderOperation);
+
+    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
+
+    IOException exception =
+        assertThrows(IOException.class, () -> deleteFolderOperation.performDeleteOperation());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            String.format(
+                "Received IllegalStateException while deletion of folder resource : Deletion stalled: No active threads, but %d folders remain.",
+                foldersToDelete.size()));
+  }
+
+  @Ignore("Ignoring in production because it takes more than a minute to complete.")
+  @Test
+  public void checkExceptionTypeWhenPollTimesOutOnceForPerformDeleteOperation() throws Exception {
+    List<FolderInfo> foldersToDelete = new LinkedList<>();
+    FolderInfo testFolder1 =
+        new FolderInfo(FolderInfo.createFolderInfoObject(BUCKET_NAME, "test-folder"));
+    FolderInfo testFolder2 =
+        new FolderInfo(
+            FolderInfo.createFolderInfoObject(BUCKET_NAME, "test-folder/test-folder-sleep"));
+    foldersToDelete.add(testFolder1);
+    foldersToDelete.add(testFolder2);
+
+    CustomDeleteFolderOperationTest deleteFolderOperation =
+        new CustomDeleteFolderOperationTest(
+            foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+    deleteFolderOperation.performDeleteOperation();
+
+    assertThat(deleteFolderOperation.orderOfDeletion.size()).isEqualTo(2);
+  }
+
+  private void setMockFolderDeleteBlockingQueue(DeleteFolderOperation deleteFolderOperation)
+      throws NoSuchFieldException, IllegalAccessException {
+    Field queueField = DeleteFolderOperation.class.getDeclaredField("folderDeleteBlockingQueue");
+    queueField.setAccessible(true);
+    queueField.set(deleteFolderOperation, mockFolderDeleteBlockingQueue);
   }
 
   private void addFolders(List<FolderInfo> foldersToDelete, String curFolderName) {
@@ -123,7 +187,14 @@ public class DeleteFolderOperationTest {
     }
 
     public void queueSingleFolderDelete(final FolderInfo folder, final int attempt) {
-      addToToBatchExecutorQueue(() -> null, getDeletionCallback(folder));
+      addToBatchExecutorQueue(
+          () -> {
+            if (folder.getFolderName().contains("sleep")) {
+              Thread.sleep(1000 * 61);
+            }
+            return null;
+          },
+          getDeletionCallback(folder));
     }
 
     private synchronized void addToOrderOfDeletion(FolderInfo folderDeleted) {

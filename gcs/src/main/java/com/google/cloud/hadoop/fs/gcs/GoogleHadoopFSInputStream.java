@@ -180,7 +180,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
         () -> {
           long startTimeNs = System.nanoTime();
-          vectoredIOSupplier.get().readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath);
+          vectoredIOSupplier
+              .get()
+              .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
           statistics.incrementReadOps(1);
           vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
           return null;
@@ -222,7 +224,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             if (numRead > 0) {
               // -1 means we actually read 0 bytes, but requested at least one byte.
               totalBytesRead += numRead;
-              statistics.incrementBytesRead(numRead);
               statistics.incrementReadOps(1);
               streamStats.updateReadStreamStats(numRead, startTimeNs);
             }
@@ -295,6 +296,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                     "Error while closing underneath read channel resources for path: %s", gcsPath);
               }
             } finally {
+              statistics.incrementBytesRead(streamStatistics.getBytesRead());
               streamStats.close();
               seekStreamStats.close();
               vectoredReadStats.close();
