@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
 
-public class GoogleCloudStorageBidiReadChannel implements SeekableByteChannel, ReadVectored {
+public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
 
   private final Storage storage;
   private final StorageResourceId resourceId;

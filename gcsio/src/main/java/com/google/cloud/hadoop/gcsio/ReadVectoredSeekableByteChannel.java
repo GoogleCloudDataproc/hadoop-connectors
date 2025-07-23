@@ -18,10 +18,11 @@ package com.google.cloud.hadoop.gcsio;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.util.List;
 import java.util.function.IntFunction;
 
-public interface ReadVectored {
+public interface ReadVectoredSeekableByteChannel extends SeekableByteChannel {
   void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException;
 }

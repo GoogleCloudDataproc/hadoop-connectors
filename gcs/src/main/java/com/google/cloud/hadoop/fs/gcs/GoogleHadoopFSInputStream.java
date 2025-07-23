@@ -28,7 +28,7 @@ import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
-import com.google.cloud.hadoop.gcsio.ReadVectored;
+import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
@@ -182,9 +182,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         streamStatistics,
         STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
         () -> {
-          if (channel instanceof ReadVectored) {
-            ReadVectored readVectoredChannel = (ReadVectored) channel;
-            readVectoredChannel.readVectored(
+          if (channel instanceof ReadVectoredSeekableByteChannel) {
+            ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
+                (ReadVectoredSeekableByteChannel) channel;
+            readVectoredSeekableByteChannelChannel.readVectored(
                 ranges.stream()
                     .map(
                         range ->
