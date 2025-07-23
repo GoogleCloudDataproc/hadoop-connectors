@@ -89,7 +89,7 @@
     <google.auth.version>1.33.1</google.auth.version>
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud-core.verion>2.44.1</google.cloud-core.verion>
-    <google.cloud-storage.bom.version>2.49.0</google.cloud-storage.bom.version>
+    <google.cloud-storage.bom.version>2.52.2</google.cloud-storage.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
     <google.gax.version>2.54.1</google.gax.version>
