@@ -491,7 +491,7 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
 *  `fs.gs.storage.client.cache.maxSize` (default: `10`) Maximum number of gRPC storage clients to cache.
 
-*   `fs.gs.storage.client.cache.time` (default: `30m`) Maximum time to keep a gRPC storage client in the cache (expireAfterWrite).
+*   `fs.gs.storage.client.cache.time` (default: `10m`) Maximum time to keep a gRPC storage client in the cache (expireAfterWrite).
 
 ### Performance cache configuration
 

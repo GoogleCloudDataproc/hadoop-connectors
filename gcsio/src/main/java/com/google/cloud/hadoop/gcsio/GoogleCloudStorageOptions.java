@@ -70,7 +70,7 @@ public abstract class GoogleCloudStorageOptions {
         .setMoveOperationEnabled(false)
         .setStorageClientCachingEnabled(false)
         .setStorageClientCacheMaxSize(10)
-        .setStorageClientCacheExpiryTime(Duration.ofMinutes(30));
+        .setStorageClientCacheExpiryTime(Duration.ofMinutes(10));
   }
 
   public abstract Builder toBuilder();
