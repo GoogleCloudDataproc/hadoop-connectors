@@ -128,7 +128,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
-          put("fs.gs.operation.move.enable", false);
+          put("fs.gs.operation.move.enable", true);
           put("fs.gs.write.rolling.checksum.enable", false);
         }
       };
