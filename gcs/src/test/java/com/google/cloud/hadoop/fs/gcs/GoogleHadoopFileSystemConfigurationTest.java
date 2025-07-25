@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_I
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
@@ -130,6 +131,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
           put("fs.gs.operation.move.enable", false);
           put("fs.gs.write.rolling.checksum.enable", false);
+          put("fs.gs.storage.client.caching.enable", false);
+          put("fs.gs.storage.client.cache.maxSize", 10);
+          put("fs.gs.storage.client.cache.time", 600_000L);
         }
       };
 
@@ -325,6 +329,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.setTimeDuration("fs.gs.grpc.read.timeout", 7, MILLISECONDS);
     config.setTimeDuration("fs.gs.grpc.write.message.timeout", 25, MILLISECONDS);
     config.setTimeDuration("fs.gs.grpc.write.timeout", 20, MILLISECONDS);
+    config.setTimeDuration("fs.gs.http.connect-timeout", 10, MINUTES);
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -379,6 +384,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.http.read-timeout", "2000ms");
     config.set("fs.gs.max.wait.for.empty.object.creation", "90s");
     config.set("fs.gs.performance.cache.max.entry.age", "4s");
+    config.set("fs.gs.storage.client.cache.time", "10m");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -398,5 +404,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+    assertThat(options.getStorageClientCacheExpiryTime()).isEqualTo(Duration.ofMinutes(10));
   }
 }
