@@ -15,13 +15,13 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  public void testInitialValue() {
+  public void getInvocationId_initialContext_returnsEmptyString() {
     // Test that the initial value of INVOCATION_ID is an empty string
     assertEquals("", InvocationIdContext.getInvocationId());
   }
 
   @Test
-  public void testSetInvocationId() {
+  public void setInvocationId_noExistingId_generatesValidId() {
     // Set a new invocation ID and verify it is not empty
     InvocationIdContext.setInvocationId();
 
@@ -37,7 +37,7 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  public void testClearInvocationId() {
+  public void clear_whenIdExists_resetsToEmptyString() {
     // Set an invocation ID, clear it, and verify it is reset to an empty string
     InvocationIdContext.setInvocationId();
 
@@ -47,7 +47,8 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  public void testThreadLocalIsolation() throws InterruptedException {
+  public void setInvocationId_inNewThread_doesNotAffectParentThreadId()
+      throws InterruptedException {
     // Test that the INVOCATION_ID is isolated across threads
     InvocationIdContext.setInvocationId();
     String mainThreadId = InvocationIdContext.getInvocationId();
@@ -66,7 +67,7 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  public void testChildThreadInheritsInvocationId() throws InterruptedException {
+  public void getInvocationId_inChildThread_inheritsParentId() throws InterruptedException {
     // Set an invocation ID in the parent thread
     InvocationIdContext.setInvocationId();
     String parentThreadId = InvocationIdContext.getInvocationId();

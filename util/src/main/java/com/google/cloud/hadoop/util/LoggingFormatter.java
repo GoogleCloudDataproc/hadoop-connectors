@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.util;
 
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
+import java.util.Optional;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
@@ -25,20 +26,23 @@ public class LoggingFormatter extends Formatter {
   @Override
   public String format(LogRecord record) {
     String invocationId = InvocationIdContext.getInvocationId();
-    String message = record.getMessage();
-    String loggerName = record.getLoggerName();
-    // Return the message unchanged if the log did not originate from GCS Connector or invocation ID
-    // is empty or the message is JSON.
-    // Prefixing JSON logs would break their structure; some JSON logs like traces already
-    // include the invocation ID.
-    if (loggerName == null
-        || !loggerName.startsWith(GCS_CONNECTOR_LOGGER_PREFIX)
-        || invocationId.isEmpty()
-        || isJson(message)) {
-      return String.format("%s%n", message);
+    Optional<String> optMessage = Optional.ofNullable(record.getMessage());
+    Optional<String> optLoggerName = Optional.ofNullable(record.getLoggerName());
+
+    // A log should be formatted if its logger name matches the connector's prefix,
+    // it has an invocation ID, and the message is not structured JSON.
+    boolean shouldFormat =
+        optLoggerName.map(name -> name.startsWith(GCS_CONNECTOR_LOGGER_PREFIX)).orElse(false)
+            && !invocationId.isEmpty()
+            && !optMessage.map(this::isJson).orElse(false);
+
+    if (shouldFormat) {
+      // Prefix the invocation ID to the log message.
+      return String.format("[%s]: %s%n", invocationId, optMessage.orElse(""));
     }
-    // Prefix the invocation ID to the log message
-    return String.format("[%s]: %s%n", invocationId, record.getMessage());
+
+    // Otherwise, return the message as-is.
+    return String.format("%s%n", optMessage.orElse(""));
   }
 
   /**

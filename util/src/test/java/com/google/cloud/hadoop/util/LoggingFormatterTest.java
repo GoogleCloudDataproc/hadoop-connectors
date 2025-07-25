@@ -29,7 +29,7 @@ public class LoggingFormatterTest {
   }
 
   @Test
-  public void testFormat_withInvocationId_andMatchingLogger() {
+  public void format_withMatchingLoggerAndInvocationId_prefixesMessageWithId() {
     String invocationId = InvocationIdContext.getInvocationId();
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");
     record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
@@ -40,7 +40,7 @@ public class LoggingFormatterTest {
   }
 
   @Test
-  public void testFormat_withOtherLoggerName() {
+  public void format_withNonMatchingLoggerName_doesNotPrefixMessage() {
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");
     record.setLoggerName(OTHER_LOGGER_NAME);
 
@@ -51,7 +51,7 @@ public class LoggingFormatterTest {
   }
 
   @Test
-  public void testFormat_withJsonMessage() {
+  public void format_withJsonMessage_doesNotPrefixMessage() {
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "{\"key\":\"value\"}");
     record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
 
@@ -62,7 +62,7 @@ public class LoggingFormatterTest {
   }
 
   @Test
-  public void testFormat_withEmptyInvocationId() {
+  public void format_withEmptyInvocationId_doesNotPrefixMessage() {
     InvocationIdContext.clear();
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");
     record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
@@ -74,7 +74,7 @@ public class LoggingFormatterTest {
   }
 
   @Test
-  public void testFormat_withNullLoggerName() {
+  public void format_withNullLoggerName_doesNotThrowNpeOrPrefixMessage() {
     // This record will have a null logger name by default
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");
 
@@ -85,7 +85,7 @@ public class LoggingFormatterTest {
   }
 
   @Test
-  public void testAddFormatter() {
+  public void addFormatter_toLogger_addsFormatterToAllHandlers() {
     Logger logger = Logger.getLogger("testLogger");
 
     LoggingFormatter.addFormatter(logger);
