@@ -46,7 +46,7 @@ public class StorageProvider {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  StorageWrapper getStorage(
+  synchronized StorageWrapper getStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
@@ -100,18 +100,18 @@ public class StorageProvider {
           storageToCacheKeyMap.put(storage, key);
           logger.atFinest().log(
               "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate"
-                  + " : %.2f",
+                  + ": %.2f",
               key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
         } else {
           logger.atInfo().log(
               "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate"
-                  + " : %.2f",
+                  + ": %.2f",
               key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
         }
       }
     } else {
       logger.atInfo().log(
-          "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate :"
+          "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate:"
               + " %.2f",
           key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
     }
