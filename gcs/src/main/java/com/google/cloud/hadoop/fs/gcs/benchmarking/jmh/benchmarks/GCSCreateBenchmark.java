@@ -75,6 +75,15 @@ public class GCSCreateBenchmark {
   @Param({"755"})
   private String permissionOctalString;
 
+  @Param({"0"})
+  private int bufferSize;
+
+  @Param({"1"})
+  private short replication;
+
+  @Param({"1"})
+  private long blockSize;
+
   private GoogleHadoopFileSystem ghfs;
   private Path pathToCreate;
   private FsPermission permission;
@@ -102,8 +111,8 @@ public class GCSCreateBenchmark {
     this.ghfs.initialize(this.pathToCreate.toUri(), conf);
 
     logger.atInfo().log(
-        "Benchmark Setup: Ready to create file at %s with overwrite=%b and permissions=%s",
-        pathToCreate, overwrite, permission);
+        "Benchmark Setup: Ready to create file at %s with overwrite=%b, permissions=%s, bufferSize=%d, replication=%d, blockSize=%d",
+        pathToCreate, overwrite, permission, bufferSize, replication, blockSize);
   }
 
   /**
@@ -137,8 +146,11 @@ public class GCSCreateBenchmark {
   @Benchmark
   public void create_Operation(Blackhole bh) throws IOException {
     // A try-with-resources statement ensures the stream is closed, finalizing the file creation.
+    // Use valid positive integers for replication and block size to satisfy API validation,
+    // even though GCS ignores these values.
     try (FSDataOutputStream out =
-        ghfs.create(pathToCreate, permission, overwrite, 0, (short) 0, 0L, null)) {
+        ghfs.create(
+            pathToCreate, permission, overwrite, bufferSize, replication, blockSize, null)) {
       bh.consume(out);
     }
   }
@@ -149,9 +161,18 @@ public class GCSCreateBenchmark {
    * @param hadoopPath The GCS path for creating the test file.
    * @param overwrite The overwrite flag to use for the create operation.
    * @param permission The FsPermission to use for the create operation.
+   * @param bufferSize The buffer size to use for the create operation.
+   * @param replication The replication factor to use for the create operation.
+   * @param blockSize The block size to use for the create operation.
    * @throws IOException if the benchmark runner fails to execute.
    */
-  public static void runBenchmark(Path hadoopPath, boolean overwrite, FsPermission permission)
+  public static void runBenchmark(
+      Path hadoopPath,
+      boolean overwrite,
+      FsPermission permission,
+      int bufferSize,
+      short replication,
+      long blockSize)
       throws IOException {
     try {
       // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
@@ -173,6 +194,9 @@ public class GCSCreateBenchmark {
               // Converts permission flags (e.g., rwxrwxrwx) to their octal string representation
               // (e.g., "777")
               .param("permissionOctalString", Integer.toOctalString(permission.toShort()))
+              .param("bufferSize", String.valueOf(bufferSize))
+              .param("replication", String.valueOf(replication))
+              .param("blockSize", String.valueOf(blockSize))
               .jvmArgs(jvmArgs)
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
