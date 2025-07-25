@@ -123,7 +123,10 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
       Progressable progress)
       throws IOException {
     runJMHBenchmarkAndLog(
-        "CREATE", () -> GCSCreateBenchmark.runBenchmark(hadoopPath, overwrite, permission));
+        "CREATE",
+        () ->
+            GCSCreateBenchmark.runBenchmark(
+                hadoopPath, overwrite, permission, bufferSize, replication, blockSize));
     logger.atInfo().log("Benchmark complete. Now performing the actual Create operation...");
     // Run actual create operation after benchmarking it.
     return super.create(
@@ -132,7 +135,7 @@ public class GoogleHadoopFileSystemJMHBenchmarking extends GoogleHadoopFileSyste
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    runJMHBenchmarkAndLog("OPEN", () -> GCSOpenBenchmark.runBenchmark(hadoopPath));
+    runJMHBenchmarkAndLog("OPEN", () -> GCSOpenBenchmark.runBenchmark(hadoopPath, bufferSize));
     logger.atInfo().log("Benchmark complete. Now performing the actual Open operation...");
     // Run actual open operation after benchmarking it.
     return super.open(hadoopPath, bufferSize);

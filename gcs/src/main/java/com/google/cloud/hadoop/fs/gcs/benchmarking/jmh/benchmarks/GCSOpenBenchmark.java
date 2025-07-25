@@ -71,6 +71,9 @@ public class GCSOpenBenchmark {
   @Param({"_path_not_set_"})
   private String pathString;
 
+  @Param({"0"})
+  private int bufferSize;
+
   private GoogleHadoopFileSystem ghfs;
   private Path pathToOpen;
 
@@ -105,7 +108,8 @@ public class GCSOpenBenchmark {
               + ". Please ensure the file exists before running the benchmark.");
     }
     logger.atInfo().log(
-        "Benchmark Setup: Ready to open existing file at %s for open operation.", pathToOpen);
+        "Benchmark Setup: Ready to open existing file at %s with bufferSize=%d for open operation.",
+        pathToOpen, bufferSize);
   }
 
   /**
@@ -142,7 +146,7 @@ public class GCSOpenBenchmark {
   @Benchmark
   public void open_Operation(Blackhole bh) throws IOException {
     // A try-with-resources statement ensures the input stream is closed after each operation.
-    try (FSDataInputStream in = ghfs.open(pathToOpen)) {
+    try (FSDataInputStream in = ghfs.open(pathToOpen, bufferSize)) {
       bh.consume(in);
     }
   }
@@ -151,9 +155,10 @@ public class GCSOpenBenchmark {
    * A static entry point to programmatically run this benchmark with specific parameters.
    *
    * @param hadoopPath The GCS path for the file to be opened during the benchmark.
+   * @param bufferSize The buffer size to use for the open operation.
    * @throws IOException if the benchmark runner fails to execute.
    */
-  public static void runBenchmark(Path hadoopPath) throws IOException {
+  public static void runBenchmark(Path hadoopPath, int bufferSize) throws IOException {
     try {
       // Fetch benchmark iteration counts from system properties (e.g., -Djmh.warmup.iterations=7).
       // If the properties are not set, fall back to the default constant values defined for this
@@ -170,6 +175,7 @@ public class GCSOpenBenchmark {
           new OptionsBuilder()
               .include(GCSOpenBenchmark.class.getSimpleName() + ".open_Operation")
               .param("pathString", hadoopPath.toString())
+              .param("bufferSize", String.valueOf(bufferSize))
               .jvmArgs(jvmArgs)
               .warmupIterations(warmupIterations)
               .measurementIterations(measurementIterations)
