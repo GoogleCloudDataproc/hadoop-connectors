@@ -102,6 +102,21 @@ class BatchExecutor {
     }
   }
 
+  /**
+   * Checks if the underlying executor has any active or queued tasks. This is used to detect
+   * stalling issues in the jobs.
+   */
+  public boolean isIdle() {
+    if (requestsExecutor instanceof ThreadPoolExecutor) {
+      ThreadPoolExecutor executor = (ThreadPoolExecutor) requestsExecutor;
+      // Thread's idle if no threads are active and the work queue is empty.
+      return executor.getActiveCount() == 0 && executor.getQueue().isEmpty();
+    }
+    // The executor is the instance of a DirectExecutorService, it is always idle because there are
+    // no child threads.
+    return true;
+  }
+
   /** Awaits until all tasks are terminated and then shutdowns the executor. */
   public void shutdown() throws IOException {
     awaitRequestsCompletion();
