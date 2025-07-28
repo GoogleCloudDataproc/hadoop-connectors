@@ -5,12 +5,18 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
 
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.UserCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.grpc.ClientInterceptor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -226,5 +232,99 @@ public class StorageProviderTest {
       fail("Storage creation failed");
     }
     assertEquals(1, storageProvider.cache.size());
+  }
+
+  @Test
+  public void getStorage_withInterceptors_doesNotCache() throws IOException {
+    ClientInterceptor mockInterceptor = mock(ClientInterceptor.class);
+    StorageWrapper storage1 =
+        storageProvider.getStorage(
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            ImmutableList.of(mockInterceptor),
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+    assertNotNull(storage1);
+    assertNull(storageProvider.cache);
+    assertTrue(storageProvider.storageClientToReferenceMap.isEmpty());
+  }
+
+  @Test
+  public void getStorage_withExecutor_doesNotCache() throws IOException {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      StorageWrapper storage1 =
+          storageProvider.getStorage(
+              TEST_CREDENTIALS,
+              TEST_STORAGE_OPTIONS,
+              null,
+              executor,
+              TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+      assertNotNull(storage1);
+      assertNull(storageProvider.cache);
+      StorageWrapper storage2 =
+          storageProvider.getStorage(
+              TEST_CREDENTIALS,
+              TEST_STORAGE_OPTIONS,
+              null,
+              executor,
+              TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+      assertNotNull(storage2);
+      assertNotEquals(storage1, storage2);
+      assertTrue(storageProvider.storageClientToReferenceMap.isEmpty());
+    } finally {
+      executor.shutdown();
+    }
+  }
+
+  @Test
+  public void close_uncachedObject_doesNotAffectCache() throws IOException {
+    // Get an uncached storage object by passing an interceptor
+    ClientInterceptor mockInterceptor = mock(ClientInterceptor.class);
+    StorageWrapper uncachedStorage =
+        storageProvider.getStorage(
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            ImmutableList.of(mockInterceptor),
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+
+    // Verify it's not in the reference map
+    assertFalse(storageProvider.storageClientToReferenceMap.containsKey(uncachedStorage));
+
+    // Closing an uncached object should not throw an exception and should not affect the maps.
+    uncachedStorage.close();
+
+    // Verify maps are still empty
+    assertTrue(storageProvider.storageClientToReferenceMap.isEmpty());
+    assertTrue(storageProvider.storageToCacheKeyMap.isEmpty());
+  }
+
+  @Test
+  public void computeCacheKey_withUserCredentials_returnsKey() {
+    // Use the builder to create a real UserCredentials object instead of mocking a final class.
+    UserCredentials credentials =
+        UserCredentials.newBuilder()
+            .setClientId("test-client-id")
+            .setClientSecret("dummy-secret")
+            .setRefreshToken("dummy-refresh-token")
+            .build();
+
+    StorageProviderCacheKey key =
+        storageProvider.computeCacheKey(
+            credentials, TEST_STORAGE_OPTIONS, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+
+    assertNotNull(key);
+    assertEquals(ImmutableList.of("test-client-id"), key.getCredentialsKey());
+  }
+
+  @Test
+  public void computeCacheKey_withComputeEngineCredentials_returnsKey() {
+    ComputeEngineCredentials credentials = mock(ComputeEngineCredentials.class);
+    StorageProviderCacheKey key =
+        storageProvider.computeCacheKey(
+            credentials, TEST_STORAGE_OPTIONS, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+    assertNotNull(key);
+    assertEquals(ImmutableList.of(ComputeEngineCredentials.class), key.getCredentialsKey());
   }
 }
