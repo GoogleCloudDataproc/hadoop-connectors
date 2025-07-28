@@ -113,6 +113,7 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
+  private static final String CLIENT_FEATURES = "x-goog-storage-client-features";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -1438,15 +1439,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     ImmutableMap<String, String> httpRequestHeaders =
         MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
     String appName = storageOptions.getAppName();
+
+    ImmutableMap.Builder<String, String> headersBuilder =
+        ImmutableMap.<String, String>builder().putAll(httpRequestHeaders);
+
     if (!httpRequestHeaders.containsKey(USER_AGENT) && !Strings.isNullOrEmpty(appName)) {
       logger.atFiner().log("Setting useragent %s", appName);
-      return ImmutableMap.<String, String>builder()
-          .putAll(httpRequestHeaders)
-          .put(USER_AGENT, appName)
-          .build();
+      headersBuilder.put(USER_AGENT, appName);
     }
 
-    return httpRequestHeaders;
+    String clientFeatures = storageOptions.getClientFeaturesValue();
+    if (!Strings.isNullOrEmpty(clientFeatures)) {
+      logger.atFiner().log("Setting client features %s", clientFeatures);
+      headersBuilder.put(CLIENT_FEATURES, clientFeatures);
+    }
+
+    return headersBuilder.build();
   }
 
   private static BlobWriteSessionConfig getSessionConfig(

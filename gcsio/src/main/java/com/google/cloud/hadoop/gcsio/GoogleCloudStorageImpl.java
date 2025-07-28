@@ -2548,6 +2548,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       RequestT request, String bucketName) {
     setRequesterPaysProject(request, bucketName);
 
+    String clientFeatures = storageOptions.getClientFeaturesValue();
+    if (clientFeatures != null) {
+      request
+          .getRequestHeaders()
+          .set(
+              "x-goog-storage-client-features",
+              clientFeatures); // Set client features for the request.
+    }
+
     if (request instanceof Storage.Objects.Get || request instanceof Storage.Objects.Insert) {
       setEncryptionHeaders(request);
     }
