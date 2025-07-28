@@ -131,6 +131,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
           put("fs.gs.operation.move.enable", false);
           put("fs.gs.write.rolling.checksum.enable", false);
+          put("fs.gs.bidi.enable", false);
+          put("fs.gs.bidi.thread.count", 16);
+          put("fs.gs.bidi.client.timeout", 30);
           put("fs.gs.storage.client.caching.enable", false);
           put("fs.gs.storage.client.cache.maxSize", 10);
           put("fs.gs.storage.client.cache.time", 600_000L);

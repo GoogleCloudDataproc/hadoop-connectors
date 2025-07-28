@@ -94,10 +94,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -147,6 +151,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setDaemon(true)
               .build());
 
+  private ExecutorService boundedThreadPool;
+
+  private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
+
   private static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? null : BaseEncoding.base64().encode(bytes);
   }
@@ -184,6 +192,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 pCUExecutorService,
                 downscopedAccessTokenFn)
             : new StorageWrapper(clientLibraryStorage, storageProvider);
+    this.boundedThreadPool = null;
   }
 
   @Override
@@ -1196,12 +1205,35 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    return new GoogleCloudStorageClientReadChannel(
-        storage.getStorage(),
-        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-        readOptions,
-        errorExtractor,
-        storageOptions);
+    GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
+    // TODO(dhritichorpa) Microbenchmark the latency of using
+    // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
+    if (readOptions.isBidiEnabled()) {
+      return new GoogleCloudStorageBidiReadChannel(
+          storage.getStorage(),
+          gcsItemInfo,
+          readOptions,
+          getBoundedThreadPool(readOptions.getBidiThreadCount()));
+    } else {
+      return new GoogleCloudStorageClientReadChannel(
+          storage.getStorage(), gcsItemInfo, readOptions, errorExtractor, storageOptions);
+    }
+  }
+
+  private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
+    if (boundedThreadPool == null) {
+      new ThreadPoolExecutor(
+          bidiThreadCount,
+          bidiThreadCount,
+          0L,
+          TimeUnit.MILLISECONDS,
+          taskQueue,
+          new ThreadFactoryBuilder()
+              .setNameFormat("bidiRead-range-pool-%d")
+              .setDaemon(true)
+              .build());
+    }
+    return boundedThreadPool;
   }
 
   @Override
@@ -1216,6 +1248,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         super.close();
       } finally {
         backgroundTasksThreadPool.shutdown();
+        if (boundedThreadPool != null) {
+          boundedThreadPool.shutdown();
+        }
       }
     } finally {
       backgroundTasksThreadPool = null;
