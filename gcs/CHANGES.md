@@ -3,6 +3,7 @@
 ## Next
 1. PR #1396 - [Bug] Throw correct exception when DeleteFolderOperation is timed out
 1. PR #1385 - [Bug] Correcting checksum calculation when received buffer is already moved
+1. PR #1413 - [Bug] Fixing DeleteFolder stalling issue where high CPU usage can cause timeouts
 
 ## 3.0.9 - 2025-06-15
 1. Add checksum verification in upload
