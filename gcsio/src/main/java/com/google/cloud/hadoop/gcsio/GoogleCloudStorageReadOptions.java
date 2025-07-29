@@ -59,7 +59,6 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBlockSize(64 * 1024 * 1024)
         .setFadviseRequestTrackCount(3)
         .setReadExactRequestedBytesEnabled(false)
-        .setBidiEnabled(false)
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30);
   }
