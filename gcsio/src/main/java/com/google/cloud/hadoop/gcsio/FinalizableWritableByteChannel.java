@@ -20,6 +20,5 @@ import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
 
 public interface FinalizableWritableByteChannel extends WritableByteChannel {
-    void finalizeAndClose()
-        throws IOException;
+  void finalizeAndClose() throws IOException;
 }
