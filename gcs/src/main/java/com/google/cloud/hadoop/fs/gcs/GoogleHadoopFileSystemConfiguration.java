@@ -580,7 +580,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Flag to enable the bidirectional Rapid Storage API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiEnabled());
+          "fs.gs.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiEnabled());
 
   /**
    * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
@@ -692,7 +692,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
-        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .build();
   }

@@ -67,7 +67,10 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setHnBucketRenameEnabled(false)
         .setGrpcWriteEnabled(false)
-        .setMoveOperationEnabled(false);
+        .setMoveOperationEnabled(false)
+        .setBidiEnabled(false)
+        .setBidiThreadCount(16)
+        .setBidiClientTimeout(30);
   }
 
   public abstract Builder toBuilder();
@@ -147,6 +150,12 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isOperationTraceLogEnabled();
 
   public abstract boolean isMoveOperationEnabled();
+
+  public abstract boolean isBidiEnabled();
+
+  public abstract int getBidiThreadCount();
+
+  public abstract int getBidiClientTimeout();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -236,6 +245,18 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcWriteEnabled(boolean grpcWriteEnabled);
 
     public abstract Builder setMoveOperationEnabled(boolean moveOperationEnabled);
+
+    /** Sets the property to use the bidirectional Rapid Storage Api. */
+    public abstract Builder setBidiEnabled(boolean bidiEnabled);
+
+    /**
+     * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used
+     * to read individual range and populate the buffer.
+     */
+    public abstract Builder setBidiThreadCount(int bidiThreadCount);
+
+    /** Sets the total amount of time, we would wait for bidi client initialization. */
+    public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
