@@ -4,7 +4,6 @@ import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.google.api.core.ApiFuture;
 import com.google.cloud.storage.BlobAppendableUpload;
 import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
 import com.google.cloud.storage.BlobAppendableUploadConfig;
@@ -141,10 +140,13 @@ public class GoogleCloudStorageBidiWriteChannelTest {
     verify(mockGcsAppendChannel, never()).finalizeAndClose();
   }
 
-  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose) throws IOException {
+  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose)
+      throws IOException {
     return new GoogleCloudStorageBidiWriteChannel(
         mockStorage,
-        GoogleCloudStorageOptions.DEFAULT.toBuilder().setFinalizeBeforeClose(finalizeBeforeClose).build(),
+        GoogleCloudStorageOptions.DEFAULT.toBuilder()
+            .setFinalizeBeforeClose(finalizeBeforeClose)
+            .build(),
         resourceId,
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().build());
   }
