@@ -43,6 +43,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -1538,7 +1539,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            maxResults);
+            maxResults,
+            listOptions.isIncludeFoldersAsPrefixes());
 
     String pageToken = null;
     int page = 0;
@@ -1658,7 +1660,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String objectNamePrefix,
       String objectFields,
       String delimiter,
-      long maxResults)
+      long maxResults,
+      boolean includeFoldersAsPrefixes)
       throws IOException {
     logger.atFiner().log(
         "createListRequest(%s, %s, %s, %s, %d)",
@@ -1674,6 +1677,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (delimiter != null) {
       listObject.setDelimiter(delimiter).setIncludeTrailingDelimiter(true);
     }
+
+    listObject.setIncludeFoldersAsPrefixes(includeFoldersAsPrefixes);
 
     // Set number of items to retrieve per call.
     listObject.setMaxResults(
@@ -1739,7 +1744,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            listOptions.getMaxResults());
+            listOptions.getMaxResults(),
+            listOptions.isIncludeFoldersAsPrefixes());
     if (pageToken != null) {
       logger.atFiner().log("listObjectInfoPage: next page %s", pageToken);
       listObject.setPageToken(pageToken);
@@ -2431,6 +2437,44 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return this.storageControlClient;
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#createFolder(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void createFolder(StorageResourceId resourceId) throws IOException {
+    logger.atInfo().log("createFolder(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    String bucketName = resourceId.getBucketName();
+
+    // 2. Format the bucket name into the fully-qualified resource name
+    //    that the StorageControlClient API requires.
+    String parentResourceName = String.format("projects/_/buckets/%s", bucketName);
+
+    // 3. Build the request with the correctly formatted parent name.
+    CreateFolderRequest request =
+        CreateFolderRequest.newBuilder()
+            .setFolderId(resourceId.getObjectName())
+            .setParent(parentResourceName)
+            .build();
+    // Add the tracing wrapper here
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.create")) {
+      logger.atFine().log("Create folder: %s%n", resourceId);
+      Folder newFolder = lazyGetStorageControlClient().createFolder(request);
+      logger.atFine().log("Created folder: %s%n", newFolder.getName());
+    } catch (AlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw (FileAlreadyExistsException)
+          new FileAlreadyExistsException(String.format("Folder '%s' already exists.", resourceId))
+              .initCause(e);
+    } catch (Throwable t) {
+      logger.atSevere().withCause(t).log("CreateFolder for %s failed", resourceId);
+      throw t;
+    }
   }
 
   @Override
