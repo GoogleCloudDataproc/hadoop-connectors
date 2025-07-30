@@ -596,7 +596,7 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.bidi.client.timeout",
           GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
 
-  /** Sets the total amount of time, we would wait for bidi client initialization. */
+  /** Flag to enable finalizing object before closing bidi write channel. */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE =
           new HadoopConfigurationProperty<>(
