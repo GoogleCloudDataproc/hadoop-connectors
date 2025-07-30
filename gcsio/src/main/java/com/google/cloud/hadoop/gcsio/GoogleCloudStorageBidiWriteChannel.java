@@ -52,11 +52,7 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
 
   private static BlobInfo getBlobInfo(
       StorageResourceId resourceId, CreateObjectOptions createOptions) {
-    return BlobInfo.newBuilder(
-            BlobId.of(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                resourceId.getGenerationId()))
+    return BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
         .setContentType(createOptions.getContentType())
         .setContentEncoding(createOptions.getContentEncoding())
         .setMetadata(encodeMetadata(createOptions.getMetadata()))
@@ -68,7 +64,6 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
     List<Storage.BlobWriteOption> blobWriteOptions = new ArrayList<>();
 
     blobWriteOptions.add(Storage.BlobWriteOption.disableGzipContent());
-    blobWriteOptions.add(Storage.BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
       blobWriteOptions.add(Storage.BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }

@@ -21,13 +21,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
-import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.base.Ascii;
@@ -451,6 +445,15 @@ class GoogleHadoopOutputStream extends OutputStream
       streamStatistics.close();
     }
     // TODO: do we need make a `cleanerThreadpool` an object field and close it here?
+  }
+
+  @Override
+  public void finalize() throws IOException {
+    if (tmpOut instanceof FinalizableWritableByteChannel) {
+      FinalizableWritableByteChannel finalizableWritableByteChannel =
+          (FinalizableWritableByteChannel) tmpOut;
+      finalizableWritableByteChannel.finalizeAndClose();
+    }
   }
 
   private void throwIfNotOpen() throws IOException {
