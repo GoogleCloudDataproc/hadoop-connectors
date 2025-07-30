@@ -447,15 +447,6 @@ class GoogleHadoopOutputStream extends OutputStream
     // TODO: do we need make a `cleanerThreadpool` an object field and close it here?
   }
 
-  @Override
-  public void finalize() throws IOException {
-    if (tmpOut instanceof FinalizableWritableByteChannel) {
-      FinalizableWritableByteChannel finalizableWritableByteChannel =
-          (FinalizableWritableByteChannel) tmpOut;
-      finalizableWritableByteChannel.finalizeAndClose();
-    }
-  }
-
   private void throwIfNotOpen() throws IOException {
     if (tmpOut == null) {
       throw new ClosedChannelException();
