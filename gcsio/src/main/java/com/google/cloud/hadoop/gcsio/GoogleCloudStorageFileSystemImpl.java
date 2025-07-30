@@ -656,7 +656,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(src)) {
+    if (!this.options.getCloudStorageOptions().isHnOptimizationEnabled() || !gcs.isHnBucket(src)) {
       repairImplicitDirectory(srcParentInfoFuture);
     }
   }
