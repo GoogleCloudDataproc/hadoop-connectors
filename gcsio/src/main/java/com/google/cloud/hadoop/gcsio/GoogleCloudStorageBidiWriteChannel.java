@@ -10,11 +10,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 
 @VisibleForTesting
-public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableByteChannel {
+public class GoogleCloudStorageBidiWriteChannel implements WritableByteChannel {
   private final AppendableUploadWriteableByteChannel gcsAppendChannel;
   private boolean open = true;
 
