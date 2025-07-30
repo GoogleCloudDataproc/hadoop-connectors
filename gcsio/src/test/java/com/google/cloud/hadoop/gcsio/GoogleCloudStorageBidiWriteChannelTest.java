@@ -30,7 +30,6 @@ public class GoogleCloudStorageBidiWriteChannelTest {
   @Mock private Storage mockStorage;
   @Mock private BlobAppendableUpload mockAppendUploadSession;
   @Mock private AppendableUploadWriteableByteChannel mockGcsAppendChannel;
-  @Mock private ApiFuture<BlobInfo> mockResultFuture;
   private StorageResourceId resourceId;
   private GoogleCloudStorageBidiWriteChannel writeChannel;
 
@@ -48,7 +47,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_success() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(false);
     ByteBuffer src = ByteBuffer.wrap(new byte[] {1, 2, 3});
     when(mockGcsAppendChannel.write(src)).thenReturn(3);
 
@@ -60,7 +59,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_whenClosed_throwsClosedChannelException() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(false);
     ByteBuffer src = ByteBuffer.wrap(new byte[] {1});
 
     writeChannel.close();
@@ -71,13 +70,13 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_nullBuffer_throwsNullPointerException() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(false);
     assertThrows(NullPointerException.class, () -> writeChannel.write(null));
   }
 
   @Test
   public void testClose_whenAlreadyClosed_doesNothing() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(false);
 
     // Call close twice
     writeChannel.close();
@@ -89,7 +88,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_success_multipleChucks() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(false);
     byte[] chunk1 = new byte[] {1, 2, 3};
     byte[] chunk2 = new byte[] {4, 5};
     byte[] expectedContent = new byte[] {1, 2, 3, 4, 5};
@@ -124,9 +123,9 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_finalizeAfterClosing() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(true);
 
-    writeChannel.finalizeAndClose();
+    writeChannel.close();
 
     verify(mockGcsAppendChannel, times(1)).finalizeAndClose();
     verify(mockGcsAppendChannel, never()).closeWithoutFinalizing();
@@ -134,7 +133,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_closeWithoutFinalizing() throws IOException {
-    writeChannel = getJavaStorageChannel();
+    writeChannel = getJavaStorageChannel(false);
 
     writeChannel.close();
 
@@ -142,10 +141,10 @@ public class GoogleCloudStorageBidiWriteChannelTest {
     verify(mockGcsAppendChannel, never()).finalizeAndClose();
   }
 
-  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel() throws IOException {
+  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose) throws IOException {
     return new GoogleCloudStorageBidiWriteChannel(
         mockStorage,
-        GoogleCloudStorageOptions.DEFAULT.toBuilder().build(),
+        GoogleCloudStorageOptions.DEFAULT.toBuilder().setFinalizeBeforeClose(finalizeBeforeClose).build(),
         resourceId,
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().build());
   }
