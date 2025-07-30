@@ -659,7 +659,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
-        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
+        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
