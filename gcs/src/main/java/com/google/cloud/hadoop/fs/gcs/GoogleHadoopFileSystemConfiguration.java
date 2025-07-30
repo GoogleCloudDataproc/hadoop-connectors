@@ -596,6 +596,12 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.bidi.client.timeout",
           GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
 
+  /** Sets the total amount of time, we would wait for bidi client initialization. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.bidi.finalize", GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -660,7 +666,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
-        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean));
+        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
+        .setFinalizeBeforeClose(
+            GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting

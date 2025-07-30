@@ -30,6 +30,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
@@ -133,6 +134,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
+          put("fs.gs.bidi.finalize", false);
         }
       };
 
@@ -401,5 +403,23 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+  }
+
+  @Test
+  public void bidiProperties() {
+    Configuration config = new Configuration();
+
+    config.setBoolean("fs.gs.bidi.enable", true);
+    config.set("fs.gs.bidi.thread.count", "20");
+    config.set("fs.gs.bidi.client.timeout", "40");
+    config.setBoolean("fs.gs.bidi.finalize",true);
+
+    GoogleCloudStorageOptions storageOptions = GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+    GoogleCloudStorageReadOptions readOptions = storageOptions.getReadChannelOptions();
+
+    assertThat(storageOptions.isBidiEnabled()).isEqualTo(true);
+    assertThat(storageOptions.isFinalizeBeforeClose()).isEqualTo(true);
+    assertThat(readOptions.getBidiThreadCount()).isEqualTo(20);
+    assertThat(readOptions.getBidiClientTimeout()).isEqualTo(40);
   }
 }
