@@ -110,4 +110,18 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
       gcsAppendChannel.closeWithoutFinalizing();
     }
   }
+
+  @Override
+  public void finalizeAndClose() throws IOException {
+    if (!open) {
+      return;
+    }
+    open = false;
+
+    if (gcsAppendChannel == null) {
+      return;
+    }
+
+    gcsAppendChannel.finalizeAndClose();
+  }
 }

@@ -412,9 +412,10 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.setBoolean("fs.gs.bidi.enable", true);
     config.set("fs.gs.bidi.thread.count", "20");
     config.set("fs.gs.bidi.client.timeout", "40");
-    config.setBoolean("fs.gs.bidi.finalize",true);
+    config.setBoolean("fs.gs.bidi.finalize", true);
 
-    GoogleCloudStorageOptions storageOptions = GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
     GoogleCloudStorageReadOptions readOptions = storageOptions.getReadChannelOptions();
 
     assertThat(storageOptions.isBidiEnabled()).isEqualTo(true);
