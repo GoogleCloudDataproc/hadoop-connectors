@@ -72,18 +72,14 @@ public class GoogleCloudStorageBidiReadChannelTest {
         () -> bidiReadChannel.write(ByteBuffer.allocateDirect(0)));
   }
 
-  // TODO(dhritichopra) Dummy test to complete coverage, remove with actual test once we have these
-  // implemented.
   @Test
-  public void readPath_dummyImplementation() throws IOException {
+  public void truncate_unsupportedOperationException() throws IOException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
-    assertEquals(bidiReadChannel.read(ByteBuffer.allocateDirect(0)), 0);
-    assertEquals(bidiReadChannel.position(), 0);
-    assertEquals(bidiReadChannel.position(12), null);
-    assertEquals(bidiReadChannel.size(), 0);
-    assertEquals(bidiReadChannel.truncate(12), null);
-    assertEquals(bidiReadChannel.isOpen(), false);
+    assertThrows(
+            UnsupportedOperationException.class,
+            () -> bidiReadChannel.truncate(10));
   }
+
 
   private String getReadVectoredData(VectoredIORange range)
       throws ExecutionException, InterruptedException, TimeoutException {
