@@ -1046,10 +1046,19 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   @Override
   public FileInfo getFileInfo(URI path) throws IOException {
     checkArgument(path != null, "path must not be null");
+
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && this.gcs.isHnBucket(path)) {
+      FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getFolderInfo(resourceId.toDirectoryId()));
+      if (fileInfo.exists()) {
+        return fileInfo;
+      }
+    }
+
     // Validate the given path. true == allow empty object name.
     // One should be able to get info about top level directory (== bucket),
     // therefore we allow object name to be empty.
-    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
     FileInfo fileInfo =
         FileInfo.fromItemInfo(
             getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true));

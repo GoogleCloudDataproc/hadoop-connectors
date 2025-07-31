@@ -212,6 +212,9 @@ public interface GoogleCloudStorage {
    */
   void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException;
 
+  /** Gets the metadata for a single folder. */
+  GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException;
+
   /**
    * Creates a native GCS folder resource. Applicable only for Hierarchical Namespace (HNS) enabled
    * buckets.

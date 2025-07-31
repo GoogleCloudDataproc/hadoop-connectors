@@ -44,6 +44,7 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.gax.rpc.AlreadyExistsException;
+import com.google.api.gax.rpc.NotFoundException;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -2437,6 +2438,36 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return this.storageControlClient;
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#getFolderInfo(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
+    logger.atInfo().log("getFolderInfo(%s)", resourceId);
+    logger.atInfo().log("[TEST] getFolderInfo(%s)", resourceId);
+
+    // checkArgument(resourceId.isFolder(), "Expected a folder resourceId, got %s", resourceId);
+
+    if (resourceId.isBucket()) {
+      // This is not a folder. Do not proceed.
+      // Throwing a NotFoundException is the appropriate GCS client library pattern.
+      logger.atInfo().log("[TEST] not found 1");
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+
+    GetFolderRequest request =
+        GetFolderRequest.newBuilder()
+            .setName(FolderName.format("_", resourceId.getBucketName(), resourceId.getObjectName()))
+            .build();
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.get")) {
+      Folder folder = lazyGetStorageControlClient().getFolder(request);
+      return GoogleCloudStorageItemInfo.createFolder(resourceId, folder);
+    } catch (Exception e) {
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
   }
 
   /**
