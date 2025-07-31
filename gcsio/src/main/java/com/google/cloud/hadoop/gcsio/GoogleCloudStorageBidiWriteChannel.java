@@ -18,8 +18,6 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
   private final AppendableUploadWriteableByteChannel gcsAppendChannel;
   private boolean open = true;
 
-  private final boolean finalizeBeforeClose;
-
   public GoogleCloudStorageBidiWriteChannel(
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
@@ -29,8 +27,6 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
 
     checkNotNull(storage, "storage cannot be null");
     checkNotNull(resourceId, "resourceId cannot be null");
-
-    finalizeBeforeClose = storageOptions.isFinalizeBeforeClose();
 
     BlobAppendableUpload appendUploadSession =
         getBlobAppendableUploadSession(storage, resourceId, createOptions, storageOptions);
@@ -48,9 +44,10 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       GoogleCloudStorageOptions storageOptions) {
+    BlobAppendableUploadConfig.CloseAction closeAction = storageOptions.isFinalizeBeforeClose() ? BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING : BlobAppendableUploadConfig.CloseAction.CLOSE_WITHOUT_FINALIZING;
     return storage.blobAppendableUpload(
         getBlobInfo(resourceId, createOptions),
-        BlobAppendableUploadConfig.of(),
+        BlobAppendableUploadConfig.of().withCloseAction(closeAction),
         generateWriteOptions(createOptions, storageOptions));
   }
 
@@ -104,11 +101,7 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
       return;
     }
 
-    if (finalizeBeforeClose) {
-      gcsAppendChannel.finalizeAndClose();
-    } else {
-      gcsAppendChannel.closeWithoutFinalizing();
-    }
+    gcsAppendChannel.close();
   }
 
   @Override
