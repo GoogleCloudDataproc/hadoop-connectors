@@ -128,11 +128,15 @@ public class GoogleHadoopFileSystemConfigurationTest {
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
+<<<<<<< HEAD
           put("fs.gs.operation.move.enable", false);
           put("fs.gs.write.rolling.checksum.enable", false);
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
+=======
+          put("fs.gs.operation.bidi.enable", false);
+>>>>>>> 170df0e808ffb70c7529acf18e14dfc1ef9d4bdb
         }
       };
 

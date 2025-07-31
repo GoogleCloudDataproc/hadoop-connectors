@@ -56,9 +56,13 @@ public abstract class GoogleCloudStorageReadOptions {
         .setInplaceSeekLimit(8 * 1024 * 1024)
         .setMinRangeRequestSize(2 * 1024 * 1024)
         .setReadExactRequestedBytesEnabled(false)
+<<<<<<< HEAD
         .setBidiEnabled(false)
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30);
+=======
+        .setBidiReadEnabled(false);
+>>>>>>> 170df0e808ffb70c7529acf18e14dfc1ef9d4bdb
   }
 
   public abstract Builder toBuilder();
@@ -108,6 +112,7 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setGrpcReadTimeout(Duration)}. */
   public abstract Duration getGrpcReadMessageTimeout();
 
+<<<<<<< HEAD
   /** See {@link Builder#setBidiEnabled(boolean)}. */
   public abstract boolean isBidiEnabled();
 
@@ -116,6 +121,10 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setBidiClientTimeout(int)}. */
   public abstract int getBidiClientTimeout();
+=======
+  /** See {@link Builder#setBidiReadEnabled}. */
+  public abstract boolean isBidiReadEnabled();
+>>>>>>> 170df0e808ffb70c7529acf18e14dfc1ef9d4bdb
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -218,6 +227,7 @@ public abstract class GoogleCloudStorageReadOptions {
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
 
+<<<<<<< HEAD
     /** Sets the property to use the bidirectional Rapid Storage Api. */
     public abstract Builder setBidiEnabled(boolean bidiEnabled);
 
@@ -229,6 +239,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the total amount of time, we would wait for bidi client initialization. */
     public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
+=======
+    public abstract Builder setBidiReadEnabled(boolean bidiReadEnabled);
+>>>>>>> 170df0e808ffb70c7529acf18e14dfc1ef9d4bdb
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
