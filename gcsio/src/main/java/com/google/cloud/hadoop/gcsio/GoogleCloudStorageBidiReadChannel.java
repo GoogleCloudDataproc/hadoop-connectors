@@ -3,6 +3,7 @@ package com.google.cloud.hadoop.gcsio;
 import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutureCallback;
 import com.google.api.core.ApiFutures;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.RangeSpec;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.List;
+import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -21,13 +23,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
 
 public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
-
-  private final Storage storage;
-  private final StorageResourceId resourceId;
-  private final BlobId blobId;
-  private final GoogleCloudStorageReadOptions readOptions;
   private final BlobReadSession blobReadSession;
-  private ExecutorService boundedThreadPool;
+  private final ExecutorService boundedThreadPool;
+  private boolean isOpen = true;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -35,14 +33,10 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-    this.storage = storage;
-    this.resourceId =
-        new StorageResourceId(
+    StorageResourceId resourceId = new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-    this.blobId =
-        BlobId.of(
+    BlobId blobId = BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-    this.readOptions = readOptions;
     this.blobReadSession =
         initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
     this.boundedThreadPool = boundedThreadPool;
@@ -64,11 +58,6 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   }
 
   @Override
-  public int write(ByteBuffer src) throws IOException {
-    throw new UnsupportedOperationException("Cannot mutate read-only channel");
-  }
-
-  @Override
   public long position() throws IOException {
     // TODO(dhritichopra) Add read flow
     return 0;
@@ -82,24 +71,17 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public long size() throws IOException {
-    // TODO(dhritichopra) Add read flow
-    return 0;
-  }
-
-  @Override
-  public SeekableByteChannel truncate(long size) throws IOException {
-    // TODO(dhritichopra) Add read flow
-    return null;
+      throwIfNotOpen();
   }
 
   @Override
   public boolean isOpen() {
-    // TODO(dhritichopra) Add read flow
-    return false;
+    return isOpen;
   }
 
   @Override
   public void close() throws IOException {
+    isOpen = false;
     blobReadSession.close();
   }
 
@@ -133,6 +115,16 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         });
   }
 
+  @Override
+  public SeekableByteChannel truncate(long size) throws IOException {
+    throw new UnsupportedOperationException("Cannot truncate a read-only channel");
+  }
+
+  @Override
+  public int write(ByteBuffer src) throws IOException {
+    throw new UnsupportedOperationException("Cannot mutate read-only channel");
+  }
+
   private void processBytesAndCompleteRange(
       DisposableByteString disposableByteString,
       VectoredIORange range,
@@ -151,4 +143,12 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       range.getData().complete(buf);
     }
   }
+
+  private void throwIfNotOpen() throws IOException {
+    if (!isOpen()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new ClosedChannelException();
+    }
+  }
+
 }
