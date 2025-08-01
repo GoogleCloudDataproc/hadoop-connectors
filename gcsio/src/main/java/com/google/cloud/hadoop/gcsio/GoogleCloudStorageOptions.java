@@ -67,7 +67,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setHnBucketRenameEnabled(false)
         .setGrpcWriteEnabled(false)
-        .setMoveOperationEnabled(false);
+        .setMoveOperationEnabled(true);
   }
 
   public abstract Builder toBuilder();
