@@ -80,70 +80,15 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     if (currentPosition >= objectSize) {
       return -1;
     }
+    int bytesRead = contentReadChannel.read(dst);
 
-    final int maxRetries = 15;
-    long backoffMillis = 50; // Start with a slightly longer initial wait
-    final long maxBackoff = 1000; // Cap the backoff at 1 second
-
-    for (int retries = 0; retries < maxRetries; retries++) {
-      int bytesRead = contentReadChannel.read(dst);
-
-      if (bytesRead == -1) {
-        this.currentPosition = objectSize;
-        return -1;
-      }
-
-      if (bytesRead > 0) {
-        this.currentPosition += bytesRead;
-        return bytesRead;
-      }
-
-      currentPosition = currentPosition + bytesRead;
-
-      // --- Start of Debugging Code ---
-      // This block inspects the buffer without disrupting its state for other consumers.
-      if (bytesRead > 0) {
-        // 1. Get the buffer's current position, which was advanced by the read() call.
-        int currentBufferPosition = dst.position();
-
-        // 2. Create a byte array to hold the data that was just read.
-        byte[] data = new byte[bytesRead];
-
-        // 3. Rewind the buffer's position to where the new data starts.
-        dst.position(currentBufferPosition - bytesRead);
-
-        // 4. Read the bytes from the buffer into our temporary array.
-        dst.get(data);
-
-        // 5. CRITICAL: Restore the buffer's position to its state right after the read().
-        // This ensures that the buffer appears untouched to any subsequent code.
-        dst.position(currentBufferPosition);
-
-        // 6. Print the content of the buffer for debugging purposes.
-        // We use UTF-8 as a common standard, but you might need a different charset.
-        System.out.println(
-            "DEBUG - Bytes read: "
-                + bytesRead
-                + ", Content: "
-                + new String(data, StandardCharsets.UTF_8));
-      }
-      // If bytesRead is 0, wait and retry.
-      if (retries < maxRetries - 1) {
-        try {
-          Thread.sleep(backoffMillis);
-          backoffMillis = Math.min(backoffMillis * 2, maxBackoff);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          GoogleCloudStorageEventBus.postOnException();
-          throw new IOException("Read operation was interrupted.", e);
-        }
-      }
+    if (bytesRead == -1) {
+      this.currentPosition = objectSize;
+      return -1;
     }
-    // --- End of Debugging Code ---
+    currentPosition = currentPosition + bytesRead;
 
-    GoogleCloudStorageEventBus.postOnException();
-    throw new IOException(
-        "Underlying GCS channel returned 0 bytes after %d retries for path %s. Failing operation.");
+    return bytesRead;
   }
 
   @Override
