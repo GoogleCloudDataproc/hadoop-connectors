@@ -57,13 +57,7 @@ public class FakeBlobReadSession implements BlobReadSession {
       private boolean open = true;
 
       @Override
-      public int read(ByteBuffer dst) throws IOException {
-        if (!open) {
-          throw new ClosedChannelException();
-        }
-        if (position >= data.length) {
-          return -1; // EOF
-        }
+      public int read(ByteBuffer dst) {
         int bytesToRead = Math.min(dst.remaining(), data.length - position);
         dst.put(data, position, bytesToRead);
         position += bytesToRead;
@@ -71,27 +65,18 @@ public class FakeBlobReadSession implements BlobReadSession {
       }
 
       @Override
-      public long position() throws IOException {
-        if (!open) {
-          throw new ClosedChannelException();
-        }
+      public long position(){
         return position;
       }
 
       @Override
-      public SeekableByteChannel position(long newPosition) throws IOException {
-        if (!open) {
-          throw new ClosedChannelException();
-        }
+      public SeekableByteChannel position(long newPosition) {
         this.position = (int) newPosition;
         return this;
       }
 
       @Override
-      public long size() throws IOException {
-        if (!open) {
-          throw new ClosedChannelException();
-        }
+      public long size(){
         return data.length;
       }
 
