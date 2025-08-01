@@ -1,17 +1,15 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.truth.Truth.assertThat;
-
 import com.google.api.core.ApiFutures;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Future;
 
 public class FakeBlobReadSession implements BlobReadSession {
 
@@ -33,21 +31,24 @@ public class FakeBlobReadSession implements BlobReadSession {
   public <Projection> Projection readAs(ReadProjectionConfig<Projection> readProjectionConfig) {
     if (readProjectionConfig instanceof ReadAsSeekableChannel) {
       return (Projection) createFakeSeekableByteChannel();
-    } else {
-      assertThat(readProjectionConfig).isInstanceOf(ReadAsFutureByteString.class);
+    } else if (readProjectionConfig instanceof ReadAsFutureByteString) {
       RangeSpec range = ((ReadAsFutureByteString) readProjectionConfig).getRange();
-      return (Projection)
-          ApiFutures.immediateFuture(
-              new DisposableByteString() {
-                @Override
-                public ByteString byteString() {
-                  return ByteString.copyFrom(getSubString(range).getBytes(StandardCharsets.UTF_8));
-                }
-
-                @Override
-                public void close() throws IOException {}
-              });
+      return (Projection) createAsFutureByteString(range);
     }
+    throw new UnsupportedOperationException("Projection not Supported");
+  }
+
+  private Future<DisposableByteString> createAsFutureByteString(RangeSpec range) {
+    return ApiFutures.immediateFuture(
+        new DisposableByteString() {
+          @Override
+          public ByteString byteString() {
+            return ByteString.copyFrom(getSubString(range).getBytes(StandardCharsets.UTF_8));
+          }
+
+          @Override
+          public void close() throws IOException {}
+        });
   }
 
   private SeekableByteChannel createFakeSeekableByteChannel() {
@@ -65,7 +66,7 @@ public class FakeBlobReadSession implements BlobReadSession {
       }
 
       @Override
-      public long position(){
+      public long position() {
         return position;
       }
 
@@ -76,7 +77,7 @@ public class FakeBlobReadSession implements BlobReadSession {
       }
 
       @Override
-      public long size(){
+      public long size() {
         return data.length;
       }
 
