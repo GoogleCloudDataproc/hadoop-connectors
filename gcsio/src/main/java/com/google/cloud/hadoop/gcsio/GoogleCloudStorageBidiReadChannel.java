@@ -29,10 +29,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private long objectSize;
   private boolean isOpen = true;
   private boolean gzipEncoded = false;
-  @VisibleForTesting private SeekableByteChannel contentReadChannel;
-  @VisibleForTesting private long currentPosition = 0;
-
-  private boolean isProjectionObtained= false;
+  @VisibleForTesting public SeekableByteChannel contentReadChannel;
+  @VisibleForTesting public long currentPosition = 0;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -49,7 +47,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     this.blobReadSession =
         initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
     this.boundedThreadPool = boundedThreadPool;
-    initMetadata(itemInfo.getContentEncoding());
+    initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+    initializeReadSession();
   }
 
   private void initializeReadSession() {
@@ -69,10 +68,6 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
-    if(!isProjectionObtained){
-      isProjectionObtained = true;
-      initializeReadSession();
-    }
     throwIfNotOpen();
     if (!dst.hasRemaining()) {
       return 0;
@@ -87,6 +82,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       this.currentPosition = objectSize;
       return -1;
     }
+    currentPosition = currentPosition + bytesRead;
 
     return bytesRead;
   }
@@ -144,13 +140,20 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public void close() throws IOException {
-    blobReadSession.close();
+    if (isOpen) {
+      isOpen = false;
+      if (contentReadChannel != null) {
+        contentReadChannel.close();
+      }
+      if (blobReadSession != null) {
+        blobReadSession.close();
+      }
+    }
   }
 
   @Override
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    isProjectionObtained = true;
     ranges.forEach(
         range -> {
           ApiFuture<DisposableByteString> futureBytes =
@@ -204,10 +207,12 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     }
   }
 
-  protected void initMetadata(@Nullable String encoding) throws UnsupportedOperationException {
+  protected void initMetadata(@Nullable String encoding, long sizeFromMetadata)
+      throws UnsupportedOperationException {
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
     if (gzipEncoded) {
       throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
     }
+    objectSize = sizeFromMetadata;
   }
 }
