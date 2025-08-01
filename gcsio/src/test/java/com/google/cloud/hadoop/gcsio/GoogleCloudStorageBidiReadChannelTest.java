@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
@@ -8,7 +7,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.core.ApiFutures;
 import com.google.cloud.storage.Storage;
 import java.io.EOFException;
@@ -33,10 +31,8 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   private static final String TEST_OBJECT_NAME = "foo-object";
 
-  private static final int OBJECT_SIZE = 1024 * 1024;
   private static final StorageResourceId RESOURCE_ID =
       new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
-  private static MockHttpTransport transport = mockTransport();
 
   private static final GoogleCloudStorageItemInfo DEFAULT_ITEM_INFO =
       GoogleCloudStorageItemInfo.createObject(
