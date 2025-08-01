@@ -9,11 +9,13 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -23,6 +25,7 @@ import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
@@ -62,6 +65,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     try {
       return storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(e);
     }
   }
@@ -76,19 +80,75 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     if (currentPosition >= objectSize) {
       return -1;
     }
-    int bytesRead = contentReadChannel.read(dst);
 
-    if (bytesRead == -1) {
-      this.currentPosition = objectSize;
-      return -1;
+    final int maxRetries = 15;
+    long backoffMillis = 50; // Start with a slightly longer initial wait
+    final long maxBackoff = 1000; // Cap the backoff at 1 second
+
+    for (int retries = 0; retries < maxRetries; retries++) {
+      int bytesRead = contentReadChannel.read(dst);
+
+      if (bytesRead == -1) {
+        this.currentPosition = objectSize;
+        return -1;
+      }
+
+      if (bytesRead > 0) {
+        this.currentPosition += bytesRead;
+        return bytesRead;
+      }
+
+      currentPosition = currentPosition + bytesRead;
+
+      // --- Start of Debugging Code ---
+      // This block inspects the buffer without disrupting its state for other consumers.
+      if (bytesRead > 0) {
+        // 1. Get the buffer's current position, which was advanced by the read() call.
+        int currentBufferPosition = dst.position();
+
+        // 2. Create a byte array to hold the data that was just read.
+        byte[] data = new byte[bytesRead];
+
+        // 3. Rewind the buffer's position to where the new data starts.
+        dst.position(currentBufferPosition - bytesRead);
+
+        // 4. Read the bytes from the buffer into our temporary array.
+        dst.get(data);
+
+        // 5. CRITICAL: Restore the buffer's position to its state right after the read().
+        // This ensures that the buffer appears untouched to any subsequent code.
+        dst.position(currentBufferPosition);
+
+        // 6. Print the content of the buffer for debugging purposes.
+        // We use UTF-8 as a common standard, but you might need a different charset.
+        System.out.println(
+            "DEBUG - Bytes read: "
+                + bytesRead
+                + ", Content: "
+                + new String(data, StandardCharsets.UTF_8));
+      }
+      // If bytesRead is 0, wait and retry.
+      if (retries < maxRetries - 1) {
+        try {
+          Thread.sleep(backoffMillis);
+          backoffMillis = Math.min(backoffMillis * 2, maxBackoff);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          GoogleCloudStorageEventBus.postOnException();
+          throw new IOException("Read operation was interrupted.", e);
+        }
+      }
     }
-    currentPosition = currentPosition + bytesRead;
+    // --- End of Debugging Code ---
 
-    return bytesRead;
+    GoogleCloudStorageEventBus.postOnException();
+    throw new IOException(
+        "Underlying GCS channel returned 0 bytes after %d retries for path %s. Failing operation.");
   }
 
   @Override
   public int write(ByteBuffer src) throws IOException {
+    GoogleCloudStorageEventBus.postOnException();
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
@@ -102,6 +162,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   public SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
     if (newPosition < 0) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException(String.format("Invalid seek position: %d", newPosition));
     }
     if (newPosition > objectSize) {
@@ -109,6 +170,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
           String.format("Seek position %d is beyond file size %d", newPosition, objectSize));
     }
     if (gzipEncoded) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Gzip is not supported");
     }
     if (newPosition == this.currentPosition) {
@@ -123,6 +185,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   public long size() throws IOException {
     throwIfNotOpen();
     if (objectSize == -1) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Size of file is not available");
     }
     return objectSize;
@@ -130,6 +193,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public SeekableByteChannel truncate(long size) throws IOException {
+    GoogleCloudStorageEventBus.postOnException();
     throw new UnsupportedOperationException("Cannot truncate a read-only channel");
   }
 
@@ -211,6 +275,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       throws UnsupportedOperationException {
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
     if (gzipEncoded) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
     }
     objectSize = sizeFromMetadata;
