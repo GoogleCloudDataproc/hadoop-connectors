@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +31,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private long objectSize;
   private boolean isOpen = true;
   private boolean gzipEncoded = false;
+  private final StorageResourceId resourceId;
   @VisibleForTesting public SeekableByteChannel contentReadChannel;
   @VisibleForTesting public long currentPosition = 0;
 
@@ -41,7 +41,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-    StorageResourceId resourceId =
+    resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
     BlobId blobId =
@@ -80,6 +80,9 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     if (currentPosition >= objectSize) {
       return -1;
     }
+
+    logger.atFiner().log(
+        "Reading %d bytes at %d position from '%s'", dst.remaining(), currentPosition, resourceId);
     int bytesRead = contentReadChannel.read(dst);
 
     if (bytesRead == -1) {
@@ -111,6 +114,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       throw new IOException(String.format("Invalid seek position: %d", newPosition));
     }
     if (newPosition > objectSize) {
+      GoogleCloudStorageEventBus.postOnException();
       throw new java.io.EOFException(
           String.format("Seek position %d is beyond file size %d", newPosition, objectSize));
     }
@@ -121,6 +125,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     if (newPosition == this.currentPosition) {
       return this;
     }
+    logger.atFiner().log(
+        "Seek from %s to %s position for '%s'", currentPosition, newPosition, resourceId);
     contentReadChannel.position(newPosition);
     this.currentPosition = newPosition;
     return this;
@@ -151,6 +157,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   public void close() throws IOException {
     if (isOpen) {
       isOpen = false;
+      logger.atFiner().log("Closing channel for '%s'", resourceId);
       if (contentReadChannel != null) {
         contentReadChannel.close();
       }
