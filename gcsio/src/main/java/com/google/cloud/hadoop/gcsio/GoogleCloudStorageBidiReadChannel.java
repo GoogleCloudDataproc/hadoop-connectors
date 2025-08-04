@@ -84,7 +84,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         dst.remaining(), contentReadChannel.position(), resourceId);
     int bytesRead = contentReadChannel.read(dst);
 
-    while (bytesRead <= 0) {
+    while (bytesRead == 0) {
       bytesRead = contentReadChannel.read(dst);
     }
 
