@@ -139,12 +139,12 @@ public class GoogleCloudStorageItemInfo {
     long creationTime =
         folder.hasCreateTime()
             ? (folder.getCreateTime().getSeconds() * 1000)
-            + (folder.getCreateTime().getNanos() / 1_000_000)
+                + (folder.getCreateTime().getNanos() / 1_000_000)
             : 0;
     long modificationTime =
         folder.hasUpdateTime()
             ? (folder.getUpdateTime().getSeconds() * 1000)
-            + (folder.getUpdateTime().getNanos() / 1_000_000)
+                + (folder.getUpdateTime().getNanos() / 1_000_000)
             : 0;
 
     return new GoogleCloudStorageItemInfo(

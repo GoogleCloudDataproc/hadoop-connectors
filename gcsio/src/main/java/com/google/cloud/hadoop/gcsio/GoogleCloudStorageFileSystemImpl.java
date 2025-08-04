@@ -95,6 +95,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           .setIncludeFoldersAsPrefixes(true)
           .build();
 
+  private static final ListObjectOptions DIRECTORY_EMPTINESS_CHECK_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludePrefix(true)
+          .setIncludeFoldersAsPrefixes(true)
+          .setMaxResults(2)
+          .build();
   public static final ListFileOptions DELETE_RENAME_LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name,generation").build();
 
@@ -349,9 +355,15 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
               // TODO: optimize by listing just one object instead of whole page
               //  (up to 1024 objects now)
-              : listFileInfoForPrefixPage(
-                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
-                  .getItems();
+              : FileInfo.fromItemInfos(
+                  gcs.listObjectInfo(
+                      fileInfo.getItemInfo().getBucketName(),
+                      fileInfo.getItemInfo().getObjectName(),
+                      updateListObjectOptions(
+                          DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)));
+      // listFileInfoForPrefixPage(
+      //     fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+      // .getItems();
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
@@ -1048,6 +1060,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     checkArgument(path != null, "path must not be null");
 
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+    // Use getFolderInfo if HNS optimization flag is enabled and its and HNS bucket
     if (this.options.getCloudStorageOptions().isHnOptimizationEnabled()
         && this.gcs.isHnBucket(path)) {
       FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getFolderInfo(resourceId.toDirectoryId()));
