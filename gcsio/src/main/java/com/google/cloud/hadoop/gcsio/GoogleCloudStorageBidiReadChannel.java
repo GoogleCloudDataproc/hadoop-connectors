@@ -80,7 +80,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     }
 
     logger.atFiner().log(
-        "Reading %d bytes at %d position from '%s'", dst.remaining(), contentReadChannel.position(), resourceId);
+        "Reading %d bytes at %d position from '%s'",
+        dst.remaining(), contentReadChannel.position(), resourceId);
     int bytesRead = contentReadChannel.read(dst);
 
     while (bytesRead <= 0) {
@@ -122,7 +123,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       return this;
     }
     logger.atFiner().log(
-        "Seek from %s to %s position for '%s'", contentReadChannel.position(), newPosition, resourceId);
+        "Seek from %s to %s position for '%s'",
+        contentReadChannel.position(), newPosition, resourceId);
     contentReadChannel.position(newPosition);
     return this;
   }
