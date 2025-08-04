@@ -797,7 +797,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     randomAccess = !gzipEncoded && readOptions.getFadvise() == Fadvise.RANDOM;
     checkEncodingAndAccess();
 
-    if (resourceId.hasGenerationId()) {
+    if (resourceId.hasGenerationId() && resourceId.getGenerationId() > 0) {
       checkState(
           resourceId.getGenerationId() == generation,
           "Provided generation (%s) should be equal to fetched generation (%s) for '%s'",
