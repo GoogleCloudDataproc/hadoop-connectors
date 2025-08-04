@@ -5,9 +5,14 @@ package com.google.cloud.hadoop.gcsio;
  * in a bitmask.
  */
 public enum TrackedFeatures {
+  // Configuration-Derived Features
   FADVISE_AUTO(1),
   FADVISE_RANDOM(2),
-  FADVISE_SEQUENTIAL(3);
+  FADVISE_SEQUENTIAL(3),
+  // FADVISE_AUTO_RANDOM(4), // Reserved for future use.
+
+  // Request-Specific Features
+  API_MOVE(5);
 
   private final int bitPosition;
 
