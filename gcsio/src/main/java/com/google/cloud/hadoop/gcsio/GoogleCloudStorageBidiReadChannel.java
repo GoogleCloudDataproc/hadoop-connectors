@@ -33,7 +33,6 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private boolean gzipEncoded = false;
   private final StorageResourceId resourceId;
   @VisibleForTesting public SeekableByteChannel contentReadChannel;
-  @VisibleForTesting public long currentPosition = 0;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -57,7 +56,6 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private void initializeReadSession() {
     ReadAsSeekableChannel seekableChannelConfig = ReadProjectionConfigs.asSeekableChannel();
     this.contentReadChannel = blobReadSession.readAs(seekableChannelConfig);
-    this.currentPosition = 0;
   }
 
   private static BlobReadSession initializeBlobReadSession(
@@ -77,19 +75,17 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       return 0;
     }
 
-    if (currentPosition >= objectSize) {
+    if (contentReadChannel.position() >= objectSize) {
       return -1;
     }
 
     logger.atFiner().log(
-        "Reading %d bytes at %d position from '%s'", dst.remaining(), currentPosition, resourceId);
+        "Reading %d bytes at %d position from '%s'", dst.remaining(), contentReadChannel.position(), resourceId);
     int bytesRead = contentReadChannel.read(dst);
 
-    if (bytesRead == -1) {
-      this.currentPosition = objectSize;
-      return -1;
+    while (bytesRead > 0) {
+      bytesRead = contentReadChannel.read(dst);
     }
-    currentPosition = currentPosition + bytesRead;
 
     return bytesRead;
   }
@@ -103,7 +99,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   @Override
   public long position() throws IOException {
     throwIfNotOpen();
-    return currentPosition;
+    return contentReadChannel.position();
   }
 
   @Override
@@ -122,13 +118,12 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Gzip is not supported");
     }
-    if (newPosition == this.currentPosition) {
+    if (newPosition == contentReadChannel.position()) {
       return this;
     }
     logger.atFiner().log(
-        "Seek from %s to %s position for '%s'", currentPosition, newPosition, resourceId);
+        "Seek from %s to %s position for '%s'", contentReadChannel.position(), newPosition, resourceId);
     contentReadChannel.position(newPosition);
-    this.currentPosition = newPosition;
     return this;
   }
 
