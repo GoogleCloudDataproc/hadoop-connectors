@@ -1144,50 +1144,55 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     validateMoveArguments(sourceToDestinationObjectsMap);
 
-    if (sourceToDestinationObjectsMap.isEmpty()) {
-      return;
-    }
+    FeatureTracking.track(
+        TrackedFeatures.API_MOVE,
+        () -> {
+          if (sourceToDestinationObjectsMap.isEmpty()) {
+            return;
+          }
 
-    // Gather FileNotFoundExceptions for individual objects,
-    // but only throw a single combined exception at the end.
-    ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
-        ConcurrentHashMap.newKeySet();
+          // Gather FileNotFoundExceptions for individual objects,
+          // but only throw a single combined exception at the end.
+          ConcurrentHashMap.KeySetView<IOException, Boolean> innerExceptions =
+              ConcurrentHashMap.newKeySet();
 
-    String traceContext = String.format("batchmove(size=%s)", sourceToDestinationObjectsMap.size());
-    try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
-      // Perform the move operations.
+          String traceContext =
+              String.format("batchmove(size=%s)", sourceToDestinationObjectsMap.size());
+          try (ITraceOperation to = TraceOperation.addToExistingTrace(traceContext)) {
+            // Perform the move operations.
 
-      BatchHelper batchHelper =
-          batchFactory.newBatchHelper(
-              httpRequestInitializer,
-              storage,
-              storageOptions.getMaxRequestsPerBatch(),
-              sourceToDestinationObjectsMap.size(),
-              storageOptions.getBatchThreads(),
-              "batchmove");
+            BatchHelper batchHelper =
+                batchFactory.newBatchHelper(
+                    httpRequestInitializer,
+                    storage,
+                    storageOptions.getMaxRequestsPerBatch(),
+                    sourceToDestinationObjectsMap.size(),
+                    storageOptions.getBatchThreads(),
+                    "batchmove");
 
-      for (Map.Entry<StorageResourceId, StorageResourceId> entry :
-          sourceToDestinationObjectsMap.entrySet()) {
-        StorageResourceId srcObject = entry.getKey();
-        StorageResourceId dstObject = entry.getValue();
-        moveInternal(
-            batchHelper,
-            innerExceptions,
-            srcObject.getBucketName(),
-            srcObject.getGenerationId(),
-            srcObject.getObjectName(),
-            dstObject.getGenerationId(),
-            dstObject.getObjectName());
-      }
+            for (Map.Entry<StorageResourceId, StorageResourceId> entry :
+                sourceToDestinationObjectsMap.entrySet()) {
+              StorageResourceId srcObject = entry.getKey();
+              StorageResourceId dstObject = entry.getValue();
+              moveInternal(
+                  batchHelper,
+                  innerExceptions,
+                  srcObject.getBucketName(),
+                  srcObject.getGenerationId(),
+                  srcObject.getObjectName(),
+                  dstObject.getGenerationId(),
+                  dstObject.getObjectName());
+            }
 
-      // Execute any remaining requests not divisible by the max batch size.
-      batchHelper.flush();
+            // Execute any remaining requests not divisible by the max batch size.
+            batchHelper.flush();
 
-      if (!innerExceptions.isEmpty()) {
-        GoogleCloudStorageEventBus.postOnException();
-        throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
-      }
-    }
+            if (!innerExceptions.isEmpty()) {
+              GoogleCloudStorageEventBus.postOnException();
+              throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+            }
+          }
+        });
   }
 
   /**
@@ -2549,7 +2554,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     setRequesterPaysProject(request, bucketName);
 
     String clientFeatures = storageOptions.getClientFeaturesValue();
-    if (clientFeatures != null) {
+    if (!Strings.isNullOrEmpty(clientFeatures)) {
       request
           .getRequestHeaders()
           .set(

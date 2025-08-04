@@ -21,7 +21,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -152,16 +151,7 @@ public abstract class GoogleCloudStorageOptions {
   /** Generates a bitmask of enabled features. Returns null if no special features are enabled. */
   @Nullable
   public String getClientFeaturesValue() {
-    long features = 0;
-    Fadvise fadvise = getReadChannelOptions().getFadvise();
-    if (fadvise == Fadvise.AUTO) {
-      features |= (1L << TrackedFeatures.FADVISE_AUTO.getBitPosition());
-    } else if (fadvise == Fadvise.RANDOM) {
-      features |= (1L << TrackedFeatures.FADVISE_RANDOM.getBitPosition());
-    } else if (fadvise == Fadvise.SEQUENTIAL) {
-      features |= (1L << TrackedFeatures.FADVISE_SEQUENTIAL.getBitPosition());
-    }
-    return features == 0 ? null : String.valueOf(features);
+    return ClientSideMetrics.getClientFeaturesValue(this);
   }
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
