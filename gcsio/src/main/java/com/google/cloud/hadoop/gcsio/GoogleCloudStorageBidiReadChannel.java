@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +33,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private boolean isOpen = true;
   private boolean gzipEncoded = false;
   private final StorageResourceId resourceId;
+
+  private final Duration readTimeout;
   @VisibleForTesting public SeekableByteChannel contentReadChannel;
 
   public GoogleCloudStorageBidiReadChannel(
@@ -40,6 +43,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
+    readTimeout = readOptions.getGrpcReadTimeout();
     resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
@@ -82,9 +86,20 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     logger.atFiner().log(
         "Reading %d bytes at %d position from '%s'",
         dst.remaining(), contentReadChannel.position(), resourceId);
+
+    long startTime = System.nanoTime();
+    long timeoutNanos = readTimeout.toNanos();
+
     int bytesRead = contentReadChannel.read(dst);
 
+
     while (bytesRead == 0) {
+      if (System.nanoTime() - startTime >= timeoutNanos) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IOException(
+                String.format(
+                        "Read timeout on %s after %s. No data was received.", resourceId, readTimeout));
+      }
       bytesRead = contentReadChannel.read(dst);
     }
 
