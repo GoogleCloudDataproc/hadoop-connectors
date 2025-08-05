@@ -92,13 +92,12 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
     int bytesRead = contentReadChannel.read(dst);
 
-
     while (bytesRead == 0) {
       if (System.nanoTime() - startTime >= timeoutNanos) {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException(
-                String.format(
-                        "Read timeout on %s after %s. No data was received.", resourceId, readTimeout));
+            String.format(
+                "Read timeout on %s after %s. No data was received.", resourceId, readTimeout));
       }
       bytesRead = contentReadChannel.read(dst);
     }
