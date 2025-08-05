@@ -11,6 +11,7 @@ import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -120,19 +121,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
-    if (newPosition < 0) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new IOException(String.format("Invalid seek position: %d", newPosition));
-    }
-    if (newPosition > objectSize) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new java.io.EOFException(
-          String.format("Seek position %d is beyond file size %d", newPosition, objectSize));
-    }
-    if (gzipEncoded) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new IOException("Gzip is not supported");
-    }
+    validatePosition(newPosition);
     if (newPosition == contentReadChannel.position()) {
       return this;
     }
@@ -242,5 +231,23 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
     }
     objectSize = sizeFromMetadata;
+  }
+
+  private void validatePosition(long position) throws IOException {
+    if (position < 0) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new EOFException(
+          String.format(
+              "Invalid seek offset: position value (%d) must be >= 0 for '%s'",
+              position, resourceId));
+    }
+
+    if (objectSize >= 0 && position >= objectSize) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new EOFException(
+          String.format(
+              "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
+              position, objectSize, resourceId));
+    }
   }
 }
