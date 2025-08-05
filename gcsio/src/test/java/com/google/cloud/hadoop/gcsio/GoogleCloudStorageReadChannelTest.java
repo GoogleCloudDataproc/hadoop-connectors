@@ -598,10 +598,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadChannel readChannel =
-        createReadChannel(
-            storage,
-            GoogleCloudStorageReadOptions.builder().build(),
-            generation);
+        createReadChannel(storage, GoogleCloudStorageReadOptions.builder().build(), generation);
 
     readChannel.read(ByteBuffer.allocate(testData.length));
 
