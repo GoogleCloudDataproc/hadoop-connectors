@@ -96,7 +96,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
   public void position_set_negative_throwsIOException() throws IOException {
     GoogleCloudStorageBidiReadChannel channel = getMockedBidiReadChannel();
     IOException e = assertThrows(IOException.class, () -> channel.position(-1));
-    assertThat(e).hasMessageThat().contains("Invalid seek position: -1");
+    assertThat(e).hasMessageThat().contains("Invalid seek offset: position value (-1) must be >= 0 for 'gs://foo-bucket/foo-object'");
   }
 
   @Test
@@ -107,9 +107,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     assertThat(e)
         .hasMessageThat()
         .contains(
-            String.format(
-                "Seek position %d is beyond file size %d",
-                invalidPosition, FakeBlobReadSession.TEST_STRING_SIZE));
+                "Invalid seek offset: position value (103) must be between 0 and 100 for 'gs://foo-bucket/foo-object'");
   }
 
   @Test
