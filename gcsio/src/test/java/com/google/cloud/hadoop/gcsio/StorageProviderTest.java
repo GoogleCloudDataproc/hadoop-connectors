@@ -327,4 +327,36 @@ public class StorageProviderTest {
     assertNotNull(key);
     assertEquals(ImmutableList.of(ComputeEngineCredentials.class), key.getCredentialsKey());
   }
+
+  @Test
+  public void onRemoval_evictionBySize_cleansUpResources() throws IOException {
+    // Configure a cache of size 1
+    GoogleCloudStorageOptions options =
+        TEST_STORAGE_OPTIONS.toBuilder().setStorageClientCacheMaxSize(1).build();
+    // Create two different options objects to generate two different cache keys.
+    // We vary the trace log setting, which is part of the cache key.
+    GoogleCloudStorageOptions options1 = options.toBuilder().setTraceLogEnabled(true).build();
+    GoogleCloudStorageOptions options2 = options.toBuilder().setTraceLogEnabled(false).build();
+    // Use null credentials, which is a safe and common case for testing.
+    // The cache key will be differentiated by the options objects.
+    Credentials credentials = null;
+    // Get the first storage object, which will be cached.
+    StorageWrapper storage1 =
+        storageProvider.getStorage(
+            credentials, options1, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+    assertEquals(1, storageProvider.cache.size());
+    assertTrue(storageProvider.storageToCacheKeyMap.containsKey(storage1));
+    assertTrue(storageProvider.storageClientToReferenceMap.containsKey(storage1));
+    // Get a second, different storage object. This should cause the first one to be evicted
+    // because the cache size is 1.
+    StorageWrapper storage2 =
+        storageProvider.getStorage(
+            credentials, options2, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+    assertNotEquals(storage1, storage2);
+    // Manually trigger Guava's cache cleanup to process the eviction and run the removal listener.
+    storageProvider.cache.cleanUp();
+    // The first storage object should now be gone from all tracking maps.
+    assertFalse(storageProvider.storageToCacheKeyMap.containsKey(storage1));
+    assertFalse(storageProvider.storageClientToReferenceMap.containsKey(storage1));
+  }
 }

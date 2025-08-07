@@ -11,6 +11,7 @@ import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
@@ -46,14 +47,14 @@ public class StorageProvider {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  synchronized StorageWrapper getStorage(
+  StorageWrapper getStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
+    if (!canCache(storageOptions, interceptors, pCUExecutorService, downscopedAccessTokenFn)) {
       logger.atFiner().log(
           "Ignoring storage object cache because caching is disabled or custom components are"
               + " used.");
@@ -81,6 +82,7 @@ public class StorageProvider {
               CacheBuilder.newBuilder()
                   .maximumSize(storageOptions.getStorageClientCacheMaxSize())
                   .expireAfterWrite(storageOptions.getStorageClientCacheExpiryTime())
+                  .removalListener(this::onRemoval)
                   .recordStats()
                   .build();
         }
@@ -130,15 +132,28 @@ public class StorageProvider {
       logger.atFinest().log("close() called on storage object outside cache.");
       return;
     }
-    // Decrement the reference count of the object.
-    storageClientToReferenceMap.put(storage, storageClientToReferenceMap.get(storage) - 1);
-    if (storageClientToReferenceMap.get(storage) == 0) {
-      logger.atFinest().log("close() called on storage object inside cache.");
+    // Atomically decrement the reference count. If it drops to zero, the remapping function
+    // returns null, which removes the entry from the map.
+    Integer newCount =
+        storageClientToReferenceMap.computeIfPresent(storage, (k, v) -> (v > 1) ? v - 1 : null);
+    if (newCount == null) {
+      // The reference count has reached zero. Invalidate the entry from the cache.
+      // The removal listener will handle the actual closing of the storage object
+      // and cleanup of the other map.
       StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
-      cache.invalidate(key);
-      storageToCacheKeyMap.remove(storage);
-      storageClientToReferenceMap.remove(storage);
-      closeStorage(storage.getStorage());
+      if (key != null && cache != null) {
+        logger.atFiner().log(
+            "Reference count is zero; invalidating storage client from cache for key: %s", key);
+        cache.invalidate(key);
+      } else {
+        // This case should ideally not be reached if the object was in the reference map.
+        // It indicates a potential state inconsistency or the cache was never initialized.
+        logger.atWarning().log(
+            "Could not invalidate from cache for a storage object whose reference count reached zero."
+                + " The object will be closed directly, but this may indicate a bug.");
+        storageToCacheKeyMap.remove(storage); // Clean up the other map.
+        closeStorage(storage.getStorage());
+      }
     }
   }
 
@@ -213,12 +228,35 @@ public class StorageProvider {
   private static boolean canCache(
       GoogleCloudStorageOptions options,
       List<ClientInterceptor> interceptors,
-      ExecutorService pCUExecutorService) {
+      ExecutorService pCUExecutorService,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     return options.isStorageClientCachingEnabled()
         // These values are currently passed while creating the storage client, but they are
         // currently not configurable by the FS options so skipping caching.
         && pCUExecutorService == null
-        && (interceptors == null || interceptors.isEmpty());
+        && (interceptors == null || interceptors.isEmpty())
+        // Downscoped access token function makes the client's configuration unique and
+        // non-shareable.
+        && downscopedAccessTokenFn == null;
+  }
+
+  /**
+   * A listener that is called by the cache whenever an item is removed. This is the centralized
+   * location for cleaning up all resources associated with a cached Storage client.
+   */
+  private void onRemoval(
+      RemovalNotification<StorageProviderCacheKey, StorageWrapper> notification) {
+    StorageWrapper storageWrapper = notification.getValue();
+    // The value can be null if it was garbage-collected (with weak/soft values).
+    if (storageWrapper == null) {
+      return;
+    }
+    logger.atFiner().log(
+        "Removing storage client for key %s from cache. Cause: %s.",
+        notification.getKey(), notification.getCause());
+    storageToCacheKeyMap.remove(storageWrapper);
+    storageClientToReferenceMap.remove(storageWrapper);
+    closeStorage(storageWrapper.getStorage());
   }
 
   private static Storage createStorage(
