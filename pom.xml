@@ -91,7 +91,7 @@
     <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
     <assertj.version>3.14.0</assertj.version>
     <deploy.skip>true</deploy.skip>
-    <nexus.remote.skip>false</nexus.remote.skip>
+    <central.publishing.skip>false</central.publishing.skip>
   </properties>
 
   <modules>
@@ -164,6 +164,7 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>false</autoPublish>
+              <skipPublishing>${central.publishing.skip}</skipPublishing>
               <checksums>all</checksums>
             </configuration>
           </plugin>
