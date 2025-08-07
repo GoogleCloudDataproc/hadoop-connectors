@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade to use cloud-storage libraries-bom
 
 1. Add getFileStatusWithHint() API
 
