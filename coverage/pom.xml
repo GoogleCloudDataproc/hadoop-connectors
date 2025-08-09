@@ -24,6 +24,11 @@
     <version>3.0.10-SNAPSHOT</version>
   </parent>
 
+  <name>coverage</name>
+  <description>
+    coverage package for gcs-connector
+  </description>
+
   <artifactId>coverage</artifactId>
   <version>3.0.10-SNAPSHOT</version>
   <packaging>pom</packaging>

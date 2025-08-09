@@ -25,6 +25,12 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
+  <name>util</name>
+  <description>
+    util package for gcs-connector
+  </description>
+
+
   <artifactId>util</artifactId>
   <version>3.0.10-SNAPSHOT</version>
 
