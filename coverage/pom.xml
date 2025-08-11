@@ -24,6 +24,8 @@
     <version>3.0.10-SNAPSHOT</version>
   </parent>
 
+  <name>coverage</name>
+
   <artifactId>coverage</artifactId>
   <version>3.0.10-SNAPSHOT</version>
   <packaging>pom</packaging>
