@@ -10,6 +10,8 @@
     <version>2.2.29-SNAPSHOT</version>
   </parent>
 
+  <name>coverage</name>
+
   <artifactId>coverage</artifactId>
   <version>2.2.29-SNAPSHOT</version>
   <packaging>pom</packaging>
