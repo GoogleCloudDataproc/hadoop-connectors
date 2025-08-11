@@ -25,6 +25,8 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
+  <name>util</name>
+
   <artifactId>util</artifactId>
   <version>3.0.10-SNAPSHOT</version>
 
