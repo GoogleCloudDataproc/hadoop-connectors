@@ -165,7 +165,7 @@
               <publishingServerId>central</publishingServerId>
               <autoPublish>false</autoPublish>
               <skipPublishing>${central.publishing.skip}</skipPublishing>
-              <checksums>all</checksums>
+              <checksums>required</checksums>
             </configuration>
           </plugin>
           <plugin>
