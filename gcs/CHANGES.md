@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.10 - 2025-08-12
 1. PR #1396 - [Bug] Throw correct exception when DeleteFolderOperation is timed out
 1. PR #1385 - [Bug] Correcting checksum calculation when received buffer is already moved
 1. PR #1413 - [Bug] Fixing DeleteFolder stalling issue where high CPU usage can cause timeouts
