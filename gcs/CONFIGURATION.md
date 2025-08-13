@@ -55,6 +55,14 @@
     return `null` for that file. Supported checksum types are `NONE`, `CRC32C`
     and `MD5`
 
+*   `fs.gs.cloud.logging.enable` (default: `false`)
+
+    If `true`, exports Cloud Storage Connector logs to GCP Logging service.The service account used by the connector
+    must have `roles/logging.logWriter` IAM permission in the GCP project for this feature to work.
+    The logs will be labelled with log name `gcs-connector` suffixed with the value of `fs.gs.application.name.suffix`
+    if set. For example, if `fs.gs.application.name.suffix` is set to `my-app`, the log name will be
+    `gcs-connector-my-app`.
+
 *   `fs.gs.status.parallel.enable` (default: `true`)
 
     If `true`, executes Cloud Storage object requests in `FileSystem`'s
