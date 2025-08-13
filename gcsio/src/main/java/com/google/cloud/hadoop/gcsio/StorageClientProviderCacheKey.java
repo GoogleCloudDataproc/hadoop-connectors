@@ -7,10 +7,10 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 @AutoValue
-public abstract class StorageProviderCacheKey {
+public abstract class StorageClientProviderCacheKey {
 
-  public static StorageProviderCacheKey.Builder builder() {
-    return new AutoValue_StorageProviderCacheKey.Builder();
+  public static StorageClientProviderCacheKey.Builder builder() {
+    return new AutoValue_StorageClientProviderCacheKey.Builder();
   }
 
   /** Whether tracing is requested. */
@@ -18,9 +18,6 @@ public abstract class StorageProviderCacheKey {
 
   @Nullable
   public abstract List<Object> getCredentialsKey();
-
-  /** Whether downscoped tokens are used for authenticating with the GCS backend. */
-  public abstract boolean getIsDownScopingEnabled();
 
   @Nullable
   public abstract ImmutableMap<String, String> getHttpHeaders();
@@ -33,7 +30,7 @@ public abstract class StorageProviderCacheKey {
 
   public abstract boolean getIsDirectPathPreferred();
 
-  public abstract StorageProviderCacheKey.Builder toBuilder();
+  public abstract StorageClientProviderCacheKey.Builder toBuilder();
 
   @AutoValue.Builder
   public abstract static class Builder {
@@ -41,8 +38,6 @@ public abstract class StorageProviderCacheKey {
     public abstract Builder setIsTracingEnabled(boolean value);
 
     public abstract Builder setCredentialsKey(List<Object> value);
-
-    public abstract Builder setIsDownScopingEnabled(boolean value);
 
     public abstract Builder setHttpHeaders(ImmutableMap<String, String> value);
 
@@ -52,6 +47,6 @@ public abstract class StorageProviderCacheKey {
 
     public abstract Builder setIsDirectPathPreferred(boolean value);
 
-    public abstract StorageProviderCacheKey build();
+    public abstract StorageClientProviderCacheKey build();
   }
 }

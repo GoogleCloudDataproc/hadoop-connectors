@@ -2,6 +2,9 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl.*;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -9,9 +12,6 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
@@ -30,9 +30,9 @@ import java.util.stream.Collectors;
  * Provides GCS SDK Storage object which is used to access the GCS. Also Caches the storage objects,
  * so they can be used re-used.
  */
-public class StorageProvider {
+public class StorageClientProvider {
 
-  @VisibleForTesting volatile Cache<StorageProviderCacheKey, StorageWrapper> cache;
+  @VisibleForTesting volatile Cache<StorageClientProviderCacheKey, StorageWrapper> cache;
 
   /**
    * Tracks the number of times a storage client is used. Used to determine when a storage can be
@@ -42,7 +42,7 @@ public class StorageProvider {
   final Map<StorageWrapper, Integer> storageClientToReferenceMap = new ConcurrentHashMap<>();
 
   /** Reverse map for storage reference to cache keys. */
-  final Map<StorageWrapper, StorageProviderCacheKey> storageToCacheKeyMap =
+  final Map<StorageWrapper, StorageClientProviderCacheKey> storageToCacheKeyMap =
       new ConcurrentHashMap<>();
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -67,19 +67,24 @@ public class StorageProvider {
               downscopedAccessTokenFn),
           this);
     }
-    StorageProviderCacheKey key =
-        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
+    StorageClientProviderCacheKey key = computeCacheKey(credentials, storageOptions);
     if (key == null) {
       // When a stable key cannot be generated for the credentials, do not cache.
       return new StorageWrapper(
-          createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn), this);
+          createStorage(
+              credentials,
+              storageOptions,
+              interceptors,
+              pCUExecutorService,
+              downscopedAccessTokenFn),
+          this);
     }
 
     if (cache == null) {
       synchronized (this) {
         if (cache == null) {
           cache =
-              CacheBuilder.newBuilder()
+              Caffeine.newBuilder()
                   .maximumSize(storageOptions.getStorageClientCacheMaxSize())
                   .expireAfterWrite(storageOptions.getStorageClientCacheExpiryTime())
                   .removalListener(this::onRemoval)
@@ -89,36 +94,44 @@ public class StorageProvider {
       }
     }
     logger.atFinest().log("Key: %s", key);
-    StorageWrapper storage = cache.getIfPresent(key);
-    if (storage == null) {
+    StorageWrapper storage;
+    try {
       synchronized (this) {
-        storage = cache.getIfPresent(key);
-        if (storage == null) {
-          storage =
-              new StorageWrapper(
-                  createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn),
-                  this);
-          cache.put(key, storage);
-          storageToCacheKeyMap.put(storage, key);
-          logger.atFinest().log(
-              "Cache miss for %d, created new storage client. Cache hit count : %d, Cache hit rate"
-                  + ": %.2f",
-              key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
-        } else {
-          logger.atInfo().log(
-              "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate"
-                  + ": %.2f",
-              key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
-        }
+        storage =
+            cache.get(
+                key,
+                k -> {
+                  try {
+                    StorageWrapper newStorage =
+                        new StorageWrapper(
+                            createStorage(
+                                credentials,
+                                storageOptions,
+                                interceptors,
+                                pCUExecutorService,
+                                downscopedAccessTokenFn),
+                            this);
+                    storageToCacheKeyMap.put(newStorage, k);
+                    logger.atFinest().log(
+                        "Cache miss. Created new storage client. Cache hit count : %d, Cache hit rate"
+                            + ": %.2f",
+                        cache.stats().hitCount(), cache.stats().hitRate());
+                    return newStorage;
+                  } catch (IOException e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+        storageClientToReferenceMap.compute(storage, (k, v) -> v == null ? 1 : v + 1);
       }
-    } else {
-      logger.atInfo().log(
-          "Cache hit for %d, reusing the storage client. Cache hit count : %d, Cache hit rate:"
-              + " %.2f",
-          key.hashCode(), cache.stats().hitCount(), cache.stats().hitRate());
+    } catch (RuntimeException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw e;
     }
-    // Increment the reference count of the storage object.
-    storageClientToReferenceMap.compute(storage, (k, v) -> v == null ? 1 : v + 1);
+    logger.atInfo().log(
+        "Using storage client. Reference count: %d. Cache stats: %s",
+        storageClientToReferenceMap.get(storage), cache.stats());
     return storage;
   }
 
@@ -129,48 +142,56 @@ public class StorageProvider {
   synchronized void close(StorageWrapper storage) {
     if (!storageClientToReferenceMap.containsKey(storage)) {
       closeStorage(storage.getStorage());
-      logger.atFinest().log("close() called on storage object outside cache.");
+      logger.atFinest().log("close() called on storage object outside reference tracking.");
       return;
     }
     // Atomically decrement the reference count. If it drops to zero, the remapping function
     // returns null, which removes the entry from the map.
     Integer newCount =
         storageClientToReferenceMap.computeIfPresent(storage, (k, v) -> (v > 1) ? v - 1 : null);
-    if (newCount == null) {
-      // The reference count has reached zero. Invalidate the entry from the cache.
-      // The removal listener will handle the actual closing of the storage object
-      // and cleanup of the other map.
-      StorageProviderCacheKey key = storageToCacheKeyMap.get(storage);
-      if (key != null && cache != null) {
-        logger.atFiner().log(
-            "Reference count is zero; invalidating storage client from cache for key: %s", key);
-        cache.invalidate(key);
-      } else {
-        // This case should ideally not be reached if the object was in the reference map.
-        // It indicates a potential state inconsistency or the cache was never initialized.
-        logger.atWarning().log(
-            "Could not invalidate from cache for a storage object whose reference count reached zero."
-                + " The object will be closed directly, but this may indicate a bug.");
-        storageToCacheKeyMap.remove(storage); // Clean up the other map.
-        closeStorage(storage.getStorage());
-      }
+    if (newCount != null) {
+      return; // Still in use.
     }
+
+    // If newCount is null, meaning the reference count dropped to zero and the entry
+    // was removed from storageClientToReferenceMap, clean up everything else.
+    logger.atFiner().log("Reference count is zero; cleaning up all resources for storage object.");
+
+    StorageClientProviderCacheKey key = storageToCacheKeyMap.get(storage);
+    if (key != null && cache != null) {
+      cache.invalidate(key);
+    }
+    closeStorage(storage.getStorage());
+  }
+
+  /**
+   * Listener for when an item is removed from the cache (e.g., expired, evicted). We must clean up
+   * our tracking map to prevent memory leaks.
+   */
+  private void onRemoval(
+      StorageClientProviderCacheKey key, StorageWrapper storageWrapper, RemovalCause cause) {
+    // The value can be null if it was garbage-collected.
+    if (storageWrapper == null) {
+      return;
+    }
+    logger.atFiner().log("Removing storage client for key %s from cache. Cause: %s.", key, cause);
+    // Only remove the entry from the reverse map.
+    // The storage object itself will be closed via the close() method
+    // when its reference count drops to zero.
+    storageToCacheKeyMap.remove(storageWrapper);
   }
 
   @VisibleForTesting
-  StorageProviderCacheKey computeCacheKey(
-      Credentials credentials,
-      GoogleCloudStorageOptions storageOptions,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+  StorageClientProviderCacheKey computeCacheKey(
+      Credentials credentials, GoogleCloudStorageOptions storageOptions) {
     List<Object> credentialsKey = getCredentialsCacheKey(credentials);
     if (credentialsKey == null) {
       return null;
     }
-    return StorageProviderCacheKey.builder()
+    return StorageClientProviderCacheKey.builder()
         .setCredentialsKey(credentialsKey)
         .setHttpHeaders(storageOptions.getHttpRequestHeaders())
         .setIsDirectPathPreferred(storageOptions.isDirectPathPreferred())
-        .setIsDownScopingEnabled(downscopedAccessTokenFn != null)
         .setIsTracingEnabled(storageOptions.isTraceLogEnabled())
         .setWriteChannelOptions(storageOptions.getWriteChannelOptions())
         .setProjectId(storageOptions.getProjectId())
@@ -240,26 +261,8 @@ public class StorageProvider {
         && downscopedAccessTokenFn == null;
   }
 
-  /**
-   * A listener that is called by the cache whenever an item is removed. This is the centralized
-   * location for cleaning up all resources associated with a cached Storage client.
-   */
-  private void onRemoval(
-      RemovalNotification<StorageProviderCacheKey, StorageWrapper> notification) {
-    StorageWrapper storageWrapper = notification.getValue();
-    // The value can be null if it was garbage-collected (with weak/soft values).
-    if (storageWrapper == null) {
-      return;
-    }
-    logger.atFiner().log(
-        "Removing storage client for key %s from cache. Cause: %s.",
-        notification.getKey(), notification.getCause());
-    storageToCacheKeyMap.remove(storageWrapper);
-    storageClientToReferenceMap.remove(storageWrapper);
-    closeStorage(storageWrapper.getStorage());
-  }
-
-  private static Storage createStorage(
+  @VisibleForTesting
+  Storage createStorage(
       Credentials credentials,
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,

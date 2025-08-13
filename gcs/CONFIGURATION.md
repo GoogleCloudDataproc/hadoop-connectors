@@ -486,8 +486,8 @@ better latency and increased bandwidth. Currently supported only for read/write 
    * `CHUNK_UPLOAD` uploads file in chunks, size of chunks are configurable via
      `fs.gs.outputstream.upload.chunk.size`
 
-*  `fs.gs.storage.client.caching.enable` (default: `false`) enables gRPC storage
-   client caching so FileSystem objects with similar configs can share the client.
+*  `fs.gs.storage.client.caching.enable` (default: `false`) enables caching of gRPC storage
+   clients. When set to true, FileSystem instances with similar configurations will reuse the same gRPC client.
 
 *  `fs.gs.storage.client.cache.maxSize` (default: `10`) Maximum number of gRPC storage clients to cache.
 

@@ -22,7 +22,6 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_I
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
@@ -332,7 +331,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.setTimeDuration("fs.gs.grpc.read.timeout", 7, MILLISECONDS);
     config.setTimeDuration("fs.gs.grpc.write.message.timeout", 25, MILLISECONDS);
     config.setTimeDuration("fs.gs.grpc.write.timeout", 20, MILLISECONDS);
-    config.setTimeDuration("fs.gs.http.connect-timeout", 10, MINUTES);
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();

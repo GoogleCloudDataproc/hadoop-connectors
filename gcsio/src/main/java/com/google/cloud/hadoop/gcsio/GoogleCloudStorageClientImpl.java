@@ -122,7 +122,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private final GoogleCloudStorageOptions storageOptions;
   @VisibleForTesting final StorageWrapper storage;
 
-  private static final StorageProvider storageProvider = new StorageProvider();
+  private static final StorageClientProvider storageClientProvider = new StorageClientProvider();
 
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
@@ -185,13 +185,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
-            ? storageProvider.getStorage(
+            ? storageClientProvider.getStorage(
                 credentials,
                 storageOptions,
                 gRPCInterceptors,
                 pCUExecutorService,
                 downscopedAccessTokenFn)
-            : new StorageWrapper(clientLibraryStorage, storageProvider);
+            : new StorageWrapper(clientLibraryStorage, storageClientProvider);
     this.boundedThreadPool = null;
   }
 
@@ -1240,7 +1240,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   public void close() {
     try {
       try {
-        storageProvider.close(storage);
+        storageClientProvider.close(storage);
       } catch (Exception e) {
         logger.atWarning().withCause(e).log("Error occurred while closing the storage client");
       }

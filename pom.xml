@@ -88,6 +88,7 @@
     <google.api.grpc.proto-google-iam-v1.version>1.6.23</google.api.grpc.proto-google-iam-v1.version>
     <google.auth.version>1.33.1</google.auth.version>
     <google.auto-value.version>1.10.4</google.auto-value.version>
+    <caffeine.version>3.1.8</caffeine.version>
     <google.cloud-core.verion>2.44.1</google.cloud-core.verion>
     <google.cloud-storage.bom.version>2.52.2</google.cloud-storage.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
@@ -274,6 +275,11 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client-gson</artifactId>

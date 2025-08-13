@@ -20,11 +20,11 @@ import com.google.cloud.storage.Storage;
 
 class StorageWrapper {
   private final Storage storage;
-  private final StorageProvider storageProvider;
+  private final StorageClientProvider storageClientProvider;
 
-  StorageWrapper(Storage storage, StorageProvider storageProvider) {
+  StorageWrapper(Storage storage, StorageClientProvider storageClientProvider) {
     this.storage = storage;
-    this.storageProvider = storageProvider;
+    this.storageClientProvider = storageClientProvider;
   }
 
   Storage getStorage() {
@@ -32,6 +32,6 @@ class StorageWrapper {
   }
 
   void close() {
-    storageProvider.close(this);
+    storageClientProvider.close(this);
   }
 }
