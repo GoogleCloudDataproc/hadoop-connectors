@@ -177,6 +177,12 @@
                     implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>
               <filters>
+                <filter>
+                  <artifact>com.github.ben-manes.caffeine:caffeine</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
                 <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
                 <filter>
                   <artifact>com.google.auth:*</artifact>
@@ -207,6 +213,7 @@
               </filters>
               <artifactSet>
                 <includes>
+                  <include>com.github.ben-manes.caffeine</include>
                   <include>com.google.api</include>
                   <include>com.google.api-client</include>
                   <include>com.google.api.grpc</include>
@@ -242,6 +249,7 @@
                   <pattern>com</pattern>
                   <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.com</shadedPattern>
                   <includes>
+                    <include>com.github.benmanes.caffeine.**</include>
                     <include>com.google.api.**</include>
                     <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>

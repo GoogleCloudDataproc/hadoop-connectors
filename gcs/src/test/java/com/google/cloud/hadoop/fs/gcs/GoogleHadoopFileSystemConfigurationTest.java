@@ -133,6 +133,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
+          put("fs.gs.storage.client.caching.enable", false);
+          put("fs.gs.storage.client.cache.maxSize", 10);
+          put("fs.gs.storage.client.cache.time", 600_000L);
         }
       };
 
@@ -382,6 +385,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.http.read-timeout", "2000ms");
     config.set("fs.gs.max.wait.for.empty.object.creation", "90s");
     config.set("fs.gs.performance.cache.max.entry.age", "4s");
+    config.set("fs.gs.storage.client.cache.time", "10m");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -401,5 +405,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+    assertThat(options.getStorageClientCacheExpiryTime()).isEqualTo(Duration.ofMinutes(10));
   }
 }
