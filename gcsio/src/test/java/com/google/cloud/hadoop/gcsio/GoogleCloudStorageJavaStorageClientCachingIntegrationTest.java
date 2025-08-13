@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getCredentials;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -53,7 +52,6 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
     optionsBuilder.setStorageClientCachingEnabled(enableCaching);
     return GoogleCloudStorageClientImpl.builder()
         .setOptions(optionsBuilder.build())
-        .setCredentials(getCredentials())
         .setCredentials(null)
         .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
         .build();
