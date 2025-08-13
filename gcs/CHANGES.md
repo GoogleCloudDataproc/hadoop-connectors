@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade google-cloud-storage to 2.46.0
 
 ## 2.2.28 - 2025-05-28
 1. Skip Soft delete using move API during rename
