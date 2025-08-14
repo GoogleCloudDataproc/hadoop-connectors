@@ -39,6 +39,8 @@ steps:
     args:
       - -c
       - |
+        gcloud components update --quiet
+        
         # Generate a unique name for the zonal bucket. $SHORT_SHA is a valid Cloud Build substitution.
         BUCKET_NAME="zonal-bucket-$SHORT_SHA"
         
