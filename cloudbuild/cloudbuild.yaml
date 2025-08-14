@@ -39,26 +39,26 @@ steps:
     args:
       - -c
       - |
-        # Generate a unique name for the zonal bucket
+        # Generate a unique name for the zonal bucket. $SHORT_SHA is a valid Cloud Build substitution.
         BUCKET_NAME="zonal-bucket-$SHORT_SHA"
         
-        # Fetch the zone of the running worker from the metadata server
-        WORKER_ZONE_FULL_PATH=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")
-        WORKER_ZONE=$(echo "$WORKER_ZONE_FULL_PATH" | awk -F/ '{print $NF}')
+        # Fetch the zone of the running worker from the metadata server. Escape shell commands with $$.
+        WORKER_ZONE_FULL_PATH=$$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")
+        WORKER_ZONE=$$(echo "$$WORKER_ZONE_FULL_PATH" | awk -F/ '{print $$NF}')
         
-        # Extract the region from the zone
-        REGION=$(echo "$WORKER_ZONE" | cut -d'-' -f1,2)
+        # Extract the region from the zone. Escape shell variables with $$.
+        REGION=$$(echo "$$WORKER_ZONE" | cut -d'-' -f1,2)
         
         # Create the zonal bucket with the specified placement and properties
-        gcloud storage buckets create "gs://$BUCKET_NAME" \
-          --location="$REGION" \
-          --placement="$WORKER_ZONE" \
+        gcloud storage buckets create "gs://$$BUCKET_NAME" \
+          --location="$$REGION" \
+          --placement="$$WORKER_ZONE" \
           --default-storage-class=RAPID \
           --enable-hierarchical-namespace \
           --uniform-bucket-level-access
-      
+        
         # Persist the bucket name for subsequent steps by writing it to a file in the workspace
-        echo "$BUCKET_NAME" > /workspace/zonal_bucket_name.txt
+        echo "$$BUCKET_NAME" > /workspace/zonal_bucket_name.txt
 
   # 4. Run integration tests using the zonal bucket
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -68,9 +68,9 @@ steps:
     args:
       - -c
       - |
-        # Read the bucket name from the file and export it as an environment variable
-        export GCS_ZONAL_TEST_BUCKET=$(cat /workspace/zonal_bucket_name.txt)
-        echo "Using zonal bucket '$GCS_ZONAL_TEST_BUCKET' for integration tests."
+        # Read the bucket name from the file and export it as an environment variable. Escape shell command with $$.
+        export GCS_ZONAL_TEST_BUCKET=$$(cat /workspace/zonal_bucket_name.txt)
+        echo "Using zonal bucket '$$GCS_ZONAL_TEST_BUCKET' for integration tests."
         
         # Execute the integration test script
         /hadoop-connectors/cloudbuild/presubmit.sh integrationtest
@@ -82,7 +82,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
-
+#
 #  # 5. Clean up and delete the zonal bucket
 #  - name: 'gcr.io/google.com/cloudsdktool/google-cloud-sdk'
 #    id: 'delete-zonal-bucket'
@@ -93,9 +93,10 @@ steps:
 #      - |
 #        # Check if the bucket name file exists before attempting deletion
 #        if [ -f /workspace/zonal_bucket_name.txt ]; then
-#          BUCKET_NAME=$(cat /workspace/zonal_bucket_name.txt)
-#          echo "Cleaning up and deleting bucket: gs://$BUCKET_NAME"
-#          gcloud storage rm -r "gs://$BUCKET_NAME"
+#          # Escape shell command with $$
+#          BUCKET_NAME=$$(cat /workspace/zonal_bucket_name.txt)
+#          echo "Cleaning up and deleting bucket: gs://$$BUCKET_NAME"
+#          gcloud storage rm -r "gs://$$BUCKET_NAME"
 #        else
 #          echo "Bucket name file not found. Skipping cleanup."
 #        fi
@@ -106,7 +107,6 @@ timeout: 2400s
 options:
   pool:
     name: 'projects/cloud-dataproc-ci/locations/us-central1/workerPools/integ-test-connector-pool'
-
 ## Copyright 2019 Google LLC
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License");
