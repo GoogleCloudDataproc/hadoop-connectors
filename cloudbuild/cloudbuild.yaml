@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-substitutions:
-  _ZONAL_BUCKET_NAME: 'gcs-zonal-test-bucket-${BUILD_ID}'
-
 steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
@@ -34,23 +31,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 3. Create the Zonal Bucket for integration tests
-  - name: 'gcr.io/google.com/cloudsdktool/google-cloud-sdk'
-    id: 'create-zonal-bucket'
-    waitFor: [ 'docker-build' ]
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        set -euxo pipefail
-        WORKER_ZONE_FULL_PATH=$$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")
-        WORKER_ZONE=$$(echo "$$WORKER_ZONE_FULL_PATH" | awk -F/ '{print $$NF}')
-        echo "Creating zonal bucket gs://${_ZONAL_BUCKET_NAME} in zone $$WORKER_ZONE..."
-        gcloud storage buckets create gs://${_ZONAL_BUCKET_NAME} \
-          --location=us-central1 \
-          --placement=$$WORKER_ZONE
-
-  # 4. Run integration tests
+  # 3. Run integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests'
     waitFor: ['docker-build','create-zonal-bucket']
@@ -65,14 +46,6 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
-
-  # 5. Cleanup the Zonal Bucket after tests complete (success or failure)
-  - name: 'gcr.io/google.com/cloudsdktool/google-cloud-sdk'
-    id: 'cleanup-zonal-bucket'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - 'gcloud storage rm --recursive gs://${_ZONAL_BUCKET_NAME} || true'
 
 # Tests take on average 25 minutes to run
 timeout: 2400s
