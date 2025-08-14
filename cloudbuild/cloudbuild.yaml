@@ -32,7 +32,7 @@ steps:
       - 'CI_BUILD_ID=$BUILD_ID'
 
   # 3. Create a zonal bucket for integration tests
-  - name: 'gcr.io/google.com/cloudsdktool/google-cloud-sdk:slim'
+  - name: 'gcr.io/cloud-builders/gcloud'
     id: 'create-zonal-bucket'
     waitFor: ['docker-build']
     entrypoint: 'bash'
