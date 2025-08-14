@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -168,10 +169,8 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       }
     }
 
-    System.out.println("Read Bytes Content:");
-    // Using Arrays.toString to print the content of the byte array for debugging.
-    // Printing the ByteBuffer object directly would only show its state (pos, lim, cap).
-    System.out.println(java.util.Arrays.toString(readBytes));
+    String textContent = new String(readBytes, StandardCharsets.UTF_8);
+    System.out.println("Read Text Content: " + textContent);
 
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
