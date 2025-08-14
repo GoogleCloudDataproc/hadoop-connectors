@@ -113,24 +113,24 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
-#
-#  # 5. Clean up and delete the zonal bucket
-#  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
-#    id: 'delete-zonal-bucket'
-#    waitFor: ['integration-tests']
-#    entrypoint: 'bash'
-#    args:
-#      - -c
-#      - |
-#        # Check if the bucket name file exists before attempting deletion
-#        if [ -f /workspace/zonal_bucket_name.txt ]; then
-#          # Escape shell command with $$
-#          BUCKET_NAME=$$(cat /workspace/zonal_bucket_name.txt)
-#          echo "Cleaning up and deleting bucket: gs://$$BUCKET_NAME"
-#          gcloud storage rm -r "gs://$$BUCKET_NAME"
-#        else
-#          echo "Bucket name file not found. Skipping cleanup."
-#        fi
+
+  # 5. Clean up and delete the zonal bucket
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'delete-zonal-bucket'
+    waitFor: ['integration-tests']
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        # Check if the bucket name file exists before attempting deletion
+        if [ -f /workspace/zonal_bucket_name.txt ]; then
+          # Escape shell command with $$
+          BUCKET_NAME=$$(cat /workspace/zonal_bucket_name.txt)
+          echo "Cleaning up and deleting bucket: gs://$$BUCKET_NAME"
+          gcloud storage rm -r "gs://$$BUCKET_NAME"
+        else
+          echo "Bucket name file not found. Skipping cleanup."
+        fi
 
 # Tests take on average 25 minutes to run
 timeout: 2400s

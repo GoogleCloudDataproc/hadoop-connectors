@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.gcsio.integration;
 
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertObjectContent;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpStatusCodes;
@@ -127,6 +128,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     if (gcs != null) {
       gcs.close();
     }
+  }
+
+  @Test
+  public void zonalBucketTest(){
+    assertEquals(System.getenv("GCS_ZONAL_TEST_BUCKET"), "Not-the-name-of-the-bucket");
   }
 
   @Test
