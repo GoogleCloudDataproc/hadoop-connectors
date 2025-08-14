@@ -115,7 +115,7 @@ steps:
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
   # 5. Clean up and delete the zonal bucket
-  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+  - name: 'gcr.io/cloud-builders/gcloud'
     id: 'delete-zonal-bucket'
     waitFor: ['-integration-tests']
     entrypoint: 'bash'
