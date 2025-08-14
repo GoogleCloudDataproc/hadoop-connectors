@@ -40,36 +40,36 @@ steps:
       - |
         gcloud components update --quiet
 
-        # --- START ADDED LOGGING AND PREPROD CONFIGURATION ---
+        # --- START ADDED LOGGING AND PROD CONFIGURATION ---
         echo "----------------------------------------"
         echo "Starting Cloud Build Step: create-zonal-bucket"
         echo "----------------------------------------"
 
         echo "Current gcloud config:"
         gcloud config list
-        
-        echo "Setting gcloud to use preprod storage API"
-        gcloud config set storage/json_api_version v1_preprod
-        
-        echo "gcloud config after set storage/json_api_version:"
+
+        echo "Setting gcloud to use PROD storage API"
+        gcloud config set api_endpoint_overrides/storage https://storage.googleapis.com/
+
+        echo "gcloud config after set api_endpoint_overrides/storage:"
         gcloud config list
-        
+
         echo "Project Description:"
         gcloud projects describe $PROJECT_ID
-        
+
         echo "Enabled Services:"
         gcloud services list --enabled --project=$PROJECT_ID
         
         # Generate a unique name for the zonal bucket. $SHORT_SHA is a valid Cloud Build substitution.
         BUCKET_NAME="zonal-bucket-$SHORT_SHA"
-        
+
         # Fetch the zone of the running worker from the metadata server. Escape shell commands with $$.
         WORKER_ZONE_FULL_PATH=$$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")
         WORKER_ZONE=$$(echo "$$WORKER_ZONE_FULL_PATH" | awk -F/ '{print $$NF}')
-        
+
         # Extract the region from the zone. Escape shell variables with $$.
         REGION=$$(echo "$$WORKER_ZONE" | cut -d'-' -f1,2)
-        
+
         echo "WORKER_ZONE_FULL_PATH: $$WORKER_ZONE_FULL_PATH"
         echo "REGION: $$REGION"
         echo "WORKER_ZONE: $$WORKER_ZONE"
@@ -86,12 +86,12 @@ steps:
 
         # Persist the bucket name for subsequent steps by writing it to a file in the workspace
         echo "$$BUCKET_NAME" > /workspace/zonal_bucket_name.txt
-        
+
         echo "Bucket created and saved to /workspace/zonal_bucket_name.txt"
         echo "----------------------------------------"
         echo "Finished Cloud Build Step: create-zonal-bucket"
         echo "----------------------------------------"
-        # --- END ADDED LOGGING AND PREPROD CONFIGURATION ---
+        # --- END ADDED LOGGING AND PROD CONFIGURATION ---
 
   # 4. Run integration tests using the zonal bucket
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -104,7 +104,7 @@ steps:
         # Read the bucket name from the file and export it as an environment variable. Escape shell command with $$.
         export GCS_ZONAL_TEST_BUCKET=$$(cat /workspace/zonal_bucket_name.txt)
         echo "Using zonal bucket '$$GCS_ZONAL_TEST_BUCKET' for integration tests."
-        
+
         # Execute the integration test script
         /hadoop-connectors/cloudbuild/presubmit.sh integrationtest
     env:
