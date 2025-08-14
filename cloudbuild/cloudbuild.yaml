@@ -34,12 +34,11 @@ steps:
   # 3. Run integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests'
-    waitFor: ['docker-build','create-zonal-bucket']
+    waitFor: ['docker-build']
     entrypoint: 'bash'
     args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
     env:
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
-      - 'GCS_ZONAL_TEST_BUCKET=${_ZONAL_BUCKET_NAME}'
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
       - 'VCS_BRANCH_NAME=$BRANCH_NAME'
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
