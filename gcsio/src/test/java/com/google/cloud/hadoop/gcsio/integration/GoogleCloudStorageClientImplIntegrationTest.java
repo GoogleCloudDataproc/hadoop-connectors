@@ -129,13 +129,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       gcs.close();
     }
   }
-
-
-  @Test void zonalBucketTest() {
-    String zonalBucket = System.getProperty("test.gcs.zonal_test_bucket");
-    assertEquals(zonalBucket, "not-zonal-bucket-name");
-
-  }
+  
   @Test
   public void writeToDiskDisabled() throws IOException {
     GoogleCloudStorageOptions storageOptions =
