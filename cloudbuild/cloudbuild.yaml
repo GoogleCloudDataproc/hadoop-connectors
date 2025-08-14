@@ -63,12 +63,10 @@ steps:
         # Generate a unique name for the zonal bucket. $SHORT_SHA is a valid Cloud Build substitution.
         BUCKET_NAME="zonal-bucket-$SHORT_SHA"
 
-        # Fetch the zone of the running worker from the metadata server. Escape shell commands with $$.
-        WORKER_ZONE_FULL_PATH=$$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")
-        WORKER_ZONE=$$(echo "$$WORKER_ZONE_FULL_PATH" | awk -F/ '{print $$NF}')
+        WORKER_ZONE="us-central1-a"
 
         # Extract the region from the zone. Escape shell variables with $$.
-        REGION=$$(echo "$$WORKER_ZONE" | cut -d'-' -f1,2)
+        REGION="us-central1"
 
         echo "WORKER_ZONE_FULL_PATH: $$WORKER_ZONE_FULL_PATH"
         echo "REGION: $$REGION"
