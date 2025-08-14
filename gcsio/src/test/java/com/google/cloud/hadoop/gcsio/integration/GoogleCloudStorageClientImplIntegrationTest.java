@@ -132,34 +132,30 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void bidiFlowOnZonalBucket() throws IOException {
-    // This test requires the GCS_ZONAL_TEST_BUCKET environment variable to be set to a bucket
-    // located in the same region as the test runner for optimal performance.
-    String zonalBucket = System.getenv("GCS_ZONAL_TEST_BUCKET");
-    org.junit.Assume.assumeNotNull(
-            "Skipping test: GCS_ZONAL_TEST_BUCKET environment variable is not set.", zonalBucket);
 
-    // Assuming a new UploadType is introduced for bidi streaming writes.
-    // The name 'BIDI_STREAMING_UPLOAD' is a placeholder for the actual enum name.
+    // Fetching zonal bucket from the env variable created during cloud build.
+    String zonalBucket = System.getenv("GCS_ZONAL_TEST_BUCKET");
+
+    // Create the storage options with bidi enabled.
     GoogleCloudStorageOptions storageOptions =
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                    .setWriteChannelOptions(
-                            AsyncWriteChannelOptions.builder()
-                                    .build())
-                    .build();
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(AsyncWriteChannelOptions.builder().build())
+            .setBidiEnabled(true)
+            .build();
     gcs = getGCSImpl(storageOptions);
 
     StorageResourceId resourceId = new StorageResourceId(zonalBucket, name.getMethodName());
-    byte[] bytesToWrite = new byte[ONE_MiB * 5]; // 5 MiB test data
+    byte[] bytesToWrite = new byte[ONE_MiB * 5];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
 
-    // Write the file using the bidi write channel
+    // Create a new channel and write bytes. Should use bidi.
     try (WritableByteChannel writeChannel = gcs.create(resourceId)) {
       writeChannel.write(ByteBuffer.wrap(bytesToWrite));
     }
 
     // Read the file back using the bidi read channel
     GoogleCloudStorageReadOptions readOptions =
-            GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
+        GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
 
     byte[] readBytes = new byte[bytesToWrite.length];
     ByteBuffer readBuffer = ByteBuffer.wrap(readBytes);
@@ -175,9 +171,6 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
     assertThat(readBytes).isEqualTo(bytesToWrite);
-
-    // Clean up the created object since this bucket is not managed by BUCKET_HELPER
-    gcs.deleteObjects(ImmutableList.of(resourceId));
   }
 
   @Test
