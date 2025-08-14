@@ -202,6 +202,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     logger.atFiner().log("create(%s)", resourceId);
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
     // Update resourceId if generationId is missing
     StorageResourceId resourceIdWithGeneration = resourceId;
     if (!resourceId.hasGenerationId()) {
@@ -212,8 +213,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    return new GoogleCloudStorageClientWriteChannel(
-        storage, storageOptions, resourceIdWithGeneration, options);
+    if (storageOptions.isBidiEnabled()) {
+      return new GoogleCloudStorageBidiWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    } else {
+      return new GoogleCloudStorageClientWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    }
   }
 
   /**
@@ -1192,7 +1198,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
-    if (readOptions.isBidiEnabled()) {
+    if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storage,
           gcsItemInfo,
