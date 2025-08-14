@@ -584,7 +584,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Flag to enable the bidirectional Rapid Storage API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiEnabled());
+          "fs.gs.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiEnabled());
 
   /**
    * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
@@ -599,6 +599,12 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.bidi.client.timeout",
           GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
+
+  /** Flag to enable finalizing object before closing bidi write channel. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.bidi.finalize", GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
@@ -663,7 +669,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
-        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
+        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
+        .setFinalizeBeforeClose(
+            GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -697,7 +706,6 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
 <<<<<<< HEAD
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
-        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
 =======
         .setBidiReadEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))

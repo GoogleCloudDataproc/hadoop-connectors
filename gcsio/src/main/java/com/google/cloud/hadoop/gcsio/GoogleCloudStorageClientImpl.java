@@ -213,9 +213,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
+<<<<<<< HEAD
     String locationType = storage.get(resourceId.getBucketName()).getLocationType();
 
     if (locationType.equals("zone")) {
+=======
+    if (storageOptions.isBidiEnabled()) {
+>>>>>>> write-branch
       return new GoogleCloudStorageBidiWriteChannel(
           storage, storageOptions, resourceIdWithGeneration, options);
     } else {
@@ -1197,11 +1201,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-<<<<<<< HEAD
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
-    if (readOptions.isBidiEnabled()) {
+    if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storage,
           gcsItemInfo,
@@ -1227,27 +1230,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .build());
     }
     return boundedThreadPool;
-=======
 
-    String locationType = storage.get(itemInfo.getBucketName()).getLocationType();
-
-    System.out.println("Location: " + locationType);
-    if (locationType.equals("zone")) {
-      return new GoogleCloudStorageBidiReadChannel(
-          storage,
-          itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-          readOptions,
-          errorExtractor,
-          storageOptions);
-    } else {
-      return new GoogleCloudStorageClientReadChannel(
-          storage,
-          itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-          readOptions,
-          errorExtractor,
-          storageOptions);
-    }
->>>>>>> 170df0e808ffb70c7529acf18e14dfc1ef9d4bdb
   }
 
   @Override

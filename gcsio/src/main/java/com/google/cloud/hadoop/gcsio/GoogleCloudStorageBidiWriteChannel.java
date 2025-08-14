@@ -3,155 +3,121 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.api.core.ApiFuture;
-import com.google.cloud.storage.BlobAppendableUpload;
-import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel; // Specific channel type
-import com.google.cloud.storage.BlobAppendableUploadConfig;
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageException;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.storage.*;
+import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.WritableByteChannel; // We still implement the generic interface
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.ArrayList;
+import java.util.List;
 
 @VisibleForTesting
-public class GoogleCloudStorageBidiWriteChannel implements WritableByteChannel {
-  private static final long DEFAULT_RESULT_TIMEOUT_SECONDS = 60;
-  private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
+public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableByteChannel {
+    private final AppendableUploadWriteableByteChannel gcsAppendChannel;
+    private boolean open = true;
 
-  private final Storage storage;
-  private final StorageResourceId resourceId;
-  private final BlobInfo
-      blobInfoForSession; // Stored for getResult() if needed, or use session object
+    public GoogleCloudStorageBidiWriteChannel(
+            Storage storage,
+            GoogleCloudStorageOptions storageOptions,
+            StorageResourceId resourceId,
+            CreateObjectOptions createOptions)
+            throws IOException {
 
-  private boolean open = true;
-  // This is the specialized channel from the SDK for appendable uploads
-  private AppendableUploadWriteableByteChannel gcsAppendChannel;
-  private BlobAppendableUpload appendUploadSession; // The session object itself
-  private BlobInfo finalizedBlobInfo;
+        checkNotNull(storage, "storage cannot be null");
+        checkNotNull(resourceId, "resourceId cannot be null");
 
-  public GoogleCloudStorageBidiWriteChannel(
-      Storage storage,
-      GoogleCloudStorageOptions
-          storageOptions, // Kept if it provides essential configs like timeouts
-      StorageResourceId resourceId,
-      CreateObjectOptions createOptions)
-      throws IOException {
+        BlobAppendableUpload appendUploadSession =
+                getBlobAppendableUploadSession(storage, resourceId, createOptions, storageOptions);
 
-    System.out.println("Bidi Write is called");
-    this.storage = checkNotNull(storage, "storage cannot be null");
-    this.resourceId = checkNotNull(resourceId, "resourceId cannot be null");
-
-    this.blobInfoForSession = getBlobInfoForSession(this.resourceId, createOptions);
-
-    try {
-      this.appendUploadSession =
-          storage.blobAppendableUpload(this.blobInfoForSession, BlobAppendableUploadConfig.of());
-      this.gcsAppendChannel = this.appendUploadSession.open();
-
-    } catch (StorageException e) {
-      throw new IOException(
-          "Failed to initialize appendable upload session for: " + this.resourceId, e);
+        try {
+            this.gcsAppendChannel = appendUploadSession.open();
+        } catch (StorageException e) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new IOException("Failed to initialize appendable upload session for: " + resourceId, e);
+        }
     }
-  }
 
-  private static BlobInfo getBlobInfoForSession(
-      StorageResourceId resourceId, CreateObjectOptions createOptions) {
-    BlobInfo.Builder blobInfoBuilder =
-        BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()));
-
-    blobInfoBuilder.setContentType(
-        !Strings.isNullOrEmpty(createOptions.getContentType())
-            ? createOptions.getContentType()
-            : DEFAULT_CONTENT_TYPE);
-
-    if (!Strings.isNullOrEmpty(createOptions.getContentEncoding())) {
-      blobInfoBuilder.setContentEncoding(createOptions.getContentEncoding());
+    private static BlobAppendableUpload getBlobAppendableUploadSession(
+            Storage storage,
+            StorageResourceId resourceId,
+            CreateObjectOptions createOptions,
+            GoogleCloudStorageOptions storageOptions) {
+        BlobAppendableUploadConfig.CloseAction closeAction =
+                storageOptions.isFinalizeBeforeClose()
+                        ? BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING
+                        : BlobAppendableUploadConfig.CloseAction.CLOSE_WITHOUT_FINALIZING;
+        return storage.blobAppendableUpload(
+                getBlobInfo(resourceId, createOptions),
+                BlobAppendableUploadConfig.of().withCloseAction(closeAction),
+                generateWriteOptions(createOptions, storageOptions));
     }
-    if (createOptions.getMetadata() != null && !createOptions.getMetadata().isEmpty()) {
-      blobInfoBuilder.setMetadata(encodeMetadata(createOptions.getMetadata()));
+
+    private static BlobInfo getBlobInfo(
+            StorageResourceId resourceId, CreateObjectOptions createOptions) {
+        return BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                .setContentType(createOptions.getContentType())
+                .setContentEncoding(createOptions.getContentEncoding())
+                .setMetadata(encodeMetadata(createOptions.getMetadata()))
+                .build();
     }
-    return blobInfoBuilder.build();
-  }
 
-  @Override
-  public int write(ByteBuffer src) throws IOException {
-    if (!open) throw new ClosedChannelException();
-    checkNotNull(src, "Source ByteBuffer (src) cannot be null");
-    try {
-      // Delegate directly to the specialized AppendableUploadWriteableByteChannel
-      return gcsAppendChannel.write(src);
-    } catch (IOException e) { // Includes StorageException
-      throw e;
+    private static Storage.BlobWriteOption[] generateWriteOptions(
+            CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
+        List<Storage.BlobWriteOption> blobWriteOptions = new ArrayList<>();
+
+        blobWriteOptions.add(Storage.BlobWriteOption.disableGzipContent());
+        if (createOptions.getKmsKeyName() != null) {
+            blobWriteOptions.add(Storage.BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
+        }
+        if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
+            blobWriteOptions.add(Storage.BlobWriteOption.crc32cMatch());
+        }
+        if (storageOptions.getEncryptionKey() != null) {
+            blobWriteOptions.add(
+                    Storage.BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+        }
+        return blobWriteOptions.toArray(new Storage.BlobWriteOption[blobWriteOptions.size()]);
     }
-  }
 
-  @Override
-  public void close() throws IOException {
-    if (!open) {
-      return;
+    @Override
+    public boolean isOpen() {
+        return open;
     }
-    open = false;
 
-    IOException L_Exception = null; // Local exception variable
+    @Override
+    public int write(ByteBuffer src) throws IOException {
+        if (!open) throw new ClosedChannelException();
+        checkNotNull(src, "Source ByteBuffer (src) cannot be null");
+        return gcsAppendChannel.write(src);
+    }
 
-    try {
-      if (gcsAppendChannel != null) {
+    @Override
+    public void close() throws IOException {
+        if (!open) {
+            return;
+        }
+        open = false;
+
+        if (gcsAppendChannel == null) {
+            return;
+        }
+
+        gcsAppendChannel.close();
+    }
+
+    @Override
+    public void finalizeAndClose() throws IOException {
+        if (!open) {
+            return;
+        }
+        open = false;
+
+        if (gcsAppendChannel == null) {
+            return;
+        }
+
         gcsAppendChannel.finalizeAndClose();
-      }
-
-      // Get the result from the BlobAppendableUpload session object
-      ApiFuture<BlobInfo> resultFuture = appendUploadSession.getResult();
-      long resultTimeout = DEFAULT_RESULT_TIMEOUT_SECONDS;
-
-      this.finalizedBlobInfo = resultFuture.get(resultTimeout, TimeUnit.SECONDS);
-
-      if (this.finalizedBlobInfo == null) {
-        L_Exception =
-            new IOException(
-                "Append session for "
-                    + resourceId
-                    + " finalized, but no BlobInfo result obtained.");
-      }
-    } catch (IOException e) { // Includes StorageException from finalizeAndClose or getResult
-      L_Exception = e;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      L_Exception = new IOException("Interrupted closing append session for: " + resourceId, e);
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      L_Exception =
-          new IOException(
-              "Failed to get result of append session for: "
-                  + resourceId
-                  + (cause != null ? ": " + cause.getMessage() : ""),
-              cause != null ? cause : e);
-    } catch (TimeoutException e) {
-      L_Exception =
-          new IOException("Timeout getting result of append session for: " + resourceId, e);
     }
-
-    if (L_Exception != null) {
-      throw L_Exception;
-    }
-  }
-
-  @Override
-  public boolean isOpen() {
-    return open;
-  }
-
-  public BlobInfo getFinalizedBlobInfo() {
-    if (open) {
-      return null;
-    }
-    return finalizedBlobInfo;
-  }
 }
