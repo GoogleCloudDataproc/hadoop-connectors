@@ -168,8 +168,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       }
     }
 
-    System.out.println("ReadBuffer");
-    System.out.println(readBuffer);
+    System.out.println("Read Bytes Content:");
+    // Using Arrays.toString to print the content of the byte array for debugging.
+    // Printing the ByteBuffer object directly would only show its state (pos, lim, cap).
+    System.out.println(java.util.Arrays.toString(readBytes));
+
 
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
