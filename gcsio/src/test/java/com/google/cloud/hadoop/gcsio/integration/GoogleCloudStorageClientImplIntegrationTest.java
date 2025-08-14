@@ -168,6 +168,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       }
     }
 
+    System.out.println("ReadBuffer");
+    System.out.println(readBuffer);
+
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
     assertThat(readBytes).isEqualTo(bytesToWrite);
