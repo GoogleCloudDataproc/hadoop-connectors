@@ -131,7 +131,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   }
 
   @Test
-  public void zonalBucketTest(){
+  public void zonalBucketTest() {
     assertEquals(System.getenv("GCS_ZONAL_TEST_BUCKET"), "Not-the-name-of-the-bucket");
   }
 
