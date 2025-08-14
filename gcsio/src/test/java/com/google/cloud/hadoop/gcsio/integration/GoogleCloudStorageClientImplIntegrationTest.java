@@ -173,7 +173,6 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     // Printing the ByteBuffer object directly would only show its state (pos, lim, cap).
     System.out.println(java.util.Arrays.toString(readBytes));
 
-
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
     assertThat(readBytes).isEqualTo(bytesToWrite);
