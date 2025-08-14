@@ -51,6 +51,10 @@ steps:
         # Extract the region from the zone. Escape shell variables with $$.
         REGION=$$(echo "$$WORKER_ZONE" | cut -d'-' -f1,2)
         
+        echo "WORKER_ZONE_FULL_PATH: $WORKER_ZONE_FULL_PATH"
+        echo "REGION: $REGION"
+        echo "WORKER_ZONE: $WORKER_ZONE"
+        
         # Create the zonal bucket with the specified placement and properties
         gcloud storage buckets create "gs://$$BUCKET_NAME" \
           --location="$$REGION" \
