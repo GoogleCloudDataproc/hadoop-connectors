@@ -24,130 +24,130 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class GoogleCloudStorageBidiWriteChannelTest {
 
-    private static final String BUCKET_NAME = "test-bucket";
-    private static final String OBJECT_NAME = "test-object.txt";
-    @Mock private Storage mockStorage;
-    @Mock private BlobAppendableUpload mockAppendUploadSession;
-    @Mock private AppendableUploadWriteableByteChannel mockGcsAppendChannel;
-    private StorageResourceId resourceId;
-    private GoogleCloudStorageBidiWriteChannel writeChannel;
+  private static final String BUCKET_NAME = "test-bucket";
+  private static final String OBJECT_NAME = "test-object.txt";
+  @Mock private Storage mockStorage;
+  @Mock private BlobAppendableUpload mockAppendUploadSession;
+  @Mock private AppendableUploadWriteableByteChannel mockGcsAppendChannel;
+  private StorageResourceId resourceId;
+  private GoogleCloudStorageBidiWriteChannel writeChannel;
 
-    @Before
-    public void setUp() throws Exception {
-        resourceId = new StorageResourceId(BUCKET_NAME, OBJECT_NAME);
+  @Before
+  public void setUp() throws Exception {
+    resourceId = new StorageResourceId(BUCKET_NAME, OBJECT_NAME);
 
-        when(mockStorage.blobAppendableUpload(
-                any(BlobInfo.class),
-                any(BlobAppendableUploadConfig.class),
-                any(Storage.BlobWriteOption.class)))
-                .thenReturn(mockAppendUploadSession);
-        when(mockAppendUploadSession.open()).thenReturn(mockGcsAppendChannel);
+    when(mockStorage.blobAppendableUpload(
+            any(BlobInfo.class),
+            any(BlobAppendableUploadConfig.class),
+            any(Storage.BlobWriteOption.class)))
+        .thenReturn(mockAppendUploadSession);
+    when(mockAppendUploadSession.open()).thenReturn(mockGcsAppendChannel);
+  }
+
+  @Test
+  public void testWrite_success() throws IOException {
+    writeChannel = getJavaStorageChannel(false);
+    ByteBuffer src = ByteBuffer.wrap(new byte[] {1, 2, 3});
+    when(mockGcsAppendChannel.write(src)).thenReturn(3);
+
+    int bytesWritten = writeChannel.write(src);
+
+    assertEquals(3, bytesWritten);
+    verify(mockGcsAppendChannel).write(src);
+  }
+
+  @Test
+  public void testWrite_whenClosed_throwsClosedChannelException() throws IOException {
+    writeChannel = getJavaStorageChannel(false);
+    ByteBuffer src = ByteBuffer.wrap(new byte[] {1});
+
+    writeChannel.close();
+
+    assertFalse(writeChannel.isOpen());
+    assertThrows(ClosedChannelException.class, () -> writeChannel.write(src));
+  }
+
+  @Test
+  public void testWrite_nullBuffer_throwsNullPointerException() throws IOException {
+    writeChannel = getJavaStorageChannel(false);
+    assertThrows(NullPointerException.class, () -> writeChannel.write(null));
+  }
+
+  @Test
+  public void testClose_whenAlreadyClosed_doesNothing() throws IOException {
+    writeChannel = getJavaStorageChannel(false);
+
+    // Call close twice
+    writeChannel.close();
+    writeChannel.close();
+
+    // Verify finalization methods were only called once
+    verify(mockGcsAppendChannel, times(1)).closeWithoutFinalizing();
+  }
+
+  @Test
+  public void testWrite_success_multipleChucks() throws IOException {
+    writeChannel = getJavaStorageChannel(false);
+    byte[] chunk1 = new byte[] {1, 2, 3};
+    byte[] chunk2 = new byte[] {4, 5};
+    byte[] expectedContent = new byte[] {1, 2, 3, 4, 5};
+    ByteBuffer buffer1 = ByteBuffer.wrap(chunk1);
+    ByteBuffer buffer2 = ByteBuffer.wrap(chunk2);
+    when(mockGcsAppendChannel.write(any(ByteBuffer.class)))
+        .thenAnswer(
+            invocation -> {
+              ByteBuffer arg = invocation.getArgument(0);
+              return arg.remaining();
+            });
+
+    int bytesWritten1 = writeChannel.write(buffer1);
+    int bytesWritten2 = writeChannel.write(buffer2);
+
+    assertEquals(3, bytesWritten1);
+    assertEquals(2, bytesWritten2);
+    ArgumentCaptor<ByteBuffer> byteBufferCaptor = ArgumentCaptor.forClass(ByteBuffer.class);
+    verify(mockGcsAppendChannel, times(2)).write(byteBufferCaptor.capture());
+    List<ByteBuffer> capturedBuffers = byteBufferCaptor.getAllValues();
+    assertEquals("Should have captured two buffers", 2, capturedBuffers.size());
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    for (ByteBuffer buffer : capturedBuffers) {
+      byte[] data = new byte[buffer.remaining()];
+      buffer.get(data);
+      outputStream.writeBytes(data); // writeBytes() doesn't throw IOException
     }
+    byte[] actualContent = outputStream.toByteArray();
+    assertArrayEquals(
+        "The combined content written to the channel is incorrect", expectedContent, actualContent);
+  }
 
-    @Test
-    public void testWrite_success() throws IOException {
-        writeChannel = getJavaStorageChannel(false);
-        ByteBuffer src = ByteBuffer.wrap(new byte[] {1, 2, 3});
-        when(mockGcsAppendChannel.write(src)).thenReturn(3);
+  @Test
+  public void testWrite_finalizeAfterClosing() throws IOException {
+    writeChannel = getJavaStorageChannel(true);
 
-        int bytesWritten = writeChannel.write(src);
+    writeChannel.close();
 
-        assertEquals(3, bytesWritten);
-        verify(mockGcsAppendChannel).write(src);
-    }
+    verify(mockGcsAppendChannel, times(1)).finalizeAndClose();
+    verify(mockGcsAppendChannel, never()).closeWithoutFinalizing();
+  }
 
-    @Test
-    public void testWrite_whenClosed_throwsClosedChannelException() throws IOException {
-        writeChannel = getJavaStorageChannel(false);
-        ByteBuffer src = ByteBuffer.wrap(new byte[] {1});
+  @Test
+  public void testWrite_closeWithoutFinalizing() throws IOException {
+    writeChannel = getJavaStorageChannel(false);
 
-        writeChannel.close();
+    writeChannel.close();
 
-        assertFalse(writeChannel.isOpen());
-        assertThrows(ClosedChannelException.class, () -> writeChannel.write(src));
-    }
+    verify(mockGcsAppendChannel, times(1)).closeWithoutFinalizing();
+    verify(mockGcsAppendChannel, never()).finalizeAndClose();
+  }
 
-    @Test
-    public void testWrite_nullBuffer_throwsNullPointerException() throws IOException {
-        writeChannel = getJavaStorageChannel(false);
-        assertThrows(NullPointerException.class, () -> writeChannel.write(null));
-    }
-
-    @Test
-    public void testClose_whenAlreadyClosed_doesNothing() throws IOException {Expand commentComment on line R77Code has comments. Press enter to view.
-        writeChannel = getJavaStorageChannel(false);Expand commentComment on line R78Code has comments. Press enter to view.
-
-        // Call close twice
-        writeChannel.close();
-        writeChannel.close();
-
-        // Verify finalization methods were only called once
-        verify(mockGcsAppendChannel, times(1)).closeWithoutFinalizing();
-    }
-
-    @Test
-    public void testWrite_success_multipleChucks() throws IOException {
-        writeChannel = getJavaStorageChannel(false);
-        byte[] chunk1 = new byte[] {1, 2, 3};
-        byte[] chunk2 = new byte[] {4, 5};
-        byte[] expectedContent = new byte[] {1, 2, 3, 4, 5};
-        ByteBuffer buffer1 = ByteBuffer.wrap(chunk1);
-        ByteBuffer buffer2 = ByteBuffer.wrap(chunk2);
-        when(mockGcsAppendChannel.write(any(ByteBuffer.class)))
-                .thenAnswer(
-                        invocation -> {
-                            ByteBuffer arg = invocation.getArgument(0);
-                            return arg.remaining();
-                        });
-
-        int bytesWritten1 = writeChannel.write(buffer1);
-        int bytesWritten2 = writeChannel.write(buffer2);
-
-        assertEquals(3, bytesWritten1);
-        assertEquals(2, bytesWritten2);
-        ArgumentCaptor<ByteBuffer> byteBufferCaptor = ArgumentCaptor.forClass(ByteBuffer.class);
-        verify(mockGcsAppendChannel, times(2)).write(byteBufferCaptor.capture());
-        List<ByteBuffer> capturedBuffers = byteBufferCaptor.getAllValues();
-        assertEquals("Should have captured two buffers", 2, capturedBuffers.size());
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        for (ByteBuffer buffer : capturedBuffers) {
-            byte[] data = new byte[buffer.remaining()];
-            buffer.get(data);
-            outputStream.writeBytes(data); // writeBytes() doesn't throw IOException
-        }
-        byte[] actualContent = outputStream.toByteArray();
-        assertArrayEquals(
-                "The combined content written to the channel is incorrect", expectedContent, actualContent);
-    }
-
-    @Test
-    public void testWrite_finalizeAfterClosing() throws IOException {
-        writeChannel = getJavaStorageChannel(true);
-
-        writeChannel.close();
-
-        verify(mockGcsAppendChannel, times(1)).finalizeAndClose();
-        verify(mockGcsAppendChannel, never()).closeWithoutFinalizing();
-    }
-
-    @Test
-    public void testWrite_closeWithoutFinalizing() throws IOException {
-        writeChannel = getJavaStorageChannel(false);
-
-        writeChannel.close();
-
-        verify(mockGcsAppendChannel, times(1)).closeWithoutFinalizing();
-        verify(mockGcsAppendChannel, never()).finalizeAndClose();
-    }
-
-    private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose)
-            throws IOException {
-        return new GoogleCloudStorageBidiWriteChannel(
-                mockStorage,
-                GoogleCloudStorageOptions.DEFAULT.toBuilder()
-                        .setFinalizeBeforeClose(finalizeBeforeClose)
-                        .build(),
-                resourceId,
-                CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().build());
-    }
+  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose)
+      throws IOException {
+    return new GoogleCloudStorageBidiWriteChannel(
+        mockStorage,
+        GoogleCloudStorageOptions.DEFAULT.toBuilder()
+            .setFinalizeBeforeClose(finalizeBeforeClose)
+            .build(),
+        resourceId,
+        CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().build());
+  }
 }

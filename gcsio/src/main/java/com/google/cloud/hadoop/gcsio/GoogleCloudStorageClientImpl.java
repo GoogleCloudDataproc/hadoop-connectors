@@ -213,13 +213,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-<<<<<<< HEAD
-    String locationType = storage.get(resourceId.getBucketName()).getLocationType();
-
-    if (locationType.equals("zone")) {
-=======
     if (storageOptions.isBidiEnabled()) {
->>>>>>> write-branch
       return new GoogleCloudStorageBidiWriteChannel(
           storage, storageOptions, resourceIdWithGeneration, options);
     } else {
@@ -1230,7 +1224,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .build());
     }
     return boundedThreadPool;
-
   }
 
   @Override

@@ -56,16 +56,9 @@ public abstract class GoogleCloudStorageReadOptions {
         .setInplaceSeekLimit(8 * 1024 * 1024)
         .setMinRangeRequestSize(2 * 1024 * 1024)
         .setReadExactRequestedBytesEnabled(false)
-<<<<<<< HEAD
-<<<<<<< HEAD
         .setBidiEnabled(false)
-=======
->>>>>>> write-branch
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30);
-=======
-        .setBidiReadEnabled(false);
->>>>>>> 170df0e808ffb70c7529acf18e14dfc1ef9d4bdb
   }
 
   public abstract Builder toBuilder();

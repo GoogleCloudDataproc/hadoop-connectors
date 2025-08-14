@@ -15,109 +15,109 @@ import java.util.List;
 
 @VisibleForTesting
 public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableByteChannel {
-    private final AppendableUploadWriteableByteChannel gcsAppendChannel;
-    private boolean open = true;
+  private final AppendableUploadWriteableByteChannel gcsAppendChannel;
+  private boolean open = true;
 
-    public GoogleCloudStorageBidiWriteChannel(
-            Storage storage,
-            GoogleCloudStorageOptions storageOptions,
-            StorageResourceId resourceId,
-            CreateObjectOptions createOptions)
-            throws IOException {
+  public GoogleCloudStorageBidiWriteChannel(
+      Storage storage,
+      GoogleCloudStorageOptions storageOptions,
+      StorageResourceId resourceId,
+      CreateObjectOptions createOptions)
+      throws IOException {
 
-        checkNotNull(storage, "storage cannot be null");
-        checkNotNull(resourceId, "resourceId cannot be null");
+    checkNotNull(storage, "storage cannot be null");
+    checkNotNull(resourceId, "resourceId cannot be null");
 
-        BlobAppendableUpload appendUploadSession =
-                getBlobAppendableUploadSession(storage, resourceId, createOptions, storageOptions);
+    BlobAppendableUpload appendUploadSession =
+        getBlobAppendableUploadSession(storage, resourceId, createOptions, storageOptions);
 
-        try {
-            this.gcsAppendChannel = appendUploadSession.open();
-        } catch (StorageException e) {
-            GoogleCloudStorageEventBus.postOnException();
-            throw new IOException("Failed to initialize appendable upload session for: " + resourceId, e);
-        }
+    try {
+      this.gcsAppendChannel = appendUploadSession.open();
+    } catch (StorageException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException("Failed to initialize appendable upload session for: " + resourceId, e);
+    }
+  }
+
+  private static BlobAppendableUpload getBlobAppendableUploadSession(
+      Storage storage,
+      StorageResourceId resourceId,
+      CreateObjectOptions createOptions,
+      GoogleCloudStorageOptions storageOptions) {
+    BlobAppendableUploadConfig.CloseAction closeAction =
+        storageOptions.isFinalizeBeforeClose()
+            ? BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING
+            : BlobAppendableUploadConfig.CloseAction.CLOSE_WITHOUT_FINALIZING;
+    return storage.blobAppendableUpload(
+        getBlobInfo(resourceId, createOptions),
+        BlobAppendableUploadConfig.of().withCloseAction(closeAction),
+        generateWriteOptions(createOptions, storageOptions));
+  }
+
+  private static BlobInfo getBlobInfo(
+      StorageResourceId resourceId, CreateObjectOptions createOptions) {
+    return BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+        .setContentType(createOptions.getContentType())
+        .setContentEncoding(createOptions.getContentEncoding())
+        .setMetadata(encodeMetadata(createOptions.getMetadata()))
+        .build();
+  }
+
+  private static Storage.BlobWriteOption[] generateWriteOptions(
+      CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
+    List<Storage.BlobWriteOption> blobWriteOptions = new ArrayList<>();
+
+    blobWriteOptions.add(Storage.BlobWriteOption.disableGzipContent());
+    if (createOptions.getKmsKeyName() != null) {
+      blobWriteOptions.add(Storage.BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
+    }
+    if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
+      blobWriteOptions.add(Storage.BlobWriteOption.crc32cMatch());
+    }
+    if (storageOptions.getEncryptionKey() != null) {
+      blobWriteOptions.add(
+          Storage.BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+    return blobWriteOptions.toArray(new Storage.BlobWriteOption[blobWriteOptions.size()]);
+  }
+
+  @Override
+  public boolean isOpen() {
+    return open;
+  }
+
+  @Override
+  public int write(ByteBuffer src) throws IOException {
+    if (!open) throw new ClosedChannelException();
+    checkNotNull(src, "Source ByteBuffer (src) cannot be null");
+    return gcsAppendChannel.write(src);
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (!open) {
+      return;
+    }
+    open = false;
+
+    if (gcsAppendChannel == null) {
+      return;
     }
 
-    private static BlobAppendableUpload getBlobAppendableUploadSession(
-            Storage storage,
-            StorageResourceId resourceId,
-            CreateObjectOptions createOptions,
-            GoogleCloudStorageOptions storageOptions) {
-        BlobAppendableUploadConfig.CloseAction closeAction =
-                storageOptions.isFinalizeBeforeClose()
-                        ? BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING
-                        : BlobAppendableUploadConfig.CloseAction.CLOSE_WITHOUT_FINALIZING;
-        return storage.blobAppendableUpload(
-                getBlobInfo(resourceId, createOptions),
-                BlobAppendableUploadConfig.of().withCloseAction(closeAction),
-                generateWriteOptions(createOptions, storageOptions));
+    gcsAppendChannel.close();
+  }
+
+  @Override
+  public void finalizeAndClose() throws IOException {
+    if (!open) {
+      return;
+    }
+    open = false;
+
+    if (gcsAppendChannel == null) {
+      return;
     }
 
-    private static BlobInfo getBlobInfo(
-            StorageResourceId resourceId, CreateObjectOptions createOptions) {
-        return BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-                .setContentType(createOptions.getContentType())
-                .setContentEncoding(createOptions.getContentEncoding())
-                .setMetadata(encodeMetadata(createOptions.getMetadata()))
-                .build();
-    }
-
-    private static Storage.BlobWriteOption[] generateWriteOptions(
-            CreateObjectOptions createOptions, GoogleCloudStorageOptions storageOptions) {
-        List<Storage.BlobWriteOption> blobWriteOptions = new ArrayList<>();
-
-        blobWriteOptions.add(Storage.BlobWriteOption.disableGzipContent());
-        if (createOptions.getKmsKeyName() != null) {
-            blobWriteOptions.add(Storage.BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
-        }
-        if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
-            blobWriteOptions.add(Storage.BlobWriteOption.crc32cMatch());
-        }
-        if (storageOptions.getEncryptionKey() != null) {
-            blobWriteOptions.add(
-                    Storage.BlobWriteOption.encryptionKey(storageOptions.getEncryptionKey().value()));
-        }
-        return blobWriteOptions.toArray(new Storage.BlobWriteOption[blobWriteOptions.size()]);
-    }
-
-    @Override
-    public boolean isOpen() {
-        return open;
-    }
-
-    @Override
-    public int write(ByteBuffer src) throws IOException {
-        if (!open) throw new ClosedChannelException();
-        checkNotNull(src, "Source ByteBuffer (src) cannot be null");
-        return gcsAppendChannel.write(src);
-    }
-
-    @Override
-    public void close() throws IOException {
-        if (!open) {
-            return;
-        }
-        open = false;
-
-        if (gcsAppendChannel == null) {
-            return;
-        }
-
-        gcsAppendChannel.close();
-    }
-
-    @Override
-    public void finalizeAndClose() throws IOException {
-        if (!open) {
-            return;
-        }
-        open = false;
-
-        if (gcsAppendChannel == null) {
-            return;
-        }
-
-        gcsAppendChannel.finalizeAndClose();
-    }
+    gcsAppendChannel.finalizeAndClose();
+  }
 }
