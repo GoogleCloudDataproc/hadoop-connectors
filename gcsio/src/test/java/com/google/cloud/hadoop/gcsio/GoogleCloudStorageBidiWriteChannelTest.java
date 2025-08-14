@@ -120,7 +120,6 @@ public class GoogleCloudStorageBidiWriteChannelTest {
         "The combined content written to the channel is incorrect", expectedContent, actualContent);
   }
 
-
   private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose)
       throws IOException {
     return new GoogleCloudStorageBidiWriteChannel(
