@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
@@ -31,12 +30,81 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 3. Run integration tests concurrently with unit tests
-  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
-    id: 'integration-tests'
+  # 3. Create a zonal bucket for integration tests
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'create-zonal-bucket'
     waitFor: ['docker-build']
     entrypoint: 'bash'
-    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
+    args:
+      - -c
+      - |
+        gcloud components update --quiet
+
+        # --- START ADDED LOGGING AND PROD CONFIGURATION ---
+        echo "----------------------------------------"
+        echo "Starting Cloud Build Step: create-zonal-bucket"
+        echo "----------------------------------------"
+
+        echo "Current gcloud config:"
+        gcloud config list
+
+        echo "Setting gcloud to use PROD storage API"
+        gcloud config set api_endpoint_overrides/storage https://storage.googleapis.com/
+
+        echo "gcloud config after set api_endpoint_overrides/storage:"
+        gcloud config list
+
+        echo "Project Description:"
+        gcloud projects describe $PROJECT_ID
+
+        echo "Enabled Services:"
+        gcloud services list --enabled --project=$PROJECT_ID
+        
+        # Generate a unique name for the zonal bucket. $SHORT_SHA is a valid Cloud Build substitution.
+        BUCKET_NAME="zonal-bucket-$SHORT_SHA"
+
+        WORKER_ZONE="us-central1-a"
+
+        # Extract the region from the zone. Escape shell variables with $$.
+        REGION="us-central1"
+
+        echo "WORKER_ZONE_FULL_PATH: $$WORKER_ZONE_FULL_PATH"
+        echo "REGION: $$REGION"
+        echo "WORKER_ZONE: $$WORKER_ZONE"
+        echo "BUCKET_NAME: $$BUCKET_NAME"
+
+        # Create the zonal bucket with the specified placement and properties, adding --verbosity=debug
+        gcloud storage buckets create "gs://$$BUCKET_NAME" \
+          --location="$$REGION" \
+          --placement="$$WORKER_ZONE" \
+          --default-storage-class=RAPID \
+          --enable-hierarchical-namespace \
+          --uniform-bucket-level-access \
+          --verbosity=debug
+
+        # Persist the bucket name for subsequent steps by writing it to a file in the workspace
+        echo "$$BUCKET_NAME" > /workspace/zonal_bucket_name.txt
+
+        echo "Bucket created and saved to /workspace/zonal_bucket_name.txt"
+        echo "----------------------------------------"
+        echo "Finished Cloud Build Step: create-zonal-bucket"
+        echo "----------------------------------------"
+        # --- END ADDED LOGGING AND PROD CONFIGURATION ---
+
+  # 4. Run integration tests using the zonal bucket
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'integration-tests'
+    waitFor: ['create-zonal-bucket']
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        # Read the bucket name from the file and export it as an environment variable. Escape shell command with $$.
+        export GCS_ZONAL_TEST_BUCKET=$$(cat /workspace/zonal_bucket_name.txt)
+        echo "Using zonal bucket '$$GCS_ZONAL_TEST_BUCKET' for integration tests."
+
+        # Execute the integration test script
+        /hadoop-connectors/cloudbuild/presubmit.sh integrationtest
     env:
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
@@ -46,9 +114,83 @@ steps:
       - 'CI_BUILD_ID=$BUILD_ID'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
+  # 5. Clean up and delete the zonal bucket
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'delete-zonal-bucket'
+    waitFor: ['integration-tests']
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        # Check if the bucket name file exists before attempting deletion
+        if [ -f /workspace/zonal_bucket_name.txt ]; then
+          # Escape shell command with $$
+          BUCKET_NAME=$$(cat /workspace/zonal_bucket_name.txt)
+          echo "Cleaning up and deleting bucket: gs://$$BUCKET_NAME"
+          gcloud storage rm -r "gs://$$BUCKET_NAME"
+        else
+          echo "Bucket name file not found. Skipping cleanup."
+        fi
+
 # Tests take on average 25 minutes to run
 timeout: 2400s
 
 options:
-  machineType: 'N1_HIGHCPU_32'
+  pool:
+    name: 'projects/cloud-dataproc-ci/locations/us-central1/workerPools/integ-test-connector-pool'
+
+## Copyright 2019 Google LLC
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##      http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+#
+#steps:
+#  # 1. Create a Docker image containing hadoop-connectors repo
+#  - name: 'gcr.io/cloud-builders/docker'
+#    id: 'docker-build'
+#    args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
+#
+#  # 2. Run unit tests
+#  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+#    id: 'unit-tests'
+#    waitFor: ['docker-build']
+#    entrypoint: 'bash'
+#    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'unittest']
+#    env:
+#      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+#      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
+#      - 'VCS_COMMIT_ID=$COMMIT_SHA'
+#      - 'VCS_TAG=$TAG_NAME'
+#      - 'CI_BUILD_ID=$BUILD_ID'
+#
+#  # 3. Run integration tests
+#  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+#    id: 'integration-tests'
+#    waitFor: ['docker-build']
+#    entrypoint: 'bash'
+#    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
+#    env:
+#      - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
+#      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+#      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
+#      - 'VCS_COMMIT_ID=$COMMIT_SHA'
+#      - 'VCS_TAG=$TAG_NAME'
+#      - 'CI_BUILD_ID=$BUILD_ID'
+#      - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
+#
+## Tests take on average 25 minutes to run
+#timeout: 2400s
+#
+#options:
+#  pool:
+#    name: 'projects/cloud-dataproc-ci/locations/us-central1/workerPools/integ-test-connector-pool'
 
