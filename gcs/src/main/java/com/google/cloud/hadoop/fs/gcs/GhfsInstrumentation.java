@@ -586,6 +586,11 @@ public class GhfsInstrumentation
       }
     }
 
+    @Override
+    public long getBytesRead() {
+      return bytesRead.get();
+    }
+
     /**
      * {@code close()} merges the stream statistics into the filesystem's instrumentation instance.
      * The filesystem statistics of {@link #filesystemStatistics} updated with the bytes read

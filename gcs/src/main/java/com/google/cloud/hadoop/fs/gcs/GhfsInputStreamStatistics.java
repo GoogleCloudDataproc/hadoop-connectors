@@ -55,6 +55,9 @@ interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterfac
    */
   void readOperationCompleted(int requested, int actual);
 
+  /** Return the aggregated bytesBread across multiple read and readVectoredOperation */
+  long getBytesRead();
+
   @Override
   void close();
 }

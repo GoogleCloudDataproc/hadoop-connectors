@@ -111,6 +111,32 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   }
 
   @Test
+  public void read_multiple() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_singleBytes");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    byte[] value = new byte[11];
+    byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 11);
+
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    try (GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics)) {
+      assertThat(in.read(value, 0, 1)).isEqualTo(1);
+      assertThat(statistics.getReadOps()).isEqualTo(1);
+      assertThat(in.read(1, value, 1, 10)).isEqualTo(10);
+      assertThat(statistics.getReadOps()).isEqualTo(2);
+    }
+
+    assertThat(statistics.getBytesRead()).isEqualTo(11);
+    assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
   public void testMergedRangeRequest() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_mergedRange");
 
@@ -131,17 +157,24 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
 
     List<FileRange> fileRanges = new ArrayList<>();
+    int totalBytesRead = 0;
     // below two ranges will be merged
     fileRanges.add(FileRange.createFileRange(0, 5));
+    totalBytesRead += 5;
     fileRanges.add(FileRange.createFileRange(6, 2)); // read till 8
+    totalBytesRead += 2;
 
     fileRanges.add(FileRange.createFileRange(11, 4)); // read till 15
+    totalBytesRead += 4;
     fileRanges.add(FileRange.createFileRange(20, 15));
+    totalBytesRead += 15;
 
     try (GoogleHadoopFSInputStream ignore = in) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
       validateVectoredReadResult(fileRanges, path);
     }
+
+    assertThat(statistics.getBytesRead()).isEqualTo(totalBytesRead);
   }
 
   @Test
