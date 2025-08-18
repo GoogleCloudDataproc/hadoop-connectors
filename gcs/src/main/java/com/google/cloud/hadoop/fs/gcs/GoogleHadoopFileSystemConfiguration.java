@@ -677,6 +677,13 @@ public class GoogleHadoopFileSystemConfiguration {
     return applicationName;
   }
 
+  /**
+   * Parses GCS read options from the supplied Hadoop configuration object, using the property keys
+   * documented in
+   * https://github.com/GoogleCloudDataproc/hadoop-connectors/blob/master/gcs/CONFIGURATION.md
+   *
+   * @param config the Hadoop Configuration object to parse
+   */
   public static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
     return GoogleCloudStorageReadOptions.builder()
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
@@ -697,6 +704,13 @@ public class GoogleHadoopFileSystemConfiguration {
         .build();
   }
 
+  /**
+   * Parses GCS write options from the supplied Hadoop configuration object, using the property keys
+   * documented in
+   * https://github.com/GoogleCloudDataproc/hadoop-connectors/blob/master/gcs/CONFIGURATION.md
+   *
+   * @param config the Hadoop Configuration object to parse
+   */
   public static AsyncWriteChannelOptions getWriteChannelOptions(Configuration config) {
     return AsyncWriteChannelOptions.builder()
         .setBufferSize(toIntExact(GCS_OUTPUT_STREAM_BUFFER_SIZE.get(config, config::getLongBytes)))
