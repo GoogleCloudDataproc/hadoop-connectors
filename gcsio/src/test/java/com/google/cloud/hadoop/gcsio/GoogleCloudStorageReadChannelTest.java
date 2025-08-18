@@ -620,6 +620,54 @@ public class GoogleCloudStorageReadChannelTest {
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
   }
 
+  @Test
+  public void openStream_whenSkipReturnsZero_throwsIOException() throws IOException {
+    // 1. Mock an InputStream that simulates a stalled connection by returning 0 from read().
+    // This will cause the wrapper stream's skip() method to return 0.
+    InputStream faultyStream =
+        new InputStream() {
+          @Override
+          public int read() throws IOException {
+            // A return value of 0 from a blocking read indicates a stream stall.
+            return 0;
+          }
+        };
+
+    // 2. Configure the mock transport with a full metadata response and the faulty stream.
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(100L))
+                    .setGeneration(1L)
+                    .setMetageneration(1L)),
+            inputStreamResponse(faultyStream));
+
+    // 3. Create the GCS instance and ReadChannel using the test's standard helpers.
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build());
+
+    // 4. Disable retries to isolate the initial failure.
+    setUpAndValidateReadChannelMocksAndSetMaxRetries(readChannel, 0);
+
+    // 5. Position the channel. The next read() will trigger openStream() and the faulty skip().
+    readChannel.position(50);
+
+    // 6. Assert that the specific IOException from your fix is thrown.
+    IOException e =
+        assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.wrap(new byte[10])));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains("contentStream.skip() returned 0, potential connection loss");
+  }
+
   /**
    * Helper for test cases involving {@code GoogleCloudStorage.open(StorageResourceId)} to set up
    * the shared sleeper/clock/backoff mocks and set {@code maxRetries}. Also checks basic invariants

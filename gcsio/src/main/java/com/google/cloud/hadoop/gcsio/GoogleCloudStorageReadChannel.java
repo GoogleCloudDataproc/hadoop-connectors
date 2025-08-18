@@ -1056,6 +1056,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             bytesToSkip, contentChannelPosition, currentPosition, resourceId);
         while (bytesToSkip > 0) {
           long skippedBytes = contentStream.skip(bytesToSkip);
+          if (skippedBytes <= 0) {
+            throw new IOException(
+                "contentStream.skip() returned " + skippedBytes + ", potential connection loss");
+          }
           logger.atFiner().log(
               "Skipped %d bytes from %d position for '%s'",
               skippedBytes, contentChannelPosition, resourceId);
