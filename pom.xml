@@ -58,17 +58,6 @@
     <url>https://github.com/GoogleCloudDataproc/hadoop-connectors/issues</url>
   </issueManagement>
 
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-    </repository>
-  </distributionManagement>
-
   <properties>
     <argLine/>
 
@@ -89,7 +78,7 @@
     <google.auth.version>1.33.1</google.auth.version>
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud-core.verion>2.44.1</google.cloud-core.verion>
-    <google.cloud-storage.bom.version>2.49.0</google.cloud-storage.bom.version>
+    <google.cloud-storage.bom.version>2.52.2</google.cloud-storage.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
     <google.gax.version>2.54.1</google.gax.version>
@@ -111,7 +100,7 @@
     <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
     <assertj.version>3.14.0</assertj.version>
     <deploy.skip>true</deploy.skip>
-    <nexus.remote.skip>false</nexus.remote.skip>
+    <central.publishing.skip>false</central.publishing.skip>
   </properties>
 
   <modules>
@@ -177,15 +166,15 @@
       <build>
         <plugins>
           <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>1.6.7</version>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.8.0</version>
             <extensions>true</extensions>
             <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>false</autoReleaseAfterClose>
-              <skipRemoteStaging>${nexus.remote.skip}</skipRemoteStaging>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+              <skipPublishing>${central.publishing.skip}</skipPublishing>
+              <checksums>required</checksums>
             </configuration>
           </plugin>
           <plugin>

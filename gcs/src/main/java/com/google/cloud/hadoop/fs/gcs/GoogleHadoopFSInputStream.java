@@ -28,6 +28,8 @@ import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
+import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
+import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.common.flogger.GoogleLogger;
@@ -39,6 +41,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
@@ -179,12 +182,28 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         streamStatistics,
         STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
         () -> {
-          long startTimeNs = System.nanoTime();
-          vectoredIOSupplier
-              .get()
-              .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
-          statistics.incrementReadOps(1);
-          vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
+          if (channel instanceof ReadVectoredSeekableByteChannel) {
+            ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
+                (ReadVectoredSeekableByteChannel) channel;
+            readVectoredSeekableByteChannelChannel.readVectored(
+                ranges.stream()
+                    .map(
+                        range ->
+                            VectoredIORange.builder()
+                                .setLength(range.getLength())
+                                .setOffset(range.getOffset())
+                                .setData(range.getData())
+                                .build())
+                    .collect(Collectors.toList()),
+                allocate);
+          } else {
+            long startTimeNs = System.nanoTime();
+            vectoredIOSupplier
+                .get()
+                .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
+            statistics.incrementReadOps(1);
+            vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
+          }
           return null;
         });
   }
