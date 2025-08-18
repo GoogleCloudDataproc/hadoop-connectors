@@ -82,7 +82,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
     writeChannel.close();
 
     // Verify finalization methods were only called once
-    verify(mockGcsAppendChannel, times(1)).closeWithoutFinalizing();
+    verify(mockGcsAppendChannel, times(1)).close();
   }
 
   @Test
@@ -118,26 +118,6 @@ public class GoogleCloudStorageBidiWriteChannelTest {
     byte[] actualContent = outputStream.toByteArray();
     assertArrayEquals(
         "The combined content written to the channel is incorrect", expectedContent, actualContent);
-  }
-
-  @Test
-  public void testWrite_finalizeAfterClosing() throws IOException {
-    writeChannel = getJavaStorageChannel(true);
-
-    writeChannel.close();
-
-    verify(mockGcsAppendChannel, times(1)).finalizeAndClose();
-    verify(mockGcsAppendChannel, never()).closeWithoutFinalizing();
-  }
-
-  @Test
-  public void testWrite_closeWithoutFinalizing() throws IOException {
-    writeChannel = getJavaStorageChannel(false);
-
-    writeChannel.close();
-
-    verify(mockGcsAppendChannel, times(1)).closeWithoutFinalizing();
-    verify(mockGcsAppendChannel, never()).finalizeAndClose();
   }
 
   private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose)
