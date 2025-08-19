@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockT
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
@@ -35,6 +36,18 @@ import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.gax.rpc.AlreadyExistsException;
+import com.google.api.gax.rpc.PermissionDeniedException;
+import com.google.api.gax.rpc.UnaryCallable;
+import com.google.protobuf.Timestamp;
+import com.google.storage.control.v2.CreateFolderRequest;
+import com.google.storage.control.v2.Folder;
+import com.google.storage.control.v2.FolderName;
+import com.google.storage.control.v2.GetFolderRequest;
+import com.google.storage.control.v2.StorageControlClient;
+import com.google.storage.control.v2.stub.StorageControlStub;
+import java.nio.file.FileAlreadyExistsException;
+import org.mockito.ArgumentCaptor;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.StorageObject;
@@ -68,6 +81,11 @@ public class GoogleCloudStorageMockitoTest {
   @Mock private ApiErrorExtractor mockErrorExtractor;
   @Mock private BatchHelper.Factory mockBatchFactory;
   @Mock private BatchHelper mockBatchHelper;
+  @Mock private StorageControlStub mockStorageControlStub;
+  @Mock private UnaryCallable<CreateFolderRequest, Folder> mockCreateFolderCallable;
+  @Mock private UnaryCallable<GetFolderRequest, Folder> mockGetFolderCallable;
+  @Mock private AlreadyExistsException mockAlreadyExistsException;
+  @Mock PermissionDeniedException mockPermissionDeniedException;
 
   /**
    * Sets up new mocks and create new instance of GoogleCloudStorage configured to only interact
@@ -87,6 +105,9 @@ public class GoogleCloudStorageMockitoTest {
     gcs = mockedGcsImpl(gcsOptions, transport);
     gcs.setBatchFactory(mockBatchFactory);
     gcs.setErrorExtractor(mockErrorExtractor);
+
+    StorageControlClient testClient = StorageControlClient.create(mockStorageControlStub);
+    gcs.setStorageControlClient(testClient);
 
     when(mockBatchFactory.newBatchHelper(
             any(), any(Storage.class), anyInt(), anyInt(), anyInt(), any()))
@@ -310,5 +331,120 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockBatchHelper).queue(any(Storage.Objects.Get.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockBatchHelper).flush();
+  }
+
+  @Test
+  public void testCreateFolder_Success() throws IOException {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "new-folder/");
+    Folder apiResponse = Folder.newBuilder().setName("folders/new-folder/").build();
+
+    // mock STUB to return the mock CALLABLE.
+    when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
+
+    when(mockCreateFolderCallable.call(any(CreateFolderRequest.class))).thenReturn(apiResponse);
+
+    gcs.createFolder(folderId);
+
+    ArgumentCaptor<CreateFolderRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateFolderRequest.class);
+
+    // Verify the stub and callable were invoked correctly and capture the argument.
+    verify(mockStorageControlStub, times(1)).createFolderCallable();
+    verify(mockCreateFolderCallable, times(1)).call(requestCaptor.capture());
+
+    CreateFolderRequest capturedRequest = requestCaptor.getValue();
+    assertThat(capturedRequest.getParent()).isEqualTo("projects/_/buckets/" + BUCKET_NAME);
+    assertThat(capturedRequest.getFolderId()).isEqualTo("new-folder/");
+  }
+
+  @Test
+  public void testCreateFolder_alreadyExists_isRethrownAsFileAlreadyExists() {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "existing-folder/");
+
+    // Stub the stub to return the mock callable.
+    when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
+
+    // Stub the callable to throw the MOCKED exception.
+    when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
+        .thenThrow(mockAlreadyExistsException);
+
+    FileAlreadyExistsException exception =
+        assertThrows(FileAlreadyExistsException.class, () -> gcs.createFolder(folderId));
+
+    assertThat(exception.getCause()).isEqualTo(mockAlreadyExistsException);
+    assertThat(exception.getMessage()).contains("already exists");
+
+    verify(mockStorageControlStub).createFolderCallable();
+    verify(mockCreateFolderCallable).call(any(CreateFolderRequest.class));
+  }
+
+  @Test
+  public void testCreateFolder_permissionDenied_isRethrown() {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "protected-folder/");
+    when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
+    when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
+        .thenThrow(mockPermissionDeniedException);
+
+
+    PermissionDeniedException exception =
+        assertThrows(PermissionDeniedException.class, () -> gcs.createFolder(folderId));
+
+    assertThat(exception).isEqualTo(mockPermissionDeniedException);
+    verify(mockStorageControlStub).createFolderCallable();
+  }
+
+  @Test
+  public void testGetFolderInfo_Success() throws IOException {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "existing-folder/");
+    String folderName = FolderName.of("_", BUCKET_NAME, "existing-folder/").toString();
+
+    Folder apiResponse =
+        Folder.newBuilder()
+            .setName(folderName)
+            .setMetageneration(1L)
+            .setCreateTime(Timestamp.newBuilder().setSeconds(System.currentTimeMillis() / 1000).build())
+            .build();
+
+    // Stub the stub to return the mock callable.
+    when(mockStorageControlStub.getFolderCallable()).thenReturn(mockGetFolderCallable);
+
+    when(mockGetFolderCallable.call(any(GetFolderRequest.class))).thenReturn(apiResponse);
+
+    GoogleCloudStorageItemInfo itemInfo = gcs.getFolderInfo(folderId);
+
+    assertThat(itemInfo).isNotNull();
+    assertThat(itemInfo.exists()).isTrue();
+    assertThat(itemInfo.getResourceId()).isEqualTo(folderId);
+    assertThat(itemInfo.isNativeFolder()).isTrue();
+
+    verify(mockStorageControlStub).getFolderCallable();
+    verify(mockGetFolderCallable).call(any(GetFolderRequest.class));
+  }
+
+  @Test
+  public void testGetFolderInfo_whenApiThrowsPermissionDenied_swallowsErrorAndReturnsNotFound()
+      throws IOException {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "permission-denied-folder/");
+    when(mockStorageControlStub.getFolderCallable()).thenReturn(mockGetFolderCallable);
+    when(mockGetFolderCallable.call(any(GetFolderRequest.class)))
+        .thenThrow(mockPermissionDeniedException);
+
+    GoogleCloudStorageItemInfo itemInfo = gcs.getFolderInfo(folderId);
+
+    assertThat(itemInfo).isNotNull();
+    assertThat(itemInfo.exists()).isFalse();
+    verify(mockStorageControlStub).getFolderCallable();
+  }
+
+  /** Verifies the early-exit logic for bucket resources, ensuring the API is never called. */
+  @Test
+  public void testGetFolderInfo_whenResourceIdIsBucket_returnsNotFound() throws IOException {
+    StorageResourceId bucketResourceId = new StorageResourceId(BUCKET_NAME);
+
+    GoogleCloudStorageItemInfo itemInfo = gcs.getFolderInfo(bucketResourceId);
+
+    assertThat(itemInfo).isNotNull();
+    assertThat(itemInfo.exists()).isFalse();
+    verify(mockStorageControlStub, never()).getFolderCallable();
   }
 }
