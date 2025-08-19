@@ -1539,7 +1539,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            maxResults);
+            maxResults,
+            listOptions.isIncludeFoldersAsPrefixes());
 
     String pageToken = null;
     int page = 0;
@@ -1659,7 +1660,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String objectNamePrefix,
       String objectFields,
       String delimiter,
-      long maxResults)
+      long maxResults,
+      boolean includeFoldersAsPrefixes)
       throws IOException {
     logger.atFiner().log(
         "createListRequest(%s, %s, %s, %s, %d)",
@@ -1675,6 +1677,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (delimiter != null) {
       listObject.setDelimiter(delimiter).setIncludeTrailingDelimiter(true);
     }
+
+    listObject.setIncludeFoldersAsPrefixes(includeFoldersAsPrefixes);
 
     // Set number of items to retrieve per call.
     listObject.setMaxResults(
@@ -1740,7 +1744,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            listOptions.getMaxResults());
+            listOptions.getMaxResults(),
+            listOptions.isIncludeFoldersAsPrefixes());
     if (pageToken != null) {
       logger.atFiner().log("listObjectInfoPage: next page %s", pageToken);
       listObject.setPageToken(pageToken);
