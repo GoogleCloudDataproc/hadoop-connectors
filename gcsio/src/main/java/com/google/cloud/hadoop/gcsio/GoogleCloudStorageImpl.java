@@ -2442,12 +2442,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
     logger.atInfo().log("getFolderInfo(%s)", resourceId);
 
-    // checkArgument(resourceId.isFolder(), "Expected a folder resourceId, got %s", resourceId);
-
     if (resourceId.isBucket()) {
       // This is not a folder. Do not proceed.
       // Throwing a NotFoundException is the appropriate GCS client library pattern.
-      logger.atInfo().log("[TEST] not found 1");
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
@@ -2459,10 +2456,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Folder folder = lazyGetStorageControlClient().getFolder(request);
       return GoogleCloudStorageItemInfo.createFolder(resourceId, folder);
     } catch (Exception e) {
-      // Any exception, including NotFound or PermissionDenied, is treated as "not found".
+      // Any exception, including NotFound or PermissionDenied, is treated as not found.
       // This is intentional. The primary caller of this method, getFileInfo(),
       // relies on this behavior to trigger its fallback logic which uses a different
-      // method (getFileInfoInternal) to authoritatively check for the file.
+      // method (getFileInfoInternal) to check for the file.
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
   }
@@ -2479,11 +2476,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     String bucketName = resourceId.getBucketName();
 
-    // 2. Format the bucket name into the fully-qualified resource name
-    //    that the StorageControlClient API requires.
+    // Format the bucket name into the fully-qualified resource name
+    // that the StorageControlClient API requires.
     String parentResourceName = String.format("projects/_/buckets/%s", bucketName);
 
-    // 3. Build the request with the correctly formatted parent name.
+    // Build the request with the correctly formatted parent name.
     CreateFolderRequest request =
         CreateFolderRequest.newBuilder()
             .setFolderId(resourceId.getObjectName())

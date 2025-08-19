@@ -573,7 +573,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
 
   /** Configuration key to enable Hierarchical Namespace (HNS) optimizations. */
-  public static final HadoopConfigurationProperty<Boolean> GCS_HNS_OPTIMIZATION_ENABLE_KEY =
+  public static final HadoopConfigurationProperty<Boolean> GCS_HNS_OPTIMIZATION_ENABLE =
       new HadoopConfigurationProperty<>(
           "fs.gs.hierarchical.namespace.folders.optimization.enable",
           GoogleCloudStorageOptions.DEFAULT.isHnOptimizationEnabled());
@@ -667,7 +667,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
-        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE_KEY.get(config, config::getBoolean));
+        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
