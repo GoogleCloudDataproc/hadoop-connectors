@@ -1828,8 +1828,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         loggingInterceptor.close();
       } catch (RuntimeException e) {
         logger.atSevere().withCause(e).log("Failed to stop cloud logging service");
+      } finally {
+        loggingInterceptor = null;
       }
-      loggingInterceptor = null;
     }
 
     backgroundTasksThreadPool.shutdown();
