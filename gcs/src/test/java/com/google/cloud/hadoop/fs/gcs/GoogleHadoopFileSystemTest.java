@@ -359,7 +359,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
       Logger rootLogger = Logger.getLogger("");
       assertThat(Arrays.asList(rootLogger.getHandlers())).contains(mockInterceptor);
 
-      // Close the filesystem
       fs.close();
 
       // Verify close was called and handler was removed
