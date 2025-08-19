@@ -721,8 +721,8 @@ public class GoogleCloudStorageImplTest {
   public void createAndGetNativeFolder_successful() throws IOException {
     if (!testStorageClientImpl) {
       String hnsBucket = bucketHelper.getUniqueBucketName("hns");
-      helperGcs.createBucket(hnsBucket,
-          CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+      helperGcs.createBucket(
+          hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
       StorageResourceId folderId = new StorageResourceId(hnsBucket, "my-native-folder/");
 
       // Create the native folder.
@@ -745,29 +745,28 @@ public class GoogleCloudStorageImplTest {
   @Test
   public void createFolder_alreadyExists_throwsFileAlreadyExistsException() throws IOException {
     if (!testStorageClientImpl) {
-    String hnsBucket = bucketHelper.getUniqueBucketName("hns");
-    helperGcs.createBucket(hnsBucket,
-        CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
-    StorageResourceId folderId = new StorageResourceId(hnsBucket, "my-native-folder/");
+      String hnsBucket = bucketHelper.getUniqueBucketName("hns");
+      helperGcs.createBucket(
+          hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+      StorageResourceId folderId = new StorageResourceId(hnsBucket, "my-native-folder/");
 
-    // Create it once, which should succeed.
-    helperGcs.createFolder(folderId);
-    assertThat(helperGcs.getFolderInfo(folderId).exists()).isTrue();
+      // Create it once, which should succeed.
+      helperGcs.createFolder(folderId);
+      assertThat(helperGcs.getFolderInfo(folderId).exists()).isTrue();
 
-    // Attempt to create it a second time, which should fail.
-    assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> helperGcs.createFolder(folderId));
-  }
+      // Attempt to create it a second time, which should fail.
+      assertThrows(
+          java.nio.file.FileAlreadyExistsException.class, () -> helperGcs.createFolder(folderId));
+    }
   }
 
   @Test
   public void getFolderInfo_nonExistent_returnsNotFound() throws IOException {
     if (!testStorageClientImpl) {
       String hnsBucket = bucketHelper.getUniqueBucketName("hns");
-      helperGcs.createBucket(hnsBucket,
-          CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
-      StorageResourceId nonExistentFolderId =
-          new StorageResourceId(hnsBucket, "non-existent-dir/");
+      helperGcs.createBucket(
+          hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+      StorageResourceId nonExistentFolderId = new StorageResourceId(hnsBucket, "non-existent-dir/");
 
       GoogleCloudStorageItemInfo folderInfo = helperGcs.getFolderInfo(nonExistentFolderId);
 
@@ -779,8 +778,8 @@ public class GoogleCloudStorageImplTest {
   public void getFolderInfo_onObject_returnsNotFound() throws IOException {
     if (!testStorageClientImpl) {
       String hnsBucket = bucketHelper.getUniqueBucketName("hns");
-      helperGcs.createBucket(hnsBucket,
-          CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+      helperGcs.createBucket(
+          hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
 
       int expectedSize = 5 * 1024 * 1024;
       StorageResourceId resourceId =

@@ -171,7 +171,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
     delegate.createFolder(resourceId);
   }
 
-
   @Override
   public boolean isHnBucket(URI src) throws IOException {
     return delegate.isHnBucket(src);

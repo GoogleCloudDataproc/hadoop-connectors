@@ -1700,7 +1700,8 @@ public class GoogleCloudStorageTest {
     StorageResourceId folderId = new StorageResourceId(bucketName, "testCreateAndGetNativeFolder/");
 
     // Ensure the resource doesn't exist before we start.
-    // Use deleteObjects because a folder might be represented by a placeholder object in some states.
+    // Use deleteObjects because a folder might be represented by a placeholder object in some
+    // states.
     rawStorage.deleteObjects(ImmutableList.of(folderId));
     assertThat(rawStorage.getItemInfo(folderId).exists()).isFalse();
 
@@ -1725,7 +1726,8 @@ public class GoogleCloudStorageTest {
   @Test
   public void testCreateFolder_alreadyExists_throwsException() throws IOException {
     String bucketName = getSharedBucketName();
-    StorageResourceId folderId = new StorageResourceId(bucketName, "testCreateFolder_alreadyExists/");
+    StorageResourceId folderId =
+        new StorageResourceId(bucketName, "testCreateFolder_alreadyExists/");
 
     // Create the folder for the first time
     rawStorage.createFolder(folderId);
@@ -1733,15 +1735,15 @@ public class GoogleCloudStorageTest {
 
     // Try to create it again and expect an exception
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class,
-        () -> rawStorage.createFolder(folderId));
+        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(folderId));
   }
 
   @Test
   public void testCreateFolder_conflictingFileExists_throwsException() throws IOException {
     String bucketName = getSharedBucketName();
     // The resource name is the same for the file and the folder we want to create.
-    StorageResourceId resourceId = new StorageResourceId(bucketName, "testCreateFolder_conflicts_with_file/");
+    StorageResourceId resourceId =
+        new StorageResourceId(bucketName, "testCreateFolder_conflicts_with_file/");
 
     // Create a regular file/object with that name
     rawStorage.createEmptyObject(resourceId);
@@ -1749,14 +1751,14 @@ public class GoogleCloudStorageTest {
 
     // Now, try to create a native folder with the exact same name. This should fail.
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class,
-        () -> rawStorage.createFolder(resourceId));
+        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(resourceId));
   }
 
   @Test
   public void testGetFolderInfo_nonExistent() throws IOException {
     String bucketName = getSharedBucketName();
-    StorageResourceId nonExistentFolderId = new StorageResourceId(bucketName, "this-folder-does-not-exist/");
+    StorageResourceId nonExistentFolderId =
+        new StorageResourceId(bucketName, "this-folder-does-not-exist/");
 
     // Attempt to get info for a folder that was never created
     GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(nonExistentFolderId);
@@ -1768,7 +1770,8 @@ public class GoogleCloudStorageTest {
   @Test
   public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
     String bucketName = getSharedBucketName();
-    StorageResourceId placeholderId = new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
+    StorageResourceId placeholderId =
+        new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
 
     // Create a zero-byte placeholder object, which is how folders were traditionally simulated.
     rawStorage.createEmptyObject(placeholderId);
