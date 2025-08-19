@@ -215,9 +215,8 @@ public interface GoogleCloudStorage {
   /**
    * Gets the metadata for a single folder.
    *
-   *  @param resourceId The StorageResourceId of the folder.
-   *  @throws IOException on IO error.
-   *
+   * @param resourceId The StorageResourceId of the folder.
+   * @throws IOException on IO error.
    */
   GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException;
 

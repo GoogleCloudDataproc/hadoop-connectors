@@ -548,8 +548,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Create only a leaf directory because subdirectories will be inferred
     // if leaf directory exists
-    final boolean isHns = this.options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && gcs.isHnBucket(path);
+    final boolean isHns =
+        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
     try {
       if (isHns) {
         // Create a native folder resource directly.
@@ -560,7 +560,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     } catch (FileAlreadyExistsException e) {
       GoogleCloudStorageEventBus.postOnException();
-      // This means that directory object/native folder already exist, and we do not need to do anything.
+      // This means that directory object/native folder already exist, and we do not need to do
+      // anything.
       String logMessage =
           isHns
               ? "mkdirs: Folder '%s' already exists, ignoring creation failure"

@@ -22,11 +22,11 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockT
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -39,6 +39,12 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.api.gax.rpc.UnaryCallable;
+import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.model.Bucket;
+import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.protobuf.Timestamp;
 import com.google.storage.control.v2.CreateFolderRequest;
 import com.google.storage.control.v2.Folder;
@@ -46,21 +52,15 @@ import com.google.storage.control.v2.FolderName;
 import com.google.storage.control.v2.GetFolderRequest;
 import com.google.storage.control.v2.StorageControlClient;
 import com.google.storage.control.v2.stub.StorageControlStub;
-import java.nio.file.FileAlreadyExistsException;
-import org.mockito.ArgumentCaptor;
-import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.model.Bucket;
-import com.google.api.services.storage.model.StorageObject;
-import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -385,7 +385,6 @@ public class GoogleCloudStorageMockitoTest {
     when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
         .thenThrow(mockPermissionDeniedException);
 
-
     PermissionDeniedException exception =
         assertThrows(PermissionDeniedException.class, () -> gcs.createFolder(folderId));
 
@@ -402,7 +401,8 @@ public class GoogleCloudStorageMockitoTest {
         Folder.newBuilder()
             .setName(folderName)
             .setMetageneration(1L)
-            .setCreateTime(Timestamp.newBuilder().setSeconds(System.currentTimeMillis() / 1000).build())
+            .setCreateTime(
+                Timestamp.newBuilder().setSeconds(System.currentTimeMillis() / 1000).build())
             .build();
 
     // Stub the stub to return the mock callable.
