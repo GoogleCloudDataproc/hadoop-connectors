@@ -155,6 +155,10 @@ public class GoogleCloudStorageItemInfo {
         /* verificationAttributes= */ null);
   }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> ac047ef8 (CreateFolder and getFolderInfo implementation)
   /**
    * Factory method for creating a "found" GoogleCloudStorageItemInfo for an inferred directory.
    *
@@ -367,7 +371,11 @@ public class GoogleCloudStorageItemInfo {
    * Indicates whether {@code itemInfo} is a native HNS folder. This is different from a placeholder
    * object or an inferred directory.
    */
+<<<<<<< HEAD
   public boolean isNativeHNSFolder() {
+=======
+  public boolean isNativeFolder() {
+>>>>>>> ac047ef8 (CreateFolder and getFolderInfo implementation)
     // A native folder is a directory, is not inferred, and has no content generation.
     // A placeholder object is also a directory but will have a contentGeneration > 0.
     return isDirectory() && !isInferredDirectory() && contentGeneration == 0;
