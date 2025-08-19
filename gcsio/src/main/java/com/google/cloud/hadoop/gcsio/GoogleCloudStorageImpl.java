@@ -43,6 +43,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -2433,6 +2434,77 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return this.storageControlClient;
   }
 
+  /**
+   * See {@link GoogleCloudStorage#getFolderInfo(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
+    logger.atInfo().log("getFolderInfo(%s)", resourceId);
+
+    // checkArgument(resourceId.isFolder(), "Expected a folder resourceId, got %s", resourceId);
+
+    if (resourceId.isBucket()) {
+      // This is not a folder. Do not proceed.
+      // Throwing a NotFoundException is the appropriate GCS client library pattern.
+      logger.atInfo().log("[TEST] not found 1");
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+
+    GetFolderRequest request =
+        GetFolderRequest.newBuilder()
+            .setName(FolderName.format("_", resourceId.getBucketName(), resourceId.getObjectName()))
+            .build();
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.get")) {
+      Folder folder = lazyGetStorageControlClient().getFolder(request);
+      return GoogleCloudStorageItemInfo.createFolder(resourceId, folder);
+    } catch (Exception e) {
+      // Any exception, including NotFound or PermissionDenied, is treated as "not found".
+      // This is intentional. The primary caller of this method, getFileInfo(),
+      // relies on this behavior to trigger its fallback logic which uses a different
+      // method (getFileInfoInternal) to authoritatively check for the file.
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#createFolder(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void createFolder(StorageResourceId resourceId) throws IOException {
+    logger.atInfo().log("createFolder(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    String bucketName = resourceId.getBucketName();
+
+    // 2. Format the bucket name into the fully-qualified resource name
+    //    that the StorageControlClient API requires.
+    String parentResourceName = String.format("projects/_/buckets/%s", bucketName);
+
+    // 3. Build the request with the correctly formatted parent name.
+    CreateFolderRequest request =
+        CreateFolderRequest.newBuilder()
+            .setFolderId(resourceId.getObjectName())
+            .setParent(parentResourceName)
+            .build();
+    // Add the tracing wrapper here
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.create")) {
+      logger.atFine().log("Create folder: %s%n", resourceId);
+      Folder newFolder = lazyGetStorageControlClient().createFolder(request);
+      logger.atFine().log("Created folder: %s%n", newFolder.getName());
+    } catch (AlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw (FileAlreadyExistsException)
+          new FileAlreadyExistsException(String.format("Folder '%s' already exists.", resourceId))
+              .initCause(e);
+    } catch (Throwable t) {
+      logger.atSevere().withCause(t).log("CreateFolder for %s failed", resourceId);
+      throw t;
+    }
+  }
+
   @Override
   public void renameHnFolder(URI src, URI dst) throws IOException {
     String bucketName = src.getAuthority();
@@ -2626,6 +2698,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       default:
         return false;
     }
+  }
+
+  @VisibleForTesting
+  void setStorageControlClient(StorageControlClient storageControlClient) {
+    this.storageControlClient = storageControlClient;
   }
 
   private static <RequestT extends StorageRequest<?>> void setUserProject(

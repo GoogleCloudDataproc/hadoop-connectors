@@ -124,6 +124,46 @@ public class GoogleCloudStorageItemInfo {
   }
 
   /**
+   * Factory method for creating a GoogleCloudStorageItemInfo from a native HNS Folder.
+   *
+   * @param resourceId The resource ID of the folder.
+   * @param folder The Folder object from the Storage Control API.
+   */
+  public static GoogleCloudStorageItemInfo createFolder(
+      StorageResourceId resourceId, com.google.storage.control.v2.Folder folder) {
+    checkNotNull(resourceId, "resourceId must not be null");
+    checkNotNull(folder, "folder must not be null");
+    checkArgument(resourceId.isDirectory(), "resourceId for a folder must be a directory");
+
+    // Convert Protobuf Timestamps to milliseconds since epoch.
+    long creationTime =
+        folder.hasCreateTime()
+            ? (folder.getCreateTime().getSeconds() * 1000)
+            + (folder.getCreateTime().getNanos() / 1_000_000)
+            : 0;
+    long modificationTime =
+        folder.hasUpdateTime()
+            ? (folder.getUpdateTime().getSeconds() * 1000)
+            + (folder.getUpdateTime().getNanos() / 1_000_000)
+            : 0;
+
+    return new GoogleCloudStorageItemInfo(
+        resourceId,
+        creationTime,
+        modificationTime,
+        /* size= */ 0, // Folders have no size.
+        /* location= */ null,
+        /* storageClass= */ null,
+        /* contentType= */ null,
+        /* contentEncoding= */ null,
+        /* metadata= */ ImmutableMap.of(), // Folders don't have user metadata
+        /* contentGeneration= */ 0, // Not applicable to folders
+        folder.getMetageneration(),
+        /* verificationAttributes= */ null);
+  }
+
+
+  /**
    * Factory method for creating a "found" GoogleCloudStorageItemInfo for an inferred directory.
    *
    * @param resourceId Resource ID that identifies an inferred directory
@@ -329,6 +369,16 @@ public class GoogleCloudStorageItemInfo {
    */
   public boolean isGlobalRoot() {
     return isRoot() && exists();
+  }
+
+  /**
+   * Indicates whether {@code itemInfo} is a native HNS folder. This is different from a placeholder
+   * object or an inferred directory.
+   */
+  public boolean isNativeFolder() {
+    // A native folder is a directory, is not inferred, and has no content generation.
+    // A placeholder object is also a directory but will have a contentGeneration > 0.
+    return isDirectory() && !isInferredDirectory() && contentGeneration == 0;
   }
 
   /** Indicates whether {@code itemInfo} is a directory. */

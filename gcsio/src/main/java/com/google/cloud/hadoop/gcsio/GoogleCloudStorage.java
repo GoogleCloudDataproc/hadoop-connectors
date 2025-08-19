@@ -213,6 +213,25 @@ public interface GoogleCloudStorage {
   void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException;
 
   /**
+   * Gets the metadata for a single folder.
+   *
+   *  @param resourceId The StorageResourceId of the folder.
+   *  @throws IOException on IO error.
+   *
+   */
+  GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException;
+
+  /**
+   * Creates a native GCS folder resource. Applicable only for Hierarchical Namespace (HNS) enabled
+   * buckets.
+   *
+   * @param folderId The StorageResourceId of the folder to create.
+   * @throws IOException if the folder cannot be created, or if it already exists and is not a
+   *     folder.
+   */
+  void createFolder(StorageResourceId folderId) throws IOException;
+
+  /**
    * Deletes the given folder resources. Does not throw any exception for "folders not found"
    * errors.
    *
