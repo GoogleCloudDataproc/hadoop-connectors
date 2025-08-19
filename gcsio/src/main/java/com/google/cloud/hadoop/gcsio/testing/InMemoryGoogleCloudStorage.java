@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.protobuf.Timestamp;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -327,16 +328,58 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
-    throw new IOException("Not implemented");
-  }
-
-  @Override
   public void createFolder(StorageResourceId resourceId) throws IOException {
-    throw new IOException("Not implemented");
+    String bucketName = resourceId.getBucketName();
+    if (!validateBucketName(bucketName)) {
+      throw new IOException("Error creating folder. Invalid bucket name: " + bucketName);
+    }
+    if (!bucketLookup.containsKey(bucketName)) {
+      throw new IOException("Bucket does not exist: " + bucketName);
+    }
+    // Check for any conflicting resource (file, placeholder, or native folder).
+    if (getItemInfo(resourceId).exists()) {
+      throw new FileAlreadyExistsException(
+          "Folder or object '" + resourceId + "' already exists");
+    }
+
+    // Simulate the Folder object that the real API would return.
+    long now = clock.currentTimeMillis();
+    Timestamp timestamp = Timestamp.newBuilder()
+        .setSeconds(now / 1000)
+        .setNanos((int) ((now % 1000) * 1_000_000))
+        .build();
+
+    com.google.storage.control.v2.Folder fakeApiFolder =
+        com.google.storage.control.v2.Folder.newBuilder()
+            .setName(String.format("projects/_/buckets/%s/folders/%s",
+                resourceId.getBucketName(), resourceId.getObjectName()))
+            .setMetageneration(1L)
+            .setCreateTime(timestamp)
+            .setUpdateTime(timestamp)
+            .build();
+
+    GoogleCloudStorageItemInfo folderItemInfo =
+        GoogleCloudStorageItemInfo.createFolder(resourceId, fakeApiFolder);
+
+    InMemoryObjectEntry folderEntry = new InMemoryObjectEntry(folderItemInfo);
+
+    // Add it to in-memory store
+    bucketLookup.get(resourceId.getBucketName()).add(folderEntry);
   }
 
   @Override
+  public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
+    GoogleCloudStorageItemInfo itemInfo = getItemInfo(resourceId);
+
+    if (itemInfo.exists() && itemInfo.isNativeFolder()) {
+      return itemInfo;
+    }
+
+    // If it doesn't exist or isn't a native folder, return not found.
+    return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+  }
+
+    @Override
   public synchronized void move(
       Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
     if (sourceToDestinationObjectsMap == null) {
