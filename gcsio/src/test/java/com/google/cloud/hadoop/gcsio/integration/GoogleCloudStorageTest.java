@@ -1797,7 +1797,8 @@ public class GoogleCloudStorageTest {
 
   public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
     String bucketName = getSharedBucketName();
-    StorageResourceId placeholderId = new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
+    StorageResourceId placeholderId =
+        new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
 
     rawStorage.createEmptyObject(placeholderId);
 
