@@ -548,8 +548,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Create only a leaf directory because subdirectories will be inferred
     // if leaf directory exists
-    final boolean isHns =
-        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
+    final boolean isHns = isHnsOptimized(path);
     try {
       if (isHns) {
         // Create a native folder resource directly.
@@ -1033,8 +1032,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     checkArgument(path != null, "path must not be null");
 
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
-    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && this.gcs.isHnBucket(path)) {
+    if (isHnsOptimized(path)) {
       FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getFolderInfo(resourceId.toDirectoryId()));
       if (fileInfo.exists()) {
         return fileInfo;
@@ -1202,7 +1200,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     resourceId = resourceId.toDirectoryId();
 
     // Check if HNS optimization is enabled, it's an HNS bucket
-    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
+    if (isHnsOptimized(path)) {
       // Not a top-level directory, create an folder.
       gcs.createFolder(resourceId);
     } else {
@@ -1235,6 +1233,13 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             "Cannot create directories because of existing file: " + fileInfo.getResourceId());
       }
     }
+  }
+
+  private boolean isHnsOptimized(URI path) throws IOException {
+    GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
+    return gcsOptions.isHnBucketRenameEnabled()
+        && gcsOptions.isHnOptimizationEnabled()
+        && gcs.isHnBucket(path);
   }
 
   private <T> Future<T> runFuture(ExecutorService service, Callable<T> task, String name) {

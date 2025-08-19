@@ -70,8 +70,7 @@ public abstract class GoogleCloudStorageOptions {
         .setMoveOperationEnabled(true)
         .setStorageClientCachingEnabled(false)
         .setBidiEnabled(false)
-        .setFinalizeBeforeClose(false)
-        .setHnOptimizationEnabled(false);
+        .setFinalizeBeforeClose(false);
   }
 
   public abstract Builder toBuilder();
