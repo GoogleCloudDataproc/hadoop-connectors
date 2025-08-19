@@ -24,6 +24,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
+import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
@@ -99,11 +100,33 @@ public class GoogleCloudStorageTest {
                 }
               });
 
+  private static final LoadingCache<GoogleCloudStorage, String> SHARED_HNS_BUCKETS =
+      CacheBuilder.newBuilder()
+          .build(
+              new CacheLoader<>() {
+                @Override
+                public String load(GoogleCloudStorage gcs) throws Exception {
+                  // Note the call to createHnBucket and the new suffix
+                  return createHnBucket(gcs, "shared-hns");
+                }
+              });
+
   private static String createUniqueBucket(GoogleCloudStorage gcs, String suffix)
       throws IOException {
     String bucketName = getUniqueBucketName(suffix) + "_" + gcs.hashCode();
     gcs.createBucket(bucketName);
     return bucketName;
+  }
+
+  private static String createHnBucket(GoogleCloudStorage gcs, String suffix) throws IOException {
+    String bucketName = getUniqueBucketName(suffix) + "_" + gcs.hashCode();
+    gcs.createBucket(
+        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    return bucketName;
+  }
+
+  private String getSharedHnsBucketName() {
+    return SHARED_HNS_BUCKETS.getUnchecked(rawStorage);
   }
 
   private String createUniqueBucket(String suffix) throws IOException {
@@ -1696,7 +1719,7 @@ public class GoogleCloudStorageTest {
 
   @Test
   public void testCreateAndGetNativeFolder() throws IOException {
-    String bucketName = getSharedBucketName();
+    String bucketName = getSharedHnsBucketName();
     StorageResourceId folderId = new StorageResourceId(bucketName, "testCreateAndGetNativeFolder/");
 
     // Ensure the resource doesn't exist before we start.
@@ -1705,13 +1728,10 @@ public class GoogleCloudStorageTest {
     rawStorage.deleteObjects(ImmutableList.of(folderId));
     assertThat(rawStorage.getItemInfo(folderId).exists()).isFalse();
 
-    // Create the native folder
     rawStorage.createFolder(folderId);
 
-    // Retrieve it using the specific getFolderInfo method
     GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(folderId);
 
-    // Assert its properties
     assertThat(folderInfo).isNotNull();
     assertWithMessage("Folder '%s' should exist", folderId).that(folderInfo.exists()).isTrue();
     assertThat(folderInfo.getResourceId()).isEqualTo(folderId);
@@ -1719,73 +1739,60 @@ public class GoogleCloudStorageTest {
     assertThat(folderInfo.isNativeFolder()).isTrue(); // This is the key check
     assertThat(folderInfo.isInferredDirectory()).isFalse();
     assertThat(folderInfo.getSize()).isEqualTo(0);
-    // Native folders are expected to have a metageneration.
     assertThat(folderInfo.getMetaGeneration()).isGreaterThan(0L);
   }
 
   @Test
   public void testCreateFolder_alreadyExists_throwsException() throws IOException {
-    String bucketName = getSharedBucketName();
+    String bucketName = getSharedHnsBucketName();
     StorageResourceId folderId =
         new StorageResourceId(bucketName, "testCreateFolder_alreadyExists/");
 
-    // Create the folder for the first time
     rawStorage.createFolder(folderId);
     assertThat(rawStorage.getFolderInfo(folderId).exists()).isTrue();
 
-    // Try to create it again and expect an exception
     assertThrows(
         java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(folderId));
   }
 
   @Test
   public void testCreateFolder_conflictingFileExists_throwsException() throws IOException {
-    String bucketName = getSharedBucketName();
-    // The resource name is the same for the file and the folder we want to create.
+    String bucketName = getSharedHnsBucketName();
     StorageResourceId resourceId =
         new StorageResourceId(bucketName, "testCreateFolder_conflicts_with_file/");
 
-    // Create a regular file/object with that name
     rawStorage.createEmptyObject(resourceId);
     assertThat(rawStorage.getItemInfo(resourceId).exists()).isTrue();
 
-    // Now, try to create a native folder with the exact same name. This should fail.
     assertThrows(
         java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(resourceId));
   }
 
   @Test
   public void testGetFolderInfo_nonExistent() throws IOException {
-    String bucketName = getSharedBucketName();
+    String bucketName = getSharedHnsBucketName();
     StorageResourceId nonExistentFolderId =
         new StorageResourceId(bucketName, "this-folder-does-not-exist/");
 
-    // Attempt to get info for a folder that was never created
     GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(nonExistentFolderId);
 
-    // Assert it is correctly reported as not found
     assertThat(folderInfo.exists()).isFalse();
   }
 
   @Test
-  public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
-    String bucketName = getSharedBucketName();
-    StorageResourceId placeholderId =
-        new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
+  public void testGetFolderInfo_forObject_isNotFound() throws IOException {
+    String bucketName = getSharedHnsBucketName();
+    StorageResourceId object1 =
+        new StorageResourceId(bucketName, "this-is-a-non-empty-object");;
 
-    // Create a zero-byte placeholder object, which is how folders were traditionally simulated.
-    rawStorage.createEmptyObject(placeholderId);
+    writeObject(rawStorage, object1, /* objectSize= */ 1024);
 
-    // Verify with the generic getItemInfo that *something* exists at that path.
-    GoogleCloudStorageItemInfo genericInfo = rawStorage.getItemInfo(placeholderId);
+    GoogleCloudStorageItemInfo genericInfo = rawStorage.getItemInfo(object1);
     assertThat(genericInfo.exists()).isTrue();
-    // It should NOT be identified as a native folder.
     assertThat(genericInfo.isNativeFolder()).isFalse();
 
-    // Now, use the getFolderInfo method, which only looks for native folders.
-    GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(placeholderId);
+    GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(object1);
 
-    // It should be reported as "not found" because it's not a native folder object.
     assertThat(nativeFolderInfo.exists()).isFalse();
   }
 
