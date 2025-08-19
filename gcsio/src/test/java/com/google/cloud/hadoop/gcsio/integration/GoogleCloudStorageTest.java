@@ -1695,6 +1695,98 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testCreateAndGetNativeFolder() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId folderId = new StorageResourceId(bucketName, "testCreateAndGetNativeFolder/");
+
+    // Ensure the resource doesn't exist before we start.
+    // Use deleteObjects because a folder might be represented by a placeholder object in some states.
+    rawStorage.deleteObjects(ImmutableList.of(folderId));
+    assertThat(rawStorage.getItemInfo(folderId).exists()).isFalse();
+
+    // Create the native folder
+    rawStorage.createFolder(folderId);
+
+    // Retrieve it using the specific getFolderInfo method
+    GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(folderId);
+
+    // Assert its properties
+    assertThat(folderInfo).isNotNull();
+    assertWithMessage("Folder '%s' should exist", folderId).that(folderInfo.exists()).isTrue();
+    assertThat(folderInfo.getResourceId()).isEqualTo(folderId);
+    assertThat(folderInfo.isDirectory()).isTrue();
+    assertThat(folderInfo.isNativeFolder()).isTrue(); // This is the key check
+    assertThat(folderInfo.isInferredDirectory()).isFalse();
+    assertThat(folderInfo.getSize()).isEqualTo(0);
+    // Native folders are expected to have a metageneration.
+    assertThat(folderInfo.getMetaGeneration()).isGreaterThan(0L);
+  }
+
+  @Test
+  public void testCreateFolder_alreadyExists_throwsException() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId folderId = new StorageResourceId(bucketName, "testCreateFolder_alreadyExists/");
+
+    // Create the folder for the first time
+    rawStorage.createFolder(folderId);
+    assertThat(rawStorage.getFolderInfo(folderId).exists()).isTrue();
+
+    // Try to create it again and expect an exception
+    assertThrows(
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> rawStorage.createFolder(folderId));
+  }
+
+  @Test
+  public void testCreateFolder_conflictingFileExists_throwsException() throws IOException {
+    String bucketName = getSharedBucketName();
+    // The resource name is the same for the file and the folder we want to create.
+    StorageResourceId resourceId = new StorageResourceId(bucketName, "testCreateFolder_conflicts_with_file/");
+
+    // Create a regular file/object with that name
+    rawStorage.createEmptyObject(resourceId);
+    assertThat(rawStorage.getItemInfo(resourceId).exists()).isTrue();
+
+    // Now, try to create a native folder with the exact same name. This should fail.
+    assertThrows(
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> rawStorage.createFolder(resourceId));
+  }
+
+  @Test
+  public void testGetFolderInfo_nonExistent() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId nonExistentFolderId = new StorageResourceId(bucketName, "this-folder-does-not-exist/");
+
+    // Attempt to get info for a folder that was never created
+    GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(nonExistentFolderId);
+
+    // Assert it is correctly reported as not found
+    assertThat(folderInfo.exists()).isFalse();
+  }
+
+  @Test
+  public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId placeholderId = new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
+
+    // Create a zero-byte placeholder object, which is how folders were traditionally simulated.
+    rawStorage.createEmptyObject(placeholderId);
+
+    // Verify with the generic getItemInfo that *something* exists at that path.
+    GoogleCloudStorageItemInfo genericInfo = rawStorage.getItemInfo(placeholderId);
+    assertThat(genericInfo.exists()).isTrue();
+    // It should NOT be identified as a native folder.
+    assertThat(genericInfo.isNativeFolder()).isFalse();
+
+    // Now, use the getFolderInfo method, which only looks for native folders.
+    GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(placeholderId);
+
+    // It should be reported as "not found" because it's not a native folder object.
+    assertThat(nativeFolderInfo.exists()).isFalse();
+  }
+
+  @Test
   public void googleCloudStorageItemInfo_equals() throws IOException {
     String bucketName = getSharedBucketName();
 
