@@ -154,10 +154,10 @@ public class GoogleCloudStorageItemInfo {
         /* size= */ 0, // Folders have no size.
         /* location= */ null,
         /* storageClass= */ null,
-        /* contentType= */ null, // A sensible default.
+        /* contentType= */ null,
         /* contentEncoding= */ null,
-        /* metadata= */ ImmutableMap.of(), // Folders don't have user metadata.
-        /* contentGeneration= */ 0, // Not applicable to folders.
+        /* metadata= */ ImmutableMap.of(), // Folders don't have user metadata
+        /* contentGeneration= */ 0, // Not applicable to folders
         folder.getMetageneration(),
         /* verificationAttributes= */ null);
   }
@@ -368,6 +368,16 @@ public class GoogleCloudStorageItemInfo {
    */
   public boolean isGlobalRoot() {
     return isRoot() && exists();
+  }
+
+  /**
+   * Indicates whether {@code itemInfo} is a native HNS folder. This is different from a placeholder
+   * object or an inferred directory.
+   */
+  public boolean isNativeFolder() {
+    // A native folder is a directory, is not inferred, and has no content generation.
+    // A placeholder object is also a directory but will have a contentGeneration > 0.
+    return isDirectory() && !isInferredDirectory() && contentGeneration == 0;
   }
 
   /** Indicates whether {@code itemInfo} is a directory. */

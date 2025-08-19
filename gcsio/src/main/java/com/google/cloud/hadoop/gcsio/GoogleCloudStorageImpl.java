@@ -2427,7 +2427,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  private StorageControlClient lazyGetStorageControlClient() throws IOException {
+  StorageControlClient lazyGetStorageControlClient() throws IOException {
     if (this.storageControlClient == null) {
       this.storageControlClient =
           StorageControlClient.create(
@@ -2446,7 +2446,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
     logger.atInfo().log("getFolderInfo(%s)", resourceId);
-    logger.atInfo().log("[TEST] getFolderInfo(%s)", resourceId);
 
     // checkArgument(resourceId.isFolder(), "Expected a folder resourceId, got %s", resourceId);
 
@@ -2465,6 +2464,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Folder folder = lazyGetStorageControlClient().getFolder(request);
       return GoogleCloudStorageItemInfo.createFolder(resourceId, folder);
     } catch (Exception e) {
+      // Any exception, including NotFound or PermissionDenied, is treated as "not found".
+      // This is intentional. The primary caller of this method, getFileInfo(),
+      // relies on this behavior to trigger its fallback logic which uses a different
+      // method (getFileInfoInternal) to authoritatively check for the file.
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
   }
@@ -2616,6 +2619,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       request.getRequestHeaders().setAuthorization("Bearer " + token);
     }
     return configureRequest(request, bucketName);
+  }
+
+  @VisibleForTesting
+  void setStorageControlClient(StorageControlClient storageControlClient) {
+    this.storageControlClient = storageControlClient;
   }
 
   <RequestT extends StorageRequest<?>> RequestT configureRequest(

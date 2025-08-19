@@ -97,7 +97,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
   private static final ListObjectOptions DIRECTORY_EMPTINESS_CHECK_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder()
-          .setIncludePrefix(true)
+          //.setIncludePrefix(true)
           .setIncludeFoldersAsPrefixes(true)
           .setMaxResults(2)
           .build();

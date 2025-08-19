@@ -37,6 +37,7 @@ public abstract class ListObjectOptions {
     return new AutoValue_ListObjectOptions.Builder()
         .setDelimiter(PATH_DELIMITER)
         .setIncludePrefix(false)
+        .setIncludeFoldersAsPrefixes(false)
         .setMaxResults(MAX_RESULTS_UNLIMITED)
         .setFields(OBJECT_FIELDS);
   }
