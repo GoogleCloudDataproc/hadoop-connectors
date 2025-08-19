@@ -258,6 +258,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
 
+    public abstract Builder setHnOptimizationEnabled(boolean hnOptimizationEnabled);
+
     abstract GoogleCloudStorageOptions autoBuild();
 
     public GoogleCloudStorageOptions build() {
