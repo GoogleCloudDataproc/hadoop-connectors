@@ -1782,8 +1782,8 @@ public class GoogleCloudStorageTest {
   @Test
   public void testGetFolderInfo_forObject_isNotFound() throws IOException {
     String bucketName = getSharedHnsBucketName();
-    StorageResourceId object1 =
-        new StorageResourceId(bucketName, "this-is-a-non-empty-object");;
+    StorageResourceId object1 = new StorageResourceId(bucketName, "this-is-a-non-empty-object");
+    ;
 
     writeObject(rawStorage, object1, /* objectSize= */ 1024);
 
