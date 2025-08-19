@@ -338,21 +338,23 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     }
     // Check for any conflicting resource (file, placeholder, or native folder).
     if (getItemInfo(resourceId).exists()) {
-      throw new FileAlreadyExistsException(
-          "Folder or object '" + resourceId + "' already exists");
+      throw new FileAlreadyExistsException("Folder or object '" + resourceId + "' already exists");
     }
 
     // Simulate the Folder object that the real API would return.
     long now = clock.currentTimeMillis();
-    Timestamp timestamp = Timestamp.newBuilder()
-        .setSeconds(now / 1000)
-        .setNanos((int) ((now % 1000) * 1_000_000))
-        .build();
+    Timestamp timestamp =
+        Timestamp.newBuilder()
+            .setSeconds(now / 1000)
+            .setNanos((int) ((now % 1000) * 1_000_000))
+            .build();
 
     com.google.storage.control.v2.Folder fakeApiFolder =
         com.google.storage.control.v2.Folder.newBuilder()
-            .setName(String.format("projects/_/buckets/%s/folders/%s",
-                resourceId.getBucketName(), resourceId.getObjectName()))
+            .setName(
+                String.format(
+                    "projects/_/buckets/%s/folders/%s",
+                    resourceId.getBucketName(), resourceId.getObjectName()))
             .setMetageneration(1L)
             .setCreateTime(timestamp)
             .setUpdateTime(timestamp)
@@ -379,7 +381,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return GoogleCloudStorageItemInfo.createNotFound(resourceId);
   }
 
-    @Override
+  @Override
   public synchronized void move(
       Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap) throws IOException {
     if (sourceToDestinationObjectsMap == null) {

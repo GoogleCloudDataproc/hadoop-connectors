@@ -587,7 +587,6 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.write.rolling.checksum.enable",
           AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
 
-
   /** Configuration key to enable Hierarchical Namespace (HNS) optimizations. */
   public static final HadoopConfigurationProperty<Boolean> GCS_HNS_OPTIMIZATION_ENABLE =
       new HadoopConfigurationProperty<>(
