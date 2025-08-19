@@ -484,6 +484,13 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         try {
           int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
           int bytesRead = byteChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+          if (bytesRead == 0) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new IOException(
+                String.format(
+                    "Read 0 bytes without blocking while skipping %d bytes from object: '%s'",
+                    seekDistance, resourceId));
+          }
           if (bytesRead < 0) {
             logger.atInfo().log(
                 "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
