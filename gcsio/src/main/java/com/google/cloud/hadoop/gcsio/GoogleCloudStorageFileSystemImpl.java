@@ -1001,6 +1001,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      Thread.currentThread().interrupt();
       GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
@@ -1012,6 +1013,33 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
     fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
     return fileInfos;
+  }
+
+  public List<FileInfo> listFileInfoStartingFrom(URI startsFrom, ListFileOptions listOptions)
+      throws IOException {
+    checkNotNull(startsFrom, "start Offset can't be null");
+    logger.atFiner().log("listFileInfoStartingFrom(startsFrom: %s)", startsFrom);
+
+    StorageResourceId startOffsetPathId =
+        StorageResourceId.fromUriPath(startsFrom, /* allowEmptyObjectName= */ true);
+
+    checkArgument(
+        !startOffsetPathId.isRoot(),
+        "provided start offset shouldn't be root but an object path %s",
+        startsFrom);
+
+    List<GoogleCloudStorageItemInfo> itemsInfo =
+        gcs.listObjectInfoStartingFrom(
+            startOffsetPathId.getBucketName(),
+            startOffsetPathId.getObjectName(),
+            updateListObjectOptions(
+                ListObjectOptions.builder()
+                    .setMaxResults(options.getCloudStorageOptions().getMaxListItemsPerCall())
+                    .setIncludePrefix(false)
+                    .setDelimiter(null)
+                    .build(),
+                listOptions));
+    return FileInfo.fromItemInfos(itemsInfo);
   }
 
   @Override

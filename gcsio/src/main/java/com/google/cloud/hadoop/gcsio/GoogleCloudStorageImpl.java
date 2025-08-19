@@ -80,8 +80,13 @@ import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.storage.control.v2.*;
+import com.google.storage.control.v2.Folder;
+import com.google.storage.control.v2.FolderName;
+import com.google.storage.control.v2.ListFoldersRequest;
+import com.google.storage.control.v2.RenameFolderRequest;
+import com.google.storage.control.v2.StorageControlClient;
 import com.google.storage.control.v2.StorageControlClient.ListFoldersPagedResponse;
+import com.google.storage.control.v2.StorageControlSettings;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -92,6 +97,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1483,6 +1489,44 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return insertObject;
   }
 
+  private List<StorageObject> listStorageObjects(
+      String bucketName, String startOffset, ListObjectOptions listOptions) throws IOException {
+    logger.atFiner().log("listStorageObjects(%s, %s, %s)", bucketName, startOffset, listOptions);
+    checkArgument(
+        listOptions.getDelimiter() == null,
+        "Delimiter shouldn't be used while listing objects starting from an offset");
+
+    long maxResults =
+        listOptions.getMaxResults() > 0 ? listOptions.getMaxResults() : LIST_MAX_RESULTS;
+
+    Storage.Objects.List listObject =
+        createListRequest(
+            bucketName,
+            /* objectNamePrefix */ null,
+            startOffset,
+            listOptions.getFields(),
+            /* delimiter */ null,
+            maxResults);
+    String pageToken = null;
+    LinkedList<StorageObject> listedObjects = new LinkedList<>();
+    // paginated call is required because we may filter all the items, if they are "directory"
+    // Avoid calling another list API as soon as we have some files listed.
+    int page = 0;
+    do {
+      page += 1;
+      if (pageToken != null) {
+        logger.atFiner().log(
+            "listStorageObjects: next page %s, listedObjects: %d", pageToken, listedObjects.size());
+        listObject.setPageToken(pageToken);
+      }
+      pageToken =
+          listStorageObjectsFilteredPage(
+              listObject, listOptions, listedObjects, Integer.toString(page));
+    } while (pageToken != null && listedObjects.size() == 0);
+
+    return listedObjects;
+  }
+
   /**
    * Helper for both listObjectInfo that executes the actual API calls to get paginated lists,
    * accumulating the StorageObjects and String prefixes into the params {@code listedObjects} and
@@ -1536,6 +1580,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createListRequest(
             bucketName,
             objectNamePrefix,
+            /* startOffset */ null,
             listOptions.getFields(),
             listOptions.getDelimiter(),
             maxResults);
@@ -1555,6 +1600,38 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         && getMaxRemainingResults(listOptions.getMaxResults(), listedPrefixes, listedObjects) > 0);
   }
 
+  /*
+   * Helper function to list files which are lexicographically higher than the offset (inclusive).
+   * It strictly expects no delimiter to be provided.
+   * It also filters out all the objects which are "directories"
+   */
+
+  private String listStorageObjectsFilteredPage(
+      Storage.Objects.List listObject,
+      ListObjectOptions listOptions,
+      List<StorageObject> listedObjects,
+      String pageContext)
+      throws IOException {
+    logger.atFiner().log("listStorageObjectsPage(%s, %s)", listObject, listOptions);
+    checkNotNull(listedObjects, "Must provide a non-null container for listedObjects.");
+    // We don't want any prefixes[] and filter the objects which are "directories" manually.
+    checkArgument(
+        listObject.getDelimiter() == null,
+        "Delimiter shouldn't be set while listing object from an offset");
+
+    Objects response = executeListCall(listObject, pageContext);
+    if (response == null || response.getItems() == null) {
+      return null;
+    }
+    /* filter the objects which are directory */
+    for (StorageObject object : response.getItems()) {
+      if (!object.getName().endsWith(PATH_DELIMITER)) {
+        listedObjects.add(object);
+      }
+    }
+    return response.getNextPageToken();
+  }
+
   @Nullable
   private String listStorageObjectsAndPrefixesPage(
       Storage.Objects.List listObject,
@@ -1571,13 +1648,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Deduplicate prefixes and items, because if 'includeTrailingDelimiter' set to true
     // then returned items will contain "prefix objects" too.
     Set<String> prefixes = new LinkedHashSet<>(listedPrefixes);
-
     Objects items;
-    try (ITraceOperation op =
-        TraceOperation.addToExistingTrace(
-            String.format("gcs.objects.list(page=%s)", pageContext))) {
-      items = listObject.execute();
-      op.annotate("resultSize", items == null ? 0 : items.size());
+    try {
+      items = executeListCall(listObject, pageContext);
     } catch (IOException e) {
       GoogleCloudStorageEventBus.postOnException();
       String resource = StringPaths.fromComponents(listObject.getBucket(), listObject.getPrefix());
@@ -1653,9 +1726,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return items.getNextPageToken();
   }
 
+  private Objects executeListCall(Storage.Objects.List listObject, String pageContext)
+      throws IOException {
+    try (ITraceOperation op =
+        TraceOperation.addToExistingTrace(
+            String.format("gcs.objects.list(page=%s)", pageContext))) {
+      Objects items = listObject.execute();
+      op.annotate("resultSize", items == null ? 0 : items.size());
+      return items;
+    }
+  }
+
   private Storage.Objects.List createListRequest(
       String bucketName,
       String objectNamePrefix,
+      String startOffset,
       String objectFields,
       String delimiter,
       long maxResults)
@@ -1667,7 +1752,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     Storage.Objects.List listObject =
         initializeRequest(
-            storage.objects().list(bucketName).setPrefix(emptyToNull(objectNamePrefix)),
+            storage
+                .objects()
+                .list(bucketName)
+                .setStartOffset(emptyToNull(startOffset))
+                .setPrefix(emptyToNull(objectNamePrefix)),
             bucketName);
 
     // Set delimiter if supplied.
@@ -1718,6 +1807,32 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
   }
 
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfoStartingFrom(
+      String bucketName, String startOffset, ListObjectOptions listOptions) throws IOException {
+    logger.atFiner().log(
+        "listObjectInfoStartingFrom(%s, %s, %s)", bucketName, startOffset, listOptions);
+    checkArgument(
+        listOptions.getFields() != null && listOptions.getFields().contains("name"),
+        "Name is a required field for listing files, provided fields %s",
+        listOptions.getFields());
+    try {
+      List<StorageObject> listedObjects = listStorageObjects(bucketName, startOffset, listOptions);
+      return getGoogleCloudStorageItemInfos(
+          bucketName,
+          /* objectNamePrefix= */ null,
+          listOptions,
+          Collections.EMPTY_LIST,
+          listedObjects);
+    } catch (Exception e) {
+      throw new IOException(
+          String.format(
+              "Having issue while listing files from offset: %s for bucket: %s and options: %s",
+              startOffset, bucketName, listOptions),
+          e);
+    }
+  }
+
   /**
    * @see GoogleCloudStorage#listObjectInfoPage(String, String, ListObjectOptions, String)
    */
@@ -1737,6 +1852,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createListRequest(
             bucketName,
             objectNamePrefix,
+            /* startOffset */ null,
             listOptions.getFields(),
             listOptions.getDelimiter(),
             listOptions.getMaxResults());
@@ -1839,7 +1955,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<StorageObject> listedObjects) {
     List<GoogleCloudStorageItemInfo> objectInfos =
         // Size to accommodate inferred directories for listed prefixes and prefix object
-        new ArrayList<>(listedPrefixes.size() + listedObjects.size() + 1);
+        new LinkedList<>();
 
     // Create inferred directory for the prefix object if necessary
     if (listOptions.isIncludePrefix()
