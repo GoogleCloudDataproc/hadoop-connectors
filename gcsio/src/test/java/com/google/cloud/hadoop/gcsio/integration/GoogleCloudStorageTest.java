@@ -1792,6 +1792,20 @@ public class GoogleCloudStorageTest {
     assertThat(genericInfo.isNativeHNSFolder()).isFalse();
 
     GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(object1);
+    assertThat(nativeFolderInfo.exists()).isFalse();
+  }
+
+  public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId placeholderId = new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
+
+    rawStorage.createEmptyObject(placeholderId);
+
+    GoogleCloudStorageItemInfo genericInfo = rawStorage.getItemInfo(placeholderId);
+    assertThat(genericInfo.exists()).isTrue();
+    assertThat(genericInfo.isNativeHNSFolder()).isFalse();
+
+    GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(placeholderId);
 
     assertThat(nativeFolderInfo.exists()).isFalse();
   }
