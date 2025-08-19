@@ -1826,7 +1826,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       try {
         Logger.getLogger("").removeHandler(loggingInterceptor);
         loggingInterceptor.close();
-        loggingInterceptor = null;
       } catch (RuntimeException e) {
         logger.atSevere().withCause(e).log("Failed to stop cloud logging service");
       }
