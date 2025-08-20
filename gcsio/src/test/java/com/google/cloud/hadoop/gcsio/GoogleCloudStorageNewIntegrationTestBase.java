@@ -905,7 +905,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     gcsfsIHelper.gcs.createEmptyObject(fileResource);
 
     assertThrows(
-        IllegalArgumentException.class,
+        IOException.class,
         () ->
             gcs.listObjectInfoStartingFrom(
                 gcsfsIHelper.sharedBucketName1, dir, ListObjectOptions.DEFAULT));
