@@ -83,7 +83,15 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     return newConfig;
   }
 
-  @Rule public TestName name = new TestName();
+  @Rule
+  public TestName name =
+      new TestName() {
+        // With parametrization method name will get [index] appended in their name.
+        @Override
+        public String getMethodName() {
+          return super.getMethodName().replaceAll("[\\[,\\]]", "");
+        }
+      };
 
   // -----------------------------------------------------------------------------------------
   // Tests that vary according to the GHFS variant, but which we want to make sure get tested.

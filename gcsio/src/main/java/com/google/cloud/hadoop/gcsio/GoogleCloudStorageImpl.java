@@ -1955,7 +1955,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<StorageObject> listedObjects) {
     List<GoogleCloudStorageItemInfo> objectInfos =
         // Size to accommodate inferred directories for listed prefixes and prefix object
-        new LinkedList<>();
+        new ArrayList<>(listedPrefixes.size() + listedObjects.size() + 1);
 
     // Create inferred directory for the prefix object if necessary
     if (listOptions.isIncludePrefix()
