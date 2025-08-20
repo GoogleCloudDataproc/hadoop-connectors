@@ -1664,8 +1664,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       boolean includeFoldersAsPrefixes)
       throws IOException {
     logger.atFiner().log(
-        "createListRequest(%s, %s, %s, %s, %d)",
-        bucketName, objectNamePrefix, objectFields, delimiter, maxResults);
+        "createListRequest(%s, %s, %s, %s, %d, %b)",
+        bucketName,
+        objectNamePrefix,
+        objectFields,
+        delimiter,
+        maxResults,
+        includeFoldersAsPrefixes);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject =

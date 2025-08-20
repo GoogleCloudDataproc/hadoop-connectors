@@ -96,10 +96,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?maxResults=5000&project=%s";
 
   private static final String LIST_REQUEST_FORMAT =
-      "GET:"
-          + GOOGLEAPIS_ENDPOINT
-          + "/storage/v1/b/%s/o?%sfields=items(%s),prefixes,nextPageToken"
-          + "%s&maxResults=%d%s";
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o";
 
   private static final String LIST_SIMPLE_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o?maxResults=%d&prefix=%s";
@@ -512,7 +509,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         objectFields,
         maxResults,
-        pageToken);
+        pageToken,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestString(
@@ -529,7 +527,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         objectFields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
-        pageToken);
+        pageToken,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestString(
@@ -539,19 +538,32 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String prefix,
       String objectFields,
       int maxResults,
-      String pageToken) {
-    String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
-    extraParams += prefix == null ? "" : "&prefix=" + prefix;
-    return String.format(
-        LIST_REQUEST_FORMAT,
-        bucket,
-        flatList ? "" : "delimiter=/&",
-        objectFields,
-        includeTrailingDelimiter == null
-            ? ""
-            : "&includeTrailingDelimiter=" + includeTrailingDelimiter,
-        maxResults,
-        extraParams);
+      String pageToken,
+      Boolean includeFoldersAsPrefixes) {
+    String baseUrl = String.format(LIST_REQUEST_FORMAT, bucket);
+
+    //The rest of your dynamic parameter building logic remains the same.
+    List<String> params = new ArrayList<>();
+    if (!flatList) {
+      params.add("delimiter=/");
+    }
+    params.add("fields=items(" + objectFields + "),prefixes,nextPageToken");
+    params.add("includeFoldersAsPrefixes=" + includeFoldersAsPrefixes);
+
+    if (includeTrailingDelimiter != null) {
+      params.add("includeTrailingDelimiter=" + includeTrailingDelimiter);
+    }
+
+    params.add("maxResults=" + maxResults);
+
+    if (pageToken != null) {
+      params.add("pageToken=" + pageToken);
+    }
+
+    if (prefix != null) {
+      params.add("prefix=" + prefix);
+    }
+    return baseUrl + "?" + String.join("&", params);
   }
 
   public static String createBucketRequestString(String projectId) {
