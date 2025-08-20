@@ -1737,6 +1737,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     return gcsiHelper.getPath(sharedBucketName1, "file-" + UUID.randomUUID());
   }
 
+  /** Gets a unique path of a non-existent file. */
+  public URI getTempFilePath(String directory) {
+    return gcsiHelper.getPath(sharedBucketName1, directory + "file-" + UUID.randomUUID());
+  }
+
   /**
    * Returns intermediate sub-paths for the given path.
    *

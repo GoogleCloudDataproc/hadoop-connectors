@@ -778,6 +778,16 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     assertThat(exception).hasMessageThat().startsWith("hadoopPath must not be null");
   }
 
+  // TODO: already part of UT, need not add here.
+  @Test
+  public void listStatusStartingFrom_throwsExceptionWhenHadoopPathNull() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> myGhfs.listStatusStartingFrom((Path) null));
+    assertThat(exception).hasMessageThat().startsWith("start offset path must not be null");
+  }
+
   @Test
   public void setWorkingDirectory_throwsExceptionWhenHadoopPathNull() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();

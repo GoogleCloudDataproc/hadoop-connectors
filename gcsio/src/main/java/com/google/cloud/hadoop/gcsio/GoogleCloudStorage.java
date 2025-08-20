@@ -46,8 +46,14 @@ public interface GoogleCloudStorage {
    */
   String PATH_DELIMITER = "/";
 
-  /** Value indicating all objects should be returned from GCS, no limit. */
+  /**
+   * Value indicating all objects should be returned from GCSFileSystem. No limit i.e. get all
+   * possible items. Used while listing all files in a directory
+   */
   long MAX_RESULTS_UNLIMITED = -1;
+
+  /** Value indicates the maxResult returned by gcs List API. */
+  long LIST_MAX_RESULTS = 5000L;
 
   /** The maximum number of objects that can be composed in one operation. */
   int MAX_COMPOSE_OBJECTS = 32;
@@ -351,6 +357,12 @@ public interface GoogleCloudStorage {
     return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
+  default List<GoogleCloudStorageItemInfo> listObjectInfoStartingFrom(
+      String bucketName, String startOffset) throws IOException {
+    return listObjectInfoStartingFrom(
+        bucketName, startOffset, ListObjectOptions.DEFAULT_USING_START_OFFSET);
+  }
+
   /**
    * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
    * names begin with the given prefix.
@@ -378,6 +390,9 @@ public interface GoogleCloudStorage {
    */
   List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions) throws IOException;
+
+  List<GoogleCloudStorageItemInfo> listObjectInfoStartingFrom(
+      String bucketName, String startOffset, ListObjectOptions listOptions) throws IOException;
 
   /**
    * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
