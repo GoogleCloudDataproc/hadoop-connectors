@@ -11,4 +11,4 @@ bin/
 .DS_Store
 
 # Ignore Maven wrapper jar
-.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.jargcs/dependency-reduced-pom.xml
