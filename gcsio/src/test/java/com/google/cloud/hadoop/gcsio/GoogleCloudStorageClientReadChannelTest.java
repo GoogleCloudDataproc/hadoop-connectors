@@ -391,7 +391,9 @@ public class GoogleCloudStorageClientReadChannelTest {
     // Act and Assert: Expect an IOException when read is called.
     IOException e = assertThrows(IOException.class, () -> readChannel.read(buffer));
     // Verify the exception message.
-    assertThat(e).hasCauseThat().hasMessageThat()
+    assertThat(e)
+        .hasCauseThat()
+        .hasMessageThat()
         .isEqualTo(String.format("Read 0 bytes without blocking from object: '%s'", RESOURCE_ID));
   }
 
