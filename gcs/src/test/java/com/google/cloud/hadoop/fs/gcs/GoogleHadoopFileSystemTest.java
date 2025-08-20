@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.cr
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -44,6 +45,7 @@ import com.google.cloud.hadoop.util.interceptors.LoggingInterceptor;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -51,8 +53,11 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
+import java.util.logging.Formatter;
 import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -367,6 +372,70 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     } finally {
       // Ensure handler is removed even if test fails, to not affect other tests
       Logger.getLogger("").removeHandler(mockInterceptor);
+    }
+  }
+
+  @Test
+  public void loggingInterceptorCloseFails() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE.getKey(), true);
+    // Provide credentials config to satisfy initialize()
+    conf.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
+    conf.setClass(
+        "fs.gs.auth.access.token.provider",
+        TestingAccessTokenProvider.class,
+        AccessTokenProvider.class);
+    conf.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
+
+    LoggingInterceptor mockInterceptor = mock(LoggingInterceptor.class);
+    doThrow(new RuntimeException("Close failed!")).when(mockInterceptor).close();
+
+    // Setup log capturing
+    Logger ghfsLogger = Logger.getLogger(GoogleHadoopFileSystem.class.getName());
+    ByteArrayOutputStream logOutput = new ByteArrayOutputStream();
+    StreamHandler testLogHandler =
+        new StreamHandler(
+            logOutput,
+            new Formatter() {
+              @Override
+              public String format(LogRecord record) {
+                return record.getMessage() + "\n";
+              }
+            });
+    ghfsLogger.addHandler(testLogHandler);
+
+    // Anonymous subclass to inject the mock
+    GoogleHadoopFileSystem fs =
+        new GoogleHadoopFileSystem() {
+          @Override
+          LoggingInterceptor createLoggingInterceptor(
+              GoogleCredentials credentials, String suffix) {
+            // Return our mock instead of a real one
+            return mockInterceptor;
+          }
+        };
+
+    try {
+      fs.initialize(new URI("gs://foobar/"), conf);
+
+      // Verify handler was added
+      Logger rootLogger = Logger.getLogger("");
+      assertThat(Arrays.asList(rootLogger.getHandlers())).contains(mockInterceptor);
+
+      // Close should not throw an exception, even if the interceptor's close fails.
+      fs.close();
+
+      // Verify close was called and handler was removed
+      verify(mockInterceptor, times(1)).close();
+      assertThat(Arrays.asList(rootLogger.getHandlers())).doesNotContain(mockInterceptor);
+
+      // Verify exception was logged
+      testLogHandler.flush();
+      assertThat(logOutput.toString()).contains("Failed to stop cloud logging service");
+    } finally {
+      // Ensure handler is removed even if test fails, to not affect other tests
+      Logger.getLogger("").removeHandler(mockInterceptor);
+      ghfsLogger.removeHandler(testLogHandler);
     }
   }
 
