@@ -37,6 +37,7 @@ public abstract class ListObjectOptions {
     return new AutoValue_ListObjectOptions.Builder()
         .setDelimiter(PATH_DELIMITER)
         .setIncludePrefix(false)
+        .setIncludeFoldersAsPrefixes(false)
         .setMaxResults(MAX_RESULTS_UNLIMITED)
         .setFields(OBJECT_FIELDS);
   }
@@ -49,6 +50,9 @@ public abstract class ListObjectOptions {
 
   /** Whether to include prefix object in the result. */
   public abstract boolean isIncludePrefix();
+
+  /** Whether to include empty folders in the result. */
+  public abstract boolean isIncludeFoldersAsPrefixes();
 
   /** Maximum number of results to return, unlimited if negative or zero. */
   public abstract long getMaxResults();
@@ -69,6 +73,8 @@ public abstract class ListObjectOptions {
     public abstract Builder setDelimiter(String delimiter);
 
     public abstract Builder setIncludePrefix(boolean includePrefix);
+
+    public abstract Builder setIncludeFoldersAsPrefixes(boolean includeFoldersAsPrefixes);
 
     public abstract Builder setMaxResults(long maxResults);
 
