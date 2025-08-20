@@ -483,6 +483,45 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         bucket, /* includeTrailingDelimiter= */ true, prefix, objectFields, maxResults, pageToken);
   }
 
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken, int maxResults) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        OBJECT_FIELDS,
+        maxResults,
+        pageToken,
+        startOffset);
+  }
+
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        OBJECT_FIELDS,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken,
+        startOffset);
+  }
+
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken, String fields) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        fields,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken,
+        startOffset);
+  }
+
   public static String listRequestString(
       String bucket,
       Boolean includeTrailingDelimiter,
@@ -512,7 +551,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         objectFields,
         maxResults,
-        pageToken);
+        pageToken,
+        /* startOffset */ null);
   }
 
   public static String listRequestString(
@@ -529,7 +569,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         objectFields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
-        pageToken);
+        pageToken,
+        /* startOffset */ null);
   }
 
   public static String listRequestString(
@@ -539,9 +580,11 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String prefix,
       String objectFields,
       int maxResults,
-      String pageToken) {
+      String pageToken,
+      String startOffset) {
     String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
     extraParams += prefix == null ? "" : "&prefix=" + prefix;
+    extraParams += startOffset == null ? "" : "&startOffset=" + startOffset;
     return String.format(
         LIST_REQUEST_FORMAT,
         bucket,

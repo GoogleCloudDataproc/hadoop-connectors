@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add listStatusStartingFrom API.
 
 ## 3.1.5 - 2025-09-01
 1. Fix cloud logging issue.
