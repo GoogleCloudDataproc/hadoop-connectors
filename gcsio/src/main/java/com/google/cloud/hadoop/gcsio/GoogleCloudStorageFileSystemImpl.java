@@ -86,6 +86,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   private static final ListObjectOptions GET_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).setMaxResults(1).build();
 
+  private static final ListObjectOptions LIST_OPTIONS_INCLUDE_FOLDERS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludePrefix(true)
+          .setIncludeFoldersAsPrefixes(true)
+          .build();
+
   private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
@@ -985,6 +991,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     StorageResourceId dirId = pathId.toDirectoryId();
 
+    boolean isHnBucket =
+        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
+
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
         (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
             .submit(
@@ -994,7 +1003,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
                         : gcs.listObjectInfo(
                             dirId.getBucketName(),
                             dirId.getObjectName(),
-                            updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
+                            updateListObjectOptions(
+                                isHnBucket
+                                    ? LIST_OPTIONS_INCLUDE_FOLDERS
+                                    : LIST_FILE_INFO_LIST_OPTIONS,
+                                listOptions)));
 
     if (!pathId.isDirectory()) {
       try {
