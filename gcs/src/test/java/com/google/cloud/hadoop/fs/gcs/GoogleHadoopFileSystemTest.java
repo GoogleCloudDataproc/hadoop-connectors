@@ -392,6 +392,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
     // Setup log capturing
     Logger ghfsLogger = Logger.getLogger(GoogleHadoopFileSystem.class.getName());
+    ghfsLogger.setLevel(Level.ALL);
     ByteArrayOutputStream logOutput = new ByteArrayOutputStream();
     StreamHandler testLogHandler =
         new StreamHandler(
@@ -436,6 +437,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
       // Ensure handler is removed even if test fails, to not affect other tests
       Logger.getLogger("").removeHandler(mockInterceptor);
       ghfsLogger.removeHandler(testLogHandler);
+      ghfsLogger.setLevel(Level.OFF);
     }
   }
 
