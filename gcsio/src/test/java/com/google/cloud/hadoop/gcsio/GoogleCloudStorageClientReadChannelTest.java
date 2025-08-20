@@ -377,6 +377,25 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
+  public void read_throwsIOException_whenUnderlyingChannelReturnsZero() throws IOException {
+    // Mock the underlying ReadChannel to return 0 on read.
+    ReadChannel mockContentChannel = mock(ReadChannel.class);
+    when(mockContentChannel.read(any(ByteBuffer.class))).thenReturn(0);
+    // Configure the storage mock to return our misbehaving channel.
+    when(mockedStorage.reader(any(), any())).thenReturn(mockContentChannel);
+    // Re-create the channel under test with the new mock behavior.
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+    // Prepare a buffer for reading.
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+
+    // Act and Assert: Expect an IOException when read is called.
+    IOException e = assertThrows(IOException.class, () -> readChannel.read(buffer));
+    // Verify the exception message.
+    assertThat(e).hasCauseThat().hasMessageThat()
+        .isEqualTo(String.format("Read 0 bytes without blocking from object: '%s'", RESOURCE_ID));
+  }
+
+  @Test
   public void closeThrowsException() throws IOException {
     fakeReadChannel =
         spy(

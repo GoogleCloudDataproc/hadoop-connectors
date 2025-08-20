@@ -782,6 +782,56 @@ public class GoogleCloudStorageReadChannelTest {
         .inOrder();
   }
 
+  @Test
+  public void read_throwsIOException_whenSkipReturnsZero() throws IOException {
+    byte[] testData = {0x01, 0x02, 0x03, 0x04, 0x05};
+    long generation = 1L;
+    int minRangeRequestSize = 4;
+
+    MockHttpTransport transport =
+        mockTransport(
+            // Data response with a misbehaving InputStream
+            // The response headers are important for lazy metadata initialization.
+            inputStreamResponse(
+                    new InputStream() {
+                      @Override
+                      public int read() {
+                        // This shouldn't be called if skip is overridden correctly.
+                        throw new UnsupportedOperationException(
+                            "read() should not be called in this test.");
+                      }
+
+                      @Override
+                      public long skip(long n) {
+                        // Simulate a stream that fails to skip any bytes, like a broken connection.
+                        return 0;
+                      }
+                    })
+                .addHeader("x-goog-generation", String.valueOf(generation))
+                .addHeader(
+                    "Content-Range",
+                    String.format("bytes 0-%d/%d", testData.length - 1, testData.length)));
+
+    Storage storage =
+        new Storage(transport, GsonFactory.getDefaultInstance(), new ArrayList<>()::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    // Position the channel to trigger a skip on the next read.
+    readChannel.position(2);
+
+    IOException e =
+        assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.wrap(new byte[1])));
+
+    assertThat(e).hasMessageThat().contains("potential connection loss for object");
+  }
+
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
     return GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false);
   }
