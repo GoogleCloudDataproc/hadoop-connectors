@@ -653,7 +653,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   private List<GoogleCloudStorageItemInfo> convertToItemInfo(
-      String bucketName, final List<String> listedNames, ListObjectOptions listOptions) throws IOException {
+      String bucketName, final List<String> listedNames, ListObjectOptions listOptions)
+      throws IOException {
     List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
     for (String objectName : listedNames) {
       GoogleCloudStorageItemInfo itemInfo =
