@@ -14,16 +14,21 @@
 
 package com.google.cloud.hadoop.gcsio.integration;
 
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertObjectContent;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 
+import com.google.api.client.http.HttpStatusCodes;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
+import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -33,6 +38,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -409,118 +416,118 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   //    writeAndVerifyPartFiles(
   //        bufferCapacity, resourceId, /* expectedPartFileCountAfterCleanup */ 0, partFilePrefix);
   //  }
-  //
-  //  private void verifyPartFileNotFound(Throwable throwable, String partFileName) {
-  //    StorageException exception = getStorageException(throwable);
-  //    assertThat(exception.getMessage()).contains(partFileName);
-  //    assertThat(exception.getCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_NOT_FOUND);
-  //  }
-  //
-  //  private void verifyPartFileInvalidArgument(Throwable throwable) {
-  //    StorageException exception = getStorageException(throwable);
-  //    assertThat(exception.getMessage()).contains("INVALID_ARGUMENT");
-  //    assertThat(exception.getCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_BAD_REQUEST);
-  //  }
-  //
-  //  private StorageException getStorageException(Throwable throwable) {
-  //    Throwable cause = throwable;
-  //    while (cause != null) {
-  //      if (cause instanceof StorageException) {
-  //        return (StorageException) cause;
-  //      }
-  //      cause = cause.getCause();
-  //    }
-  //    return null;
-  //  }
-  //
-  //  private List<GoogleCloudStorageItemInfo> getPartFiles(String prefix) throws IOException {
-  //    // list all object
-  //    List<GoogleCloudStorageItemInfo> itemInfos =
-  //        gcs.listObjectInfo(
-  //            TEST_BUCKET, prefix, ListObjectOptions.builder().setDelimiter(null).build());
-  //    return itemInfos.stream()
-  //        .filter(x -> x.getObjectName().endsWith(".part"))
-  //        .collect(Collectors.toList());
-  //  }
-  //
-  //  private void writeAndVerifyPartFiles(
-  //      int bufferCapacity,
-  //      StorageResourceId resourceId,
-  //      int expectedPartFileCountAfterCleanup,
-  //      String partFilePrefix)
-  //      throws IOException {
-  //    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
-  //    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-  //    WritableByteChannel writeChannel = gcs.create(resourceId);
-  //    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-  //
-  //    writeChannel.close();
-  //    List<GoogleCloudStorageItemInfo> partFiles = getPartFiles(partFilePrefix);
-  //    // part files are deleted once upload is finished.
-  //    assertThat(partFiles.stream().count()).isEqualTo(expectedPartFileCountAfterCleanup);
-  //    // verify file content
-  //    verifyFileContent(resourceId, bytesToWrite);
-  //  }
-  //
-  //  private void writeAndVerifyTemporaryFiles(
-  //      StorageResourceId resourceId, int expectedTemporaryFileCount) throws IOException {
-  //    byte[] bytesToWrite = new byte[1024 * 1024 * 3];
-  //    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-  //
-  //    verifyTemporaryFileCount(tempDirsPath, 0);
-  //
-  //    WritableByteChannel writeChannel = gcs.create(resourceId);
-  //    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-  //    // temporary files created in disk.
-  //    verifyTemporaryFileCount(tempDirsPath, expectedTemporaryFileCount);
-  //
-  //    writeChannel.close();
-  //    // temporary files will be deleted from disk once upload is finished.
-  //    verifyTemporaryFileCount(tempDirsPath, 0);
-  //  }
-  //
-  //  private GoogleCloudStorage getGCSImpl(GoogleCloudStorageOptions storageOptions)
-  //      throws IOException {
-  //    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-  //    return GoogleCloudStorageClientImpl.builder()
-  //        .setOptions(storageOptions)
-  //        .setCredentials(credentials)
-  //        .setPCUExecutorService(MoreExecutors.newDirectExecutorService())
-  //        .build();
-  //  }
-  //
-  //  private void verifyTemporaryFileCount(ImmutableSet<Path> paths, int expectedCount) {
-  //    Iterator<Path> iterator = paths.stream().iterator();
-  //    int fileCount = 0;
-  //    while (iterator.hasNext()) {
-  //      Path path = iterator.next();
-  //      File directory = path.toFile();
-  //      fileCount += getFileCount(directory);
-  //    }
-  //    assertThat(fileCount).isEqualTo(expectedCount);
-  //  }
-  //
-  //  private void verifyFileContent(StorageResourceId resourceId, byte[] bytesWritten)
-  //      throws IOException {
-  //    GoogleCloudStorageItemInfo fileInfo = gcs.getItemInfo(resourceId);
-  //    assertThat(fileInfo.exists()).isTrue();
-  //
-  //    assertObjectContent(gcs, resourceId, bytesWritten);
-  //  }
-  //
-  //  private int getFileCount(File file) {
-  //    File[] files = file.listFiles();
-  //    if (files == null) {
-  //      return 0;
-  //    }
-  //    int count = 0;
-  //    for (File f : files) {
-  //      if (f.isDirectory()) {
-  //        count += getFileCount(f);
-  //      } else {
-  //        count = count + 1;
-  //      }
-  //    }
-  //    return count;
-  //  }
+
+  private void verifyPartFileNotFound(Throwable throwable, String partFileName) {
+    StorageException exception = getStorageException(throwable);
+    assertThat(exception.getMessage()).contains(partFileName);
+    assertThat(exception.getCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_NOT_FOUND);
+  }
+
+  private void verifyPartFileInvalidArgument(Throwable throwable) {
+    StorageException exception = getStorageException(throwable);
+    assertThat(exception.getMessage()).contains("INVALID_ARGUMENT");
+    assertThat(exception.getCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_BAD_REQUEST);
+  }
+
+  private StorageException getStorageException(Throwable throwable) {
+    Throwable cause = throwable;
+    while (cause != null) {
+      if (cause instanceof StorageException) {
+        return (StorageException) cause;
+      }
+      cause = cause.getCause();
+    }
+    return null;
+  }
+
+  private List<GoogleCloudStorageItemInfo> getPartFiles(String prefix) throws IOException {
+    // list all object
+    List<GoogleCloudStorageItemInfo> itemInfos =
+        gcs.listObjectInfo(
+            TEST_BUCKET, prefix, ListObjectOptions.builder().setDelimiter(null).build());
+    return itemInfos.stream()
+        .filter(x -> x.getObjectName().endsWith(".part"))
+        .collect(Collectors.toList());
+  }
+
+  private void writeAndVerifyPartFiles(
+      int bufferCapacity,
+      StorageResourceId resourceId,
+      int expectedPartFileCountAfterCleanup,
+      String partFilePrefix)
+      throws IOException {
+    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+
+    writeChannel.close();
+    List<GoogleCloudStorageItemInfo> partFiles = getPartFiles(partFilePrefix);
+    // part files are deleted once upload is finished.
+    assertThat(partFiles.stream().count()).isEqualTo(expectedPartFileCountAfterCleanup);
+    // verify file content
+    verifyFileContent(resourceId, bytesToWrite);
+  }
+
+  private void writeAndVerifyTemporaryFiles(
+      StorageResourceId resourceId, int expectedTemporaryFileCount) throws IOException {
+    byte[] bytesToWrite = new byte[1024 * 1024 * 3];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+
+    verifyTemporaryFileCount(tempDirsPath, 0);
+
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+    // temporary files created in disk.
+    verifyTemporaryFileCount(tempDirsPath, expectedTemporaryFileCount);
+
+    writeChannel.close();
+    // temporary files will be deleted from disk once upload is finished.
+    verifyTemporaryFileCount(tempDirsPath, 0);
+  }
+
+  private GoogleCloudStorage getGCSImpl(GoogleCloudStorageOptions storageOptions)
+      throws IOException {
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+    return GoogleCloudStorageClientImpl.builder()
+        .setOptions(storageOptions)
+        .setCredentials(credentials)
+        .setPCUExecutorService(MoreExecutors.newDirectExecutorService())
+        .build();
+  }
+
+  private void verifyTemporaryFileCount(ImmutableSet<Path> paths, int expectedCount) {
+    Iterator<Path> iterator = paths.stream().iterator();
+    int fileCount = 0;
+    while (iterator.hasNext()) {
+      Path path = iterator.next();
+      File directory = path.toFile();
+      fileCount += getFileCount(directory);
+    }
+    assertThat(fileCount).isEqualTo(expectedCount);
+  }
+
+  private void verifyFileContent(StorageResourceId resourceId, byte[] bytesWritten)
+      throws IOException {
+    GoogleCloudStorageItemInfo fileInfo = gcs.getItemInfo(resourceId);
+    assertThat(fileInfo.exists()).isTrue();
+
+    assertObjectContent(gcs, resourceId, bytesWritten);
+  }
+
+  private int getFileCount(File file) {
+    File[] files = file.listFiles();
+    if (files == null) {
+      return 0;
+    }
+    int count = 0;
+    for (File f : files) {
+      if (f.isDirectory()) {
+        count += getFileCount(f);
+      } else {
+        count = count + 1;
+      }
+    }
+    return count;
+  }
 }
