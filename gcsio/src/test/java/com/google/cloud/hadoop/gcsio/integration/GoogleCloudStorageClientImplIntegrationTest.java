@@ -144,40 +144,42 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void bidiFlowOnZonalBucket() throws IOException {
-    // Create the storage options with bidi enabled.
-    GoogleCloudStorageOptions storageOptions =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(AsyncWriteChannelOptions.builder().build())
-            .setBidiEnabled(true)
+    // Define write options to disable resumable/appendable uploads.
+    AsyncWriteChannelOptions writeOptions = AsyncWriteChannelOptions.builder()
+            .setDirectUploadEnabled(true)
             .build();
+
+    // Create the storage options with bidi enabled and non-resumable writes.
+    GoogleCloudStorageOptions storageOptions =
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                    .setWriteChannelOptions(writeOptions)
+                    .setBidiEnabled(true)
+                    .setFinalizeBeforeClose(true)
+                    .build();
     gcs = getGCSImpl(storageOptions);
 
     StorageResourceId resourceId = new StorageResourceId(ZONAL_TEST_BUCKET, name.getMethodName());
     byte[] bytesToWrite = new byte[ONE_MiB * 5];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
 
-    // Create a new channel and write bytes. Should use bidi.
+    // This write operation will now use a direct gRPC stream compatible with zonal buckets.
     try (WritableByteChannel writeChannel = gcs.create(resourceId)) {
       writeChannel.write(ByteBuffer.wrap(bytesToWrite));
     }
 
     // Read the file back using the bidi read channel
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
+            GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
 
     byte[] readBytes = new byte[bytesToWrite.length];
     ByteBuffer readBuffer = ByteBuffer.wrap(readBytes);
     try (SeekableByteChannel readChannel = gcs.open(resourceId, readOptions)) {
-      // Loop to ensure all bytes are read, as read() might not fill the buffer in one go.
       while (readBuffer.hasRemaining()) {
         if (readChannel.read(readBuffer) == -1) {
           break; // End of stream
         }
       }
     }
-
-    String textContent = new String(readBytes, StandardCharsets.UTF_8);
-    System.out.println("Read Text Content: " + textContent);
 
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
