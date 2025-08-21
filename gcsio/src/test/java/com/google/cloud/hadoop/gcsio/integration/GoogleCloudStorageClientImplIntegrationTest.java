@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -145,17 +144,16 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @Test
   public void bidiFlowOnZonalBucket() throws IOException {
     // Define write options to disable resumable/appendable uploads.
-    AsyncWriteChannelOptions writeOptions = AsyncWriteChannelOptions.builder()
-            .setDirectUploadEnabled(true)
-            .build();
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder().setDirectUploadEnabled(true).build();
 
     // Create the storage options with bidi enabled and non-resumable writes.
     GoogleCloudStorageOptions storageOptions =
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                    .setWriteChannelOptions(writeOptions)
-                    .setBidiEnabled(true)
-                    .setFinalizeBeforeClose(true)
-                    .build();
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(writeOptions)
+            .setBidiEnabled(true)
+            .setFinalizeBeforeClose(true)
+            .build();
     gcs = getGCSImpl(storageOptions);
 
     StorageResourceId resourceId = new StorageResourceId(ZONAL_TEST_BUCKET, name.getMethodName());
@@ -169,7 +167,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
     // Read the file back using the bidi read channel
     GoogleCloudStorageReadOptions readOptions =
-            GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
+        GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
 
     byte[] readBytes = new byte[bytesToWrite.length];
     ByteBuffer readBuffer = ByteBuffer.wrap(readBytes);

@@ -79,10 +79,10 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     if (!dst.hasRemaining()) {
       return 0;
     }
-//
-//    if (contentReadChannel.position() >= objectSize) {
-//      return -1;
-//    }
+    //
+    //    if (contentReadChannel.position() >= objectSize) {
+    //      return -1;
+    //    }
 
     logger.atFiner().log(
         "Reading %d bytes at %d position from '%s'",
