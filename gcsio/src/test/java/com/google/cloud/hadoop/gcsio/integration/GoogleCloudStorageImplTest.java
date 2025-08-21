@@ -40,6 +40,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
@@ -558,6 +559,99 @@ public class GoogleCloudStorageImplTest {
         .containsExactly(
             emptyUploadRequestString(
                 resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl));
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void listObjectInfo_withFoldersAsPrefixes_returnsFolders() throws IOException {
+    String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
+    helperGcs.createBucket(
+        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    StorageResourceId root = new StorageResourceId(hnsBucket);
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "test-dir/");
+    StorageResourceId objectInFolderId = new StorageResourceId(hnsBucket, "test-dir/file.txt");
+    StorageResourceId rootObjectId = new StorageResourceId(hnsBucket, "root-file.txt");
+
+    helperGcs.createFolder(folderId);
+    helperGcs.createEmptyObject(objectInFolderId);
+    helperGcs.createEmptyObject(rootObjectId);
+
+    ListObjectOptions listOptions =
+        ListObjectOptions.DEFAULT.toBuilder()
+            .setIncludePrefix(true)
+            .setIncludeFoldersAsPrefixes(true)
+            .build();
+    List<GoogleCloudStorageItemInfo> items =
+        helperGcs.listObjectInfo(root.getBucketName(), root.getObjectName(), listOptions);
+    List<String> objectNames =
+        items.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
+
+    assertThat(objectNames).containsExactly(rootObjectId.getObjectName(), folderId.getObjectName());
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void listObjectInfo_withoutFoldersAsPrefixes_doesNotReturnFolders() throws IOException {
+    String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
+    helperGcs.createBucket(
+        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    StorageResourceId root = new StorageResourceId(hnsBucket);
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "native-directory/");
+    StorageResourceId placeholderId = new StorageResourceId(hnsBucket, "placeholder-directory/");
+    StorageResourceId rootObjectId = new StorageResourceId(hnsBucket, "root-file.txt");
+
+    helperGcs.createFolder(folderId);
+    helperGcs.createEmptyObject(placeholderId);
+    helperGcs.createEmptyObject(rootObjectId);
+
+    ListObjectOptions listOptions =
+        ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
+    List<GoogleCloudStorageItemInfo> items =
+        helperGcs.listObjectInfo(root.getBucketName(), root.getObjectName(), listOptions);
+    List<String> objectNames =
+        items.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
+
+    assertThat(objectNames)
+        .containsExactly(rootObjectId.getObjectName(), placeholderId.getObjectName());
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void listObjectInfo_withFoldersAsPrefixes_returnFolders() throws IOException {
+    String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
+    helperGcs.createBucket(
+        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    StorageResourceId root = new StorageResourceId(hnsBucket);
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "native-directory/");
+    StorageResourceId placeholderId = new StorageResourceId(hnsBucket, "placeholder-directory/");
+    StorageResourceId rootObjectId = new StorageResourceId(hnsBucket, "root-file.txt");
+
+    helperGcs.createFolder(folderId);
+    helperGcs.createEmptyObject(placeholderId);
+    helperGcs.createEmptyObject(rootObjectId);
+
+    ListObjectOptions listOptions =
+        ListObjectOptions.DEFAULT.toBuilder()
+            .setIncludePrefix(true)
+            .setIncludeFoldersAsPrefixes(true)
+            .build();
+    List<GoogleCloudStorageItemInfo> items =
+        helperGcs.listObjectInfo(root.getBucketName(), root.getObjectName(), listOptions);
+    List<String> objectNames =
+        items.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
+
+    assertThat(objectNames)
+        .containsExactly(
+            folderId.getObjectName(), rootObjectId.getObjectName(), placeholderId.getObjectName());
     trackingGcs.delegate.close();
   }
 
