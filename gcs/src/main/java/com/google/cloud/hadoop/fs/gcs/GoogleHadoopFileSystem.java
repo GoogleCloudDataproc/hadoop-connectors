@@ -58,6 +58,8 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.TraceFactory;
 import com.google.cloud.hadoop.util.interceptors.LoggingInterceptor;
@@ -180,6 +182,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   static final String GETFILESTATUS_FILETYPE_HINT = "fs.gs.getfilestatus.filetype.hint";
 
   static {
+    // Add formatter to root logger.
+    LoggingFormatter.addFormatter(Logger.getLogger(""));
     VERSION =
         PropertyUtil.getPropertyOrDefault(
             GoogleHadoopFileSystem.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
@@ -776,7 +780,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-
+    InvocationIdContext.setInvocationId();
     return GhfsGlobalStorageStatistics.trackDuration(
         factory, stats, statistic, context, traceFactory, operation);
   }
@@ -980,6 +984,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
     checkOpen();
 
@@ -1008,6 +1013,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
     Token<?> result = null;
     if (delegationTokens != null) {
@@ -1021,6 +1027,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
@@ -1031,6 +1038,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
 
     logger.atFiner().log(
@@ -1041,6 +1049,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -1067,6 +1076,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
   }
