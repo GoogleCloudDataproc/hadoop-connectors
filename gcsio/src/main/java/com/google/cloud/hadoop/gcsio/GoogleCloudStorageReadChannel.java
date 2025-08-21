@@ -797,7 +797,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     randomAccess = !gzipEncoded && readOptions.getFadvise() == Fadvise.RANDOM;
     checkEncodingAndAccess();
 
-    if (resourceId.hasGenerationId()) {
+    if (resourceId.hasGenerationId() && resourceId.getGenerationId() > 0) {
       checkState(
           resourceId.getGenerationId() == generation,
           "Provided generation (%s) should be equal to fetched generation (%s) for '%s'",
@@ -1145,7 +1145,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     Storage.Objects.Get getData =
         storageRequestFactory.objectsGetData(
             resourceId.getBucketName(), resourceId.getObjectName());
-    if (resourceId.hasGenerationId()) {
+    if (resourceId.hasGenerationId() && resourceId.getGenerationId() > 0) {
       getData.setGeneration(resourceId.getGenerationId());
     }
     return getData;
@@ -1160,7 +1160,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     Storage.Objects.Get getMetadata =
         storageRequestFactory.objectsGetMetadata(
             resourceId.getBucketName(), resourceId.getObjectName());
-    if (resourceId.hasGenerationId()) {
+    if (resourceId.hasGenerationId() && resourceId.getGenerationId() > 0) {
       getMetadata.setGeneration(resourceId.getGenerationId());
     }
     return getMetadata;
