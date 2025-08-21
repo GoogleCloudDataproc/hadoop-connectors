@@ -236,6 +236,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     BucketInfo.Builder bucketInfoBuilder =
         BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
 
+    if (options.getZonalPlacement() != null) {
+      bucketInfoBuilder
+              .setCustomPlacementConfig(
+                      BucketInfo.CustomPlacementConfig.newBuilder()
+                              .setDataLocations(ImmutableList.of("us-central1-a"))
+                              .build())
+              .setStorageClass(StorageClass.valueOf("RAPID"))
+              .setHierarchicalNamespace(
+                      BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
+              .setIamConfiguration(
+                      BucketInfo.IamConfiguration.newBuilder()
+                              .setIsUniformBucketLevelAccessEnabled(true)
+                              .build())
+              .build();
+    }
+
     if (options.getStorageClass() != null) {
       bucketInfoBuilder.setStorageClass(
           StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));

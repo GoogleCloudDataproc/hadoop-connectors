@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
@@ -21,15 +22,8 @@ steps:
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'unit-tests'
     waitFor: ['docker-build']
-    allowFailure: true
     entrypoint: 'bash'
-    args:
-      - -c
-      - |
-        if ! /hadoop-connectors/cloudbuild/presubmit.sh unittest; then
-          echo "Unit tests failed. Marking build for failure."
-          touch /workspace/failure.txt
-        fi
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'unittest']
     env:
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
       - 'VCS_BRANCH_NAME=$BRANCH_NAME'
@@ -37,47 +31,12 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 3. Create a zonal bucket for integration tests
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'create-zonal-bucket'
-    waitFor: ['docker-build']
-    entrypoint: 'bash'
-    args:
-      - -c
-      - |
-        gcloud components update --quiet
-        gcloud config list
-        gcloud config set api_endpoint_overrides/storage https://storage.googleapis.com/
-        BUCKET_NAME="zonal-bucket-$SHORT_SHA"
-        WORKER_ZONE="us-central1-a"
-        REGION="us-central1"
-        echo "WORKER_ZONE: $$WORKER_ZONE"
-        echo "BUCKET_NAME: $$BUCKET_NAME"
-        gcloud storage buckets create "gs://$$BUCKET_NAME" \
-          --location="$$REGION" \
-          --placement="$$WORKER_ZONE" \
-          --default-storage-class=RAPID \
-          --enable-hierarchical-namespace \
-          --uniform-bucket-level-access \
-          --verbosity=debug
-        echo "$$BUCKET_NAME" > /workspace/zonal_bucket_name.txt
-        echo "Bucket created and saved to /workspace/zonal_bucket_name.txt"
-
-  # 4. Run integration tests using the zonal bucket
+  # 3. Run integration tests concurrently with unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests'
-    waitFor: ['create-zonal-bucket']
-    allowFailure: true
+    waitFor: ['docker-build']
     entrypoint: 'bash'
-    args:
-      - -c
-      - |
-        export GCS_ZONAL_TEST_BUCKET=$$(cat /workspace/zonal_bucket_name.txt)
-        echo "Using zonal bucket '$$GCS_ZONAL_TEST_BUCKET' for integration tests."
-        if ! /hadoop-connectors/cloudbuild/presubmit.sh integrationtest; then
-          echo "Integration tests failed. Marking build for failure."
-          touch /workspace/failure.txt
-        fi
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
     env:
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
@@ -86,36 +45,6 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
-
-  # 5. Clean up and delete the zonal bucket
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'delete-zonal-bucket'
-    waitFor: ['integration-tests']
-    entrypoint: 'bash'
-    args:
-      - -c
-      - |
-        if [ -f /workspace/zonal_bucket_name.txt ]; then
-          BUCKET_NAME=$$(cat /workspace/zonal_bucket_name.txt)
-          echo "Cleaning up and deleting bucket: gs://$$BUCKET_NAME"
-          gcloud storage rm -r "gs://$$BUCKET_NAME"
-        else
-          echo "Bucket name file not found. Skipping cleanup."
-        fi
-
-  # 6. Check for any test failures and fail the build.
-  - name: 'alpine'
-    id: 'check-failure'
-    waitFor: ['delete-zonal-bucket', 'unit-tests']
-    entrypoint: 'sh'
-    args:
-      - -c
-      - |
-        if [ -f /workspace/failure.txt ]; then
-          echo "Failing build due to previous step failure."
-          exit 1
-        fi
-        echo "All steps succeeded."
 
 # Tests take on average 25 minutes to run
 timeout: 2400s

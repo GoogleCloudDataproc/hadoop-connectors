@@ -60,6 +60,10 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
   private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
 
+  private static final TestBucketHelper ZONAL_BUCKET_HELPER =
+          new TestBucketHelper("zonal-bucket-integration-test");
+  private static final String ZONAL_TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
+
   // Do cleanup the path after every test.
   private static final String GCS_WRITE_TMP_DIR =
       String.format("%s/%s", TEMP_DIR_PATH, "gcs-write-dir");
@@ -94,12 +98,14 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   public static void before() throws IOException {
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
     helperGcs.createBucket(TEST_BUCKET);
+    helperGcs.createBucket(ZONAL_TEST_BUCKET, CreateBucketOptions.builder().setLocation("us-central1").setZonalPlacement("us-central1-a").build());
   }
 
   @AfterClass
   public static void after() throws IOException {
     try {
       BUCKET_HELPER.cleanup(helperGcs);
+      ZONAL_BUCKET_HELPER.cleanup(helperGcs);
     } finally {
       helperGcs.close();
     }
@@ -133,10 +139,6 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   @Test
   public void bidiFlowOnZonalBucket() throws IOException {
-
-    // Fetching zonal bucket from the env variable created during cloud build.
-    String zonalBucket = System.getenv("GCS_ZONAL_TEST_BUCKET");
-
     // Create the storage options with bidi enabled.
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
@@ -145,7 +147,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
             .build();
     gcs = getGCSImpl(storageOptions);
 
-    StorageResourceId resourceId = new StorageResourceId(zonalBucket, name.getMethodName());
+    StorageResourceId resourceId = new StorageResourceId(ZONAL_TEST_BUCKET, name.getMethodName());
     byte[] bytesToWrite = new byte[ONE_MiB * 5];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
 
