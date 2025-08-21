@@ -1172,6 +1172,101 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   @Test
+  public void rename_onHnsBucket_repairsImplicitDirectory() throws Exception {
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-bucket");
+    gcsFs =
+        newGcsFs(
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    URI parentDirUri = new URI(String.format("gs://%s/explicit-dir-no-repair/", hnsBucketName));
+    URI src = parentDirUri.resolve("file.txt");
+    URI dst = new URI(String.format("gs://%s/explicit-file.txt", hnsBucketName));
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, src.getPath(), "test-data-hns");
+    assertThat(gcsFs.exists(src)).isTrue();
+
+    gcsFs.rename(src, dst);
+
+    assertThat(gcsFs.exists(src)).isFalse();
+    assertThat(gcsFs.exists(dst)).isTrue();
+
+    // The parent directory exists since in HNS bucket the parent directories are created
+    // automatically
+    FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
+    assertThat(parentInfo.exists()).isTrue();
+    assertThat(parentInfo.isDirectory()).isTrue();
+  }
+
+  @Test
+  public void rename_onNonHnsBucket_withHnsOptimization_repairsImplicitDirectory()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI parentDirUri = new URI(String.format("gs://%s/implicit-dir-to-repair1/", bucketName));
+    URI src = parentDirUri.resolve("file.txt");
+    URI dst = new URI(String.format("gs://%s/repaired-file.txt", bucketName));
+
+    gcsfsIHelper.writeTextFile(bucketName, src.getPath(), "test-data");
+    assertThat(gcsFs.exists(parentDirUri)).isTrue();
+    assertThat(gcsFs.exists(src)).isTrue();
+
+    gcsFs.rename(src, dst);
+
+    assertThat(gcsFs.exists(src)).isFalse();
+    assertThat(gcsFs.exists(dst)).isTrue();
+
+    // The parent directory should still exist because the repair logic was triggered
+    FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
+    assertThat(parentInfo.exists()).isTrue();
+    assertThat(parentInfo.isDirectory()).isTrue();
+  }
+
+  @Test
+  public void rename_onNonHnsBucket_withAutoRepairDisabled_doesNotRepairsImplicitDirectory()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setAutoRepairImplicitDirectoriesEnabled(false)
+                        .build())
+                .build());
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI parentDirUri = new URI(String.format("gs://%s/implicit-dir-to-repair2/", bucketName));
+    URI src = parentDirUri.resolve("file.txt");
+    URI dst = new URI(String.format("gs://%s/renamed-file.txt", bucketName));
+
+    gcsfsIHelper.writeTextFile(bucketName, src.getPath(), "test-data");
+    assertThat(gcsFs.exists(parentDirUri)).isTrue();
+    assertThat(gcsFs.exists(src)).isTrue();
+
+    gcsFs.rename(src, dst);
+
+    assertThat(gcsFs.exists(src)).isFalse();
+    assertThat(gcsFs.exists(dst)).isTrue();
+
+    // The parent directory does not  exist because the repair logic was not triggered
+    FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
+    assertThat(parentInfo.exists()).isFalse();
+  }
+
+  @Test
   public void rename_directory_parallel() throws Exception {
     gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build());
 
