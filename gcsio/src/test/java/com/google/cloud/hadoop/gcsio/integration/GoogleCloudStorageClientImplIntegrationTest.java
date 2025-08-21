@@ -56,12 +56,13 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   private static final TestBucketHelper BUCKET_HELPER =
       new TestBucketHelper("dataproc-gcs-client-impl");
-  private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
-  private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
 
   private static final TestBucketHelper ZONAL_BUCKET_HELPER =
       new TestBucketHelper("zonal-bucket-integration-test");
-  private static final String ZONAL_TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
+  private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
+  private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
+
+  private static final String ZONAL_TEST_BUCKET = ZONAL_BUCKET_HELPER.getUniqueBucketPrefix();
 
   // Do cleanup the path after every test.
   private static final String GCS_WRITE_TMP_DIR =
@@ -96,7 +97,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @BeforeClass
   public static void before() throws IOException {
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
-    helperGcs.createBucket(TEST_BUCKET);
+    //    helperGcs.createBucket(TEST_BUCKET);
     helperGcs.createBucket(
         ZONAL_TEST_BUCKET,
         CreateBucketOptions.builder()
@@ -108,7 +109,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @AfterClass
   public static void after() throws IOException {
     try {
-      BUCKET_HELPER.cleanup(helperGcs);
+      //      BUCKET_HELPER.cleanup(helperGcs);
       ZONAL_BUCKET_HELPER.cleanup(helperGcs);
     } finally {
       helperGcs.close();
