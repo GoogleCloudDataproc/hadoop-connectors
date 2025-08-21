@@ -588,15 +588,12 @@ public class GoogleCloudStorageReadChannelTest {
   public void read_withPositiveGeneration_usesGenerationMatchPrecondition() throws IOException {
     long generation = 12345L;
     byte[] testData = {0x01, 0x02, 0x03};
-
     MockHttpTransport transport =
         mockTransport(
             jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(generation)),
             dataResponse(testData));
-
     List<HttpRequest> requests = new ArrayList<>();
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
-
     GoogleCloudStorageReadChannel readChannel =
         createReadChannel(storage, GoogleCloudStorageReadOptions.builder().build(), generation);
 
@@ -614,16 +611,13 @@ public class GoogleCloudStorageReadChannelTest {
     // The actual object has a real, positive generation ID.
     long actualGeneration = 54321L;
     byte[] testData = {0x04, 0x05, 0x06};
-
     MockHttpTransport transport =
         mockTransport(
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(actualGeneration)),
             dataResponse(testData));
-
     List<HttpRequest> requests = new ArrayList<>();
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
-
     GoogleCloudStorageReadChannel readChannel =
         createReadChannel(
             storage,
