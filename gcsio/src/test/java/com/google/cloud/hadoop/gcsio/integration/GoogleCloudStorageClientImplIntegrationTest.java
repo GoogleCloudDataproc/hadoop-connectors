@@ -61,7 +61,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
 
   private static final TestBucketHelper ZONAL_BUCKET_HELPER =
-          new TestBucketHelper("zonal-bucket-integration-test");
+      new TestBucketHelper("zonal-bucket-integration-test");
   private static final String ZONAL_TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
 
   // Do cleanup the path after every test.
@@ -98,7 +98,12 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   public static void before() throws IOException {
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
     helperGcs.createBucket(TEST_BUCKET);
-    helperGcs.createBucket(ZONAL_TEST_BUCKET, CreateBucketOptions.builder().setLocation("us-central1").setZonalPlacement("us-central1-a").build());
+    helperGcs.createBucket(
+        ZONAL_TEST_BUCKET,
+        CreateBucketOptions.builder()
+            .setLocation("us-central1")
+            .setZonalPlacement("us-central1-a")
+            .build());
   }
 
   @AfterClass
