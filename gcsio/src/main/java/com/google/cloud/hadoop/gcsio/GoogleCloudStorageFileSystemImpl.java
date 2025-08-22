@@ -202,6 +202,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             ? new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions())
             : gcs;
     this.options = options;
+    // Set the configuration features mask for the FeatureUsageHeader.
+    FeatureUsageHeader.setConfigFeatures(options);
   }
 
   private static ExecutorService createCachedExecutor() {

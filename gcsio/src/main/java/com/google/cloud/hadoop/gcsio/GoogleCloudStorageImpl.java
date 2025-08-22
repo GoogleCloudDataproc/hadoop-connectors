@@ -2557,7 +2557,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       setDecryptionHeaders(request);
     }
 
+    setFeatureUsageHeader(request);
     return request;
+  }
+
+  private <RequestT extends StorageRequest<?>> void setFeatureUsageHeader(RequestT request) {
+    String featureUsageHeaderString = FeatureUsageHeader.getValue();
+    if (!Strings.isNullOrEmpty(featureUsageHeaderString)) {
+      request.getRequestHeaders().set(FeatureUsageHeader.NAME, featureUsageHeaderString);
+    }
   }
 
   private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {

@@ -29,11 +29,11 @@
       "bit_position": 6
     },
     {
-      "name": "CHECKSUM_CRC32C_ENABLED",
+      "name": "TRACE_LOG_ENABLED",
       "bit_position": 7
     },
     {
-      "name": "CHECKSUM_MD5_ENABLED",
+      "name": "OPERATION_TRACE_LOG_ENABLED",
       "bit_position": 8
     },
     {
@@ -45,20 +45,12 @@
       "bit_position": 10
     },
     {
-      "name": "TRACE_LOG_ENABLED",
+      "name": "DIRECT_UPLOAD_ENABLED",
       "bit_position": 11
     },
     {
-      "name": "OPERATION_TRACE_LOG_ENABLED",
-      "bit_position": 12
-    },
-    {
-      "name": "DIRECT_UPLOAD_ENABLED",
-      "bit_position": 13
-    },
-    {
       "name": "BIDI_ENABLED",
-      "bit_position": 14
+      "bit_position": 12
     }
   ]
 }

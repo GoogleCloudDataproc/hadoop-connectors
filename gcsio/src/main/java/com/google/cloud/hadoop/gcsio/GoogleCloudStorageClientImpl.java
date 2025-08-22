@@ -1432,7 +1432,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       ExecutorService pCUExecutorService,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    final ImmutableMap<String, String> headers = getUpdatedHeadersWithUserAgent(storageOptions);
+    final ImmutableMap<String, String> headers = getUpdatedHeaders(storageOptions);
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> headers)
@@ -1468,20 +1468,23 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .getService();
   }
 
-  private static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
+  private static ImmutableMap<String, String> getUpdatedHeaders(
       GoogleCloudStorageOptions storageOptions) {
     ImmutableMap<String, String> httpRequestHeaders =
         MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
     String appName = storageOptions.getAppName();
+    ImmutableMap.Builder<String, String> headersBuilder =
+        ImmutableMap.<String, String>builder().putAll(httpRequestHeaders);
     if (!httpRequestHeaders.containsKey(USER_AGENT) && !Strings.isNullOrEmpty(appName)) {
       logger.atFiner().log("Setting useragent %s", appName);
-      return ImmutableMap.<String, String>builder()
-          .putAll(httpRequestHeaders)
-          .put(USER_AGENT, appName)
-          .build();
+      headersBuilder.put(USER_AGENT, appName);
     }
-
-    return httpRequestHeaders;
+    String featureUsageString = FeatureUsageHeader.getValue();
+    if (!Strings.isNullOrEmpty(featureUsageString)) {
+      logger.atFiner().log("Setting feature usage header %s", featureUsageString);
+      headersBuilder.put(FeatureUsageHeader.NAME, featureUsageString);
+    }
+    return headersBuilder.build();
   }
 
   private static BlobWriteSessionConfig getSessionConfig(
