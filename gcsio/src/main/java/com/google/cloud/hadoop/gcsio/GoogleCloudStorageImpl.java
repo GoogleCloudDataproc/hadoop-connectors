@@ -1605,7 +1605,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * It strictly expects no delimiter to be provided.
    * It also filters out all the objects which are "directories"
    */
-
   private String listStorageObjectsFilteredPage(
       Storage.Objects.List listObject,
       ListObjectOptions listOptions,

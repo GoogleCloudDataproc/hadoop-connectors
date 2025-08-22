@@ -851,10 +851,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /**
-   * Gets FileStatus of all files which are lexicographically greater than the provided path. It
-   * filters out any directory objects present in underneath storage.
+   * Gets FileStatus of all files which are lexicographically greater than and equal the provided
+   * path. It filters out any directory objects present in underneath storage.
    *
-   * <p>This is an experimental API can can change without notice.
+   * <p>This is an experimental API can change without notice.
    */
   public FileStatus[] listStatusStartingFrom(Path startFrom) throws IOException {
     return trackDurationWithTracing(
@@ -950,7 +950,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * performance and reduce redundant API calls without compromising performance and API behaviour.
    * Currently, only "file" type hint is supported.
    *
-   * <p>This is an experimental API can can change without notice.
+   * <p>This is an experimental API can change without notice.
    */
   public FileStatus getFileStatusWithHint(Path hadoopPath, Configuration hint) throws IOException {
     return trackDurationWithTracing(
