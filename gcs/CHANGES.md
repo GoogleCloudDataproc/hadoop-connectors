@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add listStatusStartingFrom API.
 
 ## 3.1.3 - 2025-05-29
 1. Skip Soft delete using move API during rename
