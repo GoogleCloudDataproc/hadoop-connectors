@@ -92,6 +92,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           .setIncludeFoldersAsPrefixes(true)
           .build();
 
+  private static final ListObjectOptions DIRECTORY_EMPTINESS_CHECK_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludeFoldersAsPrefixes(true)
+          .setMaxResults(1)
+          .build();
+
   private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
@@ -349,9 +355,16 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
               // TODO: optimize by listing just one object instead of whole page
               //  (up to 1024 objects now)
-              : listFileInfoForPrefixPage(
-                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
-                  .getItems();
+              : this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+                  ? FileInfo.fromItemInfos(
+                      gcs.listObjectInfo(
+                          fileInfo.getItemInfo().getBucketName(),
+                          fileInfo.getItemInfo().getObjectName(),
+                          updateListObjectOptions(
+                              DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)))
+                  : listFileInfoForPrefixPage(
+                          fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+                      .getItems();
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
@@ -391,7 +404,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    repairImplicitDirectory(parentInfoFuture);
+    if (!isHnBucket) {
+      repairImplicitDirectory(parentInfoFuture);
+    }
   }
 
   /**

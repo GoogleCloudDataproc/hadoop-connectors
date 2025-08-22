@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketStorageLayoutRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
@@ -896,6 +897,16 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     delete_directory(/* parallelStatus= */ true);
   }
 
+  @Test
+  public void delete_directory_sequential_withHnsOptimization() throws Exception {
+    delete_directory_hns_optimization(/* parallelStatus= */ false);
+  }
+
+  @Test
+  public void delete_directory_parallel_withHnsOptimization() throws Exception {
+    delete_directory_hns_optimization(/* parallelStatus= */ true);
+  }
+
   private void delete_directory(boolean parallelStatus) throws Exception {
     gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(parallelStatus).build());
 
@@ -916,6 +927,44 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
               listRequestString(
                   bucketName, true, null, dirObject + "/d1/", "bucket,name,generation", null),
               deleteRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1));
+    }
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1"))).isFalse();
+  }
+
+  private void delete_directory_hns_optimization(boolean parallelStatus) throws Exception {
+    gcsFs =
+        newGcsFs(
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .setStatusParallelEnabled(parallelStatus)
+            .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/d1/");
+    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ false);
+
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+      .containsExactly(
+          getBucketStorageLayoutRequestString(bucketName),
+          listRequestWithTrailingDelimiter(
+              bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
+          listRequestString(
+              bucketName,
+              /* flatList= */ false,
+              /* includeTrailingDelimiter= */ true,
+              dirObject + "/d1/",
+              "bucket,name,generation",
+              /* maxResults= */ 2,
+              /* pageToken= */ null,
+              /* includeFoldersAsPrefixes= */ true),
+          getRequestString(bucketName, dirObject + "/"),
+          deleteRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1));
     }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1"))).isFalse();
@@ -1264,6 +1313,88 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     // The parent directory does not  exist because the repair logic was not triggered
     FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
     assertThat(parentInfo.exists()).isFalse();
+  }
+
+  @Test
+  public void delete_onNonHnsBucket_withAutoRepairEnabled_repairsImplicitDirectory()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setAutoRepairImplicitDirectoriesEnabled(true).build())
+                .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI parentDirUri = new URI(String.format("gs://%s/implicit-dir-for-delete/", bucketName));
+    URI fileToDelete = parentDirUri.resolve("file-to-delete.txt");
+
+    gcsfsIHelper.writeTextFile(bucketName, fileToDelete.getPath(), "test-data");
+    assertThat(gcsFs.exists(parentDirUri)).isTrue();
+    assertThat(gcsFs.exists(fileToDelete)).isTrue();
+
+    gcsFs.delete(fileToDelete, /* recursive= */ false);
+
+    assertThat(gcsFs.exists(fileToDelete)).isFalse();
+
+    FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
+    assertThat(parentInfo.exists()).isTrue();
+    assertThat(parentInfo.isDirectory()).isTrue();
+  }
+
+  @Test
+  public void delete_onNonHnsBucket_withAutoRepairDisabled_removesImplicitDirectory()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setAutoRepairImplicitDirectoriesEnabled(false).build())
+                .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI parentDirUri = new URI(String.format("gs://%s/implicit-dir-to-vanish/", bucketName));
+    URI fileToDelete = parentDirUri.resolve("file-to-delete.txt");
+
+    gcsfsIHelper.writeTextFile(bucketName, fileToDelete.getPath(), "test-data");
+    assertThat(gcsFs.exists(parentDirUri)).isTrue();
+
+    gcsFs.delete(fileToDelete, /* recursive= */ false);
+
+    assertThat(gcsFs.exists(fileToDelete)).isFalse();
+
+    FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
+    assertThat(parentInfo.exists()).isFalse();
+  }
+
+  @Test
+  public void delete_onHnsBucket_skipsRepairForNativeFolder() throws Exception {
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-bucket-delete");
+    gcsFs =
+        newGcsFs(
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    URI parentDirUri = new URI(String.format("gs://%s/native-folder-for-delete/", hnsBucketName));
+    URI fileToDelete = parentDirUri.resolve("file.txt");
+
+    gcsFs.mkdirs(parentDirUri);
+    gcsfsIHelper.writeTextFile(hnsBucketName, fileToDelete.getPath(), "test-data-hns");
+    assertThat(gcsFs.exists(fileToDelete)).isTrue();
+
+    gcsFs.delete(fileToDelete, false);
+
+    assertThat(gcsFs.exists(fileToDelete)).isFalse();
+
+    FileInfo parentInfo = gcsFs.getFileInfo(parentDirUri);
+    assertThat(parentInfo.exists()).isTrue();
   }
 
   @Test
