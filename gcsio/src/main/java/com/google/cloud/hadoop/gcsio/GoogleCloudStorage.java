@@ -359,7 +359,7 @@ public interface GoogleCloudStorage {
 
   /**
    * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and their
-   * name is lexicographically greater than the provided offset.
+   * name is lexicographically greater than or equal the provided offset.
    *
    * <p>Note: As GCS doesn't implement a file system, directory is also treated as an object (if
    * it's been created). This APi filters out all those directory object and maintain the order of
@@ -414,7 +414,7 @@ public interface GoogleCloudStorage {
 
   /**
    * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and their
-   * name is lexicographically greater than the provided offset.
+   * name is lexicographically greater than or equal the provided offset.
    *
    * <p>Note: As GCS doesn't implement a file system, directory is also treated as an object (if
    * it's been created). This APi filters out all those directory object and maintain the order of

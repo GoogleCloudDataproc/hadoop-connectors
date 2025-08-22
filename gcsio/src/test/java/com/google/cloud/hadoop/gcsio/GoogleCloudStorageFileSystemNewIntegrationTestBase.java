@@ -954,7 +954,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfoStartingFrom(bucketUri.resolve(dirObject));
 
-    // Can't asset that this is the only object we get in response, other object lexicographically
+    // Can't assert that this is the only object we get in response, other object lexicographically
     // higher would also come in response.
     // Only thing we can assert strongly is, list would start with the files created in this
     // directory.
