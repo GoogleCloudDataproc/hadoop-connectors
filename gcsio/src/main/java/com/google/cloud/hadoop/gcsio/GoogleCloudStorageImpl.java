@@ -2422,7 +2422,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         initializeRequest(storage.buckets().getStorageLayout(bucketName), bucketName);
     try (ITraceOperation to = TraceOperation.addToExistingTrace("getStorageLayout.HN")) {
       BucketStorageLayout layout = request.execute();
-      boolean result = layout.getHierarchicalNamespace().getEnabled();
+      boolean result = false;
+      if (layout.getHierarchicalNamespace() != null) {
+        result = layout.getHierarchicalNamespace().getEnabled();
+      }
 
       logger.atInfo().log("Checking if %s is HN enabled returned %s", src, result);
 
