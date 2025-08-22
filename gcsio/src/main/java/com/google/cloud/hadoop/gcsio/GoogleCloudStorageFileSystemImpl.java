@@ -89,6 +89,18 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
+  private static final ListObjectOptions LIST_OPTIONS_INCLUDE_FOLDERS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludePrefix(true)
+          .setIncludeFoldersAsPrefixes(true)
+          .build();
+
+  private static final ListObjectOptions DIRECTORY_EMPTINESS_CHECK_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          //.setIncludePrefix(true)
+          .setIncludeFoldersAsPrefixes(true)
+          .setMaxResults(2)
+          .build();
   public static final ListFileOptions DELETE_RENAME_LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name,generation").build();
 
@@ -333,7 +345,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     }
 
     boolean isHnBucket =
-        (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
+        (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path));
     List<FolderInfo> listOfFolders = new LinkedList<>();
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
@@ -343,9 +355,15 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
               // TODO: optimize by listing just one object instead of whole page
               //  (up to 1024 objects now)
-              : listFileInfoForPrefixPage(
-                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
-                  .getItems();
+              : FileInfo.fromItemInfos(
+                  gcs.listObjectInfo(
+                      fileInfo.getItemInfo().getBucketName(),
+                      fileInfo.getItemInfo().getObjectName(),
+                      updateListObjectOptions(
+                          DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)));
+      // listFileInfoForPrefixPage(
+      //     fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+      // .getItems();
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
@@ -384,8 +402,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
-
-    repairImplicitDirectory(parentInfoFuture);
+    if (!isHnBucket) {
+      repairImplicitDirectory(parentInfoFuture);
+    }
   }
 
   /**
@@ -514,10 +533,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     logger.atFiner().log("mkdirs(path: %s)", path);
     checkNotNull(path, "path should not be null");
 
-    mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
+    mkdirsInternal(path);
   }
 
-  private void mkdirsInternal(StorageResourceId resourceId) throws IOException {
+  private void mkdirsInternal(URI path) throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     if (resourceId.isRoot()) {
       // GCS_ROOT directory always exists, no need to go through the rest of the method.
       return;
@@ -544,15 +565,26 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       checkNoFilesConflictingWithDirs(resourceId);
     }
 
-    // Create only a leaf directory because subdirectories will be inferred
-    // if leaf directory exists
-    try {
-      gcs.createEmptyObject(resourceId);
-    } catch (FileAlreadyExistsException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      // This means that directory object already exist, and we do not need to do anything.
-      logger.atFiner().withCause(e).log(
-          "mkdirs: %s already exists, ignoring creation failure", resourceId);
+    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
+      // Create a native folder resource directly.
+      try {
+        gcs.createFolder(resourceId);
+      } catch (FileAlreadyExistsException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        //  This means that directory object already exist, and we do not need to do anything.
+        logger.atFiner().withCause(e).log(
+            "mkdirs: Folder '%s' already exists, ignoring creation failure", resourceId);
+      }
+    } else {
+      // Create an empty placeholder object to represent the directory.
+      try {
+        gcs.createEmptyObject(resourceId);
+      } catch (FileAlreadyExistsException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        //  This means that directory object already exist, and we do not need to do anything.
+        logger.atFiner().withCause(e).log(
+            "mkdirs: %s object already exists, ignoring creation failure", resourceId);
+      }
     }
   }
 
@@ -636,7 +668,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    repairImplicitDirectory(srcParentInfoFuture);
+    if (!this.options.getCloudStorageOptions().isHnOptimizationEnabled() || !gcs.isHnBucket(src)) {
+      repairImplicitDirectory(srcParentInfoFuture);
+    }
   }
 
   private URI getDstUri(FileInfo srcInfo, FileInfo dstInfo, @Nullable FileInfo dstParentInfo)
@@ -972,6 +1006,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     StorageResourceId dirId = pathId.toDirectoryId();
 
+    boolean isHnBucket =
+        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
+
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
         (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
             .submit(
@@ -981,7 +1018,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
                         : gcs.listObjectInfo(
                             dirId.getBucketName(),
                             dirId.getObjectName(),
-                            updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
+                            updateListObjectOptions(
+                                isHnBucket
+                                    ? LIST_OPTIONS_INCLUDE_FOLDERS
+                                    : LIST_FILE_INFO_LIST_OPTIONS,
+                                listOptions)));
 
     if (!pathId.isDirectory()) {
       try {
@@ -1017,10 +1058,20 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   @Override
   public FileInfo getFileInfo(URI path) throws IOException {
     checkArgument(path != null, "path must not be null");
+
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+    // Use getFolderInfo if HNS optimization flag is enabled and its and HNS bucket
+    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && this.gcs.isHnBucket(path)) {
+      FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getFolderInfo(resourceId.toDirectoryId()));
+      if (fileInfo.exists()) {
+        return fileInfo;
+      }
+    }
+
     // Validate the given path. true == allow empty object name.
     // One should be able to get info about top level directory (== bucket),
     // therefore we allow object name to be empty.
-    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
     FileInfo fileInfo =
         FileInfo.fromItemInfo(
             getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true));
@@ -1178,8 +1229,14 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // Ensure that the path looks like a directory path.
     resourceId = resourceId.toDirectoryId();
 
-    // Not a top-level directory, create 0 sized object.
-    gcs.createEmptyObject(resourceId);
+    // Check if HNS optimization is enabled, it's an HNS bucket
+    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
+      // Not a top-level directory, create an folder.
+      gcs.createFolder(resourceId);
+    } else {
+      // Not a top-level directory, create 0 sized object.
+      gcs.createEmptyObject(resourceId);
+    }
   }
 
   private void checkNoFilesConflictingWithDirs(StorageResourceId resourceId) throws IOException {
