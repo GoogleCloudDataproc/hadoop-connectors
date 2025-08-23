@@ -939,7 +939,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 .setCloudStorageOptions(
                     gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
                 .setStatusParallelEnabled(parallelStatus)
-            .build());
+                .build());
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -950,21 +950,21 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     if (isTracingSupported) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
-      .containsExactly(
-          getBucketStorageLayoutRequestString(bucketName),
-          listRequestWithTrailingDelimiter(
-              bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
-          listRequestString(
-              bucketName,
-              /* flatList= */ false,
-              /* includeTrailingDelimiter= */ true,
-              dirObject + "/d1/",
-              "bucket,name,generation",
-              /* maxResults= */ 2,
-              /* pageToken= */ null,
-              /* includeFoldersAsPrefixes= */ true),
-          getRequestString(bucketName, dirObject + "/"),
-          deleteRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1));
+          .containsExactly(
+              getBucketStorageLayoutRequestString(bucketName),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
+              listRequestString(
+                  bucketName,
+                  /* flatList= */ false,
+                  /* includeTrailingDelimiter= */ true,
+                  dirObject + "/d1/",
+                  "bucket,name,generation",
+                  /* maxResults= */ 2,
+                  /* pageToken= */ null,
+                  /* includeFoldersAsPrefixes= */ true),
+              getRequestString(bucketName, dirObject + "/"),
+              deleteRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1));
     }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1"))).isFalse();
