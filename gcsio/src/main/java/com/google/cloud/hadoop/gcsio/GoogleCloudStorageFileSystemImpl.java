@@ -86,6 +86,18 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   private static final ListObjectOptions GET_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).setMaxResults(1).build();
 
+  private static final ListObjectOptions LIST_OPTIONS_INCLUDE_FOLDERS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludePrefix(true)
+          .setIncludeFoldersAsPrefixes(true)
+          .build();
+
+  private static final ListObjectOptions DIRECTORY_EMPTINESS_CHECK_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludeFoldersAsPrefixes(true)
+          .setMaxResults(1)
+          .build();
+
   private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
@@ -343,9 +355,16 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
               // TODO: optimize by listing just one object instead of whole page
               //  (up to 1024 objects now)
-              : listFileInfoForPrefixPage(
-                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
-                  .getItems();
+              : this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+                  ? FileInfo.fromItemInfos(
+                      gcs.listObjectInfo(
+                          fileInfo.getItemInfo().getBucketName(),
+                          fileInfo.getItemInfo().getObjectName(),
+                          updateListObjectOptions(
+                              DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)))
+                  : listFileInfoForPrefixPage(
+                          fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+                      .getItems();
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
@@ -385,7 +404,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    repairImplicitDirectory(parentInfoFuture);
+    if (!isHnBucket) {
+      repairImplicitDirectory(parentInfoFuture);
+    }
   }
 
   /**
@@ -650,7 +671,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    repairImplicitDirectory(srcParentInfoFuture);
+    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && this.gcs.isHnBucket(src))) {
+      repairImplicitDirectory(srcParentInfoFuture);
+    }
   }
 
   private URI getDstUri(FileInfo srcInfo, FileInfo dstInfo, @Nullable FileInfo dstParentInfo)
@@ -986,6 +1010,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     StorageResourceId dirId = pathId.toDirectoryId();
 
+    boolean isHnBucket =
+        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
+
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
         (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
             .submit(
@@ -995,7 +1022,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
                         : gcs.listObjectInfo(
                             dirId.getBucketName(),
                             dirId.getObjectName(),
-                            updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
+                            updateListObjectOptions(
+                                isHnBucket
+                                    ? LIST_OPTIONS_INCLUDE_FOLDERS
+                                    : LIST_FILE_INFO_LIST_OPTIONS,
+                                listOptions)));
 
     if (!pathId.isDirectory()) {
       try {
