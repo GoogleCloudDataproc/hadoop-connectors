@@ -98,7 +98,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @BeforeClass
   public static void before() throws IOException {
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
-    //    helperGcs.createBucket(TEST_BUCKET);
+    helperGcs.createBucket(TEST_BUCKET);
     helperGcs.createBucket(
         ZONAL_TEST_BUCKET,
         CreateBucketOptions.builder()
@@ -110,7 +110,7 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @AfterClass
   public static void after() throws IOException {
     try {
-      //      BUCKET_HELPER.cleanup(helperGcs);
+      BUCKET_HELPER.cleanup(helperGcs);
       ZONAL_BUCKET_HELPER.cleanup(helperGcs);
     } finally {
       helperGcs.close();
