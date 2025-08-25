@@ -109,14 +109,15 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
     helperGcs.createBucket(TEST_BUCKET);
     helperGcs.createBucket(
-            ZONAL_TEST_BUCKET,
-            CreateBucketOptions.builder()
-                    .setLocation("us-central1")
-                    .setZonalPlacement("us-central1-a")
-                    .build());
+        ZONAL_TEST_BUCKET,
+        CreateBucketOptions.builder()
+            .setLocation("us-central1")
+            .setZonalPlacement("us-central1-a")
+            .build());
 
     if (!helperGcs.getBucket(TEST_BUCKET).isPresent()) {
-      throw new IllegalStateException("FATAL: Test bucket '" + TEST_BUCKET + "' was not created successfully.");
+      throw new IllegalStateException(
+          "FATAL: Test bucket '" + TEST_BUCKET + "' was not created successfully.");
     }
   }
 
