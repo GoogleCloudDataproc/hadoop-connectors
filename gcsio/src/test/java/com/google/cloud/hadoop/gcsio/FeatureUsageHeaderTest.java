@@ -98,25 +98,6 @@ public class FeatureUsageHeaderTest {
               (defaultLowBits & ~(1L)) | (1L << 2)
             },
             {
-              "Copy With Rewrite Disabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
-                          .setCopyWithRewriteEnabled(false)
-                          .build())
-                  .build(),
-              0L,
-              defaultLowBits & ~(1L << 10)
-            },
-            {
-              "Status Parallel Disabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setStatusParallelEnabled(false)
-                  .build(),
-              0L,
-              defaultLowBits & ~(1L << 9)
-            },
-            {
               "Hierarchical Namespace",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setCloudStorageOptions(
@@ -136,20 +117,13 @@ public class FeatureUsageHeaderTest {
               defaultLowBits | (1L << 5)
             },
             {
-              "Direct Upload",
+              "Cloud Logging Enabled",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
-                          .setWriteChannelOptions(
-                              GoogleCloudStorageOptions.DEFAULT.getWriteChannelOptions().toBuilder()
-                                  .setDirectUploadEnabled(true)
-                                  .build())
-                          .build())
+                  .setCloudLoggingEnabled(true)
                   .build(),
               0L,
-              defaultLowBits | (1L << 11)
+              defaultLowBits | (1L << 6)
             },
-            {"Bidi Enabled", buildOptionsWithBidi(true), 0L, defaultLowBits | (1L << 12)},
             {
               "Trace Log Enabled",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
@@ -171,7 +145,41 @@ public class FeatureUsageHeaderTest {
                   .build(),
               0L,
               defaultLowBits | (1L << 8)
-            }
+            },
+            {
+              "Status Parallel Disabled",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setStatusParallelEnabled(false)
+                  .build(),
+              0L,
+              defaultLowBits & ~(1L << 9)
+            },
+            {
+              "Copy With Rewrite Disabled",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setCloudStorageOptions(
+                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                          .setCopyWithRewriteEnabled(false)
+                          .build())
+                  .build(),
+              0L,
+              defaultLowBits & ~(1L << 10)
+            },
+            {
+              "Direct Upload",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setCloudStorageOptions(
+                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                          .setWriteChannelOptions(
+                              GoogleCloudStorageOptions.DEFAULT.getWriteChannelOptions().toBuilder()
+                                  .setDirectUploadEnabled(true)
+                                  .build())
+                          .build())
+                  .build(),
+              0L,
+              defaultLowBits | (1L << 11)
+            },
+            {"Bidi Enabled", buildOptionsWithBidi(true), 0L, defaultLowBits | (1L << 12)}
           });
     }
 
