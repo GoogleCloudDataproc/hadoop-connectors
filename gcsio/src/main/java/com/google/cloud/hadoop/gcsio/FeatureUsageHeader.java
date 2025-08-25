@@ -40,7 +40,7 @@ public final class FeatureUsageHeader {
             fsOptions,
             opts -> {
               long[] features = new long[BITMASK_SIZE];
-              addConfigurationFeatures(features, opts);
+              populateBitMask(features, opts);
               return features;
             });
   }
@@ -57,7 +57,7 @@ public final class FeatureUsageHeader {
   /**
    * Populates the bitmask with features derived from {@link GoogleCloudStorageFileSystemOptions}.
    */
-  private static void addConfigurationFeatures(
+  private static void populateBitMask(
       long[] features, GoogleCloudStorageFileSystemOptions fsOptions) {
     GoogleCloudStorageOptions storageOptions = fsOptions.getCloudStorageOptions();
     // Fadvise options
@@ -109,10 +109,10 @@ public final class FeatureUsageHeader {
       setBit(features, TrackedFeatures.PERFORMANCE_CACHE_ENABLED.getBitPosition());
     }
 
-    //    // Cloud Logging
-    //    if (fsOptions.isCloudLoggingEnabled()) {
-    //      setBit(features, TrackedFeatures.CLOUD_LOGGING_ENABLED.getBitPosition());
-    //    }
+    // Cloud Logging
+    if (fsOptions.isCloudLoggingEnabled()) {
+      setBit(features, TrackedFeatures.CLOUD_LOGGING_ENABLED.getBitPosition());
+    }
 
     // GCS Status Parallel
     if (fsOptions.isStatusParallelEnabled()) {
@@ -153,7 +153,7 @@ public final class FeatureUsageHeader {
   private static void setBit(long[] features, int bitPosition) {
     checkArgument(features.length == BITMASK_SIZE, "Bitmask must be 128 bits (2 longs).");
     checkArgument(
-        bitPosition < 0 || bitPosition >= 128, "Bit position must be in the range [0, 127].");
+        bitPosition >= 0 || bitPosition < 128, "Bit position must be in the range [0, 127].");
     if (bitPosition < 64) {
       features[LOW_BITS_INDEX] |= (1L << bitPosition);
     } else {

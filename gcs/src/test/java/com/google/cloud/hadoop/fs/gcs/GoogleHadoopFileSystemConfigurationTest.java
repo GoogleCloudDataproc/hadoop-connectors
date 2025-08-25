@@ -402,4 +402,15 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
   }
+
+  @Test
+  public void cloudLoggingEnabled_isSettable() {
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.cloud.logging.enable", true);
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.isCloudLoggingEnabled()).isTrue();
+  }
 }
