@@ -8,7 +8,6 @@ import com.google.api.core.ApiFutures;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -36,7 +35,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private final StorageResourceId resourceId;
 
   private final Duration readTimeout;
-  @VisibleForTesting public SeekableByteChannel contentReadChannel;
+  private long position = 0;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -44,8 +43,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-    readTimeout = readOptions.getGrpcReadTimeout();
-    resourceId =
+    this.readTimeout = readOptions.getGrpcReadTimeout();
+    this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
     BlobId blobId =
@@ -55,12 +54,6 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
-    initializeReadSession();
-  }
-
-  private void initializeReadSession() {
-    ReadAsSeekableChannel seekableChannelConfig = ReadProjectionConfigs.asSeekableChannel();
-    this.contentReadChannel = blobReadSession.readAs(seekableChannelConfig);
   }
 
   private static BlobReadSession initializeBlobReadSession(
@@ -79,57 +72,77 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     if (!dst.hasRemaining()) {
       return 0;
     }
-    //
-    //    if (contentReadChannel.position() >= objectSize) {
-    //      return -1;
-    //    }
 
-    logger.atFiner().log(
-        "Reading %d bytes at %d position from '%s'",
-        dst.remaining(), contentReadChannel.position(), resourceId);
-
-    long startTime = System.nanoTime();
-    long timeoutNanos = readTimeout.toNanos();
-
-    int bytesRead = contentReadChannel.read(dst);
-
-    while (bytesRead == 0) {
-      if (System.nanoTime() - startTime >= timeoutNanos) {
-        GoogleCloudStorageEventBus.postOnException();
-        throw new IOException(
-            String.format(
-                "Read timeout on %s after %s. No data was received.", resourceId, readTimeout));
-      }
-      bytesRead = contentReadChannel.read(dst);
+    if (position >= objectSize) {
+      return -1;
     }
 
-    return bytesRead;
-  }
+    logger.atFinest().log(
+        "Reading up to %d bytes at position %d from '%s'", dst.remaining(), position, resourceId);
 
-  @Override
-  public int write(ByteBuffer src) throws IOException {
-    GoogleCloudStorageEventBus.postOnException();
-    throw new UnsupportedOperationException("Cannot mutate read-only channel");
+    long bytesToRequest = Math.min(dst.remaining(), objectSize - position);
+
+    try {
+      ApiFuture<DisposableByteString> futureBytes =
+          blobReadSession.readAs(
+              ReadProjectionConfigs.asFutureByteString()
+                  .withRangeSpec(RangeSpec.of(position, bytesToRequest)));
+
+      DisposableByteString disposableByteString =
+          futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS);
+
+      int bytesRead;
+      try (DisposableByteString dbs = disposableByteString) {
+        ByteString byteString = dbs.byteString();
+        bytesRead = byteString.size();
+
+        // MODIFICATION: Add check for unexpected 0-byte read for parity with ClientReadChannel.
+        if (bytesRead == 0 && position < objectSize) {
+          throw new IOException(
+              String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
+        }
+
+        if (bytesRead > 0) {
+          byteString.copyTo(dst);
+          position += bytesRead;
+        }
+      }
+
+      // MODIFICATION: Return -1 on end-of-stream, not 0, for parity.
+      return bytesRead > 0 ? bytesRead : -1;
+
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException(
+          String.format("Read failed on %s at position %d", resourceId, position), e);
+    }
   }
 
   @Override
   public long position() throws IOException {
     throwIfNotOpen();
-    return contentReadChannel.position();
+    return position;
   }
 
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
     validatePosition(newPosition);
-    if (newPosition == contentReadChannel.position()) {
+    if (newPosition == this.position) {
       return this;
     }
-    logger.atFiner().log(
-        "Seek from %s to %s position for '%s'",
-        contentReadChannel.position(), newPosition, resourceId);
-    contentReadChannel.position(newPosition);
+
+    logger.atFinest().log(
+        "Seek from %d to %d position for '%s'", this.position, newPosition, resourceId);
+
+    this.position = newPosition;
     return this;
+  }
+
+  @Override
+  public int write(ByteBuffer src) throws IOException {
+    GoogleCloudStorageEventBus.postOnException();
+    throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
   @Override
@@ -157,10 +170,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   public void close() throws IOException {
     if (isOpen) {
       isOpen = false;
-      logger.atFiner().log("Closing channel for '%s'", resourceId);
-      if (contentReadChannel != null) {
-        contentReadChannel.close();
-      }
+      logger.atFinest().log("Closing channel for '%s'", resourceId);
       if (blobReadSession != null) {
         blobReadSession.close();
       }
@@ -202,16 +212,14 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       VectoredIORange range,
       IntFunction<ByteBuffer> allocate)
       throws IOException {
-    // try-with-resources ensures the DisposableByteString is closed, releasing its memory
     try (DisposableByteString dbs = disposableByteString) {
       ByteString byteString = dbs.byteString();
       int size = byteString.size();
       ByteBuffer buf = allocate.apply(size);
-      // This loop efficiently copies data without creating intermediate byte arrays on the heap
       for (ByteBuffer b : byteString.asReadOnlyByteBufferList()) {
         buf.put(b);
       }
-      buf.flip(); // Prepare buffer for reading
+      buf.flip();
       range.getData().complete(buf);
     }
   }
