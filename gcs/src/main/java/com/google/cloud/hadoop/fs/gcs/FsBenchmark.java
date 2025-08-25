@@ -465,7 +465,7 @@ public class FsBenchmark extends Configured implements Tool {
                 try {
                   for (int j = 0; j < numOpen; j++) {
                     try {
-                      long seekPos = random.nextLong(maxReadPositionExclusive);
+                      long seekPos = random.nextLong(50);
 
                       long openStart = System.nanoTime();
                       long fileBytesRead = 0;
