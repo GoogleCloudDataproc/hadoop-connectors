@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.flogger.GoogleLogger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Base64;
@@ -19,6 +20,7 @@ public final class FeatureUsageHeader {
   @VisibleForTesting static final int HIGH_BITS_INDEX = 0;
   @VisibleForTesting static final int LOW_BITS_INDEX = 1;
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   // Cache for the configuration-derived part of the feature bitmask.
   private static final ConcurrentHashMap<GoogleCloudStorageFileSystemOptions, long[]>
       configFeaturesCache = new ConcurrentHashMap<>();
@@ -150,9 +152,8 @@ public final class FeatureUsageHeader {
   /** Sets a specific bit in the 128-bit feature mask. */
   private static void setBit(long[] features, int bitPosition) {
     checkArgument(features.length == BITMASK_SIZE, "Bitmask must be 128 bits (2 longs).");
-    if (bitPosition < 0 || bitPosition >= 128) {
-      return;
-    }
+    checkArgument(
+        bitPosition < 0 || bitPosition >= 128, "Bit position must be in the range [0, 127].");
     if (bitPosition < 64) {
       features[LOW_BITS_INDEX] |= (1L << bitPosition);
     } else {
