@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
 import com.google.cloud.storage.StorageException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -36,6 +37,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -183,9 +185,9 @@ public class GoogleCloudStorageClientImplIntegrationTest {
         "Printing read buffer: "
             + readBuffer.hasRemaining()
             + "Read Bytes found "
-            + readBytes.toString()
+            + Arrays.toString(readBytes)
             + "Expected"
-            + bytesToWrite.toString());
+            + Arrays.toString(bytesToWrite));
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
     assertThat(readBytes).isEqualTo(bytesToWrite);
