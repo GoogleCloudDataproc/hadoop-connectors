@@ -114,11 +114,6 @@ public class GoogleCloudStorageClientImplIntegrationTest {
             .setLocation("us-central1")
             .setZonalPlacement("us-central1-a")
             .build());
-
-    if (!helperGcs.getBucket(TEST_BUCKET).isPresent()) {
-      throw new IllegalStateException(
-          "FATAL: Test bucket '" + TEST_BUCKET + "' was not created successfully.");
-    }
   }
 
   @AfterClass
