@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+1. Add checksum verification in upload
+2. PR #1463 - [Bug] Fix for Hadoop directory copy failures in gRPC client. 
 
 ## 3.1.3 - 2025-05-29
 1. Skip Soft delete using move API during rename
