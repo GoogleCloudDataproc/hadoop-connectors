@@ -179,244 +179,248 @@ public class GoogleCloudStorageClientImplIntegrationTest {
       }
     }
 
+    System.out.println(
+        "Printing read buffer: "
+            + readBuffer.hasRemaining()
+            + "Read Bytes found "
+            + readBytes.toString()
+            + "Expected"
+            + bytesToWrite.toString());
     // Verify that the entire content was read and matches the original
     assertThat(readBuffer.hasRemaining()).isFalse();
     assertThat(readBytes).isEqualTo(bytesToWrite);
   }
-  //
-  //  @Test
-  //  public void writeToDiskDisabled() throws IOException {
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //
-  // AsyncWriteChannelOptions.builder().setUploadType(UploadType.CHUNK_UPLOAD).build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    // validate that there were no temporaryFiles created files
-  //    writeAndVerifyTemporaryFiles(resourceId, /* expectedPartFileCountAfterCleanup */ 0);
-  //  }
-  //
-  //  @Test
-  //  public void writeToDefaultPathThenUploadEnabled() throws IOException {
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                AsyncWriteChannelOptions.builder()
-  //                    .setUploadType(UploadType.WRITE_TO_DISK_THEN_UPLOAD)
-  //                    .build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    writeAndVerifyTemporaryFiles(resourceId, /* expectedPartFileCountAfterCleanup */ 1);
-  //  }
-  //
-  //  @Test
-  //  public void writeToPathThenUploadEnabled() throws IOException {
-  //
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                AsyncWriteChannelOptions.builder()
-  //                    .setUploadType(UploadType.WRITE_TO_DISK_THEN_UPLOAD)
-  //                    .setTemporaryPaths(tempDirs)
-  //                    .build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    writeAndVerifyTemporaryFiles(resourceId, /* expectedPartFileCountAfterCleanup */ 1);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaJournalingThrowsIfTempDirNotProvided() {
-  //
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                AsyncWriteChannelOptions.builder().setUploadType(UploadType.JOURNALING).build())
-  //            .build();
-  //
-  //    assertThrows(IllegalArgumentException.class, () -> getGCSImpl(storageOptions));
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaJournaling() throws IOException {
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                AsyncWriteChannelOptions.builder()
-  //                    .setTemporaryPaths(tempDirs)
-  //                    .setUploadType(UploadType.JOURNALING)
-  //                    .build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    writeAndVerifyTemporaryFiles(resourceId, 1);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaPCUVerifyPartFileCleanup() throws IOException, InterruptedException {
-  //    String partFilePrefix = name.getMethodName();
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                pcuDefaultOptions.toBuilder().setPartFileNamePrefix(partFilePrefix).build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    writeAndVerifyPartFiles(
-  //        bufferCapacity, resourceId, /* expectedPartFileCountAfterCleanup */ 0, partFilePrefix);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaPCUVerifyPartFileNotCleanedUp() throws IOException {
-  //    String partFilePrefix = name.getMethodName();
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                pcuDefaultOptions.toBuilder()
-  //                    .setPartFileNamePrefix(partFilePrefix)
-  //                    .setPartFileCleanupType(PartFileCleanupType.NEVER)
-  //                    .build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //    // part file not cleaned up because PartFileCleanupType.NEVER is used.
-  //    writeAndVerifyPartFiles(bufferCapacity, resourceId, partFileCount, partFilePrefix);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaPCUComposeFileMissingFailure() throws IOException {
-  //    String partFilePrefix = name.getMethodName();
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                pcuDefaultOptions.toBuilder().setPartFileNamePrefix(partFilePrefix).build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
-  //    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-  //    WritableByteChannel writeChannel = gcs.create(resourceId);
-  //    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-  //
-  //    List<GoogleCloudStorageItemInfo> partFiles = getPartFiles(partFilePrefix);
-  //
-  //    // delete one part file
-  //    StorageResourceId partFileToBeDeleted = partFiles.get(0).getResourceId();
-  //    gcs.deleteObjects(ImmutableList.of(partFileToBeDeleted));
-  //
-  //    Exception e = assertThrows(IOException.class, writeChannel::close);
-  //    verifyPartFileNotFound(e, partFileToBeDeleted.getObjectName());
-  //
-  //    partFiles = getPartFiles(partFilePrefix);
-  //    // part files were cleaned up even after failure
-  //    assertThat(partFiles.size()).isEqualTo(0);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaPCUComposeMissingObjectVersion() throws IOException {
-  //    String partFilePrefix = name.getMethodName();
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                pcuDefaultOptions.toBuilder()
-  //                    .setPartFileNamePrefix(partFilePrefix)
-  //                    .setPartFileCleanupType(PartFileCleanupType.ON_SUCCESS)
-  //                    .build())
-  //            .build();
-  //
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //
-  //    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
-  //    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-  //    WritableByteChannel writeChannel = gcs.create(resourceId);
-  //    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
-  //
-  //    List<GoogleCloudStorageItemInfo> partFiles = getPartFiles(partFilePrefix);
-  //    // get one part file and override its content
-  //    GoogleCloudStorageItemInfo itemInfoBeforeModification = partFiles.get(0);
-  //    gcs.create(itemInfoBeforeModification.getResourceId(),
-  // CreateObjectOptions.DEFAULT_OVERWRITE)
-  //        .close();
-  //
-  //    GoogleCloudStorageItemInfo itemInfoAfterModification =
-  //        gcs.getItemInfo(itemInfoBeforeModification.getResourceId());
-  //    List<GoogleCloudStorageItemInfo> updatedFiles = getPartFiles(partFilePrefix);
-  //    // object with same name is present but generationId is different
-  //    assertThat(
-  //            updatedFiles.stream()
-  //                .anyMatch(
-  //                    itemInfo ->
-  //
-  // (itemInfo.getObjectName().equals(itemInfoAfterModification.getObjectName())
-  //                                && itemInfo.getContentGeneration()
-  //                                    != itemInfoBeforeModification.getContentGeneration())
-  //                            ? true
-  //                            : false))
-  //        .isTrue();
-  //
-  //    Exception e = assertThrows(IOException.class, writeChannel::close);
-  //    verifyPartFileNotFound(e, itemInfoBeforeModification.getObjectName());
-  //    partFiles = getPartFiles(partFilePrefix);
-  //    // part files weren't cleaned up on failure as PartFileCleanupType.ON_SUCCESS was used
-  //    assertThat(partFiles.size()).isEqualTo(partFileCount);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaPCUInvalidPartFileNamePrefix() throws IOException {
-  //    // invalid object name https://cloud.google.com/storage/docs/objects#naming
-  //    String partFilePrefix = "\n";
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                pcuDefaultOptions.toBuilder()
-  //                    .setPartFileNamePrefix(partFilePrefix)
-  //                    .setPartFileCleanupType(PartFileCleanupType.NEVER)
-  //                    .build())
-  //            .build();
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
-  //    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-  //    WritableByteChannel writeChannel = gcs.create(resourceId);
-  //    Exception e =
-  //        assertThrows(
-  //            StorageException.class, () -> writeChannel.write(ByteBuffer.wrap(bytesToWrite)));
-  //    verifyPartFileInvalidArgument(e);
-  //  }
-  //
-  //  @Test
-  //  public void uploadViaPCUPartFileCleanupOnSuccess() throws IOException, InterruptedException {
-  //    String partFilePrefix = name.getMethodName();
-  //    GoogleCloudStorageOptions storageOptions =
-  //        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-  //            .setWriteChannelOptions(
-  //                pcuDefaultOptions.toBuilder()
-  //                    .setPartFileNamePrefix(partFilePrefix)
-  //                    .setPartFileCleanupType(PartFileCleanupType.ON_SUCCESS)
-  //                    .build())
-  //            .build();
-  //    gcs = getGCSImpl(storageOptions);
-  //    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-  //    writeAndVerifyPartFiles(
-  //        bufferCapacity, resourceId, /* expectedPartFileCountAfterCleanup */ 0, partFilePrefix);
-  //  }
+
+  @Test
+  public void writeToDiskDisabled() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder().setUploadType(UploadType.CHUNK_UPLOAD).build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    // validate that there were no temporaryFiles created files
+    writeAndVerifyTemporaryFiles(resourceId, /* expectedPartFileCountAfterCleanup */ 0);
+  }
+
+  @Test
+  public void writeToDefaultPathThenUploadEnabled() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder()
+                    .setUploadType(UploadType.WRITE_TO_DISK_THEN_UPLOAD)
+                    .build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    writeAndVerifyTemporaryFiles(resourceId, /* expectedPartFileCountAfterCleanup */ 1);
+  }
+
+  @Test
+  public void writeToPathThenUploadEnabled() throws IOException {
+
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder()
+                    .setUploadType(UploadType.WRITE_TO_DISK_THEN_UPLOAD)
+                    .setTemporaryPaths(tempDirs)
+                    .build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    writeAndVerifyTemporaryFiles(resourceId, /* expectedPartFileCountAfterCleanup */ 1);
+  }
+
+  @Test
+  public void uploadViaJournalingThrowsIfTempDirNotProvided() {
+
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder().setUploadType(UploadType.JOURNALING).build())
+            .build();
+
+    assertThrows(IllegalArgumentException.class, () -> getGCSImpl(storageOptions));
+  }
+
+  @Test
+  public void uploadViaJournaling() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder()
+                    .setTemporaryPaths(tempDirs)
+                    .setUploadType(UploadType.JOURNALING)
+                    .build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    writeAndVerifyTemporaryFiles(resourceId, 1);
+  }
+
+  @Test
+  public void uploadViaPCUVerifyPartFileCleanup() throws IOException, InterruptedException {
+    String partFilePrefix = name.getMethodName();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                pcuDefaultOptions.toBuilder().setPartFileNamePrefix(partFilePrefix).build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    writeAndVerifyPartFiles(
+        bufferCapacity, resourceId, /* expectedPartFileCountAfterCleanup */ 0, partFilePrefix);
+  }
+
+  @Test
+  public void uploadViaPCUVerifyPartFileNotCleanedUp() throws IOException {
+    String partFilePrefix = name.getMethodName();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                pcuDefaultOptions.toBuilder()
+                    .setPartFileNamePrefix(partFilePrefix)
+                    .setPartFileCleanupType(PartFileCleanupType.NEVER)
+                    .build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    // part file not cleaned up because PartFileCleanupType.NEVER is used.
+    writeAndVerifyPartFiles(bufferCapacity, resourceId, partFileCount, partFilePrefix);
+  }
+
+  @Test
+  public void uploadViaPCUComposeFileMissingFailure() throws IOException {
+    String partFilePrefix = name.getMethodName();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                pcuDefaultOptions.toBuilder().setPartFileNamePrefix(partFilePrefix).build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+
+    List<GoogleCloudStorageItemInfo> partFiles = getPartFiles(partFilePrefix);
+
+    // delete one part file
+    StorageResourceId partFileToBeDeleted = partFiles.get(0).getResourceId();
+    gcs.deleteObjects(ImmutableList.of(partFileToBeDeleted));
+
+    Exception e = assertThrows(IOException.class, writeChannel::close);
+    verifyPartFileNotFound(e, partFileToBeDeleted.getObjectName());
+
+    partFiles = getPartFiles(partFilePrefix);
+    // part files were cleaned up even after failure
+    assertThat(partFiles.size()).isEqualTo(0);
+  }
+
+  @Test
+  public void uploadViaPCUComposeMissingObjectVersion() throws IOException {
+    String partFilePrefix = name.getMethodName();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                pcuDefaultOptions.toBuilder()
+                    .setPartFileNamePrefix(partFilePrefix)
+                    .setPartFileCleanupType(PartFileCleanupType.ON_SUCCESS)
+                    .build())
+            .build();
+
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+
+    List<GoogleCloudStorageItemInfo> partFiles = getPartFiles(partFilePrefix);
+    // get one part file and override its content
+    GoogleCloudStorageItemInfo itemInfoBeforeModification = partFiles.get(0);
+    gcs.create(itemInfoBeforeModification.getResourceId(), CreateObjectOptions.DEFAULT_OVERWRITE)
+        .close();
+
+    GoogleCloudStorageItemInfo itemInfoAfterModification =
+        gcs.getItemInfo(itemInfoBeforeModification.getResourceId());
+    List<GoogleCloudStorageItemInfo> updatedFiles = getPartFiles(partFilePrefix);
+    // object with same name is present but generationId is different
+    assertThat(
+            updatedFiles.stream()
+                .anyMatch(
+                    itemInfo ->
+                        (itemInfo.getObjectName().equals(itemInfoAfterModification.getObjectName())
+                                && itemInfo.getContentGeneration()
+                                    != itemInfoBeforeModification.getContentGeneration())
+                            ? true
+                            : false))
+        .isTrue();
+
+    Exception e = assertThrows(IOException.class, writeChannel::close);
+    verifyPartFileNotFound(e, itemInfoBeforeModification.getObjectName());
+    partFiles = getPartFiles(partFilePrefix);
+    // part files weren't cleaned up on failure as PartFileCleanupType.ON_SUCCESS was used
+    assertThat(partFiles.size()).isEqualTo(partFileCount);
+  }
+
+  @Test
+  public void uploadViaPCUInvalidPartFileNamePrefix() throws IOException {
+    // invalid object name https://cloud.google.com/storage/docs/objects#naming
+    String partFilePrefix = "\n";
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                pcuDefaultOptions.toBuilder()
+                    .setPartFileNamePrefix(partFilePrefix)
+                    .setPartFileCleanupType(PartFileCleanupType.NEVER)
+                    .build())
+            .build();
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    byte[] bytesToWrite = new byte[partFileCount * bufferCapacity];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+    WritableByteChannel writeChannel = gcs.create(resourceId);
+    Exception e =
+        assertThrows(
+            StorageException.class, () -> writeChannel.write(ByteBuffer.wrap(bytesToWrite)));
+    verifyPartFileInvalidArgument(e);
+  }
+
+  @Test
+  public void uploadViaPCUPartFileCleanupOnSuccess() throws IOException, InterruptedException {
+    String partFilePrefix = name.getMethodName();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(
+                pcuDefaultOptions.toBuilder()
+                    .setPartFileNamePrefix(partFilePrefix)
+                    .setPartFileCleanupType(PartFileCleanupType.ON_SUCCESS)
+                    .build())
+            .build();
+    gcs = getGCSImpl(storageOptions);
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    writeAndVerifyPartFiles(
+        bufferCapacity, resourceId, /* expectedPartFileCountAfterCleanup */ 0, partFilePrefix);
+  }
 
   private void verifyPartFileNotFound(Throwable throwable, String partFileName) {
     StorageException exception = getStorageException(throwable);
