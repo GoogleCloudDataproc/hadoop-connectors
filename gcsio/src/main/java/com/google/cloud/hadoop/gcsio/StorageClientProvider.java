@@ -67,7 +67,8 @@ public class StorageClientProvider {
               downscopedAccessTokenFn),
           this);
     }
-    StorageClientProviderCacheKey key = computeCacheKey(credentials, storageOptions);
+    StorageClientProviderCacheKey key =
+        computeCacheKey(credentials, storageOptions, downscopedAccessTokenFn);
     if (key == null) {
       // When a stable key cannot be generated for the credentials, do not cache.
       return new StorageWrapper(
@@ -183,7 +184,9 @@ public class StorageClientProvider {
 
   @VisibleForTesting
   StorageClientProviderCacheKey computeCacheKey(
-      Credentials credentials, GoogleCloudStorageOptions storageOptions) {
+      Credentials credentials,
+      GoogleCloudStorageOptions storageOptions,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     ImmutableList<Object> credentialsKey = getCredentialsCacheKey(credentials);
     if (credentialsKey.isEmpty()) {
       return null;
@@ -192,6 +195,7 @@ public class StorageClientProvider {
         .setCredentialsKey(credentialsKey)
         .setHttpHeaders(storageOptions.getHttpRequestHeaders())
         .setIsDirectPathPreferred(storageOptions.isDirectPathPreferred())
+        .setIsDownScopingEnabled(downscopedAccessTokenFn != null)
         .setIsTracingEnabled(storageOptions.isTraceLogEnabled())
         .setWriteChannelOptions(storageOptions.getWriteChannelOptions())
         .setProjectId(storageOptions.getProjectId())
@@ -255,10 +259,7 @@ public class StorageClientProvider {
         // These values are currently passed while creating the storage client, but they are
         // currently not configurable by the FS options so skipping caching.
         && pCUExecutorService == null
-        && (interceptors == null || interceptors.isEmpty())
-        // Downscoped access token function makes the client's configuration unique and
-        // non-shareable.
-        && downscopedAccessTokenFn == null;
+        && (interceptors == null || interceptors.isEmpty());
   }
 
   @VisibleForTesting

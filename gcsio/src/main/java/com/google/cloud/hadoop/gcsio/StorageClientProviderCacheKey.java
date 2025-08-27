@@ -2,9 +2,9 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.util.List;
-import javax.annotation.Nullable;
+import java.util.Optional;
 
 @AutoValue
 public abstract class StorageClientProviderCacheKey {
@@ -16,17 +16,16 @@ public abstract class StorageClientProviderCacheKey {
   /** Whether tracing is requested. */
   public abstract boolean getIsTracingEnabled();
 
-  @Nullable
-  public abstract List<Object> getCredentialsKey();
+  public abstract Optional<ImmutableList<Object>> getCredentialsKey();
 
-  @Nullable
-  public abstract ImmutableMap<String, String> getHttpHeaders();
+  /** Whether downscoped tokens are used for authenticating with the GCS backend. */
+  public abstract boolean getIsDownScopingEnabled();
 
-  @Nullable
-  public abstract AsyncWriteChannelOptions getWriteChannelOptions();
+  public abstract Optional<ImmutableMap<String, String>> getHttpHeaders();
 
-  @Nullable
-  public abstract String getProjectId();
+  public abstract Optional<AsyncWriteChannelOptions> getWriteChannelOptions();
+
+  public abstract Optional<String> getProjectId();
 
   public abstract boolean getIsDirectPathPreferred();
 
@@ -37,7 +36,9 @@ public abstract class StorageClientProviderCacheKey {
 
     public abstract Builder setIsTracingEnabled(boolean value);
 
-    public abstract Builder setCredentialsKey(List<Object> value);
+    public abstract Builder setCredentialsKey(ImmutableList<Object> value);
+
+    public abstract Builder setIsDownScopingEnabled(boolean value);
 
     public abstract Builder setHttpHeaders(ImmutableMap<String, String> value);
 
