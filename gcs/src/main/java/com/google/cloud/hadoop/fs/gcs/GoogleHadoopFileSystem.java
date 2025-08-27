@@ -39,18 +39,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
-import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.cloud.hadoop.gcsio.FileInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
-import com.google.cloud.hadoop.gcsio.ListFileOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
-import com.google.cloud.hadoop.gcsio.UriPaths;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -765,7 +754,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             return false;
           }
           return true;
-        });
+        },
+        TrackedFeatures.RENAME_API);
   }
 
   /**
@@ -783,6 +773,28 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     InvocationIdContext.setInvocationId();
     return GhfsGlobalStorageStatistics.trackDuration(
         factory, stats, statistic, context, traceFactory, operation);
+  }
+
+  /**
+   * Tracks the duration of the operation {@code operation} and a specific feature usage. Also setup
+   * operation tracking using {@code ThreadTrace}.
+   */
+  private <B> B trackDurationWithTracing(
+      DurationTrackerFactory factory,
+      @Nonnull GhfsGlobalStorageStatistics stats,
+      GhfsStatistic statistic,
+      Object context,
+      ITraceFactory traceFactory,
+      CallableRaisingIOE<B> operation,
+      TrackedFeatures feature)
+      throws IOException {
+    return trackDurationWithTracing(
+        factory,
+        stats,
+        statistic,
+        context,
+        traceFactory,
+        () -> FeatureUsageHeader.track(feature, operation));
   }
 
   @Override

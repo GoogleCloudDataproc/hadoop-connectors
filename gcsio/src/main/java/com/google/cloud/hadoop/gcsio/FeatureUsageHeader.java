@@ -4,11 +4,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.flogger.GoogleLogger;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.util.functional.CallableRaisingIOE;
 
 /**
  * Generates the x-goog-storage-hadoop-connector-features header value by combining
@@ -20,11 +21,20 @@ public final class FeatureUsageHeader {
   @VisibleForTesting static final int HIGH_BITS_INDEX = 0;
   @VisibleForTesting static final int LOW_BITS_INDEX = 1;
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   // Cache for the configuration-derived part of the feature bitmask.
   private static final ConcurrentHashMap<GoogleCloudStorageFileSystemOptions, long[]>
       configFeaturesCache = new ConcurrentHashMap<>();
-  private static long[] configFeaturesMask = new long[BITMASK_SIZE];
+  private static long[] configFeatures = new long[BITMASK_SIZE];
+
+  @VisibleForTesting
+  static final InheritableThreadLocal<long[]> requestFeatures =
+      new InheritableThreadLocal<>() {
+        @Override
+        protected long[] initialValue() {
+          return new long[BITMASK_SIZE];
+        }
+      };
+
   public static final String NAME = "X-Goog-Storage-Hadoop-Connector-Features";
 
   private FeatureUsageHeader() {}
@@ -35,7 +45,7 @@ public final class FeatureUsageHeader {
    * redundant calculations for the same options.
    */
   public static void setConfigFeatures(GoogleCloudStorageFileSystemOptions fsOptions) {
-    configFeaturesMask =
+    configFeatures =
         configFeaturesCache.computeIfAbsent(
             fsOptions,
             opts -> {
@@ -51,7 +61,26 @@ public final class FeatureUsageHeader {
    * @return The Base64 encoded string for the header, or {@code null} if no features are set.
    */
   public static String getValue() {
-    return encode(configFeaturesMask);
+    long[] features = new long[BITMASK_SIZE];
+    features[HIGH_BITS_INDEX] =
+        configFeatures[HIGH_BITS_INDEX] | requestFeatures.get()[HIGH_BITS_INDEX];
+    features[LOW_BITS_INDEX] =
+        configFeatures[LOW_BITS_INDEX] | requestFeatures.get()[LOW_BITS_INDEX];
+    return encode(features);
+  }
+
+  /**
+   * Executes a block of code with a specific feature tracked. The feature bit is set before
+   * execution and cleared in a finally block, ensuring it doesn't leak to other requests.
+   */
+  public static <B> B track(TrackedFeatures feature, CallableRaisingIOE<B> operation)
+      throws IOException {
+    setBit(requestFeatures.get(), feature.getBitPosition());
+    try {
+      return operation.apply();
+    } finally {
+      clearBit(requestFeatures.get(), feature.getBitPosition());
+    }
   }
 
   /**
@@ -153,11 +182,23 @@ public final class FeatureUsageHeader {
   private static void setBit(long[] features, int bitPosition) {
     checkArgument(features.length == BITMASK_SIZE, "Bitmask must be 128 bits (2 longs).");
     checkArgument(
-        bitPosition >= 0 || bitPosition < 128, "Bit position must be in the range [0, 127].");
+        bitPosition >= 0 && bitPosition < 128, "Bit position must be in the range [0, 127].");
     if (bitPosition < 64) {
       features[LOW_BITS_INDEX] |= (1L << bitPosition);
     } else {
       features[HIGH_BITS_INDEX] |= (1L << (bitPosition - 64));
+    }
+  }
+
+  /** Clears a specific bit in the 128-bit feature mask. */
+  private static void clearBit(long[] features, int bitPosition) {
+    checkArgument(features.length == BITMASK_SIZE);
+    checkArgument(
+        bitPosition >= 0 && bitPosition < 128, "Bit position must be in the range [0, 127].");
+    if (bitPosition < 64) {
+      features[LOW_BITS_INDEX] &= ~(1L << bitPosition);
+    } else {
+      features[HIGH_BITS_INDEX] &= ~(1L << (bitPosition - 64));
     }
   }
 }

@@ -4,10 +4,12 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -21,6 +23,14 @@ import org.junit.runners.Parameterized.Parameters;
  */
 @RunWith(JUnit4.class)
 public class FeatureUsageHeaderTest {
+
+  @Before
+  public void setUp() {
+    // Reset config features to default before each test.
+    FeatureUsageHeader.setConfigFeatures(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    // Clear any request-specific features.
+    FeatureUsageHeader.requestFeatures.set(new long[FeatureUsageHeader.BITMASK_SIZE]);
+  }
 
   // --- Tests for the encode method ---
 
@@ -58,21 +68,68 @@ public class FeatureUsageHeaderTest {
     assertThrows(IllegalArgumentException.class, () -> FeatureUsageHeader.encode(features));
   }
 
+  // --- Tests for the track method ---
+
+  @Test
+  public void track_withCallable_setsAndClearsFeature() throws IOException {
+    // Initially, the header should be based on default options
+    String initialHeader = FeatureUsageHeader.getValue();
+
+    // A feature to track that is not part of the default set
+    TrackedFeatures testFeature = TrackedFeatures.DIRECT_UPLOAD_ENABLED; // bit 11
+
+    String result =
+        FeatureUsageHeader.track(
+            testFeature,
+            () -> {
+              // Inside track, the header should include the new feature
+              String trackedHeader = FeatureUsageHeader.getValue();
+              assertThat(trackedHeader).isNotNull();
+              byte[] decodedBytes = Base64.getDecoder().decode(trackedHeader);
+              long[] features = bytesToLongs(decodedBytes);
+              assertThat(
+                      (features[FeatureUsageHeader.LOW_BITS_INDEX]
+                          & (1L << testFeature.getBitPosition())))
+                  .isNotEqualTo(0);
+              return "success";
+            });
+
+    assertThat(result).isEqualTo("success");
+
+    // After track, the header should be back to the initial state
+    String finalHeader = FeatureUsageHeader.getValue();
+    assertThat(finalHeader).isEqualTo(initialHeader);
+  }
+
+  @Test
+  public void track_clearsFeatureOnException() {
+    String initialHeader = FeatureUsageHeader.getValue();
+    TrackedFeatures testFeature = TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED; // bit 4
+
+    IOException thrown =
+        assertThrows(
+            IOException.class,
+            () ->
+                FeatureUsageHeader.track(
+                    testFeature,
+                    () -> {
+                      throw new IOException("test exception");
+                    }));
+
+    assertThat(thrown).hasMessageThat().isEqualTo("test exception");
+    assertThat(FeatureUsageHeader.getValue()).isEqualTo(initialHeader);
+  }
+
   /** Parameterized tests for feature flag generation based on GCS options. */
   @RunWith(Parameterized.class)
   public static class FeatureFlagGenerationTest {
 
-    private final String testName;
     private final GoogleCloudStorageFileSystemOptions options;
     private final long expectedHighBits;
     private final long expectedLowBits;
 
     public FeatureFlagGenerationTest(
-        String testName,
-        GoogleCloudStorageFileSystemOptions options,
-        long expectedHighBits,
-        long expectedLowBits) {
-      this.testName = testName;
+        GoogleCloudStorageFileSystemOptions options, long expectedHighBits, long expectedLowBits) {
       this.options = options;
       this.expectedHighBits = expectedHighBits;
       this.expectedLowBits = expectedLowBits;
@@ -179,7 +236,7 @@ public class FeatureUsageHeaderTest {
               0L,
               defaultLowBits | (1L << 11)
             },
-            {"Bidi Enabled", buildOptionsWithBidi(true), 0L, defaultLowBits | (1L << 12)}
+            {"Bidi Enabled", buildOptionsWithBidi(), 0L, defaultLowBits | (1L << 12)}
           });
     }
 
@@ -201,9 +258,9 @@ public class FeatureUsageHeaderTest {
         .build();
   }
 
-  private static GoogleCloudStorageFileSystemOptions buildOptionsWithBidi(boolean enabled) {
+  private static GoogleCloudStorageFileSystemOptions buildOptionsWithBidi() {
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setBidiEnabled(enabled).build();
+        GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setBidiEnabled(true).build();
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageOptions.DEFAULT.toBuilder().setReadChannelOptions(readOptions).build();
     return GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
