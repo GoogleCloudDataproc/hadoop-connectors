@@ -184,8 +184,8 @@ public class StorageClientProvider {
   @VisibleForTesting
   StorageClientProviderCacheKey computeCacheKey(
       Credentials credentials, GoogleCloudStorageOptions storageOptions) {
-    List<Object> credentialsKey = getCredentialsCacheKey(credentials);
-    if (credentialsKey == null) {
+    ImmutableList<Object> credentialsKey = getCredentialsCacheKey(credentials);
+    if (credentialsKey.isEmpty()) {
       return null;
     }
     return StorageClientProviderCacheKey.builder()
@@ -207,12 +207,12 @@ public class StorageClientProvider {
    * @return A list of objects forming the cache key, or {@code null} if a stable key cannot be
    *     created.
    */
-  private static List<Object> getCredentialsCacheKey(Credentials credentials) {
+  private static ImmutableList<Object> getCredentialsCacheKey(Credentials credentials) {
 
     if (credentials == null) {
       return ImmutableList.of("null_credentials");
     }
-    List<Object> keyParts = new ArrayList<>();
+    ImmutableList.Builder<Object> keyParts = ImmutableList.builder();
     Credentials current = credentials;
     while (current != null) {
       if (current instanceof com.google.auth.oauth2.ServiceAccountCredentials) {
@@ -239,10 +239,10 @@ public class StorageClientProvider {
             "Unable to generate a stable cache key for credentials of type %s."
                 + " A new storage client will be created and not cached.",
             current.getClass().getName());
-        return null;
+        return ImmutableList.of();
       }
     }
-    return keyParts;
+    return keyParts.build();
   }
 
   /** Determines if the storage instance can be served from the cache. */
