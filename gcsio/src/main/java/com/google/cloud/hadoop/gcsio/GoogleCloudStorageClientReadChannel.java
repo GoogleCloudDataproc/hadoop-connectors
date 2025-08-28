@@ -118,6 +118,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   @Override
   public int write(ByteBuffer src) throws IOException {
+    GoogleCloudStorageEventBus.postOnException();
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
