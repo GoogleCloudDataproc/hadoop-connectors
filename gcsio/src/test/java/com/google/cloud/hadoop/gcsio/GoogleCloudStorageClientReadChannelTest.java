@@ -55,7 +55,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final int CHUNK_SIZE = FakeReadChannel.CHUNK_SIZE;
-  private static final int OBJECT_SIZE = 1024 * 1024;
+  private static final int OBJECT_SIZE = 5 * 1024 * 1024;
   private static final int IN_PLACE_SEEK_LIMIT = 5;
   private static final StorageResourceId RESOURCE_ID =
       new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME);
@@ -320,6 +320,48 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(fakeReadChannel, times(1)).close();
     verify(fakeReadChannel, times(2)).read(any());
     verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void fadviseAutoRandom_onSequentialRead_switchToSequential() throws IOException {
+    long blockSize = CHUNK_SIZE;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(Fadvise.AUTO_RANDOM)
+            .setGrpcChecksumsEnabled(true)
+            .setInplaceSeekLimit(5)
+            .setMinRangeRequestSize(10)
+            .setBlockSize(blockSize)
+            .build();
+    GoogleCloudStorageClientReadChannel readChannel =
+        getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
+
+    int seekPosition = 0;
+    int readLength = (int) readOptions.getMinRangeRequestSize();
+
+    for (int i = 0; i < readOptions.getFadviseRequestTrackCount() + 1; i++) {
+      ByteBuffer buffer = ByteBuffer.allocate(readLength);
+      fakeReadChannel = spy(new FakeReadChannel(CONTENT));
+      when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+
+      readChannel.position(seekPosition);
+      readChannel.read(buffer);
+      verifyContent(buffer, seekPosition, readLength);
+      if (i < readOptions.getFadviseRequestTrackCount()) {
+        assertThat(readChannel.randomAccessStatus()).isTrue();
+        verify(fakeReadChannel, times(1)).seek(seekPosition);
+        verify(fakeReadChannel, times(1)).limit(seekPosition + readLength);
+        verify(fakeReadChannel, times(1)).setChunkSize(0);
+      } else {
+        assertThat(readChannel.randomAccessStatus()).isFalse();
+        verify(fakeReadChannel, times(1)).seek(seekPosition);
+        verify(fakeReadChannel, times(1)).limit(seekPosition + blockSize);
+        verify(fakeReadChannel, times(1)).setChunkSize(0);
+      }
+
+      seekPosition += readLength;
+      buffer.clear();
+    }
   }
 
   @Test
