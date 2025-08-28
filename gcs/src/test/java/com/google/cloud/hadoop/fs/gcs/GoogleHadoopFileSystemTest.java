@@ -64,6 +64,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -72,6 +73,10 @@ import org.junit.runners.Parameterized;
 /** Unit tests for {@link GoogleHadoopFileSystem} class. */
 @RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegrationTest {
+
+  private LoggingInterceptor mockInterceptor;
+  private StreamHandler testLogHandler;
+  private Logger ghfsLogger;
 
   @Before
   public void before() throws IOException {
@@ -83,6 +88,22 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     super.ghfs = createInMemoryGoogleHadoopFileSystem();
 
     postCreateInit();
+  }
+
+  @After
+  public void after() throws IOException {
+    if (mockInterceptor != null) {
+      // Ensure handler is removed even if test fails, to not affect other tests
+      Logger.getLogger("").removeHandler(mockInterceptor);
+      mockInterceptor = null;
+    }
+    if (testLogHandler != null) {
+      assertThat(ghfsLogger).isNotNull();
+      ghfsLogger.removeHandler(testLogHandler);
+      ghfsLogger.setLevel(Level.OFF);
+      testLogHandler = null;
+      ghfsLogger = null;
+    }
   }
 
   @Test
@@ -387,14 +408,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         AccessTokenProvider.class);
     conf.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
 
-    LoggingInterceptor mockInterceptor = mock(LoggingInterceptor.class);
+    mockInterceptor = mock(LoggingInterceptor.class);
     doThrow(new RuntimeException("Close failed!")).when(mockInterceptor).close();
 
     // Setup log capturing
-    Logger ghfsLogger = Logger.getLogger(GoogleHadoopFileSystem.class.getName());
+    ghfsLogger = Logger.getLogger(GoogleHadoopFileSystem.class.getName());
     ghfsLogger.setLevel(Level.ALL);
     ByteArrayOutputStream logOutput = new ByteArrayOutputStream();
-    StreamHandler testLogHandler =
+    testLogHandler =
         new StreamHandler(
             logOutput,
             new Formatter() {
@@ -416,29 +437,22 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
           }
         };
 
-    try {
-      fs.initialize(new URI("gs://foobar/"), conf);
+    fs.initialize(new URI("gs://foobar/"), conf);
 
-      // Verify handler was added
-      Logger rootLogger = Logger.getLogger("");
-      assertThat(Arrays.asList(rootLogger.getHandlers())).contains(mockInterceptor);
+    // Verify handler was added
+    Logger rootLogger = Logger.getLogger("");
+    assertThat(Arrays.asList(rootLogger.getHandlers())).contains(mockInterceptor);
 
-      // Close should not throw an exception, even if the interceptor's close fails.
-      fs.close();
+    // Close should not throw an exception, even if the interceptor's close fails.
+    fs.close();
 
-      // Verify close was called and handler was removed
-      verify(mockInterceptor, times(1)).close();
-      assertThat(Arrays.asList(rootLogger.getHandlers())).doesNotContain(mockInterceptor);
+    // Verify close was called and handler was removed
+    verify(mockInterceptor, times(1)).close();
+    assertThat(Arrays.asList(rootLogger.getHandlers())).doesNotContain(mockInterceptor);
 
-      // Verify exception was logged
-      testLogHandler.flush();
-      assertThat(logOutput.toString()).contains("Failed to stop cloud logging service");
-    } finally {
-      // Ensure handler is removed even if test fails, to not affect other tests
-      Logger.getLogger("").removeHandler(mockInterceptor);
-      ghfsLogger.removeHandler(testLogHandler);
-      ghfsLogger.setLevel(Level.OFF);
-    }
+    // Verify exception was logged
+    testLogHandler.flush();
+    assertThat(logOutput.toString()).contains("Failed to stop cloud logging service");
   }
 
   // -----------------------------------------------------------------
