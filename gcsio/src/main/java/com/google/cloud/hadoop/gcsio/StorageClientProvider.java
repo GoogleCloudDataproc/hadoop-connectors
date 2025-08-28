@@ -7,8 +7,14 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.ExternalAccountCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ImpersonatedCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.auth.oauth2.UserCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
@@ -214,39 +220,81 @@ public class StorageClientProvider {
   private static ImmutableList<Object> getCredentialsCacheKey(Credentials credentials) {
 
     if (credentials == null) {
-      return ImmutableList.of("null_credentials");
+      return ImmutableList.of("UNAUTHENTICATED");
     }
-    ImmutableList.Builder<Object> keyParts = ImmutableList.builder();
-    Credentials current = credentials;
-    while (current != null) {
-      if (current instanceof com.google.auth.oauth2.ServiceAccountCredentials) {
-        keyParts.add(((com.google.auth.oauth2.ServiceAccountCredentials) current).getClientEmail());
-        break;
-      }
-      if (current instanceof com.google.auth.oauth2.UserCredentials) {
-        keyParts.add(((com.google.auth.oauth2.UserCredentials) current).getClientId());
-        break;
-      }
-      if (current instanceof com.google.auth.oauth2.ComputeEngineCredentials) {
-        keyParts.add(com.google.auth.oauth2.ComputeEngineCredentials.class);
-        break;
-      }
-      if (current instanceof com.google.auth.oauth2.ImpersonatedCredentials) {
-        Credentials wrapped =
-            ((com.google.auth.oauth2.ImpersonatedCredentials) current).getSourceCredentials();
-        current = (wrapped == current) ? null : wrapped;
-      } else {
-        // This is an unknown credential type.
-        // Return null to indicate that a stable key cannot be created, and this
-        // storage client should not be cached.
+    if (credentials instanceof ServiceAccountCredentials) {
+      ServiceAccountCredentials sac = (ServiceAccountCredentials) credentials;
+      return ImmutableList.of("ServiceAccountCredentials", sac.getClientEmail(), sac.getClientId());
+    }
+    if (credentials instanceof UserCredentials) {
+      UserCredentials uc = (UserCredentials) credentials;
+      return ImmutableList.of("UserCredentials",
+          uc.getClientId(),
+          uc.getRefreshToken(),
+          uc.getQuotaProjectId());
+    }
+    if (credentials instanceof ComputeEngineCredentials) {
+      ComputeEngineCredentials cec = (ComputeEngineCredentials) credentials;
+      return ImmutableList.of(
+          "ComputeEngineCredentials",
+          cec.getQuotaProjectId());
+    }
+    if (credentials instanceof ImpersonatedCredentials) {
+      ImpersonatedCredentials ic = (ImpersonatedCredentials) credentials;
+      // The key must be unique for the combination of the account being impersonated
+      // and the underlying credential used for impersonation.
+      ImmutableList<Object> sourceKey = getCredentialsCacheKey(ic.getSourceCredentials());
+      if (sourceKey.isEmpty()) {
+        // If we can't get a stable key for the source, we can't cache this.
         logger.atWarning().log(
-            "Unable to generate a stable cache key for credentials of type %s."
-                + " A new storage client will be created and not cached.",
-            current.getClass().getName());
+            "Could not generate cache key for source credentials of ImpersonatedCredentials."
+                + " Caching will be disabled for this client.");
         return ImmutableList.of();
       }
+      return ImmutableList.builder()
+          .add("ImpersonatedCredentials")
+          .add(ic.getAccount())
+          .add(ic.getQuotaProjectId())
+          .addAll(sourceKey) // Add the entire source key to the list
+          .build();
     }
-    return keyParts.build();
+    if (credentials instanceof ExternalAccountCredentials) {
+      ExternalAccountCredentials eac = (ExternalAccountCredentials) credentials;
+      // Key is based on the unique properties of the Workload Identity Federation config.
+      return ImmutableList.of(
+          "ExternalAccountCredentials",
+          eac.getClass().getName(), //Get type of external source
+          eac.getAudience(),
+          eac.getSubjectTokenType(),
+          eac.getTokenUrl(),
+          eac.getQuotaProjectId(),
+          ofNullable(eac.getClientId()),
+          ofNullable(eac.getWorkforcePoolUserProject()),
+          ofNullable(eac.getServiceAccountImpersonationUrl()));
+    }
+
+    if (credentials instanceof AccessTokenProvider) {
+      AccessTokenProvider provider = (AccessTokenProvider) credentials;
+      // Delegation tokens require special handling, as multiple provider instances
+      // can represent the same underlying token.
+      if (provider.getDelegationTokenIdentifier().isPresent()) {
+        // Use the stable delegation token identifier for the key.
+        // Wrap the byte[] in a ByteBuffer for a stable equals/hashCode implementation.
+        return ImmutableList.of(
+            "AccessTokenProvider",
+            "DelegationToken",
+            java.nio.ByteBuffer.wrap(provider.getDelegationTokenIdentifier().get()));
+      }
+      // For other custom token providers, use the class name as an identifier.
+      return ImmutableList.of("AccessTokenProvider", provider.getClass().getName());
+    }
+    // For any other unknown credential type, we cannot generate a stable key.
+    // Return an empty list to indicate that this storage client should not be cached.
+    logger.atWarning().log(
+        "Unable to generate a stable cache key for credentials of type %s."
+            + " A new storage client will be created and not cached.",
+        credentials.getClass().getName());
+    return ImmutableList.of();
   }
 
   /** Determines if the storage instance can be served from the cache. */
