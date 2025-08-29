@@ -68,12 +68,12 @@ public abstract class GoogleCloudStorageOptions {
         .setHnBucketRenameEnabled(false)
         .setGrpcWriteEnabled(false)
         .setMoveOperationEnabled(false)
-        .setStorageClientCachingExperimentEnabled(false);
+        .setStorageClientCachingEnabled(false);
   }
 
   public abstract Builder toBuilder();
 
-  public abstract boolean isStorageClientCachingExperimentEnabled();
+  public abstract boolean isStorageClientCachingEnabled();
 
   public abstract boolean isGrpcEnabled();
 
@@ -238,7 +238,9 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setGrpcWriteEnabled(boolean grpcWriteEnabled);
 
-    public abstract Builder setStorageClientCachingExperimentEnabled(boolean isExperimentEnabled);
+    public abstract Builder setMoveOperationEnabled(boolean moveOperationEnabled);
+
+    public abstract Builder setStorageClientCachingEnabled(boolean isCachingEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

@@ -5,7 +5,6 @@ import static org.junit.Assert.*;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.storage.Storage;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
@@ -25,7 +24,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class StorageProviderTest {
+public class StorageClientProviderTest {
 
   private static final Credentials TEST_CREDENTIALS = null;
 
@@ -35,7 +34,7 @@ public class StorageProviderTest {
           .setTraceLogEnabled(true)
           .setDirectPathPreferred(true)
           .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
-          .setStorageClientCachingExperimentEnabled(true)
+          .setStorageClientCachingEnabled(true)
           .build();
 
   private static final Function<List<AccessBoundary>, String> TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC =
@@ -45,13 +44,13 @@ public class StorageProviderTest {
 
   private static final String PROJECT_ENV_VARIABLE = "GOOGLE_CLOUD_PROJECT";
 
-  private StorageProvider storageProvider;
+  private StorageClientProvider storageClientProvider;
 
   private static String testProject = null;
 
   /** Returns number of times a storage object in cache is referenced among different clients. */
-  private int getReferences(Storage storage) {
-    return storageProvider.storageClientToReferenceMap.getOrDefault(storage, 0);
+  private int getReferences(StorageClientWrapper storage) {
+    return storageClientProvider.storageClientToReferenceMap.getOrDefault(storage, 0);
   }
 
   @BeforeClass
@@ -72,52 +71,48 @@ public class StorageProviderTest {
 
   @Before
   public void setUp() {
-    storageProvider = new StorageProvider();
+    storageClientProvider = new StorageClientProvider();
   }
 
   @Test
   public void getStorage_returnsAndCachesNewStorageObject() throws IOException {
-    Storage storage =
-        storageProvider.getStorage(
+    StorageClientWrapper storage =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
 
     assertNotNull(storage);
-    assertEquals(storageProvider.cache.size(), 1);
+    assertEquals(storageClientProvider.cache.size(), 1);
 
-    Storage cachedStorage =
-        storageProvider.cache.getIfPresent(
-            storageProvider.computeCacheKey(
+    StorageClientWrapper cachedStorage =
+        storageClientProvider.cache.getIfPresent(
+            storageClientProvider.computeCacheKey(
                 TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC));
     assertNotNull(cachedStorage);
     assertEquals(storage, cachedStorage);
   }
 
   @Test
-  public void getStorage_experimentDisabled_doesNotCache() throws IOException {
-    GoogleCloudStorageOptions disableExperimentOptions =
-        TEST_STORAGE_OPTIONS.toBuilder().setStorageClientCachingExperimentEnabled(false).build();
-    Storage storage =
-        storageProvider.getStorage(
-            TEST_CREDENTIALS,
-            disableExperimentOptions,
-            null,
-            null,
-            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+  public void getStorage_cacheDisabled_doesNotCache() throws IOException {
+    GoogleCloudStorageOptions disableCacheOptions =
+        TEST_STORAGE_OPTIONS.toBuilder().setStorageClientCachingEnabled(false).build();
+    StorageClientWrapper storage =
+        storageClientProvider.getStorage(
+            TEST_CREDENTIALS, disableCacheOptions, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
 
     assertNotNull(storage);
-    assertEquals(storageProvider.cache.size(), 0);
+    assertEquals(storageClientProvider.cache.size(), 0);
   }
 
   @Test
   public void getStorage_returnsCachedStorageObject() throws IOException {
-    Storage storage1 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage1 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
-    Storage storage2 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage2 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
 
-    assertEquals(storageProvider.cache.size(), 1);
+    assertEquals(storageClientProvider.cache.size(), 1);
     // A single storage object should be shared across both the references.
     assertEquals(getReferences(storage1), 2);
     assertEquals(storage1, storage2);
@@ -126,17 +121,16 @@ public class StorageProviderTest {
   @Test
   public void getStorage_cacheMiss_returnsNewObject() throws Exception {
     GoogleCloudStorageOptions testOptions =
-        TEST_STORAGE_OPTIONS
-            .toBuilder()
+        TEST_STORAGE_OPTIONS.toBuilder()
             .setTraceLogEnabled(false)
             .setDirectPathPreferred(false)
             .build();
 
-    Storage storage1 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage1 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
-    Storage storage2 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage2 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, testOptions, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
 
     assertNotEquals(storage1, storage2);
@@ -146,39 +140,39 @@ public class StorageProviderTest {
 
   @Test
   public void close_nonZeroReference_doesNotCloseObject() throws Exception {
-    Storage storage1 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage1 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
-    Storage storage2 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage2 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
 
-    assertEquals(storageProvider.cache.size(), 1);
+    assertEquals(storageClientProvider.cache.size(), 1);
     // A single storage object should be shared across both the references.
     assertEquals(getReferences(storage1), 2);
     assertEquals(storage1, storage2);
 
-    storageProvider.close(storage1);
+    storageClientProvider.close(storage1);
     // Item is not removed from the cache but the reference is reduced.
-    assertEquals(storageProvider.cache.size(), 1);
+    assertEquals(storageClientProvider.cache.size(), 1);
     assertEquals(getReferences(storage1), 1);
   }
 
   @Test
   public void close_zeroReference_closesStorageObject() throws Exception {
-    Storage storage1 =
-        storageProvider.getStorage(
+    StorageClientWrapper storage1 =
+        storageClientProvider.getStorage(
             TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
 
-    assertEquals(storageProvider.cache.size(), 1);
+    assertEquals(storageClientProvider.cache.size(), 1);
     // A single storage object should be shared across both the references.
     assertEquals(getReferences(storage1), 1);
 
-    storageProvider.close(storage1);
+    storageClientProvider.close(storage1);
     // Item is removed from the cache.
-    assertEquals(storageProvider.cache.size(), 0);
+    assertEquals(storageClientProvider.cache.size(), 0);
     assertEquals(getReferences(storage1), 0);
-    assertFalse(storageProvider.storageClientToReferenceMap.containsKey(storage1));
+    assertFalse(storageClientProvider.storageClientToReferenceMap.containsKey(storage1));
   }
 
   @Test
@@ -192,7 +186,7 @@ public class StorageProviderTest {
       executorService.submit(
           () -> {
             try {
-              storageProvider.getStorage(
+              storageClientProvider.getStorage(
                   TEST_CREDENTIALS,
                   TEST_STORAGE_OPTIONS,
                   null,
@@ -211,6 +205,6 @@ public class StorageProviderTest {
     if (failures.get() > 0 || !isComplete) {
       fail("Storage creation failed");
     }
-    assertEquals(storageProvider.cache.size(), 1);
+    assertEquals(storageClientProvider.cache.size(), 1);
   }
 }
