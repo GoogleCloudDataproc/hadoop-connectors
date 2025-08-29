@@ -7,10 +7,10 @@ import com.google.common.collect.ImmutableMap;
 import javax.annotation.Nullable;
 
 @AutoValue
-public abstract class StorageProviderCacheKey {
+public abstract class StorageClientProviderCacheKey {
 
-  public static StorageProviderCacheKey.Builder builder() {
-    return new AutoValue_StorageProviderCacheKey.Builder();
+  public static StorageClientProviderCacheKey.Builder builder() {
+    return new AutoValue_StorageClientProviderCacheKey.Builder();
   }
 
   /** Whether tracing is requested. */
@@ -34,7 +34,7 @@ public abstract class StorageProviderCacheKey {
 
   public abstract boolean getIsDirectPathPreferred();
 
-  public abstract StorageProviderCacheKey.Builder toBuilder();
+  public abstract StorageClientProviderCacheKey.Builder toBuilder();
 
   @AutoValue.Builder
   public abstract static class Builder {
@@ -52,6 +52,6 @@ public abstract class StorageProviderCacheKey {
 
     public abstract Builder setIsDirectPathPreferred(boolean value);
 
-    public abstract StorageProviderCacheKey build();
+    public abstract StorageClientProviderCacheKey build();
   }
 }

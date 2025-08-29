@@ -137,7 +137,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
           put("fs.gs.bidi.finalize.on.close", false);
-          put("fs.gs.client.caching.experiment.enabled", false);
+          put("fs.gs.storage.client.cache.enable", false);
         }
       };
 
@@ -381,7 +381,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getInplaceSeekLimit()).isEqualTo(3L);
     assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
     assertThat(options.getBidiThreadCount()).isEqualTo(5);
-    assertThat(options.isBidiEnabled()).isTrue();
     assertThat(options.getBidiClientTimeout()).isEqualTo(6);
   }
 

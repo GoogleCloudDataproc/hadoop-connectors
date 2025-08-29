@@ -519,10 +519,10 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key to enable JAVA_STORAGE client caching across FS objects. This config will be
    * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
    */
-  public static final HadoopConfigurationProperty<Boolean> GCS_STORAGE_CLIENT_CACHING_EXPERIMENT =
+  public static final HadoopConfigurationProperty<Boolean> GCS_STORAGE_CLIENT_CACHING =
       new HadoopConfigurationProperty<>(
-          "fs.gs.client.caching.experiment.enabled",
-          GoogleCloudStorageOptions.DEFAULT.isStorageClientCachingExperimentEnabled());
+          "fs.gs.storage.client.cache.enable",
+          GoogleCloudStorageOptions.DEFAULT.isStorageClientCachingEnabled());
 
   /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
@@ -683,8 +683,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
-        .setStorageClientCachingExperimentEnabled(
-            GCS_STORAGE_CLIENT_CACHING_EXPERIMENT.get(config, config::getBoolean))
+        .setStorageClientCachingEnabled(GCS_STORAGE_CLIENT_CACHING.get(config, config::getBoolean))
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setFinalizeBeforeClose(
             GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));

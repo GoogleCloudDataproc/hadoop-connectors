@@ -69,7 +69,6 @@ import com.google.cloud.storage.Storage.CopyRequest;
 import com.google.cloud.storage.Storage.MoveBlobRequest;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
-import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
@@ -121,7 +120,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
-  private final Storage storage;
+  @VisibleForTesting final StorageClientWrapper storage;
+
+  private static final StorageClientProvider storageClientProvider = new StorageClientProvider();
 
   // Error extractor to map APi exception to meaningful ErrorTypes.
   private static final ErrorTypeExtractor errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
@@ -184,9 +185,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
-            ? createStorage(
-                credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
-            : clientLibraryStorage;
+            ? storageClientProvider.getStorage(
+                credentials,
+                storageOptions,
+                gRPCInterceptors,
+                pCUExecutorService,
+                downscopedAccessTokenFn)
+            : new StorageClientWrapper(clientLibraryStorage, storageClientProvider);
     this.boundedThreadPool = null;
   }
 
@@ -212,10 +217,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiWriteChannel(
-          storage, storageOptions, resourceIdWithGeneration, options);
+          storage.getStorage(), storageOptions, resourceIdWithGeneration, options);
     } else {
       return new GoogleCloudStorageClientWriteChannel(
-          storage, storageOptions, resourceIdWithGeneration, options);
+          storage.getStorage(), storageOptions, resourceIdWithGeneration, options);
     }
   }
 
@@ -1197,13 +1202,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
     if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
-          storage,
+          storage.getStorage(),
           gcsItemInfo,
           readOptions,
           getBoundedThreadPool(readOptions.getBidiThreadCount()));
     } else {
       return new GoogleCloudStorageClientReadChannel(
-          storage, gcsItemInfo, readOptions, errorExtractor, storageOptions);
+          storage.getStorage(), gcsItemInfo, readOptions, errorExtractor, storageOptions);
     }
   }
 
@@ -1429,26 +1434,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
-  private static GoogleCloudStorage getDelegate(
-      HttpRequestInitializer httpRequestInitializer,
-      com.google.api.services.storage.Storage storage,
-      GoogleCloudStorageOptions storageOptions,
-      Credentials credentials,
-      Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    if (httpRequestInitializer != null) {
-      logger.atWarning().log("Overriding httpRequestInitializer. ALERT: Use this only for testing");
-      return new GoogleCloudStorageImpl(
-          storageOptions, httpRequestInitializer, downscopedAccessTokenFn);
-    } else if (storage != null) {
-      logger.atWarning().log("Overriding storage. ALERT: Use this only for testing");
-      return new GoogleCloudStorageImpl(
-          storageOptions, storage, credentials, downscopedAccessTokenFn);
-    }
-    return new GoogleCloudStorageImpl(storageOptions, credential, downscopedAccessTokenFn);
-  }
-
   static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
       GoogleCloudStorageOptions storageOptions) {
     ImmutableMap<String, String> httpRequestHeaders =
@@ -1585,17 +1570,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         blob.getGeneration() == null ? 0 : blob.getGeneration(),
         blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
         new VerificationAttributes(md5Hash, crc32c));
-  }
-
-  private static Credentials getNoCredentials(
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    if (downscopedAccessTokenFn == null) {
-      return null;
-    }
-
-    // Workaround for https://github.com/googleapis/sdk-platform-java/issues/2356. Once this is
-    // fixed, change this to return NoCredentials.getInstance();
-    return GoogleCredentials.create(new AccessToken("", null));
   }
 
   public static Builder builder() {

@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getCredential;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -12,12 +11,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Tests for GoogleCloudStorageClientImpl caching experiment. */
+/** Tests for GoogleCloudStorageClientImpl caching. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
 
   @Test
-  public void reusesCachedStorageClient_experimentEnabled() throws IOException {
+  public void reusesCachedStorageClient_cacheEnabled() throws IOException {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(null, true);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, true);
 
@@ -25,7 +24,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
   }
 
   @Test
-  public void createsNewClient_experimentEnabled() throws IOException {
+  public void createsNewClient_cacheEnabled() throws IOException {
     GoogleCloudStorageOptions.Builder testOptionsBuilder =
         getStandardOptionBuilder()
             .setTraceLogEnabled(true)
@@ -37,7 +36,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
   }
 
   @Test
-  public void createsNewClient_experimentDisabled() throws IOException {
+  public void createsNewClient_cacheDisabled() throws IOException {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(null, false);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, false);
 
@@ -45,15 +44,14 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
   }
 
   private GoogleCloudStorageClientImpl createGcsClient(
-      @Nullable GoogleCloudStorageOptions.Builder optionsBuilder, boolean enableCachingExperiment)
+      @Nullable GoogleCloudStorageOptions.Builder optionsBuilder, boolean enableCache)
       throws IOException {
     if (optionsBuilder == null) {
       optionsBuilder = getStandardOptionBuilder();
     }
-    optionsBuilder.setStorageClientCachingExperimentEnabled(enableCachingExperiment);
+    optionsBuilder.setStorageClientCachingEnabled(enableCache);
     return GoogleCloudStorageClientImpl.builder()
         .setOptions(optionsBuilder.build())
-        .setCredential(getCredential())
         .setCredentials(null)
         .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
         .build();
