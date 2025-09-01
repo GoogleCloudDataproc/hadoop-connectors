@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 3.1.5 - 2025-09-01
 1. Fix cloud logging issue.
 
 ## 3.1.4 - 2025-08-28
