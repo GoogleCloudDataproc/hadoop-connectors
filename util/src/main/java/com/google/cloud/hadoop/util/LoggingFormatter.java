@@ -17,6 +17,7 @@ public class LoggingFormatter extends Formatter {
 
   /** The base package for all loggers in this repository that should be formatted. */
   private static final String GCS_CONNECTOR_LOGGER_PREFIX = "com.google.cloud.hadoop";
+
   private final Formatter existingFormatter;
 
   /**
