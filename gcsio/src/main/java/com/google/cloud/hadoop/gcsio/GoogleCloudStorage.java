@@ -225,10 +225,11 @@ public interface GoogleCloudStorage {
    * buckets.
    *
    * @param folderId The StorageResourceId of the folder to create.
+   * @param recursive If true, creates all nonexistent parent folders in the path.
    * @throws IOException if the folder cannot be created, or if it already exists and is not a
    *     folder.
    */
-  void createFolder(StorageResourceId folderId) throws IOException;
+  void createFolder(StorageResourceId folderId, boolean recursive) throws IOException;
 
   /**
    * Deletes the given folder resources. Does not throw any exception for "folders not found"

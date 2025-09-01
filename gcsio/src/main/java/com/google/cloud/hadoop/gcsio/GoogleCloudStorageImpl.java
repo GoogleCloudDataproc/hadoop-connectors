@@ -2480,11 +2480,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#createFolder(StorageResourceId)} for details about expected
+   * See {@link GoogleCloudStorage#createFolder(StorageResourceId,boolean)} for details about expected
    * behavior.
    */
   @Override
-  public void createFolder(StorageResourceId resourceId) throws IOException {
+  public void createFolder(StorageResourceId resourceId, boolean recursive) throws IOException {
     logger.atInfo().log("createFolder(%s)", resourceId);
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
@@ -2500,8 +2500,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         CreateFolderRequest.newBuilder()
             .setFolderId(resourceId.getObjectName())
             .setParent(parentResourceName)
+            .setRecursive(recursive)
             .build();
-    // Add the tracing wrapper here
+    // Add the tracing wrapper
     try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.create")) {
       logger.atFine().log("Create folder: %s%n", resourceId);
       Folder newFolder = lazyGetStorageControlClient().createFolder(request);
