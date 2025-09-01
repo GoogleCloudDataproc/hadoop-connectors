@@ -54,12 +54,8 @@ public class LoggingInterceptor extends Handler {
     }
     String logName = String.join("-", LOG_NAME_PREFIX, logNameSuffix).replaceAll("-$", "");
 
-    String message = record.getMessage();
-    if (getFormatter() != null) {
-      message = getFormatter().format(record);
-    }
     LogEntry entry =
-        LogEntry.newBuilder(StringPayload.of(message))
+        LogEntry.newBuilder(StringPayload.of(record.getMessage()))
             .setSeverity(mapToCloudSeverity(record.getLevel()))
             .setLogName(logName)
             .addLabel("class", record.getSourceClassName())
