@@ -78,6 +78,10 @@ public class LoggingFormatter extends Formatter {
 
   public static void addFormatterToHandler(Handler handler) {
     Formatter existingFormatter = handler.getFormatter();
+    if (existingFormatter instanceof LoggingFormatter) {
+      // To prevent re-wrapping, do nothing if already a LoggingFormatter.
+      return;
+    }
     handler.setFormatter(new LoggingFormatter(existingFormatter));
   }
 
