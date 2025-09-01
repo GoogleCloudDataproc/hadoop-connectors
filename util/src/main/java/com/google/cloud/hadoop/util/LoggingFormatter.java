@@ -2,7 +2,6 @@ package com.google.cloud.hadoop.util;
 
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
@@ -46,7 +45,7 @@ public class LoggingFormatter extends Formatter {
             && !invocationId.isEmpty()
             && !isJson(originalMessage);
 
-    String messageToFormat = Objects.toString(originalMessage, "");
+    String messageToFormat = originalMessage;
     if (shouldFormat) {
       // Prefix the invocation ID to the log message.
       messageToFormat = String.format("[%s]: %s", invocationId, messageToFormat);
