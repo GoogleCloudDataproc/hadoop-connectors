@@ -2480,8 +2480,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#createFolder(StorageResourceId,boolean)} for details about expected
-   * behavior.
+   * See {@link GoogleCloudStorage#createFolder(StorageResourceId,boolean)} for details about
+   * expected behavior.
    */
   @Override
   public void createFolder(StorageResourceId resourceId, boolean recursive) throws IOException {

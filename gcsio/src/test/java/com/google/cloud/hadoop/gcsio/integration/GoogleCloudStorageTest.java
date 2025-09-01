@@ -1752,7 +1752,8 @@ public class GoogleCloudStorageTest {
     assertThat(rawStorage.getFolderInfo(folderId).exists()).isTrue();
 
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(folderId, false));
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> rawStorage.createFolder(folderId, false));
   }
 
   @Test
@@ -1765,7 +1766,8 @@ public class GoogleCloudStorageTest {
     assertThat(rawStorage.getItemInfo(resourceId).exists()).isTrue();
 
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(resourceId, false));
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> rawStorage.createFolder(resourceId, false));
   }
 
   @Test

@@ -55,7 +55,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -629,9 +628,12 @@ public class GoogleCloudStorageImplTest {
     helperGcs.createFolder(folderId, /* recursive= */ true);
 
     // Verify all parts of the path now exist as folders.
-    GoogleCloudStorageItemInfo folderA = helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/"));
-    GoogleCloudStorageItemInfo folderB = helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/"));
-    GoogleCloudStorageItemInfo folderC = helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/c/"));
+    GoogleCloudStorageItemInfo folderA =
+        helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/"));
+    GoogleCloudStorageItemInfo folderB =
+        helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/"));
+    GoogleCloudStorageItemInfo folderC =
+        helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/c/"));
 
     assertThat(folderA.isNativeFolder()).isTrue();
     assertThat(folderB.isNativeFolder()).isTrue();
