@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import java.util.Optional;
@@ -71,7 +72,8 @@ public class LoggingFormatter extends Formatter {
     }
   }
 
-  public static void addFormatterToHandler(Handler handler) {
+  @VisibleForTesting
+  static void addFormatterToHandler(Handler handler) {
     Formatter existingFormatter = handler.getFormatter();
     if (existingFormatter instanceof LoggingFormatter) {
       // To prevent re-wrapping, do nothing if already a LoggingFormatter.
