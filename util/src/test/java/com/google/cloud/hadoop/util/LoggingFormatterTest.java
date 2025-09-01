@@ -1,9 +1,13 @@
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 
+import java.util.logging.Formatter;
+import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,7 +21,14 @@ public class LoggingFormatterTest {
 
   @Before
   public void setUp() {
-    formatter = new LoggingFormatter();
+    formatter =
+        new LoggingFormatter(
+            new Formatter() {
+              @Override
+              public String format(LogRecord record) {
+                return String.format("%s%n", record.getMessage());
+              }
+            });
     // Ensure a fresh Invocation ID is set for each test
     InvocationIdContext.setInvocationId();
   }
@@ -82,6 +93,38 @@ public class LoggingFormatterTest {
 
     // Should not throw an NPE and should not be prefixed
     assertEquals("Test log message\n", formattedMessage);
+  }
+
+  @Test
+  public void addFormatter_toHandlerWithNoInitialFormatter_succeeds() {
+    Logger logger = Logger.getLogger("testLoggerWithNoFormatterHandler");
+    logger.setUseParentHandlers(false);
+
+    // Create a handler that explicitly has no formatter
+    Handler handler = new StreamHandler();
+    Formatter formatter1 =
+        new Formatter() {
+          @Override
+          public String format(LogRecord record) {
+            return record.getMessage() + "\n";
+          }
+        };
+    handler.setFormatter(formatter1);
+    logger.addHandler(handler);
+
+    try {
+      LoggingFormatter.addFormatter(logger);
+
+      Formatter newFormatter = handler.getFormatter();
+      assertThat(newFormatter).isInstanceOf(LoggingFormatter.class);
+
+      // Verify that it formats correctly without a decorated formatter
+      LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test message");
+      String formattedMessage = newFormatter.format(record);
+      assertEquals("Test message\n", formattedMessage);
+    } finally {
+      logger.removeHandler(handler);
+    }
   }
 
   @Test
