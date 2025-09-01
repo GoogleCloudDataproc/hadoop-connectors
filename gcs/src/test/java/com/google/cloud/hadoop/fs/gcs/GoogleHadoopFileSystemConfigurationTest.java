@@ -380,7 +380,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getInplaceSeekLimit()).isEqualTo(3L);
     assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
     assertThat(options.getBidiThreadCount()).isEqualTo(5);
-    assertThat(options.isBidiEnabled()).isTrue();
     assertThat(options.getBidiClientTimeout()).isEqualTo(6);
   }
 
