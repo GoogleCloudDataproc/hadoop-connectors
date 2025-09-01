@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Fix cloud logging issue.
 
 ## 3.1.4 - 2025-08-28
 1. Add checksum verification in upload.
