@@ -1054,13 +1054,20 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         logger.atFiner().log(
             "Skipping %d bytes from %d position to %d position for '%s'",
             bytesToSkip, contentChannelPosition, currentPosition, resourceId);
+        if (skipBuffer == null) {
+          skipBuffer = new byte[SKIP_BUFFER_SIZE];
+        }
         while (bytesToSkip > 0) {
-          long skippedBytes = contentStream.skip(bytesToSkip);
-          logger.atFiner().log(
-              "Skipped %d bytes from %d position for '%s'",
-              skippedBytes, contentChannelPosition, resourceId);
-          bytesToSkip -= skippedBytes;
-          contentChannelPosition += skippedBytes;
+          int bytesRead =
+              contentStream.read(skipBuffer, 0, toIntExact(min(bytesToSkip, skipBuffer.length)));
+          if (bytesRead < 0) {
+            throw new EOFException(
+                String.format(
+                    "Unexpected end of stream trying to skip %d bytes to seek to position %d, size: %d for '%s'",
+                    bytesToSkip, currentPosition, size, resourceId));
+          }
+          bytesToSkip -= bytesRead;
+          contentChannelPosition += bytesRead;
         }
       }
 
