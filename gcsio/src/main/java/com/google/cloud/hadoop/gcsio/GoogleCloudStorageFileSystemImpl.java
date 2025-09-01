@@ -572,8 +572,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     final boolean isHns = isHnsOptimized(path);
     try {
       if (isHns) {
-        // Create a native folder resource directly.
-        gcs.createFolder(resourceId);
+        // Create a native folder and underlying parent folders recursively if not present.
+        gcs.createFolder(resourceId, /* recursive */ true);
       } else {
         // Create an empty placeholder object to represent the directory.
         gcs.createEmptyObject(resourceId);
@@ -1236,8 +1236,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Check if HNS optimization is enabled, it's an HNS bucket
     if (isHnsOptimized(path)) {
-      // Not a top-level directory, create an folder.
-      gcs.createFolder(resourceId);
+      // Not a top-level directory, create a folder.
+      gcs.createFolder(resourceId, /* recursive */ false);
     } else {
       // Not a top-level directory, create 0 sized object.
       gcs.createEmptyObject(resourceId);
