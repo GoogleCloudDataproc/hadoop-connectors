@@ -49,15 +49,21 @@ public class LoggingFormatter extends Formatter {
     String messageToFormat = originalMessage;
     if (shouldFormat) {
       // Prefix the invocation ID to the log message.
-      messageToFormat = String.format("[%s]: %s", invocationId, messageToFormat);
+      messageToFormat =
+          String.format("[%s]: %s", invocationId, originalMessage == null ? "" : originalMessage);
     }
 
     if (existingFormatter != null) {
-      record.setMessage(messageToFormat);
-      return existingFormatter.format(record);
+      try {
+        record.setMessage(messageToFormat);
+        return existingFormatter.format(record);
+      } finally {
+        // Restore original message to avoid side-effects on the LogRecord.
+        record.setMessage(originalMessage);
+      }
     }
     // Otherwise, return the message as-is with a newline.
-    return String.format("%s%n", messageToFormat);
+    return String.format("%s%n", messageToFormat == null ? "" : messageToFormat);
   }
 
   /**
