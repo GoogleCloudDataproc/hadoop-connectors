@@ -1228,16 +1228,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
     if (boundedThreadPool == null) {
-      new ThreadPoolExecutor(
-          bidiThreadCount,
-          bidiThreadCount,
-          0L,
-          TimeUnit.MILLISECONDS,
-          taskQueue,
-          new ThreadFactoryBuilder()
-              .setNameFormat("bidiRead-range-pool-%d")
-              .setDaemon(true)
-              .build());
+      boundedThreadPool =
+          new ThreadPoolExecutor(
+              bidiThreadCount,
+              bidiThreadCount,
+              0L,
+              TimeUnit.MILLISECONDS,
+              taskQueue,
+              new ThreadFactoryBuilder()
+                  .setNameFormat("bidiRead-range-pool-%d")
+                  .setDaemon(true)
+                  .build());
     }
     return boundedThreadPool;
   }
