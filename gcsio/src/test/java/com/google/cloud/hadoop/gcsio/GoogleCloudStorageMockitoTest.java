@@ -419,15 +419,16 @@ public class GoogleCloudStorageMockitoTest {
   }
 
   @Test
-  public void testCreateFolder_recursive_alreadyExists_isRethrownAsFileAlreadyExists() throws IOException {
+  public void testCreateFolder_recursive_alreadyExists_isRethrownAsFileAlreadyExists()
+      throws IOException {
     StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "existing-folder/");
 
     when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
     when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
         .thenThrow(mockAlreadyExistsException);
 
-    assertThrows(FileAlreadyExistsException.class, () ->
-        gcs.createFolder(folderId, /* recursive= */ true));
+    assertThrows(
+        FileAlreadyExistsException.class, () -> gcs.createFolder(folderId, /* recursive= */ true));
 
     verify(mockStorageControlStub).createFolderCallable();
     verify(mockCreateFolderCallable).call(any(CreateFolderRequest.class));
