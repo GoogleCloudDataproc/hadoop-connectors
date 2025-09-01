@@ -60,7 +60,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
           put("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
-          put("fs.gs.cloud.logging.enable", false);
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
