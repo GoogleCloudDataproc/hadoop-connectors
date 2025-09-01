@@ -761,6 +761,35 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   @Test
+  public void listFileInfo_emptyNativeFolder_returnsEmptyList_notFileNotFound() throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-list-test");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    URI folderUri = new URI(String.format("gs://%s/%s/", hnsBucketName, getTestResource()));
+
+    gcsFs.mkdir(folderUri);
+
+    FileInfo folderCheck = gcsFs.getFileInfo(folderUri);
+    assertThat(folderCheck.exists()).isTrue();
+    assertThat(folderCheck.getItemInfo().isNativeFolder()).isTrue();
+
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(folderUri);
+
+    assertThat(fileInfos).isEmpty();
+  }
+
+  @Test
   public void listFileInfo_customFields_some() throws Exception {
     gcsFs = newGcsFs(newGcsFsOptions().build());
 

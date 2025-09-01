@@ -1045,6 +1045,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      if (options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
+
+        if (gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true)).exists()) {
+          return FileInfo.fromItemInfos(dirItemInfos);
+        }
+      }
       GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
