@@ -76,7 +76,7 @@ public class FeatureUsageHeaderTest {
     String initialHeader = FeatureUsageHeader.getValue();
 
     // A feature to track that is not part of the default set
-    TrackedFeatures testFeature = TrackedFeatures.DIRECT_UPLOAD_ENABLED; // bit 11
+    TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // bit 11
 
     String result =
         FeatureUsageHeader.track(
@@ -104,7 +104,7 @@ public class FeatureUsageHeaderTest {
   @Test
   public void track_clearsFeatureOnException() {
     String initialHeader = FeatureUsageHeader.getValue();
-    TrackedFeatures testFeature = TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED; // bit 4
+    TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // bit 11
 
     IOException thrown =
         assertThrows(
@@ -124,12 +124,17 @@ public class FeatureUsageHeaderTest {
   @RunWith(Parameterized.class)
   public static class FeatureFlagGenerationTest {
 
+    String testName;
     private final GoogleCloudStorageFileSystemOptions options;
     private final long expectedHighBits;
     private final long expectedLowBits;
 
     public FeatureFlagGenerationTest(
-        GoogleCloudStorageFileSystemOptions options, long expectedHighBits, long expectedLowBits) {
+        String testName,
+        GoogleCloudStorageFileSystemOptions options,
+        long expectedHighBits,
+        long expectedLowBits) {
+      this.testName = testName;
       this.options = options;
       this.expectedHighBits = expectedHighBits;
       this.expectedLowBits = expectedLowBits;
@@ -137,7 +142,7 @@ public class FeatureUsageHeaderTest {
 
     @Parameters(name = "{0}")
     public static Collection<Object[]> data() {
-      final long defaultLowBits = (1L) | (1L << 9) | (1L << 10);
+      final long defaultLowBits = (1L);
 
       return Arrays.asList(
           new Object[][] {
@@ -204,25 +209,6 @@ public class FeatureUsageHeaderTest {
               defaultLowBits | (1L << 8)
             },
             {
-              "Status Parallel Disabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setStatusParallelEnabled(false)
-                  .build(),
-              0L,
-              defaultLowBits & ~(1L << 9)
-            },
-            {
-              "Copy With Rewrite Disabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
-                          .setCopyWithRewriteEnabled(false)
-                          .build())
-                  .build(),
-              0L,
-              defaultLowBits & ~(1L << 10)
-            },
-            {
               "Direct Upload",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setCloudStorageOptions(
@@ -234,9 +220,9 @@ public class FeatureUsageHeaderTest {
                           .build())
                   .build(),
               0L,
-              defaultLowBits | (1L << 11)
+              defaultLowBits | (1L << 9)
             },
-            {"Bidi Enabled", buildOptionsWithBidi(), 0L, defaultLowBits | (1L << 12)}
+            {"Bidi Enabled", buildOptionsWithBidi(), 0L, defaultLowBits | (1L << 10)}
           });
     }
 

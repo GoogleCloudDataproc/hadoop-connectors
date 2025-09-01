@@ -37,24 +37,16 @@
       "bit_position": 8
     },
     {
-      "name": "GCS_STATUS_PARALLEL_ENABLED",
+    "name": "DIRECT_UPLOAD_ENABLED",
       "bit_position": 9
     },
     {
-      "name": "GCS_COPY_WITH_REWRITE_ENABLED",
+      "name": "BIDI_ENABLED",
       "bit_position": 10
     },
     {
-      "name": "DIRECT_UPLOAD_ENABLED",
-      "bit_position": 11
-    },
-    {
-      "name": "BIDI_ENABLED",
-      "bit_position": 12
-    },
-    {
       "name": "RENAME_API",
-      "bit_position": 13
+      "bit_position": 11
     }
   ]
 }

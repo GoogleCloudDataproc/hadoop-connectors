@@ -110,11 +110,6 @@ public final class FeatureUsageHeader {
       setBit(features, TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED.getBitPosition());
     }
 
-    // Copy with Rewrite
-    if (storageOptions.isCopyWithRewriteEnabled()) {
-      setBit(features, TrackedFeatures.GCS_COPY_WITH_REWRITE_ENABLED.getBitPosition());
-    }
-
     // Trace Logging
     if (storageOptions.isTraceLogEnabled()) {
       setBit(features, TrackedFeatures.TRACE_LOG_ENABLED.getBitPosition());
@@ -141,11 +136,6 @@ public final class FeatureUsageHeader {
     // Cloud Logging
     if (fsOptions.isCloudLoggingEnabled()) {
       setBit(features, TrackedFeatures.CLOUD_LOGGING_ENABLED.getBitPosition());
-    }
-
-    // GCS Status Parallel
-    if (fsOptions.isStatusParallelEnabled()) {
-      setBit(features, TrackedFeatures.GCS_STATUS_PARALLEL_ENABLED.getBitPosition());
     }
   }
 
