@@ -345,7 +345,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     }
 
     boolean isHnBucket =
-        (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
+        (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path));
     List<FolderInfo> listOfFolders = new LinkedList<>();
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
@@ -573,8 +573,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
     try {
       if (isHns) {
-        // Create a native folder resource directly.
-        gcs.createFolder(resourceId);
+        // Create a native folder and underlying parent folders recursively if not present.
+        gcs.createFolder(resourceId, /* recursive */ true);
       } else {
         // Create an empty placeholder object to represent the directory.
         gcs.createEmptyObject(resourceId);
@@ -1234,8 +1234,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Check if HNS optimization is enabled, it's an HNS bucket
     if (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
-      // Not a top-level directory, create an folder.
-      gcs.createFolder(resourceId);
+      // Create top-level folder.
+      gcs.createFolder(resourceId, /* recursive */ false);
     } else {
       // Not a top-level directory, create 0 sized object.
       gcs.createEmptyObject(resourceId);

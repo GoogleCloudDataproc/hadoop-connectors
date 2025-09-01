@@ -55,6 +55,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -122,6 +123,13 @@ public class GoogleCloudStorageImplTest {
     } finally {
       helperGcs.close();
     }
+  }
+
+  private String createHnsBucket() throws IOException {
+    String hnsBucket = bucketHelper.getUniqueBucketName("create-folder-tests");
+    helperGcs.createBucket(
+        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    return hnsBucket;
   }
 
   @Test
@@ -563,6 +571,112 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
+  public void testCreateFolder_nonRecursive_Success() throws IOException {
+    String hnsBucket = createHnsBucket();
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "new-folder/");
+
+    helperGcs.createFolder(folderId, /* recursive= */ false);
+
+    GoogleCloudStorageItemInfo folderInfo = helperGcs.getFolderInfo(folderId);
+    assertThat(folderInfo.exists()).isTrue();
+    assertThat(folderInfo.isNativeFolder()).isTrue();
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void testCreateFolder_nonRecursive_alreadyExists_throwsError() throws IOException {
+    String hnsBucket = createHnsBucket();
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "existing-folder/");
+
+    // Create it once, which should succeed.
+    helperGcs.createFolder(folderId, /* recursive= */ false);
+
+    // Attempt to create it again.
+    assertThrows(
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> helperGcs.createFolder(folderId, /* recursive= */ false));
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void testCreateFolder_nonRecursive_conflictingObject_throwsError() throws IOException {
+    String hnsBucket = createHnsBucket();
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    // Create an object with a name that looks like a folder.
+    StorageResourceId objectId = new StorageResourceId(hnsBucket, "conflicting-object/");
+    helperGcs.createEmptyObject(objectId);
+
+    // Attempt to create a folder with the same name.
+    assertThrows(
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> helperGcs.createFolder(objectId, /* recursive= */ false));
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void testCreateFolder_recursive_Success() throws IOException {
+    String hnsBucket = createHnsBucket();
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "a/b/c/");
+
+    // Create a nested folder structure recursively.
+    helperGcs.createFolder(folderId, /* recursive= */ true);
+
+    // Verify all parts of the path now exist as folders.
+    GoogleCloudStorageItemInfo folderA = helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/"));
+    GoogleCloudStorageItemInfo folderB = helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/"));
+    GoogleCloudStorageItemInfo folderC = helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/c/"));
+
+    assertThat(folderA.isNativeFolder()).isTrue();
+    assertThat(folderB.isNativeFolder()).isTrue();
+    assertThat(folderC.isNativeFolder()).isTrue();
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void testCreateFolder_recursive_alreadyExists_isIdempotent() throws IOException {
+    String hnsBucket = createHnsBucket();
+    StorageResourceId folderId = new StorageResourceId(hnsBucket, "a/b/");
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    // Create the folder structure.
+    helperGcs.createFolder(folderId, /* recursive= */ true);
+    GoogleCloudStorageItemInfo infoBefore = helperGcs.getFolderInfo(folderId);
+
+    // Attempt to create it again recursively, which should throw FileAlreadyExistsException error.
+    assertThrows(
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> helperGcs.createFolder(folderId, /* recursive= */ true));
+
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void testCreateFolder_recursive_conflictingObject_throwsError() throws IOException {
+    String hnsBucket = createHnsBucket();
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    StorageResourceId objectId = new StorageResourceId(hnsBucket, "a/b/c/");
+    StorageResourceId folderToCreateId = new StorageResourceId(hnsBucket, "a/b/c/");
+
+    // Create a placeholder object.
+    helperGcs.createEmptyObject(objectId);
+
+    // Attempting to create a folder will fail
+    assertThrows(
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> helperGcs.createFolder(folderToCreateId, /* recursive= */ true));
+    trackingGcs.delegate.close();
+  }
+
+  @Test
   public void listObjectInfo_withFoldersAsPrefixes_returnsFolders() throws IOException {
     String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
     helperGcs.createBucket(
@@ -575,7 +689,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId objectInFolderId = new StorageResourceId(hnsBucket, "test-dir/file.txt");
     StorageResourceId rootObjectId = new StorageResourceId(hnsBucket, "root-file.txt");
 
-    helperGcs.createFolder(folderId);
+    helperGcs.createFolder(folderId, false);
     helperGcs.createEmptyObject(objectInFolderId);
     helperGcs.createEmptyObject(rootObjectId);
 
@@ -606,7 +720,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId placeholderId = new StorageResourceId(hnsBucket, "placeholder-directory/");
     StorageResourceId rootObjectId = new StorageResourceId(hnsBucket, "root-file.txt");
 
-    helperGcs.createFolder(folderId);
+    helperGcs.createFolder(folderId, false);
     helperGcs.createEmptyObject(placeholderId);
     helperGcs.createEmptyObject(rootObjectId);
 
@@ -635,7 +749,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId placeholderId = new StorageResourceId(hnsBucket, "placeholder-directory/");
     StorageResourceId rootObjectId = new StorageResourceId(hnsBucket, "root-file.txt");
 
-    helperGcs.createFolder(folderId);
+    helperGcs.createFolder(folderId, false);
     helperGcs.createEmptyObject(placeholderId);
     helperGcs.createEmptyObject(rootObjectId);
 

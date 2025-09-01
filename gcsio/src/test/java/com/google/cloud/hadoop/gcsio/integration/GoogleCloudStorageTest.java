@@ -1728,7 +1728,7 @@ public class GoogleCloudStorageTest {
     rawStorage.deleteObjects(ImmutableList.of(folderId));
     assertThat(rawStorage.getItemInfo(folderId).exists()).isFalse();
 
-    rawStorage.createFolder(folderId);
+    rawStorage.createFolder(folderId, false);
 
     GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(folderId);
 
@@ -1748,11 +1748,11 @@ public class GoogleCloudStorageTest {
     StorageResourceId folderId =
         new StorageResourceId(bucketName, "testCreateFolder_alreadyExists/");
 
-    rawStorage.createFolder(folderId);
+    rawStorage.createFolder(folderId, false);
     assertThat(rawStorage.getFolderInfo(folderId).exists()).isTrue();
 
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(folderId));
+        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(folderId, false));
   }
 
   @Test
@@ -1765,7 +1765,7 @@ public class GoogleCloudStorageTest {
     assertThat(rawStorage.getItemInfo(resourceId).exists()).isTrue();
 
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(resourceId));
+        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(resourceId, false));
   }
 
   @Test

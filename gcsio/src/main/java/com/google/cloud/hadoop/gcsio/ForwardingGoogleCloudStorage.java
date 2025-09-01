@@ -166,9 +166,9 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void createFolder(StorageResourceId resourceId) throws IOException {
+  public void createFolder(StorageResourceId resourceId, boolean recursive) throws IOException {
     logger.atInfo().log("createFolder(%s)", resourceId);
-    delegate.createFolder(resourceId);
+    delegate.createFolder(resourceId, recursive);
   }
 
   @Override
