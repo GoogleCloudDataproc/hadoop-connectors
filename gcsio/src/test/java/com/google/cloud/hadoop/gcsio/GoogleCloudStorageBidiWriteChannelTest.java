@@ -46,7 +46,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_success() throws IOException {
-    writeChannel = getJavaStorageChannel(false);
+    writeChannel = getJavaStorageChannel();
     ByteBuffer src = ByteBuffer.wrap(new byte[] {1, 2, 3});
     when(mockGcsAppendChannel.write(src)).thenReturn(3);
 
@@ -58,7 +58,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_whenClosed_throwsClosedChannelException() throws IOException {
-    writeChannel = getJavaStorageChannel(false);
+    writeChannel = getJavaStorageChannel();
     ByteBuffer src = ByteBuffer.wrap(new byte[] {1});
 
     writeChannel.close();
@@ -69,13 +69,13 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_nullBuffer_throwsNullPointerException() throws IOException {
-    writeChannel = getJavaStorageChannel(false);
+    writeChannel = getJavaStorageChannel();
     assertThrows(NullPointerException.class, () -> writeChannel.write(null));
   }
 
   @Test
   public void testClose_whenAlreadyClosed_doesNothing() throws IOException {
-    writeChannel = getJavaStorageChannel(false);
+    writeChannel = getJavaStorageChannel();
 
     // Call close twice
     writeChannel.close();
@@ -87,7 +87,7 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
   @Test
   public void testWrite_success_multipleChucks() throws IOException {
-    writeChannel = getJavaStorageChannel(false);
+    writeChannel = getJavaStorageChannel();
     byte[] chunk1 = new byte[] {1, 2, 3};
     byte[] chunk2 = new byte[] {4, 5};
     byte[] expectedContent = new byte[] {1, 2, 3, 4, 5};
@@ -120,12 +120,12 @@ public class GoogleCloudStorageBidiWriteChannelTest {
         "The combined content written to the channel is incorrect", expectedContent, actualContent);
   }
 
-  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel(boolean finalizeBeforeClose)
+  private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel()
       throws IOException {
     return new GoogleCloudStorageBidiWriteChannel(
         mockStorage,
         GoogleCloudStorageOptions.DEFAULT.toBuilder()
-            .setFinalizeBeforeClose(finalizeBeforeClose)
+            .setFinalizeBeforeClose(false)
             .build(),
         resourceId,
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().build());
