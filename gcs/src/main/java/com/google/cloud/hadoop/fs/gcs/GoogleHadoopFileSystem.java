@@ -435,6 +435,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     // Add the LoggingInterceptor to the root logger
     Logger rootLogger = Logger.getLogger("");
     rootLogger.addHandler(loggingInterceptor);
+    LoggingFormatter.addFormatterToHandler(loggingInterceptor);
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {

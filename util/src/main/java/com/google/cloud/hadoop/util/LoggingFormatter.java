@@ -73,9 +73,13 @@ public class LoggingFormatter extends Formatter {
   public static void addFormatter(Logger logger) {
     // Set the custom formatter on all handlers of the logger
     for (Handler handler : logger.getHandlers()) {
-      Formatter existingFormatter = handler.getFormatter();
-      handler.setFormatter(new LoggingFormatter(existingFormatter));
+      addFormatterToHandler(handler);
     }
+  }
+
+  public static void addFormatterToHandler(Handler handler) {
+    Formatter existingFormatter = handler.getFormatter();
+    handler.setFormatter(new LoggingFormatter(existingFormatter));
   }
 
   /**
