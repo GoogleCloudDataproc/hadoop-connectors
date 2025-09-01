@@ -114,9 +114,6 @@ public abstract class GoogleCloudStorageReadOptions {
 
   public abstract int getFadviseRequestTrackCount();
 
-  /** See {@link Builder#setBidiEnabled(boolean)}. */
-  public abstract boolean isBidiEnabled();
-
   /** See {@link Builder#setBidiThreadCount(int)}. */
   public abstract int getBidiThreadCount();
 
@@ -227,9 +224,6 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setBlockSize(long blockSize);
 
     public abstract Builder setFadviseRequestTrackCount(int requestTrackCount);
-
-    /** Sets the property to use the bidirectional Rapid Storage Api. */
-    public abstract Builder setBidiEnabled(boolean bidiEnabled);
 
     /**
      * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used
