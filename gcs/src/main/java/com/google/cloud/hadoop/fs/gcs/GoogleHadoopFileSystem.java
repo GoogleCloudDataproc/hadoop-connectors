@@ -850,6 +850,40 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         });
   }
 
+  /**
+   * Gets FileStatus of all files which are lexicographically greater than and equal the provided
+   * path. It filters out any directory objects present in underneath storage.
+   *
+   * <p>This is an experimental API can change without notice.
+   */
+  public FileStatus[] listStatusStartingFrom(Path startFrom) throws IOException {
+    return trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_LIST_STATUS,
+        startFrom,
+        traceFactory,
+        () -> {
+          checkArgument(startFrom != null, "start offset path must not be null");
+
+          checkOpen();
+
+          logger.atFiner().log("listStatusStartingFrom(hadoopPath: %s)", startFrom);
+
+          URI gcsPath = getGcsPath(startFrom);
+          List<FileStatus> status;
+
+          List<FileInfo> fileInfos = getGcsFs().listFileInfoStartingFrom(gcsPath, LIST_OPTIONS);
+          status = new ArrayList<>(fileInfos.size());
+          String userName = getUgiUserName();
+          for (FileInfo fileInfo : fileInfos) {
+            status.add(getGoogleHadoopFileStatus(fileInfo, userName));
+          }
+          incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE, status.size());
+          return status.toArray(new FileStatus[0]);
+        });
+  }
+
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
     return trackDurationWithTracing(
@@ -916,7 +950,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * performance and reduce redundant API calls without compromising performance and API behaviour.
    * Currently, only "file" type hint is supported.
    *
-   * <p>This is an experimental API can can change without notice.
+   * <p>This is an experimental API can change without notice.
    */
   public FileStatus getFileStatusWithHint(Path hadoopPath, Configuration hint) throws IOException {
     return trackDurationWithTracing(
