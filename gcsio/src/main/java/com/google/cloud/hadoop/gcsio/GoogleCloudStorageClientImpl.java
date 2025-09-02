@@ -202,6 +202,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     logger.atFiner().log("create(%s)", resourceId);
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
     // Update resourceId if generationId is missing
     StorageResourceId resourceIdWithGeneration = resourceId;
     if (!resourceId.hasGenerationId()) {
@@ -212,8 +213,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    return new GoogleCloudStorageClientWriteChannel(
-        storage, storageOptions, resourceIdWithGeneration, options);
+    if (storageOptions.isBidiEnabled()) {
+      return new GoogleCloudStorageBidiWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    } else {
+      return new GoogleCloudStorageClientWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    }
   }
 
   /**
@@ -229,6 +235,22 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     BucketInfo.Builder bucketInfoBuilder =
         BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
+
+    if (options.getZonalPlacement() != null) {
+      bucketInfoBuilder
+          .setCustomPlacementConfig(
+              BucketInfo.CustomPlacementConfig.newBuilder()
+                  .setDataLocations(ImmutableList.of("us-central1-a"))
+                  .build())
+          .setStorageClass(StorageClass.valueOf("RAPID"))
+          .setHierarchicalNamespace(
+              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
+          .setIamConfiguration(
+              BucketInfo.IamConfiguration.newBuilder()
+                  .setIsUniformBucketLevelAccessEnabled(true)
+                  .build())
+          .build();
+    }
 
     if (options.getStorageClass() != null) {
       bucketInfoBuilder.setStorageClass(
@@ -1192,7 +1214,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
-    if (readOptions.isBidiEnabled()) {
+    if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storage,
           gcsItemInfo,
@@ -1206,16 +1228,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
     if (boundedThreadPool == null) {
-      new ThreadPoolExecutor(
-          bidiThreadCount,
-          bidiThreadCount,
-          0L,
-          TimeUnit.MILLISECONDS,
-          taskQueue,
-          new ThreadFactoryBuilder()
-              .setNameFormat("bidiRead-range-pool-%d")
-              .setDaemon(true)
-              .build());
+      boundedThreadPool =
+          new ThreadPoolExecutor(
+              bidiThreadCount,
+              bidiThreadCount,
+              0L,
+              TimeUnit.MILLISECONDS,
+              taskQueue,
+              new ThreadFactoryBuilder()
+                  .setNameFormat("bidiRead-range-pool-%d")
+                  .setDaemon(true)
+                  .build());
     }
     return boundedThreadPool;
   }

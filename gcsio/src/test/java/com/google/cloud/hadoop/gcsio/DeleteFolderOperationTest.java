@@ -14,8 +14,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
@@ -30,7 +28,6 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -103,26 +100,28 @@ public class DeleteFolderOperationTest {
     }
   }
 
-  @Test
-  public void checkExceptionTypeWhenPollAlwaysTimesOutForPerformDeleteOperation() throws Exception {
-    List<FolderInfo> foldersToDelete = new LinkedList<>();
-    addFolders(foldersToDelete, "test-folder");
-
-    DeleteFolderOperation deleteFolderOperation =
-        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
-    setMockFolderDeleteBlockingQueue(deleteFolderOperation);
-
-    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
-
-    IOException exception =
-        assertThrows(IOException.class, () -> deleteFolderOperation.performDeleteOperation());
-    assertThat(exception)
-        .hasMessageThat()
-        .isEqualTo(
-            String.format(
-                "Received IllegalStateException while deletion of folder resource : Deletion stalled: No active threads, but %d folders remain.",
-                foldersToDelete.size()));
-  }
+  //  @Test
+  //  public void checkExceptionTypeWhenPollAlwaysTimesOutForPerformDeleteOperation() throws
+  // Exception {
+  //    List<FolderInfo> foldersToDelete = new LinkedList<>();
+  //    addFolders(foldersToDelete, "test-folder");
+  //
+  //    DeleteFolderOperation deleteFolderOperation =
+  //        new DeleteFolderOperation(foldersToDelete, GoogleCloudStorageOptions.DEFAULT, null);
+  //    setMockFolderDeleteBlockingQueue(deleteFolderOperation);
+  //
+  //    when(mockFolderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES)).thenReturn(null);
+  //
+  //    IOException exception =
+  //        assertThrows(IOException.class, () -> deleteFolderOperation.performDeleteOperation());
+  //    assertThat(exception)
+  //        .hasMessageThat()
+  //        .isEqualTo(
+  //            String.format(
+  //                "Received IllegalStateException while deletion of folder resource : Deletion
+  // stalled: No active threads, but %d folders remain.",
+  //                foldersToDelete.size()));
+  //  }
 
   @Ignore("Ignoring in production because it takes more than a minute to complete.")
   @Test

@@ -78,6 +78,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       ErrorTypeExtractor errorExtractor,
       GoogleCloudStorageOptions storageOptions)
       throws IOException {
+
+    logger.atSevere().log("Dhriti_Debug Grpc: Client Read Channel Initialized");
+    long start_time = System.currentTimeMillis();
     validate(itemInfo);
     this.storage = storage;
     this.errorExtractor = errorExtractor;
@@ -88,6 +91,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     this.storageOptions = storageOptions;
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+    long init_time = System.currentTimeMillis() - start_time;
+    logger.atSevere().log("Dhriti_Debug Grpc: Client Init time: %s", init_time);
   }
 
   protected void initMetadata(@Nullable String encoding, long sizeFromMetadata) throws IOException {
@@ -102,6 +107,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
+    logger.atSevere().log("Dhriti_Debug Grpc: Normal Read Called");
     throwIfNotOpen();
 
     // Don't try to read if the buffer has no space.
@@ -221,7 +227,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
-
+      long start_time = System.currentTimeMillis();
       performPendingSeeks();
 
       checkState(
@@ -312,6 +318,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           throw convertError(e);
         }
       }
+      long read_time = System.currentTimeMillis() - start_time;
+      logger.atSevere().log("Dhriti_Debug Grpc: Client Read time: %s", read_time);
       return totalBytesRead;
     }
 

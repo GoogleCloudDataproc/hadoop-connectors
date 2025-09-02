@@ -16,17 +16,11 @@ package com.google.cloud.hadoop.gcsio.integration;
 
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertObjectContent;
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.*;
 
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.ListObjectOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
@@ -39,9 +33,11 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -61,8 +57,13 @@ public class GoogleCloudStorageClientImplIntegrationTest {
 
   private static final TestBucketHelper BUCKET_HELPER =
       new TestBucketHelper("dataproc-gcs-client-impl");
+
+  private static final TestBucketHelper ZONAL_BUCKET_HELPER =
+      new TestBucketHelper("zonal-bucket-integration-test");
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
   private static final String TEMP_DIR_PATH = Files.createTempDir().getAbsolutePath();
+
+  private static final String ZONAL_TEST_BUCKET = ZONAL_BUCKET_HELPER.getUniqueBucketPrefix();
 
   // Do cleanup the path after every test.
   private static final String GCS_WRITE_TMP_DIR =
@@ -97,13 +98,29 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @BeforeClass
   public static void before() throws IOException {
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
+    BUCKET_HELPER.cleanup(helperGcs);
+    ZONAL_BUCKET_HELPER.cleanup(helperGcs);
+
+    try {
+      Thread.sleep(1000); // Wait 1 second
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
     helperGcs.createBucket(TEST_BUCKET);
+    helperGcs.createBucket(
+        ZONAL_TEST_BUCKET,
+        CreateBucketOptions.builder()
+            .setLocation("us-central1")
+            .setZonalPlacement("us-central1-a")
+            .build());
   }
 
   @AfterClass
   public static void after() throws IOException {
     try {
       BUCKET_HELPER.cleanup(helperGcs);
+      ZONAL_BUCKET_HELPER.cleanup(helperGcs);
     } finally {
       helperGcs.close();
     }
@@ -133,6 +150,56 @@ public class GoogleCloudStorageClientImplIntegrationTest {
     if (gcs != null) {
       gcs.close();
     }
+  }
+
+  @Test
+  public void bidiFlowOnZonalBucket() throws IOException {
+    // Define write options to disable resumable/appendable uploads.
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder().setDirectUploadEnabled(true).build();
+
+    // Create the storage options with bidi enabled and non-resumable writes.
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(writeOptions)
+            .setBidiEnabled(true)
+            .setFinalizeBeforeClose(true)
+            .build();
+    gcs = getGCSImpl(storageOptions);
+
+    StorageResourceId resourceId = new StorageResourceId(ZONAL_TEST_BUCKET, name.getMethodName());
+    byte[] bytesToWrite = new byte[ONE_MiB * 5];
+    GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
+
+    // This write operation will now use a direct gRPC stream compatible with zonal buckets.
+    try (WritableByteChannel writeChannel = gcs.create(resourceId)) {
+      writeChannel.write(ByteBuffer.wrap(bytesToWrite));
+    }
+
+    // Read the file back using the bidi read channel
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setBidiEnabled(true).build();
+
+    byte[] readBytes = new byte[bytesToWrite.length];
+    ByteBuffer readBuffer = ByteBuffer.wrap(readBytes);
+    try (SeekableByteChannel readChannel = gcs.open(resourceId, readOptions)) {
+      while (readBuffer.hasRemaining()) {
+        if (readChannel.read(readBuffer) == -1) {
+          break; // End of stream
+        }
+      }
+    }
+
+    System.out.println(
+        "Printing read buffer: "
+            + readBuffer.hasRemaining()
+            + "Read Bytes found "
+            + Arrays.toString(readBytes)
+            + "Expected"
+            + Arrays.toString(bytesToWrite));
+    // Verify that the entire content was read and matches the original
+    assertThat(readBuffer.hasRemaining()).isFalse();
+    assertThat(readBytes).isEqualTo(bytesToWrite);
   }
 
   @Test

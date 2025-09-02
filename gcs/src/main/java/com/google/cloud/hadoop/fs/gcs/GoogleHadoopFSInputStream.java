@@ -39,6 +39,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -183,8 +184,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
         () -> {
           if (channel instanceof ReadVectoredSeekableByteChannel) {
+            //            long startTimeNs = System.nanoTime();
             ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
                 (ReadVectoredSeekableByteChannel) channel;
+            ranges.forEach(
+                range -> {
+                  CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+                  range.setData(result);
+                });
             readVectoredSeekableByteChannelChannel.readVectored(
                 ranges.stream()
                     .map(
@@ -196,12 +203,20 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                                 .build())
                     .collect(Collectors.toList()),
                 allocate);
+            //            long durationMs =
+            //                java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() -
+            // startTimeNs);
+            //            logger.atSevere().log("Bidi Vectored Read Time: %d ms", durationMs);
           } else {
             long startTimeNs = System.nanoTime();
             vectoredIOSupplier
                 .get()
                 .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
             statistics.incrementReadOps(1);
+            //            long durationMs =
+            //                java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() -
+            // startTimeNs);
+            //            logger.atSevere().log("Normal Vectored Read Time: %d ms", durationMs);
             vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
           }
           return null;
