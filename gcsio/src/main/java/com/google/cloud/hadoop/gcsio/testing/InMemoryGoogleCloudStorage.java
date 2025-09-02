@@ -514,6 +514,25 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return new ArrayList<>(uniqueNames);
   }
 
+  private synchronized List<String> listObjectNamesStartingFrom(
+      String bucketName, String startOffset, ListObjectOptions listOptions) {
+    InMemoryBucketEntry bucketEntry = bucketLookup.get(bucketName);
+    if (bucketEntry == null) {
+      return new ArrayList<>();
+    }
+
+    Set<String> uniqueNames = new TreeSet<>();
+    for (String objectName : bucketEntry.getObjectNames()) {
+      if (objectName.compareTo(startOffset) >= 0) {
+        uniqueNames.add(objectName);
+      }
+      if (listOptions.getMaxResults() > 0 && uniqueNames.size() >= listOptions.getMaxResults()) {
+        break;
+      }
+    }
+    return uniqueNames.stream().sorted().collect(Collectors.toList());
+  }
+
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
@@ -544,21 +563,17 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             bucketName,
             objectNamePrefix,
             listOptions.toBuilder().setMaxResults(MAX_RESULTS_UNLIMITED).build());
-    List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
-    for (String objectName : listedNames) {
-      GoogleCloudStorageItemInfo itemInfo =
-          getItemInfo(new StorageResourceId(bucketName, objectName));
-      if (itemInfo.exists()) {
-        listedInfo.add(itemInfo);
-      } else if (itemInfo.getResourceId().isStorageObject()) {
-        listedInfo.add(
-            GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
-      }
-      if (listOptions.getMaxResults() > 0 && listedInfo.size() >= listOptions.getMaxResults()) {
-        break;
-      }
-    }
-    return listedInfo;
+    return convertToItemInfo(bucketName, listedNames, listOptions);
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfoStartingFrom(
+      String bucketName, String startOffset, ListObjectOptions listOptions) throws IOException {
+    // Since we're just in memory, we can do the naive implementation of just listing names and
+    // then calling getItemInfo for each.
+    List<String> listObjectNamesStartingFrom =
+        listObjectNamesStartingFrom(bucketName, startOffset, listOptions);
+    return convertToItemInfo(bucketName, listObjectNamesStartingFrom, listOptions);
   }
 
   public void renameHnFolder(URI src, URI dst) throws IOException {
@@ -687,5 +702,25 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public Map<String, Long> getStatistics() {
     throw new UnsupportedOperationException("not implemented");
+  }
+
+  private List<GoogleCloudStorageItemInfo> convertToItemInfo(
+      String bucketName, final List<String> listedNames, ListObjectOptions listOptions)
+      throws IOException {
+    List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
+    for (String objectName : listedNames) {
+      GoogleCloudStorageItemInfo itemInfo =
+          getItemInfo(new StorageResourceId(bucketName, objectName));
+      if (itemInfo.exists()) {
+        listedInfo.add(itemInfo);
+      } else if (itemInfo.getResourceId().isStorageObject()) {
+        listedInfo.add(
+            GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
+      }
+      if (listOptions.getMaxResults() > 0 && listedInfo.size() >= listOptions.getMaxResults()) {
+        break;
+      }
+    }
+    return listedInfo;
   }
 }
