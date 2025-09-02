@@ -33,6 +33,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -831,6 +832,364 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                   /* objectFields= */ "bucket,name,contentType",
                   /* pageToken= */ null));
     }
+  }
+
+  @Test
+  public void renameDirectory_onHnsBucket_withCopyFallback_preservesEmptyNativeSubFolders()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setHnBucketRenameEnabled(false)
+                        .build())
+                .build());
+
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-rename-bug-test");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    String testDir = getTestResource();
+    URI srcDirUri = new URI(String.format("gs://%s/%s/src/", hnsBucketName, testDir));
+    URI dstDirUri = new URI(String.format("gs://%s/%s/dst/", hnsBucketName, testDir));
+
+    URI fileInSrcUri = srcDirUri.resolve("file.txt");
+    URI emptyNativeSubDirInSrcUri = srcDirUri.resolve("empty-native-subdir/");
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, fileInSrcUri.getPath(), "test-data");
+    gcsFs.mkdir(emptyNativeSubDirInSrcUri);
+
+    assertThat(gcsFs.exists(fileInSrcUri)).isTrue();
+    FileInfo emptySubDirInfo = gcsFs.getFileInfo(emptyNativeSubDirInSrcUri);
+    assertThat(emptySubDirInfo.exists()).isTrue();
+    assertThat(emptySubDirInfo.getItemInfo().isNativeFolder()).isTrue();
+
+    gcsFs.rename(srcDirUri, dstDirUri);
+
+    URI fileInDstUri = dstDirUri.resolve("file.txt");
+    URI emptyNativeSubDirInDstUri = dstDirUri.resolve("empty-native-subdir/");
+
+    assertThat(gcsFs.exists(srcDirUri)).isFalse();
+    assertThat(gcsFs.exists(fileInSrcUri)).isFalse();
+    assertThat(gcsFs.exists(emptyNativeSubDirInSrcUri)).isFalse();
+
+    assertThat(gcsFs.exists(dstDirUri)).isTrue();
+    assertThat(gcsFs.exists(fileInDstUri)).isTrue();
+
+    FileInfo newEmptySubDirInfo = gcsFs.getFileInfo(emptyNativeSubDirInDstUri);
+    assertThat(newEmptySubDirInfo.exists()).isTrue();
+    assertThat(newEmptySubDirInfo.isDirectory()).isTrue();
+  }
+
+  @Test
+  public void renameDirectory_onHnsBucket_withCopyFallback_handlesComplexNestedStructure()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setHnBucketRenameEnabled(false) // Force the copy-and-delete path
+                        .build())
+                .build());
+
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-rename-complex-copy");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    String testDir = getTestResource();
+    URI srcDirUri = new URI(String.format("gs://%s/%s/src/", hnsBucketName, testDir));
+    URI dstDirUri = new URI(String.format("gs://%s/%s/dst/", hnsBucketName, testDir));
+
+    URI file1 = srcDirUri.resolve("file1.txt");
+    URI emptyFolder1 = srcDirUri.resolve("emptyFolder1/");
+    URI nonEmptyFolder = srcDirUri.resolve("nonEmptyFolder/");
+    URI file2 = nonEmptyFolder.resolve("file2.txt");
+    URI emptyFolder2 = nonEmptyFolder.resolve("emptyFolder2/");
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, file1.getPath(), "data1");
+    gcsFs.mkdir(emptyFolder1);
+    gcsFs.mkdir(nonEmptyFolder); // Will be created implicitly by file2, but good to be explicit.
+    gcsfsIHelper.writeTextFile(hnsBucketName, file2.getPath(), "data2");
+    gcsFs.mkdir(emptyFolder2);
+
+    gcsFs.rename(srcDirUri, dstDirUri);
+
+    assertThat(gcsFs.exists(srcDirUri)).isFalse();
+    assertThat(gcsFs.exists(file1)).isFalse();
+    assertThat(gcsFs.exists(emptyFolder1)).isFalse();
+    assertThat(gcsFs.exists(nonEmptyFolder)).isFalse();
+    assertThat(gcsFs.exists(file2)).isFalse();
+    assertThat(gcsFs.exists(emptyFolder2)).isFalse();
+
+    assertThat(gcsFs.exists(dstDirUri)).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("file1.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("emptyFolder1/"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/file2.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/emptyFolder2/"))).isTrue();
+
+    FileInfo finalEmptyFolder = gcsFs.getFileInfo(dstDirUri.resolve("emptyFolder1/"));
+    assertThat(finalEmptyFolder.getItemInfo().isNativeFolder()).isTrue();
+  }
+
+  @Test
+  public void renameDirectory_onHnsBucket_withMoveFallback_preservesEmptyNativeSubFolders()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setHnBucketRenameEnabled(false)
+                        .setMoveOperationEnabled(true)
+                        .build())
+                .build());
+
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-rename-simple-move");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    String testDir = getTestResource();
+    URI srcDirUri = new URI(String.format("gs://%s/%s/src/", hnsBucketName, testDir));
+    URI dstDirUri = new URI(String.format("gs://%s/%s/dst/", hnsBucketName, testDir));
+
+    URI fileInSrcUri = srcDirUri.resolve("file.txt");
+    URI emptyNativeSubDirInSrcUri = srcDirUri.resolve("empty-native-subdir/");
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, fileInSrcUri.getPath(), "test-data");
+    gcsFs.mkdir(emptyNativeSubDirInSrcUri);
+
+    gcsFs.rename(srcDirUri, dstDirUri);
+
+    assertThat(gcsFs.exists(srcDirUri)).isFalse();
+    assertThat(gcsFs.exists(fileInSrcUri)).isFalse();
+    assertThat(gcsFs.exists(emptyNativeSubDirInSrcUri)).isFalse();
+
+    assertThat(gcsFs.exists(dstDirUri)).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("file.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("empty-native-subdir/"))).isTrue();
+    FileInfo finalEmptyFolder = gcsFs.getFileInfo(dstDirUri.resolve("empty-native-subdir/"));
+    assertThat(finalEmptyFolder.getItemInfo().isNativeFolder()).isTrue();
+  }
+
+  @Test
+  public void renameDirectory_onHnsBucket_withMoveFallback_handlesComplexNestedStructure()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setHnBucketRenameEnabled(false) // Force fallback
+                        .setMoveOperationEnabled(true) // Force MOVE fallback
+                        .build())
+                .build());
+
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-rename-complex-move");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    String testDir = getTestResource();
+    URI srcDirUri = new URI(String.format("gs://%s/%s/src/", hnsBucketName, testDir));
+    URI dstDirUri = new URI(String.format("gs://%s/%s/dst/", hnsBucketName, testDir));
+
+    URI file1 = srcDirUri.resolve("file1.txt");
+    URI emptyFolder1 = srcDirUri.resolve("emptyFolder1/");
+    URI nonEmptyFolder = srcDirUri.resolve("nonEmptyFolder/");
+    URI file2 = nonEmptyFolder.resolve("file2.txt");
+    URI emptyFolder2 = nonEmptyFolder.resolve("emptyFolder2/");
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, file1.getPath(), "data1");
+    gcsFs.mkdir(emptyFolder1);
+    gcsfsIHelper.writeTextFile(hnsBucketName, file2.getPath(), "data2");
+    gcsFs.mkdir(emptyFolder2);
+
+    gcsFs.rename(srcDirUri, dstDirUri);
+
+    assertThat(gcsFs.exists(srcDirUri)).isFalse();
+    assertThat(gcsFs.exists(file1)).isFalse();
+    assertThat(gcsFs.exists(emptyFolder1)).isFalse();
+    assertThat(gcsFs.exists(nonEmptyFolder)).isFalse();
+    assertThat(gcsFs.exists(file2)).isFalse();
+    assertThat(gcsFs.exists(emptyFolder2)).isFalse();
+
+    assertThat(gcsFs.exists(dstDirUri)).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("file1.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("emptyFolder1/"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/file2.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/emptyFolder2/"))).isTrue();
+  }
+
+  @Test
+  public void move_onEmptyNativeFolder_throwsFileNotFound() throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-move-test");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+
+    URI srcFolderUri = new URI(String.format("gs://%s/%s/", hnsBucketName, getTestResource()));
+    URI dstFolderUri =
+        new URI(String.format("gs://%s/%s/", hnsBucketName, getTestResource() + "-dst"));
+
+    gcsFs.mkdir(srcFolderUri);
+    assertThat(gcsFs.getFileInfo(srcFolderUri).getItemInfo().isNativeFolder()).isTrue();
+
+    StorageResourceId srcId = StorageResourceId.fromUriPath(srcFolderUri, true);
+    StorageResourceId dstId = StorageResourceId.fromUriPath(dstFolderUri, true);
+
+    assertThrows(
+        FileNotFoundException.class, () -> gcsFs.getGcs().move(ImmutableMap.of(srcId, dstId)));
+
+    assertThat(gcsFs.exists(srcFolderUri)).isTrue();
+    assertThat(gcsFs.exists(dstFolderUri)).isFalse();
+  }
+
+  @Test
+  public void renameDirectory_withoutHnsOptimization_leavesEmptyNativeFolderBehind()
+      throws Exception {
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-rename-opposite-copy");
+    GoogleCloudStorage gcs = gcsfsIHelper.gcs;
+    gcs.createBucket(
+        hnsBucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    GoogleCloudStorageFileSystem hnsAwareGcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+
+    String testDir = getTestResource();
+    URI srcDirUri = new URI(String.format("gs://%s/%s/src/", hnsBucketName, testDir));
+    URI dstDirUri = new URI(String.format("gs://%s/%s/dst/", hnsBucketName, testDir));
+
+    URI fileInSrcUri = srcDirUri.resolve("file.txt");
+    URI emptyNativeSubDirInSrcUri = srcDirUri.resolve("empty-native-subdir/");
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, fileInSrcUri.getPath(), "test-data");
+    // Use the HNS-aware client to create the native folder.
+    hnsAwareGcsFs.mkdir(emptyNativeSubDirInSrcUri);
+    assertThat(hnsAwareGcsFs.getFileInfo(emptyNativeSubDirInSrcUri).getItemInfo().isNativeFolder())
+        .isTrue();
+    hnsAwareGcsFs.close();
+
+    // Perform rename using a client with HNS optimization DISABLED.
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(false) // The critical setting for this test
+                        .setHnBucketRenameEnabled(false)
+                        .build())
+                .build());
+    gcsFs.rename(srcDirUri, dstDirUri);
+
+    assertThat(gcsFs.exists(dstDirUri)).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("file.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("empty-native-subdir/"))).isFalse();
+
+    // Use getFolderInfo directly since the hns-optimization flag is off
+    assertThat(
+            gcsFs
+                .getGcs()
+                .getFolderInfo(StorageResourceId.fromStringPath(srcDirUri.toString()))
+                .exists())
+        .isTrue(); // Not deleted because it wasn't empty.
+    assertThat(gcsFs.exists(fileInSrcUri)).isFalse();
+    assertThat(
+            gcsFs
+                .getGcs()
+                .getFolderInfo(
+                    StorageResourceId.fromStringPath(emptyNativeSubDirInSrcUri.toString()))
+                .exists())
+        .isTrue();
+  }
+
+  @Test
+  public void renameDirectory_withoutHnsOptimization_withMove_leavesEmptyNativeFolderBehind()
+      throws Exception {
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-rename-opposite-move");
+    GoogleCloudStorage gcs = gcsfsIHelper.gcs;
+    gcs.createBucket(
+        hnsBucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    GoogleCloudStorageFileSystem hnsAwareGcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setHnOptimizationEnabled(true).build())
+                .build());
+
+    String testDir = getTestResource();
+    URI srcDirUri = new URI(String.format("gs://%s/%s/src/", hnsBucketName, testDir));
+    URI dstDirUri = new URI(String.format("gs://%s/%s/dst/", hnsBucketName, testDir));
+
+    URI fileInSrcUri = srcDirUri.resolve("file.txt");
+    URI emptyNativeSubDirInSrcUri = srcDirUri.resolve("empty-native-subdir/");
+
+    gcsfsIHelper.writeTextFile(hnsBucketName, fileInSrcUri.getPath(), "test-data");
+    hnsAwareGcsFs.mkdir(emptyNativeSubDirInSrcUri);
+    hnsAwareGcsFs.close();
+
+    // Perform rename using a client with HNS optimization DISABLED.
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(false)
+                        .setHnBucketRenameEnabled(false)
+                        .setMoveOperationEnabled(true)
+                        .build())
+                .build());
+    gcsFs.rename(srcDirUri, dstDirUri);
+
+    assertThat(gcsFs.exists(dstDirUri)).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("file.txt"))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri.resolve("empty-native-subdir/"))).isFalse();
+
+    // Use getFolderInfo directly since the hns-optimization flag is off
+    assertThat(
+            gcsFs
+                .getGcs()
+                .getFolderInfo(StorageResourceId.fromStringPath(srcDirUri.toString()))
+                .exists())
+        .isTrue();
+    assertThat(gcsFs.exists(fileInSrcUri)).isFalse();
+    assertThat(
+            gcsFs
+                .getGcs()
+                .getFolderInfo(
+                    StorageResourceId.fromStringPath(emptyNativeSubDirInSrcUri.toString()))
+                .exists())
+        .isTrue();
   }
 
   @Test
