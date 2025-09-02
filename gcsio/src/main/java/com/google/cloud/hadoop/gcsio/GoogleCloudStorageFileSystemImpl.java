@@ -893,11 +893,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   /**
-   * Helper for rename that explicitly creates native HNS folders at the destination.
-   * This is necessary for empty native folders which are not handled by object copy/move.
+   * Helper for rename that explicitly creates native HNS folders at the destination. This is
+   * necessary for empty native folders which are not handled by object copy/move.
    */
-  private void createDestinationFolders(
-      URI src, URI dst, List<FolderInfo> srcFolderInfos) throws IOException {
+  private void createDestinationFolders(URI src, URI dst, List<FolderInfo> srcFolderInfos)
+      throws IOException {
     if (!options.getCloudStorageOptions().isHnOptimizationEnabled() || !gcs.isHnBucket(src)) {
       return;
     }
