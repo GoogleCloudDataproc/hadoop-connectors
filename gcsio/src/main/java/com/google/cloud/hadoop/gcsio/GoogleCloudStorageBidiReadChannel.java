@@ -17,10 +17,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 
@@ -38,12 +35,16 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private long position = 0;
   private final BlobId blobId;
 
+  private static final Semaphore inflightRequestSemaphore = new Semaphore(16);
+
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
+    logger.atSevere().log("Dhriti_Debug Bidi: Channel initializaion");
+    long start_time = System.currentTimeMillis();
     this.readTimeout = readOptions.getGrpcReadTimeout();
     this.resourceId =
         new StorageResourceId(
@@ -55,6 +56,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+    long init_time = System.currentTimeMillis() - start_time;
+    logger.atSevere().log("Dhriti_Debug Bidi: Bidi Init time: %s", init_time);
   }
 
   private static BlobReadSession initializeBlobReadSession(
@@ -75,6 +78,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
+    logger.atSevere().log("Dhriti_Debug Bidi: Normal Read Called");
+    long start_time = System.currentTimeMillis();
     throwIfNotOpen();
     if (!dst.hasRemaining()) {
       return 0;
@@ -115,7 +120,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         }
       }
 
-      // MODIFICATION: Return -1 on end-of-stream, not 0, for parity.
+      long read_time = System.currentTimeMillis() - start_time;
+      logger.atSevere().log("Dhriti_Debug Bidi: Bidi Read Time: %s", read_time);
       return bytesRead > 0 ? bytesRead : -1;
 
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
@@ -188,9 +194,13 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
+    logger.atSevere().log("Dhriti_Debug Bidi: Vectored Read Called");
     long vectoredReadStartTime = System.currentTimeMillis();
     ranges.forEach(
         range -> {
+          logger.atSevere().log(
+              "Dhriti_Debug Bidi: Range offset: %d Range len: %d",
+              range.getOffset(), range.getLength());
           ApiFuture<DisposableByteString> futureBytes =
               blobReadSession.readAs(
                   ReadProjectionConfigs.asFutureByteString()

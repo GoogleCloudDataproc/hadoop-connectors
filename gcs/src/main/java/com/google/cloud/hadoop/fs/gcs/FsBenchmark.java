@@ -572,6 +572,105 @@ public class FsBenchmark extends Configured implements Tool {
     return 0;
   }
 
+  //  private void benchmarkVectoredRead(
+  //      FileSystem fs, Path testFile, int numOfReads, int numOfThreads) {
+  //    System.out.printf(
+  //        "Running vectored read test using file %s which will be read %d times in %d threads.\n",
+  //        testFile, numOfReads, numOfThreads);
+  //
+  //    Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+  //    Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+  //    Set<LongSummaryStatistics> openTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+  //    Set<LongSummaryStatistics> closeTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+  //
+  //    ExecutorService executor = Executors.newFixedThreadPool(numOfThreads);
+  //    CountDownLatch initLatch = new CountDownLatch(numOfThreads);
+  //    CountDownLatch startLatch = new CountDownLatch(1);
+  //    CountDownLatch stopLatch = new CountDownLatch(numOfThreads);
+  //    List<Future<?>> futures = new ArrayList<>(numOfThreads);
+  //    long fileSize = printAndReturnFileSize(fs, testFile, numOfReads);
+  //
+  //    for (int i = 0; i < numOfThreads; i++) {
+  //      futures.add(
+  //          executor.submit(
+  //              () -> {
+  //                LongSummaryStatistics readFileBytes =
+  // newLongSummaryStatistics(readFileBytesList);
+  //                LongSummaryStatistics readFileTimeNs =
+  // newLongSummaryStatistics(readFileTimeNsList);
+  //                LongSummaryStatistics openTimeNs = newLongSummaryStatistics(openTimeNsList);
+  //                LongSummaryStatistics closeTimeNs = newLongSummaryStatistics(closeTimeNsList);
+  //
+  //                long readFsStart;
+  //
+  //                initLatch.countDown();
+  //                try {
+  //                  startLatch.await();
+  //                } catch (InterruptedException e) {
+  //                  throw new RuntimeException(e);
+  //                }
+  //
+  //                try {
+  //                  try {
+  //                    long openStart = System.nanoTime();
+  //                    FSDataInputStream input = fs.open(testFile);
+  //                    openTimeNs.accept(System.nanoTime() - openStart);
+  //                    readFsStart = System.nanoTime();
+  //                    IntFunction<ByteBuffer> allocator =
+  //                        (length) -> ByteBuffer.allocateDirect(length);
+  //                    List<? extends FileRange> ranges = getRanges(fileSize, numOfReads);
+  //
+  //                    input.readVectored(ranges, allocator);
+  //                    ranges.forEach(
+  //                        range -> {
+  //                          try {
+  //                            ByteBuffer data = range.getData().get(30, SECONDS);
+  //                            readFileTimeNs.accept(System.nanoTime() - readFsStart);
+  //                            readFileBytes.accept(range.getLength());
+  //                          } catch (ExecutionException | InterruptedException | TimeoutException
+  // e) {
+  //                            throw new RuntimeException(e);
+  //                          }
+  //                        });
+  //                    long closeStart = System.nanoTime();
+  //                    input.close();
+  //                    closeTimeNs.accept(System.nanoTime() - closeStart);
+  //                  } catch (Exception e) {
+  //                    throw new RuntimeException(e);
+  //                  }
+  //                } finally {
+  //                  stopLatch.countDown();
+  //                }
+  //              }));
+  //    }
+  //    executor.shutdown();
+  //
+  //    awaitUnchecked(initLatch);
+  //    long startTime = System.nanoTime();
+  //    startLatch.countDown();
+  //    awaitUnchecked(stopLatch);
+  //    double runtimeSeconds = nanosToSeconds(System.nanoTime() - startTime);
+  //    long operations = combineStats(readFileTimeNsList).getCount();
+  //
+  //    // Verify that all threads completed without errors
+  //    futures.forEach(Futures::getUnchecked);
+  //
+  //    printSizeStats("Read Bytes ", combineStats(readFileBytesList));
+  //    printTimeStats("Read latency ", combineStats(readFileTimeNsList));
+  //    printTimeStats("Open latency ", combineStats(openTimeNsList));
+  //    printTimeStats("Close latency ", combineStats(closeTimeNsList));
+  //
+  //    printThroughputStats("Read file throughput", readFileTimeNsList, readFileBytesList);
+  //
+  //    System.out.printf(
+  //        "Average QPS: %.3f (%d in total %.3fs)%n",
+  //        operations / runtimeSeconds, operations, runtimeSeconds);
+  //
+  //    System.out.printf(
+  //        "Read average throughput (MiB/s): %.3f%n",
+  //        bytesToMebibytes(combineStats(readFileBytesList).getSum()) / runtimeSeconds);
+  //  }
+
   private void benchmarkVectoredRead(
       FileSystem fs, Path testFile, int numOfReads, int numOfThreads) {
     System.out.printf(
@@ -613,22 +712,32 @@ public class FsBenchmark extends Configured implements Tool {
                     long openStart = System.nanoTime();
                     FSDataInputStream input = fs.open(testFile);
                     openTimeNs.accept(System.nanoTime() - openStart);
+
                     readFsStart = System.nanoTime();
-                    IntFunction<ByteBuffer> allocator =
-                        (length) -> ByteBuffer.allocateDirect(length);
+                    IntFunction<ByteBuffer> allocator = ByteBuffer::allocateDirect;
                     List<? extends FileRange> ranges = getRanges(fileSize, numOfReads);
 
                     input.readVectored(ranges, allocator);
+
+                    // This loop now ONLY waits for completion and counts bytes.
                     ranges.forEach(
                         range -> {
                           try {
                             ByteBuffer data = range.getData().get(30, SECONDS);
-                            readFileTimeNs.accept(System.nanoTime() - readFsStart);
+                            // MODIFICATION: REMOVED the timing call from inside the loop.
+                            // readFileTimeNs.accept(System.nanoTime() - readFsStart); // <-- This
+                            // was the flaw.
                             readFileBytes.accept(range.getLength());
                           } catch (ExecutionException | InterruptedException | TimeoutException e) {
                             throw new RuntimeException(e);
                           }
                         });
+
+                    // MODIFICATION: Record the TOTAL time for the entire batch AFTER the loop
+                    // completes.
+                    // This is the correct measurement for throughput.
+                    readFileTimeNs.accept(System.nanoTime() - readFsStart);
+
                     long closeStart = System.nanoTime();
                     input.close();
                     closeTimeNs.accept(System.nanoTime() - closeStart);
@@ -649,22 +758,23 @@ public class FsBenchmark extends Configured implements Tool {
     double runtimeSeconds = nanosToSeconds(System.nanoTime() - startTime);
     long operations = combineStats(readFileTimeNsList).getCount();
 
-    // Verify that all threads completed without errors
     futures.forEach(Futures::getUnchecked);
 
     printSizeStats("Read Bytes ", combineStats(readFileBytesList));
-    printTimeStats("Read latency ", combineStats(readFileTimeNsList));
+    // The "Read latency" is now "Total Batch Time".
+    printTimeStats("Total Batch Time ", combineStats(readFileTimeNsList));
     printTimeStats("Open latency ", combineStats(openTimeNsList));
     printTimeStats("Close latency ", combineStats(closeTimeNsList));
 
     printThroughputStats("Read file throughput", readFileTimeNsList, readFileBytesList);
 
     System.out.printf(
-        "Average QPS: %.3f (%d in total %.3fs)%n",
+        "Average QPS (threads/sec): %.3f (%d in total %.3fs)%n", // This metric now refers to
+        // batches/sec.
         operations / runtimeSeconds, operations, runtimeSeconds);
 
     System.out.printf(
-        "Read average throughput (MiB/s): %.3f%n",
+        "Read average throughput (MiB/s): %.3f%n", // This is now the most important metric.
         bytesToMebibytes(combineStats(readFileBytesList).getSum()) / runtimeSeconds);
   }
 

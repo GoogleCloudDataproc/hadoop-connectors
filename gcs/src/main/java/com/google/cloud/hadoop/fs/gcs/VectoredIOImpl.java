@@ -58,6 +58,7 @@ public class VectoredIOImpl implements Closeable {
 
   public VectoredIOImpl(
       VectoredReadOptions vectoredReadOptions, GhfsGlobalStorageStatistics storageStatistics) {
+    logger.atSevere().log("Dhriti_Debug Grpc: Vectored IO Initialization");
     this.vectoredReadOptions = vectoredReadOptions;
     // same fixedThreadPool executor, but provided a way to query task queue
     this.boundedThreadPool =
@@ -121,6 +122,7 @@ public class VectoredIOImpl implements Closeable {
 
     private void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
         throws IOException {
+      logger.atSevere().log("Dhriti_Debug Grpc: Vectored Read Called");
       List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
       for (FileRange range : ranges) {
         // TODO(user): upgrade to use validateAndSortRanges
@@ -132,6 +134,9 @@ public class VectoredIOImpl implements Closeable {
         updateRangeSizeCounters(sortedRanges.size(), sortedRanges.size());
         // case when ranges are not merged
         for (FileRange sortedRange : sortedRanges) {
+          logger.atSevere().log(
+              "Dhriti_Debug Grpc: Sorted Range offset: %d Range len: %d",
+              sortedRange.getOffset(), sortedRange.getLength());
           long startTimer = System.currentTimeMillis();
           boundedThreadPool.submit(
               () -> {
@@ -149,6 +154,9 @@ public class VectoredIOImpl implements Closeable {
         updateRangeSizeCounters(sortedRanges.size(), combinedFileRanges.size());
         // case where ranges can be merged
         for (CombinedFileRange combinedFileRange : combinedFileRanges) {
+          logger.atSevere().log(
+              "Dhriti_Debug Grpc: Combined Range offset: %d Range len: %d",
+              combinedFileRange.getOffset(), combinedFileRange.getLength());
           CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
           combinedFileRange.setData(result);
           long startTimer = System.currentTimeMillis();
