@@ -55,13 +55,8 @@ public class LoggingFormatter extends Formatter {
     }
 
     if (existingFormatter != null) {
-      try {
-        record.setMessage(messageToFormat);
-        return existingFormatter.format(record);
-      } finally {
-        // Restore original message to avoid side-effects on the LogRecord.
-        record.setMessage(originalMessage);
-      }
+      record.setMessage(messageToFormat);
+      return existingFormatter.format(record);
     }
     // Otherwise, return the message as-is with a newline.
     return String.format("%s%n", messageToFormat == null ? "" : messageToFormat);
