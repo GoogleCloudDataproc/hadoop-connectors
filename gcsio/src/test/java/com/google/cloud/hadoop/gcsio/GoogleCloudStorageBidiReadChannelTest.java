@@ -1,8 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -10,9 +9,11 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.core.ApiFutures;
 import com.google.cloud.storage.Storage;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -30,7 +31,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   private static final String TEST_OBJECT_NAME = "foo-object";
 
-  private static final int OBJECT_SIZE = 1024 * 1024;
+  private static final int OBJECT_SIZE = FakeBlobReadSession.TEST_STRING.length();
   private static final StorageResourceId RESOURCE_ID =
       new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
   private static MockHttpTransport transport = mockTransport();
@@ -65,24 +66,151 @@ public class GoogleCloudStorageBidiReadChannelTest {
   }
 
   @Test
+  public void read_successful() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+
+    // Read first chunk
+    int bytesRead = bidiReadChannel.read(buffer);
+    assertEquals(10, bytesRead);
+    assertEquals(10, bidiReadChannel.position());
+    buffer.flip();
+    assertEquals(
+        FakeBlobReadSession.SUBSTRING_0_10, StandardCharsets.UTF_8.decode(buffer).toString());
+
+    // Read second chunk
+    buffer.clear();
+    bytesRead = bidiReadChannel.read(buffer);
+    assertEquals(10, bytesRead);
+    assertEquals(20, bidiReadChannel.position());
+    buffer.flip();
+    assertEquals(
+        FakeBlobReadSession.SUBSTRING_10_10, StandardCharsets.UTF_8.decode(buffer).toString());
+  }
+
+  @Test
+  public void read_partialReadAtEnd() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    bidiReadChannel.position(OBJECT_SIZE - 5);
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+
+    int bytesRead = bidiReadChannel.read(buffer);
+
+    assertEquals(5, bytesRead);
+    assertEquals(OBJECT_SIZE, bidiReadChannel.position());
+    buffer.flip();
+    String expectedContent = FakeBlobReadSession.TEST_STRING.substring(OBJECT_SIZE - 5);
+    assertEquals(expectedContent, StandardCharsets.UTF_8.decode(buffer).toString());
+  }
+
+  @Test
+  public void read_whenPositionIsAtSize_returnsNegativeOne() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    bidiReadChannel.position(OBJECT_SIZE - 1);
+
+    // Read the last byte to advance position to OBJECT_SIZE
+    bidiReadChannel.read(ByteBuffer.allocate(1));
+    assertEquals(OBJECT_SIZE, bidiReadChannel.position());
+
+    // Next read should return -1
+    assertEquals(-1, bidiReadChannel.read(ByteBuffer.allocate(10)));
+  }
+
+  @Test
+  public void read_whenDstIsEmpty_returnsZero() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    ByteBuffer buffer = ByteBuffer.allocate(0);
+
+    assertEquals(0, bidiReadChannel.read(buffer));
+    assertEquals(0, bidiReadChannel.position());
+  }
+
+  @Test
+  public void read_onClosedChannel_throwsClosedChannelException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    bidiReadChannel.close();
+
+    assertThrows(ClosedChannelException.class, () -> bidiReadChannel.read(ByteBuffer.allocate(1)));
+  }
+
+  @Test
+  public void position_getAndSet() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    assertEquals(0, bidiReadChannel.position());
+
+    bidiReadChannel.position(12);
+    assertEquals(12, bidiReadChannel.position());
+  }
+
+  @Test
+  public void position_setToNegative_throwsEofException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    assertThrows(EOFException.class, () -> bidiReadChannel.position(-1));
+  }
+
+  @Test
+  public void position_setToBeyondSize_throwsEofException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    assertThrows(EOFException.class, () -> bidiReadChannel.position(OBJECT_SIZE + 1));
+  }
+
+  @Test
+  public void position_setToSize_throwsEofException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    assertThrows(EOFException.class, () -> bidiReadChannel.position(OBJECT_SIZE));
+  }
+
+  @Test
+  public void position_onClosedChannel_throwsClosedChannelException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    bidiReadChannel.close();
+
+    assertThrows(ClosedChannelException.class, () -> bidiReadChannel.position(1));
+    assertThrows(ClosedChannelException.class, bidiReadChannel::position);
+  }
+
+  @Test
+  public void size_successful() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    assertEquals(OBJECT_SIZE, bidiReadChannel.size());
+  }
+
+  @Test
+  public void size_onClosedChannel_throwsClosedChannelException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    bidiReadChannel.close();
+
+    assertThrows(ClosedChannelException.class, bidiReadChannel::size);
+  }
+
+  @Test
+  public void isOpen_isTrueOnNewChannel() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    assertTrue(bidiReadChannel.isOpen());
+  }
+
+  @Test
+  public void isOpen_isFalseAfterClose() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
+    bidiReadChannel.close();
+
+    assertFalse(bidiReadChannel.isOpen());
+  }
+
+  @Test
   public void write_unsupportedOperationException() throws IOException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+
     assertThrows(
         UnsupportedOperationException.class,
         () -> bidiReadChannel.write(ByteBuffer.allocateDirect(0)));
-  }
-
-  // TODO(dhritichopra) Dummy test to complete coverage, remove with actual test once we have these
-  // implemented.
-  @Test
-  public void readPath_dummyImplementation() throws IOException {
-    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
-    assertEquals(bidiReadChannel.read(ByteBuffer.allocateDirect(0)), 0);
-    assertEquals(bidiReadChannel.position(), 0);
-    assertEquals(bidiReadChannel.position(12), null);
-    assertEquals(bidiReadChannel.size(), 0);
-    assertEquals(bidiReadChannel.truncate(12), null);
-    assertEquals(bidiReadChannel.isOpen(), false);
   }
 
   private String getReadVectoredData(VectoredIORange range)
