@@ -1040,7 +1040,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             "Skipping %d bytes from %d position to %d position for '%s'",
             bytesToSkip, contentChannelPosition, currentPosition, resourceId);
         while (bytesToSkip > 0) {
-          logger.atInfo().log("In skip loop with %d bytesToSkip for '%s'", bytesToSkip, resourceId);
           long skippedBytes = contentStream.skip(bytesToSkip);
           logger.atFiner().log(
               "Skipped %d bytes from %d position for '%s'",
