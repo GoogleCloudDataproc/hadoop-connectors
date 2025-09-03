@@ -86,6 +86,18 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   private static final ListObjectOptions GET_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).setMaxResults(1).build();
 
+  private static final ListObjectOptions LIST_OPTIONS_INCLUDE_FOLDERS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludePrefix(true)
+          .setIncludeFoldersAsPrefixes(true)
+          .build();
+
+  private static final ListObjectOptions DIRECTORY_EMPTINESS_CHECK_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder()
+          .setIncludeFoldersAsPrefixes(true)
+          .setMaxResults(1)
+          .build();
+
   private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
@@ -343,9 +355,16 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
               // TODO: optimize by listing just one object instead of whole page
               //  (up to 1024 objects now)
-              : listFileInfoForPrefixPage(
-                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
-                  .getItems();
+              : this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+                  ? FileInfo.fromItemInfos(
+                      gcs.listObjectInfo(
+                          fileInfo.getItemInfo().getBucketName(),
+                          fileInfo.getItemInfo().getObjectName(),
+                          updateListObjectOptions(
+                              DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)))
+                  : listFileInfoForPrefixPage(
+                          fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+                      .getItems();
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
@@ -385,7 +404,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    repairImplicitDirectory(parentInfoFuture);
+    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && gcs.isHnBucket(path))) {
+      repairImplicitDirectory(parentInfoFuture);
+    }
   }
 
   /**
@@ -480,7 +502,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
               new StorageResourceId(
                   fileInfo.getItemInfo().getBucketName(),
                   fileInfo.getItemInfo().getObjectName(),
-                  fileInfo.getItemInfo().getContentGeneration()));
+                  fileInfo.getItemInfo().getContentGeneration() > 0
+                      ? fileInfo.getItemInfo().getContentGeneration()
+                      : StorageResourceId.UNKNOWN_GENERATION_ID));
         }
       }
       gcs.deleteObjects(objectsToDelete);
@@ -552,8 +576,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
     try {
       if (isHns) {
-        // Create a native folder resource directly.
-        gcs.createFolder(resourceId);
+        // Create a native folder and underlying parent folders recursively if not present.
+        gcs.createFolder(resourceId, /* recursive */ true);
       } else {
         // Create an empty placeholder object to represent the directory.
         gcs.createEmptyObject(resourceId);
@@ -650,7 +674,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    repairImplicitDirectory(srcParentInfoFuture);
+    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && this.gcs.isHnBucket(src))) {
+      repairImplicitDirectory(srcParentInfoFuture);
+    }
   }
 
   private URI getDstUri(FileInfo srcInfo, FileInfo dstInfo, @Nullable FileInfo dstParentInfo)
@@ -776,6 +803,14 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // List of individual paths to rename;
     // we will try to carry out the copies in this list's order.
     List<FileInfo> srcItemInfos = listFileInfoForPrefix(src, DELETE_RENAME_LIST_OPTIONS);
+    List<FolderInfo> srcFolderInfos = new LinkedList<>();
+    if (options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && gcs.isHnBucket(srcInfo.getPath())) {
+      srcFolderInfos =
+          listFoldersInfoForPrefixPage(
+                  srcInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToke */ null)
+              .getItems();
+    }
 
     // Create a list of sub-items to copy.
     Pattern markerFilePattern = options.getMarkerFilePattern();
@@ -803,12 +838,23 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       // Finally, move marker items (if any) to mark rename operation success
       moveInternal(srcToDstMarkerItemNames);
 
+      // This is required for just empty native folders, other folders would be created
+      // automatically for HNS Bucket
+      if (options.getCloudStorageOptions().isHnOptimizationEnabled()
+          && gcs.isHnBucket(srcInfo.getPath())) {
+        createDestinationFolders(src, dst, srcFolderInfos);
+      }
+
       if (srcInfo.getItemInfo().isBucket()) {
         deleteBucket(Collections.singletonList(srcInfo));
       } else {
         // If src is a directory then srcItemInfos does not contain its own name,
         // we delete item separately in the list.
         deleteObjects(Collections.singletonList(srcInfo));
+        if (options.getCloudStorageOptions().isHnOptimizationEnabled()
+            && gcs.isHnBucket(srcInfo.getPath())) {
+          deleteFolders(srcFolderInfos);
+        }
       }
       return;
     }
@@ -817,6 +863,13 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     copyInternal(srcToDstItemNames);
     // Finally, copy marker items (if any) to mark rename operation success
     copyInternal(srcToDstMarkerItemNames);
+
+    // This is required for just empty native folders, other folders would be created automatically
+    // for HNS Bucket
+    if (options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && gcs.isHnBucket(srcInfo.getPath())) {
+      createDestinationFolders(src, dst, srcFolderInfos);
+    }
 
     List<FileInfo> bucketsToDelete = new ArrayList<>(1);
     List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
@@ -833,6 +886,31 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
     // Then delete rest of the items that we successfully copied.
     deleteInternal(srcItemsToDelete, bucketsToDelete);
+
+    // For the HNS Buckets, delete the empty native folders which might be left behind
+    if (options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && gcs.isHnBucket(srcInfo.getPath())) {
+      deleteFolders(srcFolderInfos);
+    }
+  }
+
+  /**
+   * Helper for rename that explicitly creates native HNS folders at the destination. This is
+   * necessary for empty native folders which are not handled by object copy/move.
+   */
+  private void createDestinationFolders(URI src, URI dst, List<FolderInfo> srcFolderInfos)
+      throws IOException {
+    if (!options.getCloudStorageOptions().isHnOptimizationEnabled() || !gcs.isHnBucket(src)) {
+      return;
+    }
+    String prefix = src.toString();
+    for (FolderInfo folderInfo : srcFolderInfos) {
+      URI srcItemUri =
+          URI.create("gs://" + folderInfo.getBucket() + "/" + folderInfo.getFolderName());
+      String relativeFolderName = srcItemUri.toString().substring(prefix.length());
+      URI dstFolderPath = dst.resolve(relativeFolderName);
+      mkdirs(dstFolderPath);
+    }
   }
 
   /** Copies items in given map that maps source items to destination items. */
@@ -986,6 +1064,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     StorageResourceId dirId = pathId.toDirectoryId();
 
+    boolean isHnBucket =
+        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
+
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
         (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
             .submit(
@@ -995,7 +1076,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
                         : gcs.listObjectInfo(
                             dirId.getBucketName(),
                             dirId.getObjectName(),
-                            updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
+                            updateListObjectOptions(
+                                isHnBucket
+                                    ? LIST_OPTIONS_INCLUDE_FOLDERS
+                                    : LIST_FILE_INFO_LIST_OPTIONS,
+                                listOptions)));
 
     if (!pathId.isDirectory()) {
       try {
@@ -1015,6 +1100,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
+      if (options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
+        if (gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true)).exists()) {
+          return FileInfo.fromItemInfos(dirItemInfos);
+        }
+      }
       GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
     }
@@ -1203,8 +1293,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Check if HNS optimization is enabled, it's an HNS bucket
     if (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
-      // Not a top-level directory, create an folder.
-      gcs.createFolder(resourceId);
+      // Create top-level folder.
+      gcs.createFolder(resourceId, /* recursive */ false);
     } else {
       // Not a top-level directory, create 0 sized object.
       gcs.createEmptyObject(resourceId);
