@@ -28,7 +28,9 @@ public interface FinalizableWritableByteChannel extends WritableByteChannel {
    * Finalizes the Appendable object and then closes the channel.
    *
    * <p>This method should be called to explicitly finalize the appendable object before closing the
-   * channel Use {@link #close()} method instead for the default behaviour.
+   * channel Use {@link #close()} method instead for the default behaviour of the channel. The
+   * default behaviour is closing without finalizing unless modified by setting the
+   * fs.gs.bidi.finalize.on.close flag to true.
    *
    * @throws IOException if the finalization or close operation fails.
    */

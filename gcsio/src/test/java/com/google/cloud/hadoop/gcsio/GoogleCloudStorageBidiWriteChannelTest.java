@@ -86,6 +86,27 @@ public class GoogleCloudStorageBidiWriteChannelTest {
   }
 
   @Test
+  public void testClose_callsAppendChannelClose() throws IOException {
+    writeChannel = getJavaStorageChannel();
+
+    writeChannel.close();
+
+    verify(mockGcsAppendChannel, times(1)).close();
+    verify(mockGcsAppendChannel, times(0)).finalizeAndClose();
+  }
+
+  @Test
+  public void testFinalizeAndClose_callsAppendChannelFinalizeAndClose() throws IOException {
+    writeChannel = getJavaStorageChannel();
+
+    writeChannel.finalizeAndClose();
+
+    verify(mockGcsAppendChannel, times(1)).finalizeAndClose();
+    verify(mockGcsAppendChannel, times(0)).close();
+
+  }
+
+  @Test
   public void testWrite_success_multipleChucks() throws IOException {
     writeChannel = getJavaStorageChannel();
     byte[] chunk1 = new byte[] {1, 2, 3};

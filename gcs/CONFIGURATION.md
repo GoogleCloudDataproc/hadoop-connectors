@@ -520,8 +520,8 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
 * `fs.gs.bidi.enable` (default: `false`) is effective only if grpc is enabled.
 * `fs.gs.bidi.finalize.on.close` (default: `false`)
-    This is for is valid for writing to appendable objects with the
-    bidi channel. Setting it as false will not finalize the object on closing the channel
+     This property is valid for writing to appendable objects with the bidi channel.
+     If set to false, the object will not be finalized when the channel is closed.
 
 ### Performance cache configuration
 
