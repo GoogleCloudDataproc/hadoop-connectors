@@ -607,7 +607,8 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean>
       GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE =
           new HadoopConfigurationProperty<>(
-              "fs.gs.bidi.finalize", GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
+              "fs.gs.bidi.finalize.on.close",
+              GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()

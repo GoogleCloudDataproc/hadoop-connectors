@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Google LLC
+ * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,18 @@ package com.google.cloud.hadoop.gcsio;
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
 
+/**
+ * A {@link java.nio.channels.WritableByteChannel} for writing to appendable objects, offering an
+ * optional finalization step before closing.
+ */
 public interface FinalizableWritableByteChannel extends WritableByteChannel {
+  /**
+   * Finalizes the Appendable object and then closes the channel.
+   *
+   * <p>This method should be called to explicitly finalize the appendable object before closing the
+   * channel Use {@link #close()} method instead for the default behaviour.
+   *
+   * @throws IOException if the finalization or close operation fails.
+   */
   void finalizeAndClose() throws IOException;
 }

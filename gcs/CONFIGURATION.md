@@ -515,6 +515,14 @@ better latency and increased bandwidth. Currently supported only for read/write 
    * `CHUNK_UPLOAD` uploads file in chunks, size of chunks are configurable via
      `fs.gs.outputstream.upload.chunk.size`
 
+
+### Bidi configurations
+
+* `fs.gs.bidi.enable` (default: `false`) is effective only if grpc is enabled.
+* `fs.gs.bidi.finalize.on.close` (default: `false`)
+    This is for is valid for writing to appendable objects with the
+    bidi channel. Setting it as false will not finalize the object on closing the channel
+
 ### Performance cache configuration
 
 *   `fs.gs.performance.cache.enable` (default: `false`)
