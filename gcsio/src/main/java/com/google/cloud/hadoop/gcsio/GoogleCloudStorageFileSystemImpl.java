@@ -404,7 +404,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    if (!isHnBucket) {
+    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && gcs.isHnBucket(path))) {
       repairImplicitDirectory(parentInfoFuture);
     }
   }
