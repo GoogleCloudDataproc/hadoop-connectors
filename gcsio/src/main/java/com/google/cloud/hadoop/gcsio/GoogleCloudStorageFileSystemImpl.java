@@ -345,7 +345,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     }
 
     boolean isHnBucket =
-        (this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path));
+        (this.options.getCloudStorageOptions().isHnBucketRenameEnabled() && gcs.isHnBucket(path));
     List<FolderInfo> listOfFolders = new LinkedList<>();
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
@@ -404,7 +404,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    if (!isHnBucket) {
+    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
+        && gcs.isHnBucket(path))) {
       repairImplicitDirectory(parentInfoFuture);
     }
   }
