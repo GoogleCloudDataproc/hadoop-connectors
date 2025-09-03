@@ -1092,28 +1092,28 @@ public class GoogleCloudStorageClientTest {
   @Test
   @SuppressWarnings("unchecked")
   public void getUpdatedHeaders_includesFeatureUsageAndUserAgent() throws Exception {
-    // Set a known state for the feature header.
-    GoogleCloudStorageFileSystemOptions options =
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
         GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
             .setPerformanceCacheEnabled(true)
             .build();
-    FeatureUsageHeader.setConfigFeatures(options);
+    FeatureUsageHeader featureUsageHeader = new FeatureUsageHeader(gcsfsOptions);
+
     // Prepare storage options
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageOptions.DEFAULT.toBuilder()
             .setAppName("test-app")
             .setHttpRequestHeaders(ImmutableMap.of())
             .build();
-
     // Use reflection to invoke the private static method under test.
     Method getUpdatedHeadersMethod =
         GoogleCloudStorageClientImpl.class.getDeclaredMethod(
-            "getUpdatedHeaders", GoogleCloudStorageOptions.class);
+            "getUpdatedHeaders", GoogleCloudStorageOptions.class, FeatureUsageHeader.class);
     getUpdatedHeadersMethod.setAccessible(true);
     ImmutableMap<String, String> headers =
-        (ImmutableMap<String, String>) getUpdatedHeadersMethod.invoke(null, storageOptions);
+        (ImmutableMap<String, String>)
+            getUpdatedHeadersMethod.invoke(null, storageOptions, featureUsageHeader);
 
-    String expectedHeaderValue = FeatureUsageHeader.getValue();
+    String expectedHeaderValue = featureUsageHeader.getValue();
     // Verify all expected headers are present.
     assertThat(headers.get("user-agent")).contains("test-app");
     assertThat(headers).containsEntry(FeatureUsageHeader.NAME, expectedHeaderValue);

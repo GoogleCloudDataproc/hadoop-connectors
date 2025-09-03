@@ -26,8 +26,7 @@ public class FeatureUsageHeaderTest {
 
   @Before
   public void setUp() {
-    // Reset config features to default before each test.
-    FeatureUsageHeader.setConfigFeatures(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    ;
     // Clear any request-specific features.
     FeatureUsageHeader.requestFeatures.set(new long[FeatureUsageHeader.BITMASK_SIZE]);
   }
@@ -73,17 +72,18 @@ public class FeatureUsageHeaderTest {
   @Test
   public void track_withCallable_setsAndClearsFeature() throws IOException {
     // Initially, the header should be based on default options
-    String initialHeader = FeatureUsageHeader.getValue();
+    FeatureUsageHeader header = new FeatureUsageHeader(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    String initialHeader = header.getValue();
 
     // A feature to track that is not part of the default set
     TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // bit 11
 
     String result =
-        FeatureUsageHeader.track(
+        FeatureUsageHeader.track( // track is still static for request-level features
             testFeature,
             () -> {
               // Inside track, the header should include the new feature
-              String trackedHeader = FeatureUsageHeader.getValue();
+              String trackedHeader = header.getValue();
               assertThat(trackedHeader).isNotNull();
               byte[] decodedBytes = Base64.getDecoder().decode(trackedHeader);
               long[] features = bytesToLongs(decodedBytes);
@@ -97,13 +97,14 @@ public class FeatureUsageHeaderTest {
     assertThat(result).isEqualTo("success");
 
     // After track, the header should be back to the initial state
-    String finalHeader = FeatureUsageHeader.getValue();
+    String finalHeader = header.getValue();
     assertThat(finalHeader).isEqualTo(initialHeader);
   }
 
   @Test
   public void track_clearsFeatureOnException() {
-    String initialHeader = FeatureUsageHeader.getValue();
+    FeatureUsageHeader header = new FeatureUsageHeader(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    String initialHeader = header.getValue();
     TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // bit 11
 
     IOException thrown =
@@ -117,7 +118,7 @@ public class FeatureUsageHeaderTest {
                     }));
 
     assertThat(thrown).hasMessageThat().isEqualTo("test exception");
-    assertThat(FeatureUsageHeader.getValue()).isEqualTo(initialHeader);
+    assertThat(header.getValue()).isEqualTo(initialHeader);
   }
 
   /** Parameterized tests for feature flag generation based on GCS options. */
@@ -256,8 +257,9 @@ public class FeatureUsageHeaderTest {
 
   private static void verifyHeader(
       GoogleCloudStorageFileSystemOptions options, long expectedHigh, long expectedLow) {
-    FeatureUsageHeader.setConfigFeatures(options);
-    String headerValue = FeatureUsageHeader.getValue();
+    ;
+    FeatureUsageHeader header = new FeatureUsageHeader(options);
+    String headerValue = header.getValue();
     assertThat(headerValue).isNotNull();
     byte[] decodedBytes = Base64.getDecoder().decode(headerValue);
     long[] actualFeatures = bytesToLongs(decodedBytes);

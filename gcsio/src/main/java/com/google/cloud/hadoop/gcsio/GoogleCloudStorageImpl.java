@@ -282,6 +282,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
+  // Feature usage header to track connector features used in requests.
+  private final FeatureUsageHeader featureUsageHeader;
+
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -297,7 +300,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       @Nullable Credentials credentials,
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
-      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      @Nullable FeatureUsageHeader featureUsageHeader)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
@@ -338,6 +342,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : new ChainingHttpRequestInitializer(httpStatistics, finalHttpRequestInitializer);
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+    this.featureUsageHeader = featureUsageHeader;
 
     HttpTransport finalHttpTransport =
         httpTransport == null
@@ -2556,13 +2561,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       setEncryptionHeaders(request);
       setDecryptionHeaders(request);
     }
-
-    setFeatureUsageHeader(request);
+    addFeatureUsageHeader(request);
     return request;
   }
 
-  private <RequestT extends StorageRequest<?>> void setFeatureUsageHeader(RequestT request) {
-    String featureUsageHeaderString = FeatureUsageHeader.getValue();
+  private <RequestT extends StorageRequest<?>> void addFeatureUsageHeader(RequestT request) {
+    String featureUsageHeaderString = this.featureUsageHeader.getValue();
     if (!Strings.isNullOrEmpty(featureUsageHeaderString)) {
       logger.atFiner().log("Setting feature usage header: %s", featureUsageHeaderString);
       request.getRequestHeaders().set(FeatureUsageHeader.NAME, featureUsageHeaderString);
@@ -2669,6 +2673,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract Builder setFeatureUsageHeader(@Nullable FeatureUsageHeader featureUsageHeader);
 
     public abstract GoogleCloudStorageImpl build() throws IOException;
   }

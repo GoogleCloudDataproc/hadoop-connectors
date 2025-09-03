@@ -8,23 +8,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.util.functional.CallableRaisingIOE;
 
 /**
  * Generates the x-goog-storage-hadoop-connector-features header value by combining
  * configuration-derived and request-specific features.
  */
-public final class FeatureUsageHeader {
+public class FeatureUsageHeader {
 
   @VisibleForTesting static final int BITMASK_SIZE = 2;
   @VisibleForTesting static final int HIGH_BITS_INDEX = 0;
   @VisibleForTesting static final int LOW_BITS_INDEX = 1;
-
-  // Cache for the configuration-derived part of the feature bitmask.
-  private static final ConcurrentHashMap<GoogleCloudStorageFileSystemOptions, long[]>
-      configFeaturesCache = new ConcurrentHashMap<>();
-  private static long[] configFeatures = new long[BITMASK_SIZE];
 
   @VisibleForTesting
   static final InheritableThreadLocal<long[]> requestFeatures =
@@ -36,23 +30,11 @@ public final class FeatureUsageHeader {
       };
 
   public static final String NAME = "X-Goog-Storage-Hadoop-Connector-Features";
+  private final long[] configFeatures;
 
-  private FeatureUsageHeader() {}
-
-  /**
-   * Sets the configuration-derived features based on the provided {@link
-   * GoogleCloudStorageFileSystemOptions}. This method caches the computed feature mask to avoid
-   * redundant calculations for the same options.
-   */
-  public static void setConfigFeatures(GoogleCloudStorageFileSystemOptions fsOptions) {
-    configFeatures =
-        configFeaturesCache.computeIfAbsent(
-            fsOptions,
-            opts -> {
-              long[] features = new long[BITMASK_SIZE];
-              populateBitMask(features, opts);
-              return features;
-            });
+  public FeatureUsageHeader(GoogleCloudStorageFileSystemOptions options) {
+    this.configFeatures = new long[BITMASK_SIZE];
+    populateBitMask(configFeatures, options);
   }
 
   /**
@@ -60,7 +42,7 @@ public final class FeatureUsageHeader {
    *
    * @return The Base64 encoded string for the header, or {@code null} if no features are set.
    */
-  public static String getValue() {
+  public String getValue() {
     long[] features = new long[BITMASK_SIZE];
     features[HIGH_BITS_INDEX] =
         configFeatures[HIGH_BITS_INDEX] | requestFeatures.get()[HIGH_BITS_INDEX];
@@ -83,11 +65,8 @@ public final class FeatureUsageHeader {
     }
   }
 
-  /**
-   * Populates the bitmask with features derived from {@link GoogleCloudStorageFileSystemOptions}.
-   */
-  private static void populateBitMask(
-      long[] features, GoogleCloudStorageFileSystemOptions fsOptions) {
+  /** Populates the bitmask with features derived from connector-level options. */
+  private void populateBitMask(long[] features, GoogleCloudStorageFileSystemOptions fsOptions) {
     GoogleCloudStorageOptions storageOptions = fsOptions.getCloudStorageOptions();
     // Fadvise options
     Fadvise fadvise = storageOptions.getReadChannelOptions().getFadvise();

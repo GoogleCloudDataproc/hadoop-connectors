@@ -3900,14 +3900,14 @@ public class GoogleCloudStorageTest {
   @Test
   public void configureRequest_addsCustomHeadersToRequest() throws IOException {
     // Set a known feature header state.
-    GoogleCloudStorageFileSystemOptions options =
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
         GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
             .setCloudStorageOptions(
                 GoogleCloudStorageOptions.DEFAULT.toBuilder()
                     .setHnBucketRenameEnabled(true)
                     .build())
             .build();
-    FeatureUsageHeader.setConfigFeatures(options);
+    FeatureUsageHeader featureUsageHeader = new FeatureUsageHeader(gcsfsOptions);
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     // Create GCS with the options.
@@ -3916,12 +3916,13 @@ public class GoogleCloudStorageTest {
             .setOptions(GCS_OPTIONS)
             .setCredentials(new FakeCredentials())
             .setHttpTransport(transport)
+            .setFeatureUsageHeader(featureUsageHeader)
             .build();
     Storage.Objects.Get testGetRequest =
         gcs.storageRequestFactory.objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
 
-    String expectedHeader = FeatureUsageHeader.getValue();
+    String expectedHeader = featureUsageHeader.getValue();
     // Verify the feature usage and user-agent header was added to the request.
     HttpHeaders headers = testGetRequest.getRequestHeaders();
     assertThat(headers.getUserAgent()).contains("gcsio-unit-test");
