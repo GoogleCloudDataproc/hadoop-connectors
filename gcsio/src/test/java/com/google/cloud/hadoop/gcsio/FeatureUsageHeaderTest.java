@@ -245,10 +245,8 @@ public class FeatureUsageHeaderTest {
   }
 
   private static GoogleCloudStorageFileSystemOptions buildOptionsWithBidi() {
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setBidiEnabled(true).build();
     GoogleCloudStorageOptions storageOptions =
-        GoogleCloudStorageOptions.DEFAULT.toBuilder().setReadChannelOptions(readOptions).build();
+        GoogleCloudStorageOptions.DEFAULT.toBuilder().setBidiEnabled(true).build();
     return GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
         .setCloudStorageOptions(storageOptions)
         .build();
@@ -256,7 +254,6 @@ public class FeatureUsageHeaderTest {
 
   private static void verifyHeader(
       GoogleCloudStorageFileSystemOptions options, long expectedHigh, long expectedLow) {
-    ;
     FeatureUsageHeader header = new FeatureUsageHeader(options);
     String headerValue = header.getValue();
     assertThat(headerValue).isNotNull();

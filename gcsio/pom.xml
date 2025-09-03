@@ -231,12 +231,14 @@
           <dependency>
             <groupId>org.codehaus.groovy</groupId>
             <artifactId>groovy-json</artifactId>
+            <scope>runtime</scope>
             <version>3.0.9</version>
           </dependency>
           <dependency>
             <groupId>org.codehaus.groovy</groupId>
             <artifactId>groovy-templates</artifactId>
             <version>3.0.9</version>
+            <scope>runtime</scope>
           </dependency>
         </dependencies>
         <executions>

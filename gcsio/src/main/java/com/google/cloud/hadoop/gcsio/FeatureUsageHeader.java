@@ -103,7 +103,7 @@ public class FeatureUsageHeader {
     }
 
     // Bidirectional Support
-    if (storageOptions.getReadChannelOptions().isBidiEnabled()) {
+    if (storageOptions.isBidiEnabled()) {
       setBit(features, TrackedFeatures.BIDI_ENABLED.getBitPosition());
     }
 

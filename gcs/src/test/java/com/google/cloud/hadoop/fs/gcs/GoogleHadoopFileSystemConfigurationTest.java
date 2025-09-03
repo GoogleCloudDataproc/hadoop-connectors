@@ -491,9 +491,10 @@ public class GoogleHadoopFileSystemConfigurationTest {
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
     assertThat(options.isCloudLoggingEnabled()).isTrue();
-  
-    @Test
-    public void bidiProperties() {
+  }
+
+  @Test
+  public void bidiProperties() {
     Configuration config = new Configuration();
 
     config.setBoolean("fs.gs.bidi.enable", true);
