@@ -103,7 +103,6 @@ public class GoogleCloudStorageBidiWriteChannelTest {
 
     verify(mockGcsAppendChannel, times(1)).finalizeAndClose();
     verify(mockGcsAppendChannel, times(0)).close();
-
   }
 
   @Test
