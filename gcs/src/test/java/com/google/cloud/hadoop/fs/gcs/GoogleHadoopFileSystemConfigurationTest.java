@@ -136,7 +136,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
-          put("fs.gs.bidi.finalize", false);
+          put("fs.gs.bidi.finalize.on.close", false);
         }
       };
 
@@ -489,7 +489,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.setBoolean("fs.gs.bidi.enable", true);
     config.set("fs.gs.bidi.thread.count", "20");
     config.set("fs.gs.bidi.client.timeout", "40");
-    config.setBoolean("fs.gs.bidi.finalize", true);
+    config.setBoolean("fs.gs.bidi.finalize.on.close", true);
 
     GoogleCloudStorageOptions storageOptions =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
