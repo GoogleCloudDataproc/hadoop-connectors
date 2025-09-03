@@ -136,6 +136,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
+          put("fs.gs.storage.client.cache.enable", false);
         }
       };
 
