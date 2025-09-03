@@ -55,6 +55,17 @@
     return `null` for that file. Supported checksum types are `NONE`, `CRC32C`
     and `MD5`
 
+*   `fs.gs.cloud.logging.enable` (default: `false`)
+
+    If `true`, exports Cloud Storage Connector logs to the GCP Logging service. The service account
+    used by the connector must have `roles/logging.logWriter` IAM permission in the GCP project
+    for this feature to work.
+
+    The logs will be labelled with the log name `gcs-connector`, which will be suffixed with the
+    value of `fs.gs.application.name.suffix` if set. For example, if
+    `fs.gs.application.name.suffix` is set to `my-app`, the log name will be
+    `gcs-connector-my-app`.
+
 *   `fs.gs.status.parallel.enable` (default: `true`)
 
     If `true`, executes Cloud Storage object requests in `FileSystem`'s
@@ -376,6 +387,8 @@ Knobs configure the vectoredRead API
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
     Storage requests.
+    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
+    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
 
 *   `fs.gs.proxy.address` (not set by default)
 
@@ -447,6 +460,22 @@ Knobs configure the vectoredRead API
         bounded range requests when reading non gzip-encoded objects instead of
         streaming requests as soon as first backward read or forward read for
         more than `fs.gs.inputstream.inplace.seek.limit` bytes was detected.
+
+    *   `AUTO_RANDOM` - It is complementing `AUTO` mode which uses sequential
+        mode to start with and adapts to bounded range requests. `AUTO_RANDOM`
+        mode uses bounded channel initially and adapts to sequential requests if
+        consecutive requests are within `fs.gs.inputstream.min.range.request.size`.
+        gzip-encode object will bypass this adoption, it will always be a
+        streaming(unbounded) channel. This helps in cases where egress limits is
+        getting breached for customer because `AUTO` mode will always lead to
+        one unbounded channel for a file. `AUTO_RANDOM` will avoid such unwanted
+        unbounded channels.
+
+*   `fs.gs.fadvise.request.track.count` (default: `3`)
+
+    Self adaptive fadvise mode uses distance between the served requests to
+    decide the access pattern. This property controls how many such requests
+    need to be tracked. It is used when `AUTO_RANDOM` is selected.
 
 *   `fs.gs.inputstream.inplace.seek.limit` (default: `8m`)
 

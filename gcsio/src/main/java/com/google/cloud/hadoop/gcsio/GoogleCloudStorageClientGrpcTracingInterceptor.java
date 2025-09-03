@@ -266,7 +266,8 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
   private class WriteObjectStreamTracer extends TrackingStreamTracer {
 
-    private String streamUploadId = null;
+    private static final String STREAM_UPLOAD_ID_NOT_FOUND = "STREAM_UPLOAD_ID_NOT_FOUND";
+    private String streamUploadId = STREAM_UPLOAD_ID_NOT_FOUND;
 
     WriteObjectStreamTracer(String rpcMethod) {
       super(rpcMethod);
@@ -301,7 +302,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, streamUploadId)
+                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, this.streamUploadId)
                   .put(
                       GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
                       response.getPersistedSize())
@@ -309,7 +310,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     private void updateUploadId(@Nonnull String uploadId) {
-      if (streamUploadId == null) {
+      if (streamUploadId.equals(STREAM_UPLOAD_ID_NOT_FOUND)) {
         this.streamUploadId = uploadId;
       }
       checkState(
