@@ -652,6 +652,22 @@ public class FsBenchmark extends Configured implements Tool {
     // Verify that all threads completed without errors
     futures.forEach(Futures::getUnchecked);
 
+    printReadVectoredStats(
+        readFileBytesList,
+        readFileTimeNsList,
+        openTimeNsList,
+        closeTimeNsList,
+        runtimeSeconds,
+        operations);
+  }
+
+  private void printReadVectoredStats(
+      Set<LongSummaryStatistics> readFileBytesList,
+      Set<LongSummaryStatistics> readFileTimeNsList,
+      Set<LongSummaryStatistics> openTimeNsList,
+      Set<LongSummaryStatistics> closeTimeNsList,
+      double runtimeSeconds,
+      long operations) {
     printSizeStats("Read Bytes ", combineStats(readFileBytesList));
     printTimeStats("Read latency ", combineStats(readFileTimeNsList));
     printTimeStats("Open latency ", combineStats(openTimeNsList));
@@ -686,11 +702,11 @@ public class FsBenchmark extends Configured implements Tool {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     List<FileRange> ranges = new ArrayList<>();
     for (int i = 0; i < numberOfTimesFileRead; i++) {
-      long counter1 = random.nextLong(chunkSize);
-      long counter2 = random.nextLong(chunkSize);
-      ranges.add(
-          new CustomFileRange(
-              chunkSize * i + min(counter1, counter2), Math.toIntExact(abs(counter2 - counter1))));
+      long index1 = random.nextLong(chunkSize);
+      long index2 = random.nextLong(chunkSize);
+      int difference = Math.toIntExact(abs(index2 - index1));
+      long offset = chunkSize * i + min(index1, index2);
+      ranges.add(new CustomFileRange(offset, difference));
     }
     return ranges;
   }
