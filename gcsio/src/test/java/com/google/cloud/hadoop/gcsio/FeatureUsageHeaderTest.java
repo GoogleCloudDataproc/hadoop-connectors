@@ -26,7 +26,6 @@ public class FeatureUsageHeaderTest {
 
   @Before
   public void setUp() {
-    ;
     // Clear any request-specific features.
     FeatureUsageHeader.requestFeatures.set(new long[FeatureUsageHeader.BITMASK_SIZE]);
   }
