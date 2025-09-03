@@ -160,6 +160,10 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isHnOptimizationEnabled();
 
+  public abstract boolean isBidiEnabled();
+
+  public abstract boolean isFinalizeBeforeClose();
+
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
         .setDefaultUserAgent(getAppName())
@@ -259,6 +263,11 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
 
     public abstract Builder setHnOptimizationEnabled(boolean hnOptimizationEnabled);
+
+    /** Sets the property to use the bidirectional Rapid Storage Api. */
+    public abstract Builder setBidiEnabled(boolean bidiEnabled);
+
+    public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
