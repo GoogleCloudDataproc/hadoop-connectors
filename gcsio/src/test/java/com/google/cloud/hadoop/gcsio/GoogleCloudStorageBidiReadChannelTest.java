@@ -11,6 +11,7 @@ import com.google.api.core.ApiFutures;
 import com.google.cloud.storage.Storage;
 import java.io.EOFException;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -213,6 +214,140 @@ public class GoogleCloudStorageBidiReadChannelTest {
         () -> bidiReadChannel.write(ByteBuffer.allocateDirect(0)));
   }
 
+  @Test
+  public void isFooterRead_returnsCorrectBoolean() throws Exception {
+    int minRangeRequestSize = 16;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    GoogleCloudStorageBidiReadChannel channel = getBidiReadChannel(readOptions);
+
+    long footerStartPosition = OBJECT_SIZE - minRangeRequestSize;
+
+    // Test position before the footer
+    channel.position(footerStartPosition - 1);
+    assertFalse(channel.isFooterRead());
+
+    // Test position at the start of the footer
+    channel.position(footerStartPosition);
+    assertTrue(channel.isFooterRead());
+
+    // Test position inside the footer
+    channel.position(OBJECT_SIZE - 1);
+    assertTrue(channel.isFooterRead());
+  }
+
+  @Test
+  public void cacheFooter_populatesFooterContentCorrectly() throws Exception {
+    int minRangeRequestSize = 16;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    GoogleCloudStorageBidiReadChannel channel = getBidiReadChannel(readOptions);
+
+    channel.cacheFooter();
+
+    byte[] footerContent = (byte[]) getPrivateField(channel, "footerContent");
+
+    String expectedFooter =
+        FakeBlobReadSession.TEST_STRING.substring(OBJECT_SIZE - minRangeRequestSize);
+    byte[] expectedFooterBytes = expectedFooter.getBytes(StandardCharsets.UTF_8);
+
+    assertNotNull(footerContent);
+    assertArrayEquals(expectedFooterBytes, footerContent);
+  }
+
+  @Test
+  public void readFromCache_readsCorrectDataAndUpdatesPosition() throws Exception {
+    GoogleCloudStorageBidiReadChannel channel = getMockedBidiReadChannel();
+
+    int footerSize = 16;
+    long footerStartPosition = OBJECT_SIZE - footerSize;
+    String footerString = FakeBlobReadSession.TEST_STRING.substring((int) footerStartPosition);
+    byte[] footerBytes = footerString.getBytes(StandardCharsets.UTF_8);
+
+    setPrivateField(channel, "footerContent", footerBytes);
+    setPrivateField(channel, "objectSize", (long) OBJECT_SIZE);
+
+    long readPosition = footerStartPosition + 4; // Read from 4 bytes into the footer
+    channel.position(readPosition);
+
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    int bytesRead = channel.readFromCache(buffer);
+
+    // We expect to read min(buffer.remaining=10, cache.remaining=12) = 10 bytes
+    assertEquals(10, bytesRead);
+
+    assertEquals(readPosition + bytesRead, channel.position());
+
+    buffer.flip();
+    String bufferContent = StandardCharsets.UTF_8.decode(buffer).toString();
+    String expectedContent = footerString.substring(4, 4 + 10);
+    assertEquals(expectedContent, bufferContent);
+  }
+
+  @Test
+  public void read_triggersFooterCaching() throws Exception {
+    int minRangeRequestSize = 20;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    GoogleCloudStorageBidiReadChannel channel = getBidiReadChannel(readOptions);
+
+    // Verify footer is not initially cached
+    assertNull("Footer should be null initially", getPrivateField(channel, "footerContent"));
+
+    // Position the read within the footer range
+    long readPosition = OBJECT_SIZE - 10;
+    channel.position(readPosition);
+
+    ByteBuffer buffer = ByteBuffer.allocate(5);
+    int bytesRead = channel.read(buffer);
+
+    // Assert that 5 bytes were read and position was updated
+    assertEquals(5, bytesRead);
+    assertEquals(readPosition + 5, channel.position());
+
+    // Verify footer has now been cached
+    byte[] footerContent = (byte[]) getPrivateField(channel, "footerContent");
+    assertNotNull(footerContent);
+    assertEquals(minRangeRequestSize, footerContent.length);
+
+    // Verify the data read into the buffer is correct
+    buffer.flip();
+    String actualContent = StandardCharsets.UTF_8.decode(buffer).toString();
+    String expectedContent =
+        FakeBlobReadSession.TEST_STRING.substring((int) readPosition, (int) readPosition + 5);
+    assertEquals(expectedContent, actualContent);
+  }
+
+  @Test
+  public void read_usesPrePopulatedFooterCache() throws Exception {
+    int footerSize = 20;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(footerSize).build();
+    GoogleCloudStorageBidiReadChannel channel = getBidiReadChannel(readOptions);
+
+    // Manually populate the footer cache to simulate it being pre-cached
+    long footerStartPosition = OBJECT_SIZE - footerSize;
+    String footerString = FakeBlobReadSession.TEST_STRING.substring((int) footerStartPosition);
+    setPrivateField(channel, "footerContent", footerString.getBytes(StandardCharsets.UTF_8));
+
+    // Update position within the pre-cached footer range
+    long readPosition = OBJECT_SIZE - 10;
+    channel.position(readPosition);
+
+    ByteBuffer buffer = ByteBuffer.allocate(8);
+    int bytesRead = channel.read(buffer);
+
+    assertEquals(8, bytesRead);
+    assertEquals(readPosition + 8, channel.position());
+
+    // Verify the data read into the buffer is correct
+    buffer.flip();
+    String actualContent = StandardCharsets.UTF_8.decode(buffer).toString();
+    String expectedContent =
+        FakeBlobReadSession.TEST_STRING.substring((int) readPosition, (int) readPosition + 8);
+    assertEquals(expectedContent, actualContent);
+  }
+
   private String getReadVectoredData(VectoredIORange range)
       throws ExecutionException, InterruptedException, TimeoutException {
     Charset charset = StandardCharsets.UTF_8;
@@ -247,5 +382,26 @@ public class GoogleCloudStorageBidiReadChannelTest {
             .setOffset(65)
             .setData(new CompletableFuture<>())
             .build());
+  }
+
+  private GoogleCloudStorageBidiReadChannel getBidiReadChannel(
+      GoogleCloudStorageReadOptions readOptions) throws IOException {
+    Storage storage = mock(Storage.class);
+    when(storage.blobReadSession(any()))
+        .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
+    return new GoogleCloudStorageBidiReadChannel(
+        storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+  }
+
+  private Object getPrivateField(Object obj, String fieldName) throws Exception {
+    Field field = obj.getClass().getDeclaredField(fieldName);
+    field.setAccessible(true);
+    return field.get(obj);
+  }
+
+  private void setPrivateField(Object obj, String fieldName, Object value) throws Exception {
+    Field field = obj.getClass().getDeclaredField(fieldName);
+    field.setAccessible(true);
+    field.set(obj, value);
   }
 }
