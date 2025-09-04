@@ -557,30 +557,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   private void skipInPlace(long seekDistance) {
-    if (skipBuffer == null) {
-      skipBuffer = new byte[SKIP_BUFFER_SIZE];
-    }
-    while (seekDistance > 0 && contentChannel != null) {
-      try {
-        int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
-        int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
-        if (bytesRead < 0) {
-          // Shouldn't happen since we called validatePosition prior to this loop.
-          logger.atInfo().log(
-              "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
-              bytesRead, seekDistance, currentPosition, size);
-          closeContentChannel();
-        } else {
-          seekDistance -= bytesRead;
-          contentChannelPosition += bytesRead;
-        }
-      } catch (IOException e) {
-        GoogleCloudStorageEventBus.postOnException();
-        logger.atInfo().withCause(e).log(
-            "Got an IO exception on contentChannel.read(), a lazy-seek will be pending for '%s'",
-            resourceId);
-        closeContentChannel();
-      }
+    try {
+      contentChannelPosition += skip(contentChannel, seekDistance);
+    } catch (IOException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      logger.atInfo().withCause(e).log(
+          "Got an IO exception on contentChannel.read(), a lazy-seek will be pending for '%s'",
+          resourceId);
+      closeContentChannel();
     }
     checkState(
         contentChannel == null || contentChannelPosition == currentPosition,
@@ -588,6 +572,27 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             + " after successful in-place skip",
         contentChannelPosition,
         currentPosition);
+  }
+
+  private long skip(ReadableByteChannel channel, long bytesToSkip) throws IOException {
+    if (skipBuffer == null) {
+      skipBuffer = new byte[SKIP_BUFFER_SIZE];
+    }
+    long totalBytesSkipped = 0;
+    while (bytesToSkip > 0) {
+      int bufferSize = toIntExact(min(skipBuffer.length, bytesToSkip));
+      int bytesRead = channel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+      if (bytesRead < 0) {
+        throw new EOFException(
+            String.format(
+                "Unexpected end of stream trying to skip %d bytes to seek to position %d,"
+                    + " size: %d for '%s'",
+                bytesToSkip, currentPosition, size, resourceId));
+      }
+      bytesToSkip -= bytesRead;
+      totalBytesSkipped += bytesRead;
+    }
+    return totalBytesSkipped;
   }
 
   /**
@@ -1037,23 +1042,9 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       if (contentChannelPosition < currentPosition) {
         long bytesToSkip = currentPosition - contentChannelPosition;
         logger.atFiner().log(
-            "Skipping %d bytes from %d position to %d position for '%s'",
+            "Skipping %d bytes from %d to %d position for '%s'",
             bytesToSkip, contentChannelPosition, currentPosition, resourceId);
-        if (skipBuffer == null) {
-          skipBuffer = new byte[SKIP_BUFFER_SIZE];
-        }
-        while (bytesToSkip > 0) {
-          int bytesRead =
-              contentStream.read(skipBuffer, 0, toIntExact(min(bytesToSkip, skipBuffer.length)));
-          if (bytesRead < 0) {
-            throw new EOFException(
-                String.format(
-                    "Unexpected end of stream trying to skip %d bytes to seek to position %d, size: %d for '%s'",
-                    bytesToSkip, currentPosition, size, resourceId));
-          }
-          bytesToSkip -= bytesRead;
-          contentChannelPosition += bytesRead;
-        }
+        contentChannelPosition += skip(Channels.newChannel(contentStream), bytesToSkip);
       }
 
       checkState(
