@@ -3869,6 +3869,11 @@ public class GoogleCloudStorageTest {
             .setOptions(GCS_OPTIONS)
             .setCredentials(new FakeCredentials())
             .setHttpTransport(transport)
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(GCS_OPTIONS)
+                        .build()))
             .build();
 
     Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
@@ -3887,6 +3892,11 @@ public class GoogleCloudStorageTest {
             .setCredentials(new FakeCredentials())
             .setHttpTransport(transport)
             .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(GCS_OPTIONS)
+                        .build()))
             .build();
 
     Storage.Objects.Get testGetRequest =

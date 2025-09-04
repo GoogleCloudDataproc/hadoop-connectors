@@ -41,6 +41,11 @@ public class MockGoogleCloudStorageImplFactory {
       HttpRequestInitializer httpRequestInitializer)
       throws IOException {
     return GoogleCloudStorageImpl.builder()
+        .setFeatureUsageHeader(
+            new FeatureUsageHeader(
+                GoogleCloudStorageFileSystemOptions.builder()
+                    .setCloudStorageOptions(options)
+                    .build()))
         .setOptions(options)
         .setCredentials(new FakeCredentials())
         .setHttpTransport(transport)
@@ -67,6 +72,11 @@ public class MockGoogleCloudStorageImplFactory {
                     .setDefaultUserAgent("gcsio-unit-test")
                     .build()))
         .setClientLibraryStorage(storage)
+        .setFeatureUsageHeader(
+            new FeatureUsageHeader(
+                GoogleCloudStorageFileSystemOptions.builder()
+                    .setCloudStorageOptions(options)
+                    .build()))
         .build();
   }
 
