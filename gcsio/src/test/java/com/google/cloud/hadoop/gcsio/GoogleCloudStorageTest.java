@@ -196,6 +196,11 @@ public class GoogleCloudStorageTest {
         GoogleCloudStorageImpl.builder()
             .setOptions(options)
             .setCredentials(new FakeCredentials())
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(options)
+                        .build()))
             .build();
 
     assertThat(gcsImpl.storage.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
