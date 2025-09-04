@@ -31,16 +31,7 @@ import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.ListObjectOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
-import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
@@ -81,6 +72,11 @@ public class GoogleCloudStorageTestHelper {
       return GoogleCloudStorageImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
           .setCredentials(getCredentials())
+          .setFeatureUsageHeader(
+              new FeatureUsageHeader(
+                  GoogleCloudStorageFileSystemOptions.builder()
+                      .setCloudStorageOptions(getStandardOptionBuilder().build())
+                      .build()))
           .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);

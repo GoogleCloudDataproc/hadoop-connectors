@@ -24,15 +24,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.io.CharStreams;
@@ -184,6 +177,11 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
                     .setOptions(gcsOptions)
                     .setCredentials(httpRequestsInitializer.getCredentials())
                     .setHttpRequestInitializer(gcsRequestsTracker)
+                    .setFeatureUsageHeader(
+                        new FeatureUsageHeader(
+                            GoogleCloudStorageFileSystemOptions.builder()
+                                .setCloudStorageOptions(gcsOptions)
+                                .build()))
                     .build(),
                 GoogleCloudStorageFileSystemOptions.builder()
                     .setCloudStorageOptions(gcsOptions)

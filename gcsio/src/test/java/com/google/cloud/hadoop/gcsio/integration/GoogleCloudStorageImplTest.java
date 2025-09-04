@@ -30,19 +30,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
-import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
-import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
-import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
-import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -827,11 +815,21 @@ public class GoogleCloudStorageImplTest {
                     .setCredentials(credentials)
                     .setHttpRequestInitializer(httpRequestInitializer)
                     .setGRPCInterceptors(grpcRequestInterceptors)
+                    .setFeatureUsageHeader(
+                        new FeatureUsageHeader(
+                            GoogleCloudStorageFileSystemOptions.builder()
+                                .setCloudStorageOptions(options)
+                                .build()))
                     .build()
                 : GoogleCloudStorageImpl.builder()
                     .setOptions(options)
                     .setCredentials(credentials)
                     .setHttpRequestInitializer(httpRequestInitializer)
+                    .setFeatureUsageHeader(
+                        new FeatureUsageHeader(
+                            GoogleCloudStorageFileSystemOptions.builder()
+                                .setCloudStorageOptions(options)
+                                .build()))
                     .build(),
         credentials);
   }
@@ -843,8 +841,21 @@ public class GoogleCloudStorageImplTest {
         ? GoogleCloudStorageClientImpl.builder()
             .setOptions(options)
             .setCredentials(credentials)
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(options)
+                        .build()))
             .build()
-        : GoogleCloudStorageImpl.builder().setOptions(options).setCredentials(credentials).build();
+        : GoogleCloudStorageImpl.builder()
+            .setOptions(options)
+            .setCredentials(credentials)
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(options)
+                        .build()))
+            .build();
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
