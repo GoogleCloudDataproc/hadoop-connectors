@@ -67,7 +67,9 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setHnBucketRenameEnabled(false)
         .setGrpcWriteEnabled(false)
-        .setMoveOperationEnabled(false);
+        .setMoveOperationEnabled(false)
+        .setBidiEnabled(false)
+        .setFinalizeBeforeClose(false);
   }
 
   public abstract Builder toBuilder();
@@ -147,6 +149,10 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isOperationTraceLogEnabled();
 
   public abstract boolean isMoveOperationEnabled();
+
+  public abstract boolean isBidiEnabled();
+
+  public abstract boolean isFinalizeBeforeClose();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -236,6 +242,11 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcWriteEnabled(boolean grpcWriteEnabled);
 
     public abstract Builder setMoveOperationEnabled(boolean moveOperationEnabled);
+
+    /** Sets the property to use the bidirectional Rapid Storage Api. */
+    public abstract Builder setBidiEnabled(boolean bidiEnabled);
+
+    public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

@@ -212,8 +212,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    return new GoogleCloudStorageClientWriteChannel(
-        storage, storageOptions, resourceIdWithGeneration, options);
+    if (storageOptions.isBidiEnabled()) {
+      return new GoogleCloudStorageBidiWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    } else {
+      return new GoogleCloudStorageClientWriteChannel(
+          storage, storageOptions, resourceIdWithGeneration, options);
+    }
   }
 
   /**
@@ -1192,7 +1197,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
-    if (readOptions.isBidiEnabled()) {
+    if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storage,
           gcsItemInfo,
@@ -1206,16 +1211,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
     if (boundedThreadPool == null) {
-      new ThreadPoolExecutor(
-          bidiThreadCount,
-          bidiThreadCount,
-          0L,
-          TimeUnit.MILLISECONDS,
-          taskQueue,
-          new ThreadFactoryBuilder()
-              .setNameFormat("bidiRead-range-pool-%d")
-              .setDaemon(true)
-              .build());
+      boundedThreadPool =
+          new ThreadPoolExecutor(
+              bidiThreadCount,
+              bidiThreadCount,
+              0L,
+              TimeUnit.MILLISECONDS,
+              taskQueue,
+              new ThreadFactoryBuilder()
+                  .setNameFormat("bidiRead-range-pool-%d")
+                  .setDaemon(true)
+                  .build());
     }
     return boundedThreadPool;
   }
