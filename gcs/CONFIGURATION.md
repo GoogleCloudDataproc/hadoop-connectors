@@ -461,6 +461,22 @@ Knobs configure the vectoredRead API
         streaming requests as soon as first backward read or forward read for
         more than `fs.gs.inputstream.inplace.seek.limit` bytes was detected.
 
+    *   `AUTO_RANDOM` - It is complementing `AUTO` mode which uses sequential
+        mode to start with and adapts to bounded range requests. `AUTO_RANDOM`
+        mode uses bounded channel initially and adapts to sequential requests if
+        consecutive requests are within `fs.gs.inputstream.min.range.request.size`.
+        gzip-encode object will bypass this adoption, it will always be a
+        streaming(unbounded) channel. This helps in cases where egress limits is
+        getting breached for customer because `AUTO` mode will always lead to
+        one unbounded channel for a file. `AUTO_RANDOM` will avoid such unwanted
+        unbounded channels.
+
+*   `fs.gs.fadvise.request.track.count` (default: `3`)
+
+    Self adaptive fadvise mode uses distance between the served requests to
+    decide the access pattern. This property controls how many such requests
+    need to be tracked. It is used when `AUTO_RANDOM` is selected.
+
 *   `fs.gs.inputstream.inplace.seek.limit` (default: `8m`)
 
     If forward seeks are within this many bytes of the current position, seeks
@@ -498,6 +514,14 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
    * `CHUNK_UPLOAD` uploads file in chunks, size of chunks are configurable via
      `fs.gs.outputstream.upload.chunk.size`
+
+
+### Bidi configurations
+
+* `fs.gs.bidi.enable` (default: `false`) is effective only if grpc is enabled.
+* `fs.gs.bidi.finalize.on.close` (default: `false`)
+     This property is valid for writing to appendable objects with the bidi channel.
+     If set to false, the object will not be finalized when the channel is closed.
 
 ### Performance cache configuration
 

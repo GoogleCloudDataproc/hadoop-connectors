@@ -39,6 +39,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -185,6 +186,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           if (channel instanceof ReadVectoredSeekableByteChannel) {
             ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
                 (ReadVectoredSeekableByteChannel) channel;
+            ranges.forEach(
+                range -> {
+                  CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+                  range.setData(result);
+                });
             readVectoredSeekableByteChannelChannel.readVectored(
                 ranges.stream()
                     .map(
