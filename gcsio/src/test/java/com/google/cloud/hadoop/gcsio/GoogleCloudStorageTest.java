@@ -800,6 +800,11 @@ public class GoogleCloudStorageTest {
     int uploadChunkSize = testData.length / 2;
     int uploadCacheSize = testData.length * 2;
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(ByteBuffer.wrap(testData));
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
@@ -817,7 +822,7 @@ public class GoogleCloudStorageTest {
             emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (3 * uploadChunkSize - 1)),
             jsonDataResponse(
-                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                newStorageObject(BUCKET_NAME, OBJECT_NAME).setCrc32c(expectedCrc32c)
                     .setSize(BigInteger.valueOf(2 * testData.length))));
 
     AsyncWriteChannelOptions writeOptions =
