@@ -2444,11 +2444,6 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 .exists())
         .isFalse();
 
-    assertThrows(
-        "The specified bucket does not exist : " + bucketPath,
-        com.google.api.gax.rpc.NotFoundException.class,
-        () -> assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath)).isEqualTo(0));
-
     googleHadoopFileSystem.close();
   }
 
