@@ -3904,8 +3904,7 @@ public class GoogleCloudStorageTest {
   static String calculateCrc32cFromBytes(byte[] data) {
     Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
     testCrc32cHasher.putBytes(data);
-    return
-        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+    return BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
   }
 
   static Bucket newBucket(String name) {
