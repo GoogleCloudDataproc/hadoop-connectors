@@ -45,6 +45,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private long position = 0;
   private final GoogleCloudStorageReadOptions readOptions;
   private byte[] footerContent;
+  private ByteBuffer internalBuffer;
+  private long bufferStartPosition = -1;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -82,6 +84,10 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     return readSession;
   }
 
+  public long getBufferStartPosition() {
+    return bufferStartPosition;
+  }
+
   @Override
   public int read(ByteBuffer dst) throws IOException {
     throwIfNotOpen();
@@ -102,8 +108,20 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       return bytesReadFromCache.get();
     }
 
-    // If not handled by the cache, perform a standard read.
-    return performStandardRead(dst);
+    if (isBufferValid()) return readBytesFromInternalBuffer(dst);
+
+    if (dst.remaining() >= readOptions.getMinRangeRequestSize()) {
+      return performStandardRead(dst);
+    }
+
+    // For small requests, refill the buffer using the same consistent chunk size.
+    refillInternalBuffer();
+
+    // Tried to refill buffer but buffer is still invalid, it means there was no data left to get.
+    // Therefore, we have reached the end of the file and must return -1.
+    if (!isBufferValid()) return -1;
+
+    return readBytesFromInternalBuffer(dst);
   }
 
   @Override
@@ -124,6 +142,13 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         "Seek from %d to %d position for '%s'", this.position, newPosition, resourceId);
 
     this.position = newPosition;
+
+    if (isBufferValid()) {
+      internalBuffer.position((int) (newPosition - bufferStartPosition));
+    } else {
+      invalidateBuffer();
+    }
+
     return this;
   }
 
@@ -373,6 +398,62 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
     // If neither case was met, this read is not for the footer.
     return Optional.empty();
+  }
+
+  // Helper functions for the Look ahead read buffer.
+  public boolean isBufferValid() {
+    return internalBuffer != null
+        && position >= bufferStartPosition
+        && position < bufferStartPosition + internalBuffer.limit();
+  }
+
+  @VisibleForTesting
+  public void invalidateBuffer() {
+    internalBuffer = null;
+    bufferStartPosition = -1;
+  }
+
+  @VisibleForTesting
+  public int readBytesFromInternalBuffer(ByteBuffer dst) {
+    int bytesToRead = Math.min(dst.remaining(), internalBuffer.remaining());
+    if (bytesToRead == 0) return 0;
+
+    byte[] tempArray = new byte[bytesToRead];
+    internalBuffer.get(tempArray);
+    dst.put(tempArray);
+
+    position += bytesToRead;
+    return bytesToRead;
+  }
+
+  /** Refills the internal buffer by fetching a fixed-size chunk from GCS. */
+  @VisibleForTesting
+  public void refillInternalBuffer() throws IOException {
+    invalidateBuffer();
+    if (position >= objectSize) return;
+
+    long bytesToRequest = Math.min(readOptions.getMinRangeRequestSize(), objectSize - position);
+
+    if (bytesToRequest <= 0) return;
+
+    try {
+      ApiFuture<DisposableByteString> futureBytes =
+          blobReadSession.readAs(
+              ReadProjectionConfigs.asFutureByteString()
+                  .withRangeSpec(RangeSpec.of(position, bytesToRequest)));
+
+      try (DisposableByteString dbs =
+          futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
+        ByteString byteString = dbs.byteString();
+        if (!byteString.isEmpty()) {
+          this.bufferStartPosition = position;
+          this.internalBuffer = byteString.asReadOnlyByteBuffer();
+        }
+      }
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      throw new IOException(
+          String.format("Read failed on %s at position %d", resourceId, position), e);
+    }
   }
 
   /**
