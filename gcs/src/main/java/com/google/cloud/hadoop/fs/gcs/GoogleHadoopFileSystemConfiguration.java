@@ -222,6 +222,13 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.batch.threads", GoogleCloudStorageOptions.DEFAULT.getBatchThreads());
 
   /**
+   * Configuration key for number of request to track for adapting the access pattern i.e. fadvise:
+   * AUTO & AUTO_RANDOM.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_FADVISE_REQUEST_TRACK_COUNT =
+      new HadoopConfigurationProperty<>("fs.gs.fadvise.request.track.count", 3);
+
+  /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
    * has the same effect as Copy request, but it can handle moving large objects that may
    * potentially time out a Copy request.
@@ -580,7 +587,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Flag to enable the bidirectional Rapid Storage API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.bidi.enable", GoogleCloudStorageReadOptions.DEFAULT.isBidiEnabled());
+          "fs.gs.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiEnabled());
 
   /**
    * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
@@ -595,6 +602,13 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.bidi.client.timeout",
           GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
+
+  /** Flag to enable finalizing object before closing bidi write channel. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.bidi.finalize.on.close",
+              GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
@@ -659,7 +673,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
-        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
+        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
+        .setFinalizeBeforeClose(
+            GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -698,8 +715,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
-        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .build();
   }

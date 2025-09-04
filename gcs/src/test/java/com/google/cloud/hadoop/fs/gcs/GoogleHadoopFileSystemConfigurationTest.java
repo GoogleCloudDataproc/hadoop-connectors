@@ -130,11 +130,13 @@ public class GoogleHadoopFileSystemConfigurationTest {
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
+          put("fs.gs.fadvise.request.track.count", 3);
           put("fs.gs.operation.move.enable", false);
           put("fs.gs.write.rolling.checksum.enable", false);
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
+          put("fs.gs.bidi.finalize.on.close", false);
         }
       };
 
@@ -378,7 +380,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getInplaceSeekLimit()).isEqualTo(3L);
     assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
     assertThat(options.getBidiThreadCount()).isEqualTo(5);
-    assertThat(options.isBidiEnabled()).isTrue();
     assertThat(options.getBidiClientTimeout()).isEqualTo(6);
   }
 
@@ -479,5 +480,24 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+  }
+
+  @Test
+  public void bidiProperties() {
+    Configuration config = new Configuration();
+
+    config.setBoolean("fs.gs.bidi.enable", true);
+    config.set("fs.gs.bidi.thread.count", "20");
+    config.set("fs.gs.bidi.client.timeout", "40");
+    config.setBoolean("fs.gs.bidi.finalize.on.close", true);
+
+    GoogleCloudStorageOptions storageOptions =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+    GoogleCloudStorageReadOptions readOptions = storageOptions.getReadChannelOptions();
+
+    assertThat(storageOptions.isBidiEnabled()).isEqualTo(true);
+    assertThat(storageOptions.isFinalizeBeforeClose()).isEqualTo(true);
+    assertThat(readOptions.getBidiThreadCount()).isEqualTo(20);
+    assertThat(readOptions.getBidiClientTimeout()).isEqualTo(40);
   }
 }
