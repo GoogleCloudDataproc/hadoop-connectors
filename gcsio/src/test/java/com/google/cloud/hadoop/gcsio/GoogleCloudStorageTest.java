@@ -213,13 +213,19 @@ public class GoogleCloudStorageTest {
   public void testCreateObjectNormalOperation() throws Exception {
     byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09};
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             jsonErrorResponse(ErrorResponses.NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
@@ -251,12 +257,18 @@ public class GoogleCloudStorageTest {
     int generationId = 13;
     byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09};
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
@@ -486,6 +498,11 @@ public class GoogleCloudStorageTest {
     int uploadChunkSize = testData.length * 2;
     int uploadCacheSize = testData.length * 2;
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
@@ -494,7 +511,8 @@ public class GoogleCloudStorageTest {
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     AsyncWriteChannelOptions writeOptions =
         AsyncWriteChannelOptions.builder()
@@ -537,6 +555,11 @@ public class GoogleCloudStorageTest {
     new Random().nextBytes(testData);
     int uploadChunkSize = testData.length * 2;
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
@@ -546,7 +569,8 @@ public class GoogleCloudStorageTest {
             emptyResponse(STATUS_CODE_RESUME_INCOMPLETE),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     AsyncWriteChannelOptions writeOptions =
         AsyncWriteChannelOptions.builder().setUploadChunkSize(uploadChunkSize).build();
@@ -616,6 +640,11 @@ public class GoogleCloudStorageTest {
     byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
     new Random().nextBytes(testData);
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
@@ -623,7 +652,8 @@ public class GoogleCloudStorageTest {
             emptyResponse(408), // HTTP 408 Request Timeout
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
@@ -684,6 +714,11 @@ public class GoogleCloudStorageTest {
     int uploadChunkSize = testData.length / 2;
     int uploadCacheSize = testData.length * 2;
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
@@ -698,7 +733,8 @@ public class GoogleCloudStorageTest {
                 .addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     AsyncWriteChannelOptions writeOptions =
         AsyncWriteChannelOptions.builder()
@@ -747,6 +783,12 @@ public class GoogleCloudStorageTest {
     int uploadChunkSize = testData.length * 2;
     int uploadCacheSize = testData.length * 2;
 
+    Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
+    testCrc32cHasher.putBytes(testData);
+    testCrc32cHasher.putBytes(testData);
+    String expectedCrc32c =
+        BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
+
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
@@ -755,7 +797,8 @@ public class GoogleCloudStorageTest {
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(expectedCrc32c)));
 
     AsyncWriteChannelOptions writeOptions =
         AsyncWriteChannelOptions.builder()
@@ -801,7 +844,8 @@ public class GoogleCloudStorageTest {
     int uploadCacheSize = testData.length * 2;
 
     Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
-    testCrc32cHasher.putBytes(ByteBuffer.wrap(testData));
+    testCrc32cHasher.putBytes(testData);
+    testCrc32cHasher.putBytes(testData);
     String expectedCrc32c =
         BaseEncoding.base64().encode(Ints.toByteArray(testCrc32cHasher.hash().asInt()));
 
@@ -822,7 +866,8 @@ public class GoogleCloudStorageTest {
             emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (3 * uploadChunkSize - 1)),
             jsonDataResponse(
-                newStorageObject(BUCKET_NAME, OBJECT_NAME).setCrc32c(expectedCrc32c)
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setCrc32c(expectedCrc32c)
                     .setSize(BigInteger.valueOf(2 * testData.length))));
 
     AsyncWriteChannelOptions writeOptions =
