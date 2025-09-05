@@ -355,7 +355,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  public void loggingInterceptorCleanedUpOnClose() throws Exception {
+  public void close_whenCloudLoggingEnabled_loggingInterceptorIsClosedAndRemoved()
+      throws Exception {
     Configuration conf = new Configuration();
     conf.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE.getKey(), true);
     // Provide credentials config to satisfy initialize()
@@ -397,7 +398,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  public void loggingInterceptorCloseFails() throws Exception {
+  public void
+      close_whenCloudLoggingEnabled_loggingInterceptorCloseFails_exceptionIsLoggedAndNotThrown()
+          throws Exception {
     Configuration conf = new Configuration();
     conf.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE.getKey(), true);
     // Provide credentials config to satisfy initialize()
