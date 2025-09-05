@@ -131,21 +131,22 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     checkNotNull(options, "options must not be null");
-
-    switch (options.getClientType()) {
-      case STORAGE_CLIENT:
-        return GoogleCloudStorageClientImpl.builder()
-            .setOptions(options.getCloudStorageOptions())
-            .setCredentials(credentials)
-            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .build();
-      default:
-        return GoogleCloudStorageImpl.builder()
-            .setOptions(options.getCloudStorageOptions())
-            .setCredentials(credentials)
-            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .build();
+    FeatureUsageHeader featureUsageHeader = new FeatureUsageHeader(options);
+    if (Objects.requireNonNull(options.getClientType())
+        == GoogleCloudStorageFileSystemOptions.ClientType.STORAGE_CLIENT) {
+      return GoogleCloudStorageClientImpl.builder()
+          .setOptions(options.getCloudStorageOptions())
+          .setCredentials(credentials)
+          .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+          .setFeatureUsageHeader(featureUsageHeader)
+          .build();
     }
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(options.getCloudStorageOptions())
+        .setCredentials(credentials)
+        .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+        .setFeatureUsageHeader(featureUsageHeader)
+        .build();
   }
 
   /**

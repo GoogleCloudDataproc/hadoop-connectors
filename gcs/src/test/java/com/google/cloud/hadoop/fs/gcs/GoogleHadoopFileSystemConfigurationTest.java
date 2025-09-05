@@ -483,6 +483,17 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
+  public void cloudLoggingEnabled_isSettable() {
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.cloud.logging.enable", true);
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.isCloudLoggingEnabled()).isTrue();
+  }
+
+  @Test
   public void bidiProperties() {
     Configuration config = new Configuration();
 
