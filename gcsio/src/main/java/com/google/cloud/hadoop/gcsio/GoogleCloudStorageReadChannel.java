@@ -574,7 +574,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         currentPosition);
   }
 
-  private long skip(ReadableByteChannel channel, long bytesToSkip) throws IOException {
+  // Reading into a buffer using `read` is more reliable which has retry logic built around it than
+  // `InputStream.skip()`, which states that it
+  // "may, for a variety of reasons, end up skipping over some smaller number of bytes, possibly 0",
+  // which may or may not be because of EOF.
+  // This implementation is also consistent with gRPC.
+  private long skip(@Nonnull ReadableByteChannel channel, long bytesToSkip) throws IOException {
     if (skipBuffer == null) {
       skipBuffer = new byte[SKIP_BUFFER_SIZE];
     }

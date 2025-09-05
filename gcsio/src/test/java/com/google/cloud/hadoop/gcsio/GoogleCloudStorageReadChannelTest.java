@@ -899,7 +899,7 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
-  public void openStream_gzipped_throwsEofException_onPrematureEofInSkip() throws IOException {
+  public void openStream_gzipped_onPrematureEofInSkip_throwsEofException() throws IOException {
     // Setup: Mock transport to return an InputStream that immediately signals EOF.
     MockHttpTransport transport =
         mockTransport(
