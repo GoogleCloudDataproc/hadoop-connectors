@@ -3948,7 +3948,7 @@ public class GoogleCloudStorageTest {
     assertThat(headers.getUserAgent()).contains("gcsio-unit-test");
     assertThat(headers.get(FeatureUsageHeader.NAME)).isEqualTo(expectedHeader);
   }
-  
+
   static String calculateCrc32cFromBytes(byte[] data) {
     Hasher testCrc32cHasher = Hashing.crc32c().newHasher();
     testCrc32cHasher.putBytes(data);
