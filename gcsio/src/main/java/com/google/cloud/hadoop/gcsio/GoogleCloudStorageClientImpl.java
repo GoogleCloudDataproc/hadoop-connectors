@@ -1494,6 +1494,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       logger.atFiner().log("Setting useragent %s", appName);
       headersBuilder.put(USER_AGENT, appName);
     }
+    if (featureUsageHeader == null) {
+      return headersBuilder.build();
+    }
     String featureUsageString = featureUsageHeader.getValue();
     if (!Strings.isNullOrEmpty(featureUsageString)) {
       logger.atFiner().log("Setting feature usage header %s", featureUsageString);

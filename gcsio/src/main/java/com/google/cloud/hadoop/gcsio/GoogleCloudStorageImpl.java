@@ -2566,6 +2566,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   private <RequestT extends StorageRequest<?>> void addFeatureUsageHeader(RequestT request) {
+    if (featureUsageHeader == null) {
+      return;
+    }
     String featureUsageHeaderString = this.featureUsageHeader.getValue();
     if (!Strings.isNullOrEmpty(featureUsageHeaderString)) {
       logger.atFiner().log("Setting feature usage header: %s", featureUsageHeaderString);
