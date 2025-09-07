@@ -2,6 +2,7 @@
 
 ## Next
 1. Add listStatusStartingFrom API.
+1. PR #1484 - [Feature] Enabled write checksum by default
 
 ## 3.1.5 - 2025-09-01
 1. Fix cloud logging issue.
