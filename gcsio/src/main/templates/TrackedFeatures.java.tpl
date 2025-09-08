@@ -6,8 +6,8 @@ package com.google.cloud.hadoop.gcsio;
 
 public enum TrackedFeatures {
 <% features.eachWithIndex { feature, i -> %>
-    ${feature.name}(${feature.bit_position})${ i < features.size() - 1 ? ',' : '' }
-<% } %>;
+    ${feature.name}(${feature.bit_position})${ i < features.size() - 1 ? ',' : ';' }<%
+} %>
 
     private final int bitPosition;
 

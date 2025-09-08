@@ -13,6 +13,19 @@ def features = jsonPath.withReader("UTF-8") { reader ->
     new JsonSlurper().parse(reader).features
 }
 
+// Validate features for duplicates
+def featureNames = features*.name
+if (featureNames.size() != featureNames.toSet().size()) {
+    throw new IllegalStateException(
+            "Duplicate feature names found in feature-map.json. Please ensure all names are unique.")
+}
+
+def bitPositions = features*.bit_position
+if (bitPositions.size() != bitPositions.toSet().size()) {
+    throw new IllegalStateException(
+            "Duplicate bit_positions found in feature-map.json. Please ensure all bit positions are unique.")
+}
+
 // Process the template
 def template = new SimpleTemplateEngine().createTemplate(templatePath).make(["features": features])
 
