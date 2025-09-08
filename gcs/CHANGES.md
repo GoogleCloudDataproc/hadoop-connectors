@@ -2,6 +2,7 @@
 
 ## Next
 1. PR #1484 - [Feature] Enabled write checksum by default
+2. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
 
 ## 3.0.10 - 2025-08-12
 1. PR #1396 - [Bug] Throw correct exception when DeleteFolderOperation is timed out
