@@ -17,8 +17,8 @@ import org.apache.hadoop.util.functional.CallableRaisingIOE;
 public class FeatureUsageHeader {
 
   @VisibleForTesting static final int BITMASK_SIZE = 2;
-  @VisibleForTesting static final int LOW_BITS_INDEX = 0;
-  @VisibleForTesting static final int HIGH_BITS_INDEX = 1;
+  @VisibleForTesting static final int LOW_BITS_INDEX = 1;
+  @VisibleForTesting static final int HIGH_BITS_INDEX = 0;
 
   @VisibleForTesting
   static final InheritableThreadLocal<long[]> requestFeatures =
