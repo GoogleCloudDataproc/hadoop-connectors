@@ -325,8 +325,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       finalHttpRequestInitializer =
           new RetryHttpInitializer(finalCredentials, options.toRetryHttpInitializerOptions());
     } else {
-      logger.atWarning().log(
-          "ALERT: Overriding httpRequestInitializer - this should not be done in production!");
       finalHttpRequestInitializer = httpRequestInitializer;
     }
     this.httpRequestInitializer =
