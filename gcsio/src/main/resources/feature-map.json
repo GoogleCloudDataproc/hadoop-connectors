@@ -43,6 +43,10 @@
     {
       "name": "BIDI_ENABLED",
       "bit_position": 10
+    },
+    {
+      "name": "RENAME_API",
+      "bit_position": 11
     }
   ]
 }
