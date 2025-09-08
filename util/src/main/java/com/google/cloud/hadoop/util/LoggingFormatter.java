@@ -3,6 +3,7 @@ package com.google.cloud.hadoop.util;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
@@ -51,7 +52,7 @@ public class LoggingFormatter extends Formatter {
     if (shouldFormat) {
       // Prefix the invocation ID to the log message.
       messageToFormat =
-          String.format("[%s]: %s", invocationId, originalMessage == null ? "" : originalMessage);
+          String.format("[%s]: %s", invocationId, Objects.toString(originalMessage, ""));
     }
 
     if (existingFormatter != null) {
@@ -59,7 +60,7 @@ public class LoggingFormatter extends Formatter {
       return existingFormatter.format(record);
     }
     // Otherwise, return the message as-is with a newline.
-    return String.format("%s%n", messageToFormat == null ? "" : messageToFormat);
+    return String.format("%s%n", Objects.toString(messageToFormat, ""));
   }
 
   /**
