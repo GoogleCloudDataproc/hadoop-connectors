@@ -1,0 +1,48 @@
+{
+  "features": [
+    {
+      "name": "FADVISE_AUTO",
+      "bit_position": 0
+    },
+    {
+      "name": "FADVISE_RANDOM",
+      "bit_position": 1
+    },
+    {
+      "name": "FADVISE_SEQUENTIAL",
+      "bit_position": 2
+    },
+    {
+      "name": "FADVISE_AUTORANDOM",
+      "bit_position": 3
+    },
+    {
+      "name": "HIERARCHICAL_NAMESPACE_ENABLED",
+      "bit_position": 4
+    },
+    {
+      "name": "PERFORMANCE_CACHE_ENABLED",
+      "bit_position": 5
+    },
+    {
+      "name": "CLOUD_LOGGING_ENABLED",
+      "bit_position": 6
+    },
+    {
+      "name": "TRACE_LOG_ENABLED",
+      "bit_position": 7
+    },
+    {
+      "name": "OPERATION_TRACE_LOG_ENABLED",
+      "bit_position": 8
+    },
+    {
+      "name": "DIRECT_UPLOAD_ENABLED",
+      "bit_position": 9
+    },
+    {
+      "name": "BIDI_ENABLED",
+      "bit_position": 10
+    }
+  ]
+}
