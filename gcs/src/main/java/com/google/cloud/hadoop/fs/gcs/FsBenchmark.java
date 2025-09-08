@@ -18,7 +18,9 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.util.concurrent.Futures.immediateVoidFuture;
 import static java.lang.Integer.parseInt;
+import static java.lang.Long.min;
 import static java.lang.Long.parseLong;
+import static java.lang.Math.abs;
 import static java.util.Collections.newSetFromMap;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -30,6 +32,9 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -48,10 +53,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
+import java.util.function.IntFunction;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
@@ -161,6 +169,8 @@ public class FsBenchmark extends Configured implements Tool {
         return benchmarkRead(fs, cmdArgs);
       case "random-read":
         return benchmarkRandomRead(fs, cmdArgs);
+      case "vectored-read":
+        return benchmarkVectoredRead(fs, cmdArgs);
     }
     throw new IllegalArgumentException("Unknown command: " + cmd);
   }
@@ -535,6 +545,175 @@ public class FsBenchmark extends Configured implements Tool {
     System.out.printf(
         "Read average throughput (MiB/s): %.3f%n",
         bytesToMebibytes(combineStats(readFileBytesList).getSum()) / runtimeSeconds);
+  }
+
+  private int benchmarkVectoredRead(FileSystem fs, Map<String, String> args) {
+
+    if (args.size() < 1) {
+      System.err.println(
+          "Usage: vectored-read"
+              + " --file=gs://${BUCKET}/path/to/test/dir/"
+              + " [--num-reads=<number of ranges read from the file>]"
+              + " [--num-threads=<number of threads to run test>]");
+      return 1;
+    }
+
+    Path testFile = new Path(args.get("--file"));
+
+    warmup(
+        args, () -> benchmarkVectoredRead(fs, testFile, /* numReads= */ 100, /* numThreads= */ 3));
+
+    benchmarkVectoredRead(
+        fs,
+        testFile,
+        parseInt(args.getOrDefault("--num-reads", String.valueOf(100))),
+        parseInt(args.getOrDefault("--num-threads", String.valueOf(3))));
+
+    return 0;
+  }
+
+  private void benchmarkVectoredRead(
+      FileSystem fs, Path testFile, int numOfReads, int numOfThreads) {
+    System.out.printf(
+        "Running vectored read test using file %s which will be read %d times in %d threads.\n",
+        testFile, numOfReads, numOfThreads);
+
+    Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> openTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> closeTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+
+    ExecutorService executor = Executors.newFixedThreadPool(numOfThreads);
+    CountDownLatch initLatch = new CountDownLatch(numOfThreads);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch stopLatch = new CountDownLatch(numOfThreads);
+    List<Future<?>> futures = new ArrayList<>(numOfThreads);
+    long fileSize = printAndReturnFileSize(fs, testFile, numOfReads);
+
+    for (int i = 0; i < numOfThreads; i++) {
+      futures.add(
+          executor.submit(
+              () -> {
+                LongSummaryStatistics readFileBytes = newLongSummaryStatistics(readFileBytesList);
+                LongSummaryStatistics readFileTimeNs = newLongSummaryStatistics(readFileTimeNsList);
+                LongSummaryStatistics openTimeNs = newLongSummaryStatistics(openTimeNsList);
+                LongSummaryStatistics closeTimeNs = newLongSummaryStatistics(closeTimeNsList);
+
+                long readFsStart;
+
+                initLatch.countDown();
+                try {
+                  startLatch.await();
+                } catch (InterruptedException e) {
+                  throw new RuntimeException(e);
+                }
+
+                try {
+                  try {
+                    long openStart = System.nanoTime();
+                    FSDataInputStream input = fs.open(testFile);
+                    openTimeNs.accept(System.nanoTime() - openStart);
+                    readFsStart = System.nanoTime();
+                    IntFunction<ByteBuffer> allocator =
+                        (length) -> ByteBuffer.allocateDirect(length);
+                    List<? extends FileRange> ranges = getRanges(fileSize, numOfReads);
+
+                    input.readVectored(ranges, allocator);
+                    ranges.forEach(
+                        range -> {
+                          try {
+                            ByteBuffer data = range.getData().get(30, SECONDS);
+                            readFileTimeNs.accept(System.nanoTime() - readFsStart);
+                            readFileBytes.accept(range.getLength());
+                          } catch (ExecutionException | InterruptedException | TimeoutException e) {
+                            throw new RuntimeException(e);
+                          }
+                        });
+                    long closeStart = System.nanoTime();
+                    input.close();
+                    closeTimeNs.accept(System.nanoTime() - closeStart);
+                  } catch (Exception e) {
+                    throw new RuntimeException(e);
+                  }
+                } finally {
+                  stopLatch.countDown();
+                }
+              }));
+    }
+    executor.shutdown();
+
+    awaitUnchecked(initLatch);
+    long startTime = System.nanoTime();
+    startLatch.countDown();
+    awaitUnchecked(stopLatch);
+    double runtimeSeconds = nanosToSeconds(System.nanoTime() - startTime);
+    long operations = combineStats(readFileTimeNsList).getCount();
+
+    // Verify that all threads completed without errors
+    futures.forEach(Futures::getUnchecked);
+
+    printReadVectoredStats(
+        readFileBytesList,
+        readFileTimeNsList,
+        openTimeNsList,
+        closeTimeNsList,
+        runtimeSeconds,
+        operations);
+  }
+
+  private void printReadVectoredStats(
+      Set<LongSummaryStatistics> readFileBytesList,
+      Set<LongSummaryStatistics> readFileTimeNsList,
+      Set<LongSummaryStatistics> openTimeNsList,
+      Set<LongSummaryStatistics> closeTimeNsList,
+      double runtimeSeconds,
+      long operations) {
+    printSizeStats("Read Bytes ", combineStats(readFileBytesList));
+    printTimeStats("Read latency ", combineStats(readFileTimeNsList));
+    printTimeStats("Open latency ", combineStats(openTimeNsList));
+    printTimeStats("Close latency ", combineStats(closeTimeNsList));
+
+    printThroughputStats("Read file throughput", readFileTimeNsList, readFileBytesList);
+
+    System.out.printf(
+        "Average QPS: %.3f (%d in total %.3fs)%n",
+        operations / runtimeSeconds, operations, runtimeSeconds);
+
+    System.out.printf(
+        "Read average throughput (MiB/s): %.3f%n",
+        bytesToMebibytes(combineStats(readFileBytesList).getSum()) / runtimeSeconds);
+  }
+
+  private long printAndReturnFileSize(FileSystem fs, Path testFile, int numOfReads) {
+    FileStatus fileStatus = null;
+    try {
+      fileStatus = fs.getFileStatus(testFile);
+      System.out.printf(
+          "File Size is %d and Chunk Size is %d\n",
+          fileStatus.getLen(), fileStatus.getLen() / numOfReads);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return fileStatus.getLen();
+  }
+
+  private List<? extends FileRange> getRanges(long fileSize, int numberOfTimesFileRead) {
+    long chunkSize = fileSize / numberOfTimesFileRead;
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    List<FileRange> ranges = new ArrayList<>();
+    for (int i = 0; i < numberOfTimesFileRead; i++) {
+      long index1 = random.nextLong(chunkSize);
+      long index2 = random.nextLong(chunkSize);
+      int difference = Math.toIntExact(abs(index2 - index1));
+      long offset = chunkSize * i + min(index1, index2);
+      ranges.add(new CustomFileRange(offset, difference));
+    }
+    return ranges;
+  }
+
+  private String getDecodedString(ByteBuffer data) {
+    Charset charset = StandardCharsets.UTF_8; // Use the same charset used for encoding
+    return charset.decode(data).toString();
   }
 
   private static void warmup(Map<String, String> args, Runnable warmupFn) {
