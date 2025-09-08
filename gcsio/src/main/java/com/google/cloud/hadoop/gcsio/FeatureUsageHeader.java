@@ -161,7 +161,7 @@ public class FeatureUsageHeader {
 
   /** Clears a specific bit in the 128-bit feature mask. */
   private static void clearBit(long[] features, int bitPosition) {
-    checkArgument(features.length == BITMASK_SIZE);
+    checkArgument(features.length == BITMASK_SIZE, "Bitmask must be 128 bits (2 longs).");
     checkArgument(
         bitPosition >= 0 && bitPosition < 128, "Bit position must be in the range [0, 127].");
     if (bitPosition < 64) {
