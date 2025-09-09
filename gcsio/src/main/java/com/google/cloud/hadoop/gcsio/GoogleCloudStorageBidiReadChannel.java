@@ -28,7 +28,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final GoogleCloudStorageReadOptions readOptions;
-  private final BlobReadSession blobReadSession;
+  private final ApiFuture<BlobReadSession> sessionFuture;
+  private volatile BlobReadSession blobReadSession;
   private ExecutorService boundedThreadPool;
 
   public GoogleCloudStorageBidiReadChannel(
@@ -45,24 +46,22 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
-    this.blobReadSession =
-        initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
+    this.sessionFuture = storage.blobReadSession(blobId);
+    this.blobReadSession = null;
     this.boundedThreadPool = boundedThreadPool;
   }
 
-  private static BlobReadSession initializeBlobReadSession(
-      Storage storage, BlobId blobId, int clientTimeout) throws IOException {
-    long clientInitializationDurationStartTime = System.currentTimeMillis();
-    BlobReadSession readSession = null;
-    try {
-      readSession = storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
-      logger.atFiner().log(
-          "Client Initialization successful in %d ms.",
-          System.currentTimeMillis() - clientInitializationDurationStartTime);
-    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      throw new IOException(e);
+  private synchronized BlobReadSession getBlobReadSession() {
+    if (blobReadSession == null){
+      BlobReadSession readSession = null;
+      try {
+        readSession = sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
+      } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        throw new RuntimeException("Failed to get BlobReadSession", e);
+      }
+      this.blobReadSession = readSession;
     }
-    return readSession;
+    return blobReadSession;
   }
 
   @Override
@@ -108,7 +107,9 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public void close() throws IOException {
-    blobReadSession.close();
+    if(blobReadSession != null){
+      blobReadSession.close();
+    }
   }
 
   @Override
@@ -116,10 +117,11 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       throws IOException {
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long vectoredReadStartTime = System.currentTimeMillis();
+    BlobReadSession session = getBlobReadSession();
     ranges.forEach(
         range -> {
           ApiFuture<DisposableByteString> futureBytes =
-              blobReadSession.readAs(
+              session.readAs(
                   ReadProjectionConfigs.asFutureByteString()
                       .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
           ApiFutures.addCallback(
