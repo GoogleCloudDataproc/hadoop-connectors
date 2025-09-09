@@ -21,14 +21,14 @@
   <parent>
     <groupId>com.google.cloud.bigdataoss</groupId>
     <artifactId>bigdataoss-parent</artifactId>
-    <version>3.1.6-SNAPSHOT</version>
+    <version>3.1.7-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
   <name>util-hadoop</name>
 
   <artifactId>util-hadoop</artifactId>
-  <version>3.1.6-SNAPSHOT</version>
+  <version>3.1.7-SNAPSHOT</version>
 
   <dependencies>
     <dependency>
