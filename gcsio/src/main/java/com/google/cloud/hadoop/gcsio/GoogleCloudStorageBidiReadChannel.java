@@ -26,18 +26,14 @@ import javax.annotation.Nullable;
 
 public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private final Storage storage;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
-  private final GoogleCloudStorageReadOptions readOptions;
   private final BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
   private long objectSize;
   private boolean isOpen = true;
   private boolean gzipEncoded = false;
-  private final StorageResourceId resourceId;
-
   private final Duration readTimeout;
   private long position = 0;
 
@@ -47,11 +43,13 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
+
+    // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
     this.readTimeout = readOptions.getGrpcReadTimeout();
     this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-    BlobId blobId =
+    this.blobId =
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.blobReadSession =
