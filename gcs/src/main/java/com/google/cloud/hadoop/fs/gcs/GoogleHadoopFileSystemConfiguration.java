@@ -222,6 +222,13 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.batch.threads", GoogleCloudStorageOptions.DEFAULT.getBatchThreads());
 
   /**
+   * Configuration key for number of request to track for adapting the access pattern i.e. fadvise:
+   * AUTO & AUTO_RANDOM.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_FADVISE_REQUEST_TRACK_COUNT =
+      new HadoopConfigurationProperty<>("fs.gs.fadvise.request.track.count", 3);
+
+  /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
    * has the same effect as Copy request, but it can handle moving large objects that may
    * potentially time out a Copy request.
@@ -487,6 +494,10 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.operation.tracelog.enable", GoogleCloudStorageOptions.DEFAULT.isTraceLogEnabled());
 
+  /** Configuration key to export logs to Google cloud logging. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_CLOUD_LOGGING_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.cloud.logging.enable", false);
+
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
       new HadoopConfigurationProperty<>(
@@ -556,11 +567,48 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.write.parallel.composite.upload.part.file.name.prefix",
           AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
+  /**
+   * Configuration key for rolling checksum on writes.
+   *
+   * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
+   * server response.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_ROLLING_CHECKSUM_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.write.rolling.checksum.enable",
+          AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
+
   /** Configuration key for enabling move operation in gcs instead of copy+delete. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_MOVE_ENABLE =
       new HadoopConfigurationProperty<>(
           "fs.gs.operation.move.enable",
           GoogleCloudStorageOptions.DEFAULT.isMoveOperationEnabled());
+
+  /** Flag to enable the bidirectional Rapid Storage API. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_BIDI_API_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiEnabled());
+
+  /**
+   * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
+   * individual range and populate the buffer.
+   */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_THREAD_COUNT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.bidi.thread.count", GoogleCloudStorageReadOptions.DEFAULT.getBidiThreadCount());
+
+  /** Sets the total amount of time, we would wait for bidi client initialization. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.bidi.client.timeout",
+          GoogleCloudStorageReadOptions.DEFAULT.getBidiClientTimeout());
+
+  /** Flag to enable finalizing object before closing bidi write channel. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.bidi.finalize.on.close",
+              GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
@@ -625,7 +673,10 @@ public class GoogleHadoopFileSystemConfiguration {
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
-        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean));
+        .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
+        .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
+        .setFinalizeBeforeClose(
+            GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -643,7 +694,14 @@ public class GoogleHadoopFileSystemConfiguration {
     return applicationName;
   }
 
-  private static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
+  /**
+   * Parses GCS read options from the supplied Hadoop configuration object, using the property keys
+   * documented in
+   * https://github.com/GoogleCloudDataproc/hadoop-connectors/blob/master/gcs/CONFIGURATION.md
+   *
+   * @param config the Hadoop Configuration object to parse
+   */
+  public static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
     return GoogleCloudStorageReadOptions.builder()
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setFastFailOnNotFoundEnabled(
@@ -657,10 +715,21 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
+        .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
+        .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .build();
   }
 
-  private static AsyncWriteChannelOptions getWriteChannelOptions(Configuration config) {
+  /**
+   * Parses GCS write options from the supplied Hadoop configuration object, using the property keys
+   * documented in
+   * https://github.com/GoogleCloudDataproc/hadoop-connectors/blob/master/gcs/CONFIGURATION.md
+   *
+   * @param config the Hadoop Configuration object to parse
+   */
+  public static AsyncWriteChannelOptions getWriteChannelOptions(Configuration config) {
     return AsyncWriteChannelOptions.builder()
         .setBufferSize(toIntExact(GCS_OUTPUT_STREAM_BUFFER_SIZE.get(config, config::getLongBytes)))
         .setDirectUploadEnabled(
@@ -683,6 +752,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
         .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setRollingChecksumEnabled(
+            GCS_WRITE_ROLLING_CHECKSUM_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

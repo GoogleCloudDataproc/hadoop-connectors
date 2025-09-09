@@ -32,7 +32,8 @@ public abstract class GoogleCloudStorageReadOptions {
   public enum Fadvise {
     AUTO,
     RANDOM,
-    SEQUENTIAL
+    SEQUENTIAL,
+    AUTO_RANDOM
   }
 
   // Default builder should be initialized after default values,
@@ -55,7 +56,11 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGzipEncodingSupportEnabled(false)
         .setInplaceSeekLimit(8 * 1024 * 1024)
         .setMinRangeRequestSize(2 * 1024 * 1024)
-        .setReadExactRequestedBytesEnabled(false);
+        .setBlockSize(64 * 1024 * 1024)
+        .setFadviseRequestTrackCount(3)
+        .setReadExactRequestedBytesEnabled(false)
+        .setBidiThreadCount(16)
+        .setBidiClientTimeout(30);
   }
 
   public abstract Builder toBuilder();
@@ -104,6 +109,16 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcReadTimeout(Duration)}. */
   public abstract Duration getGrpcReadMessageTimeout();
+
+  public abstract long getBlockSize();
+
+  public abstract int getFadviseRequestTrackCount();
+
+  /** See {@link Builder#setBidiThreadCount(int)}. */
+  public abstract int getBidiThreadCount();
+
+  /** See {@link Builder#setBidiClientTimeout(int)}. */
+  public abstract int getBidiClientTimeout();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -205,6 +220,19 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
+
+    public abstract Builder setBlockSize(long blockSize);
+
+    public abstract Builder setFadviseRequestTrackCount(int requestTrackCount);
+
+    /**
+     * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used
+     * to read individual range and populate the buffer.
+     */
+    public abstract Builder setBidiThreadCount(int bidiThreadCount);
+
+    /** Sets the total amount of time, we would wait for bidi client initialization. */
+    public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

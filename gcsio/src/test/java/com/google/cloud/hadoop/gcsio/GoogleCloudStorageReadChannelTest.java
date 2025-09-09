@@ -39,6 +39,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
@@ -47,6 +48,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
+import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -136,11 +138,11 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(readBytes).isEqualTo(new byte[] {testData[1]});
 
     readChannel.position(seekPosition);
-    assertThat(readChannel.randomAccess).isFalse();
+    assertThat(readChannel.randomAccessStatus()).isFalse();
 
     assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(1);
     assertThat(readBytes).isEqualTo(new byte[] {testData[seekPosition]});
-    assertThat(readChannel.randomAccess).isTrue();
+    assertThat(readChannel.randomAccessStatus()).isTrue();
 
     List<String> rangeHeaders =
         requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
@@ -178,16 +180,81 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(readBytes).isEqualTo(new byte[] {testData[seekPosition]});
 
     readChannel.position(0);
-    assertThat(readChannel.randomAccess).isFalse();
+    assertThat(readChannel.randomAccessStatus()).isFalse();
 
     assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(1);
     assertThat(readBytes).isEqualTo(new byte[] {testData[0]});
-    assertThat(readChannel.randomAccess).isTrue();
+    assertThat(readChannel.randomAccessStatus()).isTrue();
 
     List<String> rangeHeaders =
         requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
 
     assertThat(rangeHeaders).containsExactly("bytes=5-", "bytes=0-0").inOrder();
+  }
+
+  @Test
+  public void fadviseAutoRandom_onSequentialRead_switchToSequential() throws IOException {
+    int blockSize = 3;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    List<MockLowLevelHttpResponse> lowLevelHttpResponses = new ArrayList<>();
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.AUTO_RANDOM)
+            .setMinRangeRequestSize(1)
+            .setBlockSize(blockSize)
+            .build();
+
+    int requestLength = (int) options.getMinRangeRequestSize();
+    int rangeStartIndex = 0;
+    for (int i = 0; i <= options.getFadviseRequestTrackCount(); i++) {
+      int rangeEndIndex = rangeStartIndex + requestLength;
+      if (i == options.getFadviseRequestTrackCount()) {
+        rangeEndIndex = rangeStartIndex + blockSize;
+      }
+      MockLowLevelHttpResponse request =
+          dataRangeResponse(
+              Arrays.copyOfRange(testData, rangeStartIndex, rangeEndIndex),
+              rangeStartIndex,
+              testData.length);
+      lowLevelHttpResponses.add(request);
+      rangeStartIndex = rangeEndIndex;
+    }
+
+    MockHttpTransport transport =
+        mockTransport(
+            lowLevelHttpResponses.toArray(
+                new MockLowLevelHttpResponse[lowLevelHttpResponses.size()]));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    byte[] readBytes = new byte[requestLength];
+    rangeStartIndex = 0;
+    for (int i = 0; i <= options.getFadviseRequestTrackCount(); i++) {
+      readChannel.position(rangeStartIndex);
+
+      assertThat(readChannel.read(ByteBuffer.wrap(readBytes))).isEqualTo(requestLength);
+      assertThat(readBytes).isEqualTo(new byte[] {testData[rangeStartIndex]});
+      if (i == options.getFadviseRequestTrackCount()) {
+        assertThat(readChannel.randomAccessStatus()).isFalse();
+      } else {
+        assertThat(readChannel.randomAccessStatus()).isTrue();
+      }
+      rangeStartIndex += requestLength;
+    }
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    // bytes=3-5 instead of opening channel till end as in AUTO_RANDOM adapting to sequential read
+    // will result in opening channel till blockSize.
+    assertThat(rangeHeaders)
+        .containsExactly("bytes=0-0", "bytes=1-1", "bytes=2-2", "bytes=3-5")
+        .inOrder();
   }
 
   @Test
@@ -585,6 +652,55 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
+  public void read_withPositiveGeneration_usesGenerationMatchPrecondition() throws IOException {
+    long generation = 12345L;
+    byte[] testData = {0x01, 0x02, 0x03};
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(generation)),
+            dataResponse(testData));
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+    GoogleCloudStorageReadChannel readChannel =
+        createReadChannel(storage, GoogleCloudStorageReadOptions.builder().build(), generation);
+
+    readChannel.read(ByteBuffer.allocate(testData.length));
+
+    // The first request is for metadata, the second is for data.
+    // Verify the data request URL contains the generation parameter.
+    String mediaRequestUrl = getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation);
+    assertThat("GET:" + requests.get(1).getUrl().toString()).isEqualTo(mediaRequestUrl);
+  }
+
+  @Test
+  public void read_withZeroGeneration_doesNotUseGenerationMatchPrecondition() throws IOException {
+    long requestedGeneration = 0L;
+    // The actual object has a real, positive generation ID.
+    long actualGeneration = 54321L;
+    byte[] testData = {0x04, 0x05, 0x06};
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(actualGeneration)),
+            dataResponse(testData));
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+    GoogleCloudStorageReadChannel readChannel =
+        createReadChannel(
+            storage,
+            GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build(),
+            requestedGeneration);
+
+    readChannel.read(ByteBuffer.allocate(testData.length));
+
+    // The data request URL should not contain a generation parameter,
+    // because the requested generation was 0. The generation parameter in getMediaRequestString
+    // will be null when the check for generation > 0 fails.
+    String mediaRequestUrl = getMediaRequestString(BUCKET_NAME, OBJECT_NAME);
+    assertThat("GET:" + requests.get(0).getUrl().toString()).isEqualTo(mediaRequestUrl);
+  }
+
+  @Test
   public void open_gzipContentEncoding_succeeds_whenContentEncodingSupported() throws Exception {
     MockHttpTransport transport =
         mockTransport(
@@ -780,6 +896,43 @@ public class GoogleCloudStorageReadChannelTest {
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation))
         .inOrder();
+  }
+
+  @Test
+  public void openStream_gzipped_onPrematureEofInSkip_throwsEofException() throws IOException {
+    // Setup: Mock transport to return an InputStream that immediately signals EOF.
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setContentEncoding("gzip")
+                    .setSize(BigInteger.valueOf(100))),
+            inputStreamResponse(
+                new InputStream() {
+                  @Override
+                  public int read() {
+                    return -1;
+                  }
+                }));
+
+    Storage storage = new Storage(transport, new GsonFactory(), r -> {});
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, readOptions);
+
+    // Position the channel to a non-zero offset to trigger a skip.
+    readChannel.position(10);
+
+    // Attempting to read should trigger the skip, which should then fail with EOFException.
+    EOFException e =
+        assertThrows(EOFException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Unexpected end of stream trying to skip 10 bytes to seek to position 10,"
+                + " size: 9223372036854775807 for 'gs://foo-bucket/bar-object'");
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {

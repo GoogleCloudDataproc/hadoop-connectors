@@ -77,19 +77,42 @@ class DeleteFolderOperation {
   }
 
   /** Helper function that performs the deletion process for folder resources */
-  public void performDeleteOperation() throws InterruptedException {
-    int folderSize = folders.size();
+  public void performDeleteOperation() throws IOException {
+    int foldersRemaining = folders.size();
     computeChildrenForFolderResource();
 
-    // this will avoid infinite loop when all folders are deleted
-    while (folderSize != 0 && encounteredNoExceptions()) {
-      FolderInfo folderToDelete = getElementFromBlockingQueue();
-      folderSize--;
-
-      // Queue the deletion request
-      queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+    try {
+      while (foldersRemaining != 0 && encounteredNoExceptions()) {
+        FolderInfo folderToDelete = getElementFromBlockingQueue();
+        if (folderToDelete != null) {
+          // Queue the deletion request.
+          queueSingleFolderDelete(folderToDelete, /* attempt */ 1);
+          foldersRemaining--;
+        } else if (batchExecutor.isIdle()) {
+          // Throwing an IllegalStateException here because some folders remained undeleted
+          // even though threads are waiting idle.
+          throw new IllegalStateException(
+              String.format(
+                  "Deletion stalled: No active threads, but %d folders remain.",
+                  countOfChildren.size()));
+        }
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          String.format(
+              "Received InterruptedException while deletion of folder resource : %s",
+              e.getMessage()),
+          e);
+    } catch (IllegalStateException e) {
+      throw new IOException(
+          String.format(
+              "Received IllegalStateException while deletion of folder resource : %s",
+              e.getMessage()),
+          e);
+    } finally {
+      batchExecutorShutdown();
     }
-    batchExecutorShutdown();
   }
 
   /** Shutting down batch executor and flushing any remaining requests */
@@ -112,7 +135,7 @@ class DeleteFolderOperation {
   }
 
   /** Gets the head from the blocking queue */
-  public FolderInfo getElementFromBlockingQueue() throws InterruptedException {
+  private FolderInfo getElementFromBlockingQueue() throws InterruptedException {
     try {
       return folderDeleteBlockingQueue.poll(1, TimeUnit.MINUTES);
     } catch (InterruptedException e) {
@@ -123,12 +146,12 @@ class DeleteFolderOperation {
   }
 
   /** Adding to batch executor's queue */
-  public void addToToBatchExecutorQueue(Callable callable, FutureCallback callback) {
+  public void addToBatchExecutorQueue(Callable callable, FutureCallback callback) {
     batchExecutor.queue(callable, callback);
   }
 
   /** Computes the number of children for each folder resource */
-  public void computeChildrenForFolderResource() {
+  private void computeChildrenForFolderResource() {
     for (FolderInfo currentFolder : folders) {
       if (!countOfChildren.containsKey(currentFolder.getFolderName())) {
         countOfChildren.put(currentFolder.getFolderName(), 0L);
@@ -183,7 +206,7 @@ class DeleteFolderOperation {
         !Strings.isNullOrEmpty(folderName),
         String.format("No folder path for folder resource %s", folderName));
 
-    addToToBatchExecutorQueue(
+    addToBatchExecutorQueue(
         new DeleteFolderRequestCallable(folder, storageControlClient),
         getDeletionCallback(folder, allExceptions, attempt));
   }
