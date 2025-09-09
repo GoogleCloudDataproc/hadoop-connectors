@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.11 - 2025-09-09
 1. PR #1484 - [Feature] Enabled write checksum by default
 1. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
 1. PR #1463 - [Bug] Fix for Hadoop directory copy failures in gRPC client
