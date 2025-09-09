@@ -79,12 +79,13 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   @Override
   public int read(ByteBuffer dst) throws IOException {
     throwIfNotOpen();
+    final int EOFReturnValue = -1;
     if (!dst.hasRemaining()) {
       return 0;
     }
 
     if (position >= objectSize) {
-      return -1;
+      return EOFReturnValue;
     }
 
     logger.atFinest().log(
@@ -117,7 +118,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         }
       }
 
-      return bytesRead > 0 ? bytesRead : -1;
+      return bytesRead > 0 ? bytesRead : EOFReturnValue;
 
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       GoogleCloudStorageEventBus.postOnException();
