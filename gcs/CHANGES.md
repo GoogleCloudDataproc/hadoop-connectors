@@ -2,7 +2,7 @@
 
 ## Next
 1. PR #1484 - [Feature] Enabled write checksum by default
-2. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
+1. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
 
 ## 3.1.6 - 2025-09-04
 1. Add listStatusStartingFrom API.
