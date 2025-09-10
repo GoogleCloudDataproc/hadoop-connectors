@@ -1,7 +1,7 @@
 # Release Notes
 
 ## Next
-1. Dummy Change for release pipeline testing 
+1. Dummy Change for release pipeline testing
 
 ## 3.1.7 - 2025-09-10
 1. PR #1484 - [Feature] Enabled write checksum by default
