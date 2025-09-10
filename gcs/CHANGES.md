@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 3.1.7 - 2025-09-10
 1. PR #1484 - [Feature] Enabled write checksum by default
 1. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
 
