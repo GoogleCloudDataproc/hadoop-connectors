@@ -46,7 +46,7 @@ To add a dependency on Cloud Storage connector using Maven, use the following:
 <dependency>
   <groupId>com.google.cloud.bigdataoss</groupId>
   <artifactId>gcs-connector</artifactId>
-  <version>3.1.6</version>
+  <version>3.1.7</version>
 </dependency>
 ```
 
