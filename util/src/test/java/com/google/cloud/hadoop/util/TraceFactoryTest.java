@@ -53,7 +53,6 @@ public class TraceFactoryTest {
   @Before
   public void setUp() throws IOException {
     assertingHandler = new TestLogHandler();
-    LOGGER.setUseParentHandlers(false);
     LOGGER.addHandler(assertingHandler);
     LOGGER.setLevel(Level.INFO);
     name = getRandomString();
