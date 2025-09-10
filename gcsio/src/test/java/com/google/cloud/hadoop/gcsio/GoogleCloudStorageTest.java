@@ -52,6 +52,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.testing.http.MockHttpTransport;
@@ -195,6 +196,11 @@ public class GoogleCloudStorageTest {
         GoogleCloudStorageImpl.builder()
             .setOptions(options)
             .setCredentials(new FakeCredentials())
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(options)
+                        .build()))
             .build();
 
     assertThat(gcsImpl.storage.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
@@ -3873,6 +3879,11 @@ public class GoogleCloudStorageTest {
             .setOptions(GCS_OPTIONS)
             .setCredentials(new FakeCredentials())
             .setHttpTransport(transport)
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(GCS_OPTIONS)
+                        .build()))
             .build();
 
     Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
@@ -3891,6 +3902,11 @@ public class GoogleCloudStorageTest {
             .setCredentials(new FakeCredentials())
             .setHttpTransport(transport)
             .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
+            .setFeatureUsageHeader(
+                new FeatureUsageHeader(
+                    GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(GCS_OPTIONS)
+                        .build()))
             .build();
 
     Storage.Objects.Get testGetRequest =
@@ -3899,6 +3915,38 @@ public class GoogleCloudStorageTest {
 
     assertThat(testGetRequest.getRequestHeaders().getAuthorization())
         .isEqualTo("Bearer testDownscopedAccessToken");
+  }
+
+  @Test
+  public void configureRequest_addsCustomHeadersToRequest() throws IOException {
+    // Set a known feature header state.
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
+        GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+            .setCloudStorageOptions(
+                GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                    .setHnBucketRenameEnabled(true)
+                    .build())
+            .build();
+    FeatureUsageHeader featureUsageHeader = new FeatureUsageHeader(gcsfsOptions);
+    MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
+
+    // Create GCS with the options.
+    GoogleCloudStorageImpl gcs =
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GCS_OPTIONS)
+            .setCredentials(new FakeCredentials())
+            .setHttpTransport(transport)
+            .setFeatureUsageHeader(featureUsageHeader)
+            .build();
+    Storage.Objects.Get testGetRequest =
+        gcs.storageRequestFactory.objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
+    gcs.initializeRequest(testGetRequest, BUCKET_NAME);
+
+    String expectedHeader = featureUsageHeader.getValue();
+    // Verify the feature usage and user-agent header was added to the request.
+    HttpHeaders headers = testGetRequest.getRequestHeaders();
+    assertThat(headers.getUserAgent()).contains("gcsio-unit-test");
+    assertThat(headers.get(FeatureUsageHeader.NAME)).isEqualTo(expectedHeader);
   }
 
   static String calculateCrc32cFromBytes(byte[] data) {

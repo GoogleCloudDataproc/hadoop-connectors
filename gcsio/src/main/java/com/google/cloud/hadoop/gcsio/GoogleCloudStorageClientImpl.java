@@ -172,7 +172,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable ExecutorService pCUExecutorService)
+      @Nullable ExecutorService pCUExecutorService,
+      @Nullable FeatureUsageHeader featureUsageHeader)
       throws IOException {
     super(
         GoogleCloudStorageImpl.builder()
@@ -181,13 +182,19 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpTransport(httpTransport)
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .setFeatureUsageHeader(featureUsageHeader)
             .build());
 
     this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null
             ? createStorage(
-                credentials, options, gRPCInterceptors, pCUExecutorService, downscopedAccessTokenFn)
+                credentials,
+                options,
+                gRPCInterceptors,
+                pCUExecutorService,
+                downscopedAccessTokenFn,
+                featureUsageHeader)
             : clientLibraryStorage;
     this.boundedThreadPool = null;
   }
@@ -1436,9 +1443,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      FeatureUsageHeader featureUsageHeader)
       throws IOException {
-    final ImmutableMap<String, String> headers = getUpdatedHeadersWithUserAgent(storageOptions);
+    final ImmutableMap<String, String> headers =
+        getUpdatedHeaders(storageOptions, featureUsageHeader);
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setHeaderProvider(() -> headers)
@@ -1474,20 +1483,26 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .getService();
   }
 
-  private static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
-      GoogleCloudStorageOptions storageOptions) {
+  private static ImmutableMap<String, String> getUpdatedHeaders(
+      GoogleCloudStorageOptions storageOptions, FeatureUsageHeader featureUsageHeader) {
     ImmutableMap<String, String> httpRequestHeaders =
         MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
     String appName = storageOptions.getAppName();
+    ImmutableMap.Builder<String, String> headersBuilder =
+        ImmutableMap.<String, String>builder().putAll(httpRequestHeaders);
     if (!httpRequestHeaders.containsKey(USER_AGENT) && !Strings.isNullOrEmpty(appName)) {
       logger.atFiner().log("Setting useragent %s", appName);
-      return ImmutableMap.<String, String>builder()
-          .putAll(httpRequestHeaders)
-          .put(USER_AGENT, appName)
-          .build();
+      headersBuilder.put(USER_AGENT, appName);
     }
-
-    return httpRequestHeaders;
+    if (featureUsageHeader == null) {
+      return headersBuilder.build();
+    }
+    String featureUsageString = featureUsageHeader.getValue();
+    if (!Strings.isNullOrEmpty(featureUsageString)) {
+      logger.atFiner().log("Setting feature usage header %s", featureUsageString);
+      headersBuilder.put(FeatureUsageHeader.NAME, featureUsageString);
+    }
+    return headersBuilder.build();
   }
 
   private static BlobWriteSessionConfig getSessionConfig(
@@ -1642,6 +1657,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract Builder setFeatureUsageHeader(@Nullable FeatureUsageHeader featureUsageHeader);
 
     public abstract Builder setGRPCInterceptors(
         @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);

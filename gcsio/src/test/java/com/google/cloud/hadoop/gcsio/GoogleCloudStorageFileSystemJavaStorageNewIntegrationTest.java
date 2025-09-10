@@ -81,6 +81,11 @@ public class GoogleCloudStorageFileSystemJavaStorageNewIntegrationTest
                 .setOptions(options)
                 .setCredentials(httpRequestsInitializer.getCredentials())
                 .setHttpRequestInitializer(gcsRequestsTracker)
+                .setFeatureUsageHeader(
+                    new FeatureUsageHeader(
+                        GoogleCloudStorageFileSystemOptions.builder()
+                            .setCloudStorageOptions(options)
+                            .build()))
                 .build(),
         gcsfsOptions);
   }
