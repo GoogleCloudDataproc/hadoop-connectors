@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.protobuf.util.Timestamps.toMillis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -138,13 +139,11 @@ public class GoogleCloudStorageItemInfo {
     // Convert Protobuf Timestamps to milliseconds since epoch.
     long creationTime =
         folder.hasCreateTime()
-            ? (folder.getCreateTime().getSeconds() * 1000)
-                + (folder.getCreateTime().getNanos() / 1_000_000)
+            ? toMillis(folder.getCreateTime())
             : 0;
     long modificationTime =
         folder.hasUpdateTime()
-            ? (folder.getUpdateTime().getSeconds() * 1000)
-                + (folder.getUpdateTime().getNanos() / 1_000_000)
+            ? toMillis(folder.getCreateTime())
             : 0;
 
     return new GoogleCloudStorageItemInfo(
@@ -374,7 +373,7 @@ public class GoogleCloudStorageItemInfo {
    * Indicates whether {@code itemInfo} is a native HNS folder. This is different from a placeholder
    * object or an inferred directory.
    */
-  public boolean isNativeFolder() {
+  public boolean isNativeHNSFolder() {
     // A native folder is a directory, is not inferred, and has no content generation.
     // A placeholder object is also a directory but will have a contentGeneration > 0.
     return isDirectory() && !isInferredDirectory() && contentGeneration == 0;

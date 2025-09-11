@@ -415,7 +415,7 @@ public class GoogleCloudStorageMockitoTest {
     assertThat(itemInfo).isNotNull();
     assertThat(itemInfo.exists()).isTrue();
     assertThat(itemInfo.getResourceId()).isEqualTo(folderId);
-    assertThat(itemInfo.isNativeFolder()).isTrue();
+    assertThat(itemInfo.isNativeHNSFolder()).isTrue();
 
     verify(mockStorageControlStub).getFolderCallable();
     verify(mockGetFolderCallable).call(any(GetFolderRequest.class));
