@@ -221,7 +221,7 @@ public class GoogleCloudStorageItemInfoTest {
 
     // Verify default attributes for a folder
     assertThat(itemInfo.exists()).isTrue();
-    assertThat(itemInfo.isNativeFolder()).isTrue();
+    assertThat(itemInfo.isNativeHNSFolder()).isTrue();
     assertThat(itemInfo.isDirectory()).isTrue();
     assertThat(itemInfo.getSize()).isEqualTo(0);
     assertThat(itemInfo.getContentGeneration()).isEqualTo(0);

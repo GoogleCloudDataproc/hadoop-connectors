@@ -373,7 +373,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
     GoogleCloudStorageItemInfo itemInfo = getItemInfo(resourceId);
 
-    if (itemInfo.exists() && itemInfo.isNativeFolder()) {
+    if (itemInfo.exists() && itemInfo.isNativeHNSFolder()) {
       return itemInfo;
     }
 

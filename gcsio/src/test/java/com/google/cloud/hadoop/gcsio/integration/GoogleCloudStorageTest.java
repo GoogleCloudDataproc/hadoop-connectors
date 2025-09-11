@@ -1736,7 +1736,7 @@ public class GoogleCloudStorageTest {
     assertWithMessage("Folder '%s' should exist", folderId).that(folderInfo.exists()).isTrue();
     assertThat(folderInfo.getResourceId()).isEqualTo(folderId);
     assertThat(folderInfo.isDirectory()).isTrue();
-    assertThat(folderInfo.isNativeFolder()).isTrue(); // This is the key check
+    assertThat(folderInfo.isNativeHNSFolder()).isTrue(); // This is the key check
     assertThat(folderInfo.isInferredDirectory()).isFalse();
     assertThat(folderInfo.getSize()).isEqualTo(0);
     assertThat(folderInfo.getMetaGeneration()).isGreaterThan(0L);
@@ -1789,7 +1789,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageItemInfo genericInfo = rawStorage.getItemInfo(object1);
     assertThat(genericInfo.exists()).isTrue();
-    assertThat(genericInfo.isNativeFolder()).isFalse();
+    assertThat(genericInfo.isNativeHNSFolder()).isFalse();
 
     GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(object1);
 
