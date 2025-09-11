@@ -130,6 +130,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.fadvise.request.track.count", 3);
           put("fs.gs.operation.move.enable", false);
           put("fs.gs.write.rolling.checksum.enable", true);
+          put("fs.gs.storage.client.cache.enable", false);
         }
       };
 
