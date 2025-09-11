@@ -43,6 +43,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private final GoogleCloudStorageReadOptions readOptions;
   private byte[] footerContent;
 
+  private final int EOFReturnValue = -1;
+
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
       GoogleCloudStorageItemInfo itemInfo,
@@ -415,7 +417,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         }
       }
 
-      return bytesRead > 0 ? bytesRead : -1;
+      return bytesRead > 0 ? bytesRead : EOF;
 
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       GoogleCloudStorageEventBus.postOnException();
