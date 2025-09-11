@@ -26,6 +26,8 @@ import javax.annotation.Nullable;
 
 public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final int EOF_RETURN_VALUE = -1;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final BlobReadSession blobReadSession;
@@ -77,13 +79,12 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   @Override
   public int read(ByteBuffer dst) throws IOException {
     throwIfNotOpen();
-    final int EOFReturnValue = -1;
     if (!dst.hasRemaining()) {
       return 0;
     }
 
     if (position >= objectSize) {
-      return EOFReturnValue;
+      return EOF_RETURN_VALUE;
     }
 
     logger.atFinest().log(
@@ -97,11 +98,9 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
               ReadProjectionConfigs.asFutureByteString()
                   .withRangeSpec(RangeSpec.of(position, bytesToRequest)));
 
-      DisposableByteString disposableByteString =
-          futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS);
-
       int bytesRead;
-      try (DisposableByteString dbs = disposableByteString) {
+      try (DisposableByteString dbs =
+          futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS); ) {
         ByteString byteString = dbs.byteString();
         bytesRead = byteString.size();
 
@@ -116,7 +115,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         }
       }
 
-      return bytesRead > 0 ? bytesRead : EOFReturnValue;
+      return bytesRead > 0 ? bytesRead : EOF_RETURN_VALUE;
 
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       GoogleCloudStorageEventBus.postOnException();
@@ -260,6 +259,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   protected void initMetadata(@Nullable String encoding, long sizeFromMetadata)
       throws UnsupportedOperationException {
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
+    // TODO(dhritichopra) Add Support for GZIP Encoding
     if (gzipEncoded) {
       GoogleCloudStorageEventBus.postOnException();
       throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
