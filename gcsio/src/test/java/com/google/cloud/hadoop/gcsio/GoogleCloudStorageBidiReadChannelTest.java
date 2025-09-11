@@ -363,7 +363,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     // 2. Buffer is set, but position is before buffer - invalid
     setPrivateField(channel, "internalBuffer", buffer);
     setPrivateField(channel, "bufferStartPosition", bufferStart);
-    setPrivateField(channel, "position", bufferStart -1);
+    setPrivateField(channel, "position", bufferStart - 1);
     assertFalse(channel.isBufferValid());
 
     // 3. Position at start of buffer - valid
