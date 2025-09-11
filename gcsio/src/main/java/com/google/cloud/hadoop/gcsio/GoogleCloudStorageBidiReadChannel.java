@@ -238,7 +238,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   // Helper functions related to Footer Caching.
 
-  /* Check if the read is current position of the channel belongs to the last Range Request. If yes that will be cached
+  /** Check if the read is current position of the channel belongs to the last Range Request. If yes that will be cached
   as the footer and future requests in the footer region will be served from the cache.
    */
   @VisibleForTesting
@@ -246,7 +246,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     return objectSize - position <= readOptions.getMinRangeRequestSize();
   }
 
-  /* Function to cache the complete last range request as the footer if the footer is not already cached.
+  /** Function to cache the complete last range request as the footer if the footer is not already cached.
    */
   @VisibleForTesting
   public void cacheFooter()
@@ -280,7 +280,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
     }
   }
 
-  /* Serve the data from the cached footer if the footer Cache is already populated
+  /** Serve the data from the cached footer if the footer Cache is already populated
    */
   @VisibleForTesting
   public int readFromCache(ByteBuffer dst) {
