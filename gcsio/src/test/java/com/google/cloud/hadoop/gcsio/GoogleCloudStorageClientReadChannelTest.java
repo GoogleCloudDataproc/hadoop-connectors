@@ -33,7 +33,9 @@ import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -53,7 +55,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final int CHUNK_SIZE = FakeReadChannel.CHUNK_SIZE;
-  private static final int OBJECT_SIZE = 1024 * 1024;
+  private static final int OBJECT_SIZE = 5 * 1024 * 1024;
   private static final int IN_PLACE_SEEK_LIMIT = 5;
   private static final StorageResourceId RESOURCE_ID =
       new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME);
@@ -131,6 +133,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     verifyContent(buffer, startPosition, readBytes);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
 
     verifyNoMoreInteractions(fakeReadChannel);
@@ -162,6 +165,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(chunksToRead)).read(any());
 
     verifyNoMoreInteractions(fakeReadChannel);
@@ -186,6 +190,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).seek(anyLong());
     verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).limit(anyLong());
+    verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).setChunkSize(0);
     verify(fakeReadChannel, times(OBJECT_SIZE / chunkSize)).close();
     // read will be called two times for every chunk
     // Content channel will be created with size of a CHUNK
@@ -195,6 +200,59 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(fakeReadChannel, times((OBJECT_SIZE / chunkSize * 2) - 1)).read(any());
 
     verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void read_withPositiveGeneration_usesGenerationMatchPrecondition() throws IOException {
+    long generation = 12345L;
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME, generation),
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ generation,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+
+    readChannel = getJavaStorageChannel(itemInfo, DEFAULT_READ_OPTION);
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
+
+    assertThat(optionsCaptor.getAllValues()).contains(BlobSourceOption.generationMatch(generation));
+  }
+
+  @Test
+  public void read_withZeroGeneration_doesNotUseGenerationMatchPrecondition() throws IOException {
+    long generation = 0L;
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME, generation),
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ generation,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+
+    readChannel = getJavaStorageChannel(itemInfo, DEFAULT_READ_OPTION);
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
+
+    assertThat(optionsCaptor.getAllValues())
+        .doesNotContain(BlobSourceOption.generationMatch(generation));
   }
 
   @Test
@@ -224,6 +282,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).close();
     verify(fakeReadChannel, times(2)).read(any());
     verifyNoMoreInteractions(fakeReadChannel);
@@ -257,9 +316,52 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).close();
     verify(fakeReadChannel, times(2)).read(any());
     verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void fadviseAutoRandom_onSequentialRead_switchToSequential() throws IOException {
+    long blockSize = CHUNK_SIZE;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(Fadvise.AUTO_RANDOM)
+            .setGrpcChecksumsEnabled(true)
+            .setInplaceSeekLimit(5)
+            .setMinRangeRequestSize(10)
+            .setBlockSize(blockSize)
+            .build();
+    GoogleCloudStorageClientReadChannel readChannel =
+        getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
+
+    int seekPosition = 0;
+    int readLength = (int) readOptions.getMinRangeRequestSize();
+
+    for (int i = 0; i < readOptions.getFadviseRequestTrackCount() + 1; i++) {
+      ByteBuffer buffer = ByteBuffer.allocate(readLength);
+      fakeReadChannel = spy(new FakeReadChannel(CONTENT));
+      when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+
+      readChannel.position(seekPosition);
+      readChannel.read(buffer);
+      verifyContent(buffer, seekPosition, readLength);
+      if (i < readOptions.getFadviseRequestTrackCount()) {
+        assertThat(readChannel.randomAccessStatus()).isTrue();
+        verify(fakeReadChannel, times(1)).seek(seekPosition);
+        verify(fakeReadChannel, times(1)).limit(seekPosition + readLength);
+        verify(fakeReadChannel, times(1)).setChunkSize(0);
+      } else {
+        assertThat(readChannel.randomAccessStatus()).isFalse();
+        verify(fakeReadChannel, times(1)).seek(seekPosition);
+        verify(fakeReadChannel, times(1)).limit(seekPosition + blockSize);
+        verify(fakeReadChannel, times(1)).setChunkSize(0);
+      }
+
+      seekPosition += readLength;
+      buffer.clear();
+    }
   }
 
   @Test
@@ -278,6 +380,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     verifyContent(buffer, startPosition, bytesToRead);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
     // another request within the footer will not result into `read` and served via cache
@@ -349,6 +452,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.read(buffer);
     verifyContent(buffer, startPosition, bytesToRead);
     verify(fakeReadChannel, times(1)).seek(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).limit(anyLong());
 
     buffer.clear();
@@ -392,6 +496,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.close();
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
     verifyNoMoreInteractions(fakeReadChannel);
@@ -411,6 +516,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThrows(IOException.class, () -> readChannel.read(buffer));
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).setChunkSize(0);
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
     assertThat(buffer.position()).isEqualTo(partialByteRead);
@@ -439,6 +545,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.read(buffer);
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(2)).read(any());
     verify(fakeReadChannel, times(1)).close();
     assertThat(buffer.position()).isEqualTo(readBytes);
@@ -505,6 +612,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     ArgumentCaptor<Long> limitValue = ArgumentCaptor.forClass(Long.class);
     verify(fakeReadChannel, times(2)).seek(seekValue.capture());
     verify(fakeReadChannel, times(2)).limit(limitValue.capture());
+    verify(fakeReadChannel, times(2)).setChunkSize(0);
     verify(fakeReadChannel, times(3)).read(any());
     verify(fakeReadChannel, times(2)).close();
     // First request fetched full footer

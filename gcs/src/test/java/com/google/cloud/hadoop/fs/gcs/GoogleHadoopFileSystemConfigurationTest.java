@@ -30,8 +30,10 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PartFileCleanupType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UploadType;
@@ -128,11 +130,14 @@ public class GoogleHadoopFileSystemConfigurationTest {
               "fs.gs.write.parallel.composite.upload.part.file.cleanup.type",
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
+          put("fs.gs.fadvise.request.track.count", 3);
           put("fs.gs.operation.move.enable", false);
-          put("fs.gs.write.rolling.checksum.enable", false);
+          put("fs.gs.write.rolling.checksum.enable", true);
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
+          put("fs.gs.bidi.finalize.on.close", false);
+          put("fs.gs.storage.client.cache.enable", false);
         }
       };
 
@@ -345,6 +350,81 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .isEqualTo(Duration.ofMillis(25));
     assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout())
         .isEqualTo(Duration.ofMillis(20));
+  }
+
+  @Test
+  public void readChannelOptions() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.inputstream.fadvise", "RANDOM");
+    config.setBoolean("fs.gs.inputstream.fast.fail.on.not.found.enable", false);
+    config.setBoolean("fs.gs.grpc.checksums.enable", true);
+    config.setTimeDuration("fs.gs.grpc.read.message.timeout", 1, MILLISECONDS);
+    config.setTimeDuration("fs.gs.grpc.read.timeout", 2, MILLISECONDS);
+    config.setBoolean("fs.gs.grpc.read.zerocopy.enable", false);
+    config.setBoolean("fs.gs.inputstream.support.gzip.encoding.enable", true);
+    config.setLong("fs.gs.inputstream.inplace.seek.limit", 3L);
+    config.setLong("fs.gs.inputstream.min.range.request.size", 4L);
+    config.setInt("fs.gs.bidi.thread.count", 5);
+    config.setBoolean("fs.gs.bidi.enable", true);
+    config.setInt("fs.gs.bidi.client.timeout", 6);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleHadoopFileSystemConfiguration.getReadChannelOptions(config);
+
+    assertThat(options.getFadvise()).isEqualTo(Fadvise.RANDOM);
+    assertThat(options.isFastFailOnNotFoundEnabled()).isFalse();
+    assertThat(options.isGrpcChecksumsEnabled()).isTrue();
+    assertThat(options.getGrpcReadMessageTimeout()).isEqualTo(Duration.ofMillis(1));
+    assertThat(options.getGrpcReadTimeout()).isEqualTo(Duration.ofMillis(2));
+    assertThat(options.isGrpcReadZeroCopyEnabled()).isFalse();
+    assertThat(options.isGzipEncodingSupportEnabled()).isTrue();
+    assertThat(options.getInplaceSeekLimit()).isEqualTo(3L);
+    assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
+    assertThat(options.getBidiThreadCount()).isEqualTo(5);
+    assertThat(options.getBidiClientTimeout()).isEqualTo(6);
+  }
+
+  @Test
+  public void writeChannelOptions() {
+    Configuration config = new Configuration();
+    config.setLong("fs.gs.outputstream.buffer.size", 1L);
+    config.setBoolean("fs.gs.outputstream.direct.upload.enable", true);
+    config.setBoolean("fs.gs.grpc.checksums.enable", true);
+    config.setTimeDuration("fs.gs.grpc.write.message.timeout", 2, MILLISECONDS);
+    config.setTimeDuration("fs.gs.grpc.write.timeout", 3, MILLISECONDS);
+    config.setInt("fs.gs.grpc.write.buffered.requests", 4);
+    config.setLong("fs.gs.outputstream.pipe.buffer.size", 5L);
+    config.set("fs.gs.outputstream.pipe.type", "NIO_CHANNEL_PIPE");
+    config.setLong("fs.gs.outputstream.upload.cache.size", 6L);
+    config.setLong("fs.gs.outputstream.upload.chunk.size", 7 * 8 * 1024 * 1024);
+    config.set("fs.gs.client.upload.type", "JOURNALING");
+    config.set("fs.gs.write.temporary.dirs", "foo,bar");
+    config.setInt("fs.gs.write.parallel.composite.upload.buffer.count", 8);
+    config.setLong("fs.gs.write.parallel.composite.upload.buffer.capacity", 9L);
+    config.set("fs.gs.write.parallel.composite.upload.part.file.cleanup.type", "NEVER");
+    config.set("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "baz");
+    config.setBoolean("fs.gs.write.rolling.checksum.enable", true);
+
+    AsyncWriteChannelOptions options =
+        GoogleHadoopFileSystemConfiguration.getWriteChannelOptions(config);
+
+    assertThat(options.getBufferSize()).isEqualTo(1L);
+    assertThat(options.isDirectUploadEnabled()).isTrue();
+    assertThat(options.isGrpcChecksumsEnabled()).isTrue();
+    assertThat(options.getGrpcWriteMessageTimeout()).isEqualTo(Duration.ofMillis(2));
+    assertThat(options.getGrpcWriteTimeout()).isEqualTo(Duration.ofMillis(3));
+    assertThat(options.getNumberOfBufferedRequests()).isEqualTo(4);
+    assertThat(options.getPipeBufferSize()).isEqualTo(5L);
+    assertThat(options.getPipeType()).isEqualTo(PipeType.NIO_CHANNEL_PIPE);
+    assertThat(options.getUploadCacheSize()).isEqualTo(6L);
+    assertThat(options.getUploadChunkSize()).isEqualTo(7 * 8 * 1024 * 1024);
+    assertThat(options.getUploadType()).isEqualTo(UploadType.JOURNALING);
+    assertThat(options.getTemporaryPaths()).isEqualTo(ImmutableSet.of("foo", "bar"));
+    assertThat(options.getPCUBufferCount()).isEqualTo(8);
+    assertThat(options.getPCUBufferCapacity()).isEqualTo(9L);
+    assertThat(options.getPartFileCleanupType()).isEqualTo(PartFileCleanupType.NEVER);
+    assertThat(options.getPartFileNamePrefix()).isEqualTo("baz");
+    assertThat(options.isRollingChecksumEnabled()).isTrue();
   }
 
   @Test

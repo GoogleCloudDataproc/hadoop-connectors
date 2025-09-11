@@ -63,12 +63,18 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   private static BlobReadSession initializeBlobReadSession(
       Storage storage, BlobId blobId, int clientTimeout) throws IOException {
+    long clientInitializationDurationStartTime = System.currentTimeMillis();
+    BlobReadSession readSession = null;
     try {
-      return storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
+      readSession = storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
+      logger.atFiner().log(
+          "Client Initialization successful in %d ms.",
+          System.currentTimeMillis() - clientInitializationDurationStartTime);
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException(e);
     }
+    return readSession;
   }
 
   @Override
@@ -157,6 +163,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   @Override
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
+    logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
+    long vectoredReadStartTime = System.currentTimeMillis();
     ranges.forEach(
         range -> {
           ApiFuture<DisposableByteString> futureBytes =
@@ -169,14 +177,27 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
                 @Override
                 public void onFailure(Throwable t) {
                   range.getData().completeExceptionally(t);
+                  logger.atFiner().log(
+                      "Vectored Read failed for range starting from %d with length %d",
+                      range.getOffset(), range.getLength());
                 }
 
                 @Override
                 public void onSuccess(DisposableByteString disposableByteString) {
                   try {
-                    processBytesAndCompleteRange(disposableByteString, range, allocate);
+                    long bytesRead =
+                        processBytesAndCompleteRange(disposableByteString, range, allocate);
+                    logger.atFiner().log(
+                        "Vectored Read successful for range starting from %d with length %d. Total Bytes Read are: %d within %d ms",
+                        range.getOffset(),
+                        range.getLength(),
+                        bytesRead,
+                        System.currentTimeMillis() - vectoredReadStartTime);
                   } catch (Throwable t) {
                     range.getData().completeExceptionally(t);
+                    logger.atFiner().log(
+                        "Vectored Read failed for range starting from %d with length %d",
+                        range.getOffset(), range.getLength());
                   }
                 }
               },
@@ -184,14 +205,17 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
         });
   }
 
-  private void processBytesAndCompleteRange(
+  private long processBytesAndCompleteRange(
       DisposableByteString disposableByteString,
       VectoredIORange range,
       IntFunction<ByteBuffer> allocate)
       throws IOException {
+    long bytesRead = 0;
+    // try-with-resources ensures the DisposableByteString is closed, releasing its memory
     try (DisposableByteString dbs = disposableByteString) {
       ByteString byteString = dbs.byteString();
       int size = byteString.size();
+      bytesRead += size;
       ByteBuffer buf = allocate.apply(size);
       for (ByteBuffer b : byteString.asReadOnlyByteBufferList()) {
         buf.put(b);
@@ -199,6 +223,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       buf.flip();
       range.getData().complete(buf);
     }
+    return bytesRead;
   }
 
   private void throwIfNotOpen() throws IOException {

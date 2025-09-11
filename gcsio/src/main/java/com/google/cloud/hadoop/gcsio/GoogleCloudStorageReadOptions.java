@@ -32,7 +32,8 @@ public abstract class GoogleCloudStorageReadOptions {
   public enum Fadvise {
     AUTO,
     RANDOM,
-    SEQUENTIAL
+    SEQUENTIAL,
+    AUTO_RANDOM
   }
 
   // Default builder should be initialized after default values,
@@ -55,8 +56,9 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGzipEncodingSupportEnabled(false)
         .setInplaceSeekLimit(8 * 1024 * 1024)
         .setMinRangeRequestSize(2 * 1024 * 1024)
+        .setBlockSize(64 * 1024 * 1024)
+        .setFadviseRequestTrackCount(3)
         .setReadExactRequestedBytesEnabled(false)
-        .setBidiEnabled(false)
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30);
   }
@@ -108,8 +110,9 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setGrpcReadTimeout(Duration)}. */
   public abstract Duration getGrpcReadMessageTimeout();
 
-  /** See {@link Builder#setBidiEnabled(boolean)}. */
-  public abstract boolean isBidiEnabled();
+  public abstract long getBlockSize();
+
+  public abstract int getFadviseRequestTrackCount();
 
   /** See {@link Builder#setBidiThreadCount(int)}. */
   public abstract int getBidiThreadCount();
@@ -218,8 +221,9 @@ public abstract class GoogleCloudStorageReadOptions {
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
 
-    /** Sets the property to use the bidirectional Rapid Storage Api. */
-    public abstract Builder setBidiEnabled(boolean bidiEnabled);
+    public abstract Builder setBlockSize(long blockSize);
+
+    public abstract Builder setFadviseRequestTrackCount(int requestTrackCount);
 
     /**
      * Sets the number of threads used by ThreadPoolExecutor in bidi channel. This executor is used
