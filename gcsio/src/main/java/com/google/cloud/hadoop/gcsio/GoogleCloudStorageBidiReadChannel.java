@@ -57,7 +57,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-    this.blobId =
+    BlobId blobId =
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
