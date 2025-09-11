@@ -225,23 +225,24 @@ public class GoogleCloudStorageBidiReadChannelTest {
   public void initMetadata_unsupportedOperationException() throws IOException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(DEFAULT_ITEM_INFO);
 
-    assertThrows(UnsupportedOperationException.class, () -> bidiReadChannel.initMetadata("gzip", 10));
+    assertThrows(
+        UnsupportedOperationException.class, () -> bidiReadChannel.initMetadata("gzip", 10));
   }
 
   @Test
   public void size_ioException() throws IOException {
-     GoogleCloudStorageItemInfo ItemInfo =
-             GoogleCloudStorageItemInfo.createObject(
-                     RESOURCE_ID,
-                     /* creationTime= */ 10L,
-                     /* modificationTime= */ 15L,
-                     /* size= */ -1,
-                     /* contentType= */ "text/plain",
-                     /* contentEncoding= */ "text",
-                     /* metadata= */ null,
-                     /* contentGeneration= */ 1,
-                     /* metaGeneration= */ 2L,
-                     /* verificationAttributes= */ null);
+    GoogleCloudStorageItemInfo ItemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ -1,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
 
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(ItemInfo);
 
@@ -251,10 +252,13 @@ public class GoogleCloudStorageBidiReadChannelTest {
   private String getReadVectoredData(VectoredIORange range)
       throws ExecutionException, InterruptedException, TimeoutException {
     Charset charset = StandardCharsets.UTF_8;
-    return charset.decode(Objects.requireNonNull(range.getData()).get(3, TimeUnit.SECONDS)).toString();
+    return charset
+        .decode(Objects.requireNonNull(range.getData()).get(3, TimeUnit.SECONDS))
+        .toString();
   }
 
-  private GoogleCloudStorageBidiReadChannel getMockedBidiReadChannel(GoogleCloudStorageItemInfo ItemInfo) throws IOException {
+  private GoogleCloudStorageBidiReadChannel getMockedBidiReadChannel(
+      GoogleCloudStorageItemInfo ItemInfo) throws IOException {
     Storage storage = mock(Storage.class);
     when(storage.blobReadSession(any(), any()))
         .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
