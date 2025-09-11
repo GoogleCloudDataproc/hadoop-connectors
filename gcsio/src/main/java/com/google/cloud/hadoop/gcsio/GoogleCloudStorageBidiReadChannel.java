@@ -34,7 +34,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
   private long objectSize;
-  private boolean isOpen = true;
+  private boolean open = true;
   private boolean gzipEncoded = false;
   private final Duration readTimeout;
   private long position = 0;
@@ -147,7 +147,6 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    GoogleCloudStorageEventBus.postOnException();
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
@@ -169,13 +168,13 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
 
   @Override
   public boolean isOpen() {
-    return isOpen;
+    return open;
   }
 
   @Override
   public void close() throws IOException {
-    if (isOpen) {
-      isOpen = false;
+    if (open) {
+      open = false;
       logger.atFinest().log("Closing channel for '%s'", resourceId);
       if (blobReadSession != null) {
         blobReadSession.close();
