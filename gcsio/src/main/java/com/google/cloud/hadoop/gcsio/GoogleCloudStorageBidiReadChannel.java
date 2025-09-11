@@ -29,7 +29,6 @@ import javax.annotation.Nullable;
 
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
   private static final int EOF = -1;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
