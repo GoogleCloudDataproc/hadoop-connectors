@@ -20,7 +20,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(null, true);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, true);
 
-    assertEquals(test_gcs1.storage, test_gcs2.storage);
+    assertEquals(test_gcs1.storageWrapper, test_gcs2.storageWrapper);
   }
 
   @Test
@@ -32,7 +32,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(testOptionsBuilder, true);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, true);
 
-    assertNotEquals(test_gcs1.storage, test_gcs2.storage);
+    assertNotEquals(test_gcs1.storageWrapper, test_gcs2.storageWrapper);
   }
 
   @Test
@@ -40,7 +40,7 @@ public class GoogleCloudStorageJavaStorageClientCachingIntegrationTest {
     GoogleCloudStorageClientImpl test_gcs1 = createGcsClient(null, false);
     GoogleCloudStorageClientImpl test_gcs2 = createGcsClient(null, false);
 
-    assertNotEquals(test_gcs1.storage, test_gcs2.storage);
+    assertNotEquals(test_gcs1.storageWrapper, test_gcs2.storageWrapper);
   }
 
   private GoogleCloudStorageClientImpl createGcsClient(
