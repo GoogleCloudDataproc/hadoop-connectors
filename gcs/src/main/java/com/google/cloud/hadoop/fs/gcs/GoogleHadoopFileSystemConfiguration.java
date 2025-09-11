@@ -516,6 +516,15 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.client.upload.type", UploadType.CHUNK_UPLOAD);
 
   /**
+   * Configuration key to enable JAVA_STORAGE client caching across FS objects. This config will be
+   * effective only if fs.gs.client.type is set to STORAGE_CLIENT.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_STORAGE_CLIENT_CACHING =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.storage.client.cache.enable",
+          GoogleCloudStorageOptions.DEFAULT.isStorageClientCachingEnabled());
+
+  /**
    * Configuration key to configure the Path where uploads will be parked on disk. If not set then
    * uploads will be parked at default location pointed by java-storage client. This will only be
    * effective if fs.gs.client.upload.type is set to non-default value.
@@ -675,6 +684,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setMoveOperationEnabled(GCS_OPERATION_MOVE_ENABLE.get(config, config::getBoolean))
+        .setStorageClientCachingEnabled(GCS_STORAGE_CLIENT_CACHING.get(config, config::getBoolean))
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setFinalizeBeforeClose(
             GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));
