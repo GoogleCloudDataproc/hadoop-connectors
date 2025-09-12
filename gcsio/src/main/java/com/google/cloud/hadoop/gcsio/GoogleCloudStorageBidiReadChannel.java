@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Strings.nullToEmpty;
+import static java.lang.Math.max;
 
 import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutureCallback;
@@ -8,6 +9,7 @@ import com.google.api.core.ApiFutures;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -17,6 +19,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -26,8 +29,8 @@ import javax.annotation.Nullable;
 
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
   private static final int EOF = -1;
+
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final BlobReadSession blobReadSession;
@@ -38,6 +41,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private boolean gzipEncoded = false;
   private final Duration readTimeout;
   private long position = 0;
+  private final GoogleCloudStorageReadOptions readOptions;
+  private byte[] footerContent;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -45,7 +50,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-
     // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
     this.readTimeout = readOptions.getGrpcReadTimeout();
     this.resourceId =
@@ -56,6 +60,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.blobReadSession =
         initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
+    this.readOptions = readOptions;
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
   }
@@ -87,39 +92,18 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return EOF;
     }
 
-    logger.atFinest().log(
-        "Reading up to %d bytes at position %d from '%s'", dst.remaining(), position, resourceId);
-
-    long bytesToRequest = Math.min(dst.remaining(), objectSize - position);
-
-    try {
-      ApiFuture<DisposableByteString> futureBytes =
-          blobReadSession.readAs(
-              ReadProjectionConfigs.asFutureByteString()
-                  .withRangeSpec(RangeSpec.of(position, bytesToRequest)));
-
-      int bytesRead;
-      try (DisposableByteString dbs =
-          futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS); ) {
-        ByteString byteString = dbs.byteString();
-        bytesRead = byteString.size();
-
-        if (bytesRead == 0 && position < objectSize) {
-          throw new IOException(
-              String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
-        }
-
-        byteString.copyTo(dst);
-        position += bytesRead;
-      }
-
-      return bytesRead > 0 ? bytesRead : EOF;
-
-    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new IOException(
-          String.format("Read failed on %s at position %d", resourceId, position), e);
+    // Attempt to service the read from the footer cache logic.
+    // This method will handle both reading from an existing cache and populating it if necessary.
+    // It returns an Optional<Integer>:
+    //  - If present, the read was handled by the cache, and the value is the bytes read.
+    //  - If empty, the read is not in the footer range, and a standard read should be performed.
+    Optional<Integer> bytesReadFromCache = tryReadFromFooter(dst);
+    if (bytesReadFromCache.isPresent()) {
+      return bytesReadFromCache.get();
     }
+
+    // If not handled by the cache, perform a standard read.
+    return performStandardRead(dst);
   }
 
   @Override
@@ -235,7 +219,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       int size = byteString.size();
       bytesRead += size;
       ByteBuffer buf = allocate.apply(size);
-      // This loop efficiently copies data without creating intermediate byte arrays on the heap
       for (ByteBuffer b : byteString.asReadOnlyByteBufferList()) {
         buf.put(b);
       }
@@ -278,6 +261,157 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
           String.format(
               "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
               position, objectSize, resourceId));
+    }
+  }
+
+  // Helper functions related to Footer Caching.
+
+  /**
+   * Check if the read is current position of the channel belongs to the last Range Request. If yes
+   * that will be cached as the footer and future requests in the footer region will be served from
+   * the cache.
+   */
+  @VisibleForTesting
+  public boolean isFooterRead() {
+    return objectSize - position <= readOptions.getMinRangeRequestSize();
+  }
+
+  /**
+   * Function to cache the complete last range request as the footer if the footer is not already
+   * cached.
+   */
+  @VisibleForTesting
+  public void cacheFooter()
+      throws InterruptedException, ExecutionException, TimeoutException, IOException {
+    long footerStartPosition = max(0, objectSize - readOptions.getMinRangeRequestSize());
+    long footerSize = objectSize - footerStartPosition;
+
+    if (footerSize <= 0) {
+      return;
+    }
+
+    logger.atFiner().log(
+        "Prefetching footer for '%s'. Position: %d, Size: %d",
+        resourceId, footerStartPosition, footerSize);
+    ByteString byteString = readBytes(footerStartPosition, footerSize);
+    if (byteString.size() != footerSize) {
+      throw new IOException(
+          String.format(
+              "Failed to read complete footer for '%s'. Expected %d, got %d",
+              resourceId, footerSize, byteString.size()));
+    }
+    this.footerContent = byteString.toByteArray();
+    logger.atFiner().log("Prefetched %d bytes footer for '%s'", footerContent.length, resourceId);
+  }
+
+  /** Serve the data from the cached footer if the footer Cache is already populated */
+  @VisibleForTesting
+  public int readFromCache(ByteBuffer dst) {
+    // Calculate offset inside the footerContent byte array
+
+    long footerStartPosition = objectSize - footerContent.length;
+
+    // The Offset in the cache array will be the number bytes to start reading from the beginning of
+    // the footer.
+    int offsetInFooterCache = (int) (position - footerStartPosition);
+
+    // The number of bytes we read is limited by dst buffer remaining and cache remaining
+    int bytesToCopy = Math.min(dst.remaining(), footerContent.length - offsetInFooterCache);
+
+    if (bytesToCopy <= 0) {
+      return 0;
+    }
+
+    dst.put(footerContent, offsetInFooterCache, bytesToCopy);
+    position += bytesToCopy;
+    return bytesToCopy;
+  }
+
+  /**
+   * Attempts to fulfill the read request from the footer cache.
+   *
+   * <p>If the footer is already cached and the read is within its range, it reads from the cache.
+   * If the footer is not cached but the read is in the footer region, it fetches the footer, caches
+   * it, and then reads from the new cache.
+   *
+   * @return An {@link Optional} containing the number of bytes read if the request was handled by
+   *     the cache, or {@link Optional#empty()} if the request is not a footer request.
+   * @throws IOException if fetching the footer fails.
+   */
+  private Optional<Integer> tryReadFromFooter(ByteBuffer dst) throws IOException {
+    // The footer is already cached and our read position is within it.
+    if (footerContent != null && position >= objectSize - footerContent.length) {
+      int bytesRead = readFromCache(dst);
+      return Optional.of(bytesRead);
+    }
+
+    // The footer is not cached, but we should fetch it as position is in range.
+    boolean shouldPrefetchFooter =
+        !gzipEncoded
+            && footerContent == null
+            && isFooterRead()
+            && !readOptions.isReadExactRequestedBytesEnabled();
+
+    if (shouldPrefetchFooter) {
+      try {
+        cacheFooter();
+        // After caching, read the requested part from the new cache.
+        int bytesRead = readFromCache(dst);
+        return Optional.of(bytesRead);
+      } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IOException(String.format("Footer prefetch failed on %s", resourceId), e);
+      }
+    }
+
+    // If neither case was met, this read is not for the footer.
+    return Optional.empty();
+  }
+
+  /**
+   * Performs a standard read from the current position.
+   *
+   * @param dst The destination buffer for the read operation.
+   * @return The number of bytes read, or -1 if the end of the stream is reached.
+   * @throws IOException if the read operation fails.
+   */
+  @VisibleForTesting
+  public int performStandardRead(ByteBuffer dst) throws IOException {
+    logger.atFinest().log(
+        "Reading up to %d bytes at position %d from '%s'", dst.remaining(), position, resourceId);
+
+    long bytesToRequest = Math.min(dst.remaining(), objectSize - position);
+
+    ByteString byteString;
+    try {
+      byteString = readBytes(position, bytesToRequest);
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException(
+          String.format("Read failed on %s at position %d", resourceId, position), e);
+    }
+    int bytesRead = byteString.size();
+
+    if (bytesRead == 0 && position < objectSize) {
+      throw new IOException(
+          String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
+    }
+
+    if (bytesRead > 0) {
+      byteString.copyTo(dst);
+      position += bytesRead;
+    }
+
+    return bytesRead > 0 ? bytesRead : EOF;
+  }
+
+  private ByteString readBytes(long offset, long length)
+      throws InterruptedException, ExecutionException, TimeoutException, IOException {
+    ApiFuture<DisposableByteString> futureBytes =
+        blobReadSession.readAs(
+            ReadProjectionConfigs.asFutureByteString().withRangeSpec(RangeSpec.of(offset, length)));
+    try (DisposableByteString dbs = futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
+      return dbs.byteString();
     }
   }
 }
