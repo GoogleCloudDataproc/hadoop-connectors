@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -8,7 +9,10 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.core.ApiFutures;
+import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobSourceOption;
+import com.google.cloud.storage.StorageException;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -134,6 +138,74 @@ public class GoogleCloudStorageBidiReadChannelTest {
     bidiReadChannel.close();
 
     assertThrows(ClosedChannelException.class, () -> bidiReadChannel.read(ByteBuffer.allocate(1)));
+  }
+
+  @Test
+  public void read_whenReadZeroBytes_throwsIOException() throws IOException {
+    // Setup a FakeBlobReadSession that returns an empty ByteString
+    Storage storage = mock(Storage.class);
+    BlobReadSession fakeSession =
+        new FakeBlobReadSession(FakeBlobReadSession.Behavior.READ_ZERO_BYTES);
+    when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
+        .thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel bidiReadChannel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder().build(),
+            Executors.newSingleThreadExecutor());
+
+    IOException e =
+        assertThrows(IOException.class, () -> bidiReadChannel.read(ByteBuffer.allocate(10)));
+    assertThat(e).hasMessageThat().contains("Read 0 bytes without blocking");
+  }
+
+  @Test
+  public void read_whenFutureFails_throwsIOException() throws IOException {
+    // Setup a FakeBlobReadSession that returns a failed future
+    Storage storage = mock(Storage.class);
+    BlobReadSession fakeSession = new FakeBlobReadSession(FakeBlobReadSession.Behavior.FAIL_FUTURE);
+    when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
+        .thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel bidiReadChannel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder().build(),
+            Executors.newSingleThreadExecutor());
+
+    IOException e =
+        assertThrows(IOException.class, () -> bidiReadChannel.read(ByteBuffer.allocate(10)));
+    assertThat(e).hasMessageThat().startsWith("Read failed on");
+    assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
+    assertThat(e).hasCauseThat().hasCauseThat().isInstanceOf(StorageException.class);
+    assertThat(e).hasCauseThat().hasCauseThat().hasMessageThat().isEqualTo("Not Found");
+  }
+
+  @Test
+  public void read_whenFutureTimesOut_throwsIOException() throws IOException {
+    // Setup a FakeBlobReadSession that returns a future that never completes
+    Storage storage = mock(Storage.class);
+    BlobReadSession fakeSession =
+        new FakeBlobReadSession(FakeBlobReadSession.Behavior.TIMEOUT_FUTURE);
+    when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
+        .thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel bidiReadChannel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder()
+                .setGrpcReadTimeout(java.time.Duration.ofNanos(1))
+                .build(),
+            Executors.newSingleThreadExecutor());
+
+    IOException e =
+        assertThrows(IOException.class, () -> bidiReadChannel.read(ByteBuffer.allocate(10)));
+    assertThat(e).hasMessageThat().startsWith("Read failed on");
+    assertThat(e).hasCauseThat().isInstanceOf(TimeoutException.class);
   }
 
   @Test
