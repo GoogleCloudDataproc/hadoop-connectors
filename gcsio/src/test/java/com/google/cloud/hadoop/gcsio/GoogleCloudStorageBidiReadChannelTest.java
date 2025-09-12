@@ -54,6 +54,64 @@ public class GoogleCloudStorageBidiReadChannelTest {
           /* verificationAttributes= */ null);
 
   @Test
+  public void constructor_whenSessionInitializationFails_throwsIOException() {
+    Storage storage = mock(Storage.class);
+    when(storage.blobReadSession(any()))
+        .thenReturn(
+            ApiFutures.immediateFailedFuture(
+                new ExecutionException("Failed to create session", null)));
+
+    IOException e =
+        assertThrows(
+            IOException.class,
+            () ->
+                new GoogleCloudStorageBidiReadChannel(
+                    storage,
+                    DEFAULT_ITEM_INFO,
+                    GoogleCloudStorageReadOptions.builder().build(),
+                    Executors.newSingleThreadExecutor()));
+
+    // The original exception is wrapped in IOException by initializeBlobReadSession
+    assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
+    assertThat(e).hasCauseThat().hasMessageThat().contains("Failed to create session");
+  }
+
+  // TODO(dhritichopra): Remove test after support for Gzip is added
+  @Test
+  public void constructor_whenItemIsGzipEncoded_throwsUnsupportedOperationException()
+      throws IOException {
+    Storage storage = mock(Storage.class);
+    // Mock session creation to succeed (so the constructor gets to the metadata check)
+    when(storage.blobReadSession(any()))
+        .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
+
+    GoogleCloudStorageItemInfo gzipItemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "gzip", // <-- Set gzip encoding
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+
+    UnsupportedOperationException e =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                new GoogleCloudStorageBidiReadChannel(
+                    storage,
+                    gzipItemInfo, // Use the gzip item info
+                    GoogleCloudStorageReadOptions.builder().build(),
+                    Executors.newSingleThreadExecutor()));
+
+    assertThat(e).hasMessageThat().isEqualTo("Gzip Encoded Files are not supported");
+  }
+
+  @Test
   public void readVectored_successfulRead()
       throws IOException, ExecutionException, InterruptedException, TimeoutException,
           URISyntaxException {
@@ -239,6 +297,14 @@ public class GoogleCloudStorageBidiReadChannelTest {
   }
 
   @Test
+  public void position_onClosedChannel_throwsClosedChannelException() throws IOException {
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+    bidiReadChannel.close();
+
+    assertThrows(ClosedChannelException.class, () -> bidiReadChannel.position(10));
+  }
+
+  @Test
   public void size_successful() throws IOException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
 
@@ -325,6 +391,39 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
     verify(fakeSession, times(2)).readAs(any());
     verifyNoMoreInteractions(fakeSession);
+  }
+
+  @Test
+  public void read_whenReadExactRequestedBytesEnabled_skipsFooterCache() throws Exception {
+    int footerSize = 20;
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(footerSize)
+            .setReadExactRequestedBytesEnabled(true)
+            .build();
+
+    FakeBlobReadSession fakeSession = spy(new FakeBlobReadSession());
+    Storage storage = mock(Storage.class);
+    when(storage.blobReadSession(any())).thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+
+    // Verify footer is not initially cached
+    assertNull("Footer should be null initially", getPrivateField(channel, "footerContent"));
+
+    // Position the read within the footer range
+    long readPosition = OBJECT_SIZE - 10; // Inside 20-byte footer range
+    channel.position(readPosition);
+
+    ByteBuffer buffer = ByteBuffer.allocate(5);
+    int bytesRead = channel.read(buffer);
+
+    assertEquals(5, bytesRead);
+
+    // Verify footer is STILL null, because ReadExact disabled the optimization
+    assertNull("Footer should remain null", getPrivateField(channel, "footerContent"));
   }
 
   @Test
