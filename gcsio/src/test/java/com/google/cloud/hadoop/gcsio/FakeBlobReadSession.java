@@ -14,6 +14,8 @@ import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+import java.util.List;
 
 public class FakeBlobReadSession implements BlobReadSession {
 
@@ -31,10 +33,12 @@ public class FakeBlobReadSession implements BlobReadSession {
     DEFAULT,
     READ_ZERO_BYTES,
     FAIL_FUTURE,
-    TIMEOUT_FUTURE
+    TIMEOUT_FUTURE,
+    IO_EXCEPTION
   }
 
   private final Behavior behavior;
+  private final Iterator<Behavior> behaviorIterator;
   private final SettableApiFuture<DisposableByteString> neverCompleteFuture;
 
   public FakeBlobReadSession() {
@@ -45,9 +49,21 @@ public class FakeBlobReadSession implements BlobReadSession {
     this(behavior, SettableApiFuture.create());
   }
 
+  public FakeBlobReadSession(List<Behavior> behaviors) {
+    this(behaviors, SettableApiFuture.create());
+  }
+
   public FakeBlobReadSession(
       Behavior behavior, SettableApiFuture<DisposableByteString> neverCompleteFuture) {
     this.behavior = behavior;
+    this.behaviorIterator = null;
+    this.neverCompleteFuture = neverCompleteFuture;
+  }
+
+  public FakeBlobReadSession(
+      List<Behavior> behaviors, SettableApiFuture<DisposableByteString> neverCompleteFuture) {
+    this.behavior = null;
+    this.behaviorIterator = behaviors.iterator();
     this.neverCompleteFuture = neverCompleteFuture;
   }
 
@@ -58,7 +74,16 @@ public class FakeBlobReadSession implements BlobReadSession {
 
   @Override
   public <Projection> Projection readAs(ReadProjectionConfig<Projection> readProjectionConfig) {
-    switch (behavior) {
+    Behavior currentBehavior = behavior;
+    if (behaviorIterator != null && behaviorIterator.hasNext()) {
+      currentBehavior = behaviorIterator.next();
+    }
+
+    if (currentBehavior == null) {
+      currentBehavior = Behavior.DEFAULT;
+    }
+
+    switch (currentBehavior) {
       case READ_ZERO_BYTES:
         return (Projection)
             ApiFutures.immediateFuture(
@@ -71,6 +96,9 @@ public class FakeBlobReadSession implements BlobReadSession {
                   @Override
                   public void close() {}
                 });
+      case IO_EXCEPTION:
+        return (Projection)
+                ApiFutures.immediateFailedFuture(new IOException());
       case FAIL_FUTURE:
         return (Projection)
             ApiFutures.immediateFailedFuture(new StorageException(404, "Not Found"));

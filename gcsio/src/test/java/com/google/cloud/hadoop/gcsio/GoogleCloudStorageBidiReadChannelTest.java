@@ -4,8 +4,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockT
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.core.ApiFutures;
@@ -28,6 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
+
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 
 public class GoogleCloudStorageBidiReadChannelTest {
@@ -316,6 +317,46 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(ItemInfo);
 
     assertThrows(IOException.class, bidiReadChannel::size);
+  }
+
+  @Test
+  public void read_succeedsAfterIoException() throws IOException {
+    int bytesToRead = 10;
+    ByteBuffer buffer = ByteBuffer.allocate(bytesToRead);
+
+    Storage storage = mock(Storage.class);
+    FakeBlobReadSession fakeSession =
+        spy(
+            new FakeBlobReadSession(
+                ImmutableList.of(FakeBlobReadSession.Behavior.IO_EXCEPTION, FakeBlobReadSession.Behavior.DEFAULT),
+                null));
+    when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
+            .thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel bidiReadChannel =
+            new GoogleCloudStorageBidiReadChannel(
+                    storage,
+                    DEFAULT_ITEM_INFO,
+                    GoogleCloudStorageReadOptions.builder().build(),
+                    Executors.newSingleThreadExecutor());
+
+    IOException e = assertThrows(IOException.class, () -> bidiReadChannel.read(buffer));
+    assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
+    assertThat(buffer.position()).isEqualTo(0);
+    assertThat(bidiReadChannel.position()).isEqualTo(0);
+
+    int bytesRead = bidiReadChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(bytesToRead);
+    assertThat(buffer.position()).isEqualTo(bytesToRead);
+    assertThat(bidiReadChannel.position()).isEqualTo(bytesToRead);
+
+    buffer.flip();
+    String content = StandardCharsets.UTF_8.decode(buffer).toString();
+    assertThat(content).isEqualTo(FakeBlobReadSession.SUBSTRING_0_10);
+
+    verify(fakeSession, times(2)).readAs(any());
+    verifyNoMoreInteractions(fakeSession);
   }
 
   private String getReadVectoredData(VectoredIORange range)
