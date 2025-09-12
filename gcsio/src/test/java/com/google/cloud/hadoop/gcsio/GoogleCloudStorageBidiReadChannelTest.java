@@ -382,7 +382,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
   public void cacheFooter_whenIncompleteRead_throwsIOException() throws Exception {
     Storage storage = mock(Storage.class);
     BlobReadSession fakeSession =
-        new FakeBlobReadSession(FakeBlobReadSession.Behavior.READ_PARTIAL_BYES);
+        new FakeBlobReadSession(FakeBlobReadSession.Behavior.READ_PARTIAL_BYTES);
     when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
         .thenReturn(ApiFutures.immediateFuture(fakeSession));
 

@@ -35,7 +35,7 @@ public class FakeBlobReadSession implements BlobReadSession {
     FAIL_FUTURE,
     TIMEOUT_FUTURE,
     IO_EXCEPTION,
-    READ_PARTIAL_BYES
+    READ_PARTIAL_BYTES
   }
 
   private final Behavior behavior;
@@ -98,7 +98,7 @@ public class FakeBlobReadSession implements BlobReadSession {
                   @Override
                   public void close() {}
                 });
-      case READ_PARTIAL_BYES:
+      case READ_PARTIAL_BYTES:
         return (Projection)
             ApiFutures.immediateFuture(
                 new DisposableByteString() {
