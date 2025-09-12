@@ -142,7 +142,6 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   @Test
   public void read_whenReadZeroBytes_throwsIOException() throws IOException {
-    // Setup a FakeBlobReadSession that returns an empty ByteString
     Storage storage = mock(Storage.class);
     BlobReadSession fakeSession =
         new FakeBlobReadSession(FakeBlobReadSession.Behavior.READ_ZERO_BYTES);
@@ -163,7 +162,6 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   @Test
   public void read_whenFutureFails_throwsIOException() throws IOException {
-    // Setup a FakeBlobReadSession that returns a failed future
     Storage storage = mock(Storage.class);
     BlobReadSession fakeSession = new FakeBlobReadSession(FakeBlobReadSession.Behavior.FAIL_FUTURE);
     when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
@@ -186,7 +184,6 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   @Test
   public void read_whenFutureTimesOut_throwsIOException() throws IOException {
-    // Setup a FakeBlobReadSession that returns a future that never completes
     Storage storage = mock(Storage.class);
     BlobReadSession fakeSession =
         new FakeBlobReadSession(FakeBlobReadSession.Behavior.TIMEOUT_FUTURE);
