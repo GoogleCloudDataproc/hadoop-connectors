@@ -24,7 +24,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 
-public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
+public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final int EOF_RETURN_VALUE = -1;
@@ -109,10 +109,8 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
               String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
         }
 
-        if (bytesRead > 0) {
-          byteString.copyTo(dst);
-          position += bytesRead;
-        }
+        byteString.copyTo(dst);
+        position += bytesRead;
       }
 
       return bytesRead > 0 ? bytesRead : EOF_RETURN_VALUE;
@@ -239,6 +237,7 @@ public class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableBy
       int size = byteString.size();
       bytesRead += size;
       ByteBuffer buf = allocate.apply(size);
+      // This loop efficiently copies data without creating intermediate byte arrays on the heap
       for (ByteBuffer b : byteString.asReadOnlyByteBufferList()) {
         buf.put(b);
       }
