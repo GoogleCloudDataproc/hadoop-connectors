@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -358,6 +359,43 @@ public class GoogleCloudStorageBidiReadChannelTest {
     IOException e = assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(5)));
     assertThat(e).hasMessageThat().startsWith("Footer prefetch failed on");
     assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
+  }
+
+  @Test
+  public void cacheFooter_whenFutureFails_throwsIOException() throws Exception {
+    Storage storage = mock(Storage.class);
+    BlobReadSession fakeSession = new FakeBlobReadSession(FakeBlobReadSession.Behavior.FAIL_FUTURE);
+    when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
+        .thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
+            Executors.newSingleThreadExecutor());
+
+    ExecutionException e =
+        assertThrows(ExecutionException.class, () -> channel.cacheFooter());
+    assertThat(e).hasCauseThat().isInstanceOf(StorageException.class);
+  }
+
+  @Test
+  public void cacheFooter_whenIncompleteRead_throwsIOException() throws Exception {
+      Storage storage = mock(Storage.class);
+      BlobReadSession fakeSession = new FakeBlobReadSession(FakeBlobReadSession.Behavior.READ_PARTIAL_BYES);
+      when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
+              .thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+      GoogleCloudStorageBidiReadChannel channel =
+              new GoogleCloudStorageBidiReadChannel(
+                      storage,
+                      DEFAULT_ITEM_INFO,
+                      GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
+                      Executors.newSingleThreadExecutor());
+
+    IOException e = assertThrows(IOException.class, () -> channel.cacheFooter());
+    assertThat(e).hasMessageThat().startsWith("Failed to read complete footer");
   }
 
   @Test
