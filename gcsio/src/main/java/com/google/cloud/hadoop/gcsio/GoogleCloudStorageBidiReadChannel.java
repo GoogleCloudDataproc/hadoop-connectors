@@ -424,23 +424,14 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     if (bytesToRequest <= 0) return;
 
     try {
-      ApiFuture<DisposableByteString> futureBytes =
-          getBlobReadSession()
-              .readAs(
-                  ReadProjectionConfigs.asFutureByteString()
-                      .withRangeSpec(RangeSpec.of(position, bytesToRequest)));
-
-      try (DisposableByteString dbs =
-          futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
-        ByteString byteString = dbs.byteString();
-        if (!byteString.isEmpty()) {
-          this.bufferStartPosition = position;
-          this.internalBuffer = byteString.asReadOnlyByteBuffer();
-        }
+      ByteString byteString = readBytes(position, bytesToRequest);
+      if (!byteString.isEmpty()) {
+        this.bufferStartPosition = position;
+        this.internalBuffer = byteString.asReadOnlyByteBuffer();
       }
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       throw new IOException(
-          String.format("Read failed on %s at position %d", resourceId, position), e);
+          String.format("Look ahead read failed on %s at position %d", resourceId, position), e);
     }
   }
 
