@@ -1,7 +1,9 @@
 package com.google.cloud.hadoop.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
@@ -17,6 +19,16 @@ public class LoggingFormatter extends Formatter {
   /** The base package for all loggers in this repository that should be formatted. */
   private static final String GCS_CONNECTOR_LOGGER_PREFIX = "com.google.cloud.hadoop";
 
+  private final Formatter existingFormatter;
+
+  /**
+   * Constructs a new LoggingFormatter that wraps an existing formatter.
+   *
+   * @param existingFormatter The formatter to be decorated.
+   */
+  public LoggingFormatter(Formatter existingFormatter) {
+    this.existingFormatter = existingFormatter;
+  }
   /**
    * Formats the given log record by prefixing it with the invocation ID.
    *
@@ -25,24 +37,30 @@ public class LoggingFormatter extends Formatter {
    */
   @Override
   public String format(LogRecord record) {
-    String invocationId = InvocationIdContext.getInvocationId();
-    Optional<String> optMessage = Optional.ofNullable(record.getMessage());
+    String originalMessage = record.getMessage();
     Optional<String> optLoggerName = Optional.ofNullable(record.getLoggerName());
 
     // A log should be formatted if its logger name matches the connector's prefix,
     // it has an invocation ID, and the message is not structured JSON.
+    String invocationId = InvocationIdContext.getInvocationId();
     boolean shouldFormat =
         optLoggerName.map(name -> name.startsWith(GCS_CONNECTOR_LOGGER_PREFIX)).orElse(false)
             && !invocationId.isEmpty()
-            && !optMessage.map(this::isJson).orElse(false);
+            && !isJson(originalMessage);
 
+    String messageToFormat = originalMessage;
     if (shouldFormat) {
       // Prefix the invocation ID to the log message.
-      return String.format("[%s]: %s%n", invocationId, optMessage.orElse(""));
+      messageToFormat =
+          String.format("[%s]: %s", invocationId, Objects.toString(originalMessage, ""));
     }
 
-    // Otherwise, return the message as-is.
-    return String.format("%s%n", optMessage.orElse(""));
+    if (existingFormatter != null) {
+      record.setMessage(messageToFormat);
+      return existingFormatter.format(record);
+    }
+    // Otherwise, return the message as-is with a newline.
+    return String.format("%s%n", Objects.toString(messageToFormat, ""));
   }
 
   /**
@@ -53,8 +71,18 @@ public class LoggingFormatter extends Formatter {
   public static void addFormatter(Logger logger) {
     // Set the custom formatter on all handlers of the logger
     for (Handler handler : logger.getHandlers()) {
-      handler.setFormatter(new LoggingFormatter());
+      addFormatterToHandler(handler);
     }
+  }
+
+  @VisibleForTesting
+  static void addFormatterToHandler(Handler handler) {
+    Formatter existingFormatter = handler.getFormatter();
+    if (existingFormatter instanceof LoggingFormatter) {
+      // To prevent re-wrapping, do nothing if already a LoggingFormatter.
+      return;
+    }
+    handler.setFormatter(new LoggingFormatter(existingFormatter));
   }
 
   /**
