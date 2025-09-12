@@ -53,6 +53,29 @@ public class GoogleCloudStorageBidiReadChannelTest {
           /* metaGeneration= */ 2L,
           /* verificationAttributes= */ null);
 
+  @Test
+  public void getBlobReadSession_whenFutureFails_throwsIOException() throws IOException {
+    Storage storage = mock(Storage.class);
+    when(storage.blobReadSession(any()))
+        .thenReturn(ApiFutures.immediateFailedFuture(new ExecutionException(new Throwable())));
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder().build(),
+            Executors.newSingleThreadExecutor());
+
+    IOException e =
+        assertThrows(
+            IOException.class,
+            // Calling read() will trigger getBlobReadSession()
+            () -> channel.read(ByteBuffer.allocate(1)));
+
+    assertThat(e).hasMessageThat().isEqualTo("Failed to get BlobReadSession");
+    assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
+  }
+
   // TODO(dhritichopra): Remove test after support for Gzip is added
   @Test
   public void constructor_whenItemIsGzipEncoded_throwsUnsupportedOperationException()
@@ -754,6 +777,25 @@ public class GoogleCloudStorageBidiReadChannelTest {
     destBuffer.flip();
     String readContent = StandardCharsets.UTF_8.decode(destBuffer).toString();
     assertEquals("56789", readContent);
+  }
+
+  @Test
+  public void refillInternalBuffer_whenFutureFails_throwsIOException() throws IOException {
+    Storage storage = mock(Storage.class);
+    BlobReadSession fakeSession = new FakeBlobReadSession(FakeBlobReadSession.Behavior.FAIL_FUTURE);
+    when(storage.blobReadSession(any())).thenReturn(ApiFutures.immediateFuture(fakeSession));
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
+            Executors.newSingleThreadExecutor());
+
+    IOException e = assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(1)));
+
+    assertThat(e).hasMessageThat().startsWith("Look ahead read failed on");
+    assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
   }
 
   private String getReadVectoredData(VectoredIORange range)
