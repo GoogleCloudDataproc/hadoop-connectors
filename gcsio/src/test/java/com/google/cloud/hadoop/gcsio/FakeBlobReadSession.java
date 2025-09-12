@@ -34,7 +34,8 @@ public class FakeBlobReadSession implements BlobReadSession {
     READ_ZERO_BYTES,
     FAIL_FUTURE,
     TIMEOUT_FUTURE,
-    IO_EXCEPTION
+    IO_EXCEPTION,
+    READ_PARTIAL_BYTES
   }
 
   private final Behavior behavior;
@@ -82,6 +83,7 @@ public class FakeBlobReadSession implements BlobReadSession {
     if (currentBehavior == null) {
       currentBehavior = Behavior.DEFAULT;
     }
+    RangeSpec range = ((ReadAsFutureByteString) readProjectionConfig).getRange();
 
     switch (currentBehavior) {
       case READ_ZERO_BYTES:
@@ -96,6 +98,19 @@ public class FakeBlobReadSession implements BlobReadSession {
                   @Override
                   public void close() {}
                 });
+      case READ_PARTIAL_BYTES:
+        return (Projection)
+            ApiFutures.immediateFuture(
+                new DisposableByteString() {
+                  @Override
+                  public ByteString byteString() {
+                    return ByteString.copyFrom(
+                        getPartialSubstring(range).getBytes(StandardCharsets.UTF_8));
+                  }
+
+                  @Override
+                  public void close() throws IOException {}
+                });
       case IO_EXCEPTION:
         return (Projection) ApiFutures.immediateFailedFuture(new IOException());
       case FAIL_FUTURE:
@@ -106,7 +121,6 @@ public class FakeBlobReadSession implements BlobReadSession {
       case DEFAULT:
       default:
         assertThat(readProjectionConfig).isInstanceOf(ReadAsFutureByteString.class);
-        RangeSpec range = ((ReadAsFutureByteString) readProjectionConfig).getRange();
         return (Projection)
             ApiFutures.immediateFuture(
                 new DisposableByteString() {
@@ -126,6 +140,12 @@ public class FakeBlobReadSession implements BlobReadSession {
     return TEST_STRING.substring(
         Math.toIntExact(range.begin()),
         Math.toIntExact(range.begin() + range.maxLength().getAsLong()));
+  }
+
+  private String getPartialSubstring(RangeSpec range) {
+    return TEST_STRING.substring(
+        Math.toIntExact(range.begin()),
+        Math.toIntExact(range.begin() + (range.maxLength().getAsLong()) / 2));
   }
 
   @Override
