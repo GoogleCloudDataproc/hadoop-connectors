@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.api.core.ApiFuture;
 import com.google.api.core.BetaApi;
 import com.google.api.gax.paging.Page;
 import com.google.cloud.Policy;
@@ -8,11 +7,8 @@ import com.google.cloud.ReadChannel;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.Acl;
 import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.BlobAppendableUpload;
-import com.google.cloud.storage.BlobAppendableUploadConfig;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.BlobWriteSession;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
@@ -507,19 +503,6 @@ public class StorageClientWrapper implements Storage {
   @Override
   public Blob moveBlob(MoveBlobRequest request) {
     return storage.moveBlob(request);
-  }
-
-  @Override
-  @BetaApi
-  public ApiFuture<BlobReadSession> blobReadSession(BlobId id, BlobSourceOption... options) {
-    return storage.blobReadSession(id, options);
-  }
-
-  @Override
-  @BetaApi
-  public BlobAppendableUpload blobAppendableUpload(
-      BlobInfo blobInfo, BlobAppendableUploadConfig uploadConfig, BlobWriteOption... options) {
-    return storage.blobAppendableUpload(blobInfo, uploadConfig, options);
   }
 
   @Override
