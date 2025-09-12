@@ -128,7 +128,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    GoogleCloudStorageEventBus.postOnException();
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
