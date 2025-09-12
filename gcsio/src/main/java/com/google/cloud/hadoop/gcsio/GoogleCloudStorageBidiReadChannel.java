@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final int EOF = -1;
+
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final BlobReadSession blobReadSession;
@@ -42,8 +43,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private long position = 0;
   private final GoogleCloudStorageReadOptions readOptions;
   private byte[] footerContent;
-
-  private final int EOFReturnValue = -1;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,

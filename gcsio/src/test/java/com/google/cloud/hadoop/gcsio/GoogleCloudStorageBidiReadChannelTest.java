@@ -206,7 +206,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
     assertThrows(ClosedChannelException.class, () -> bidiReadChannel.read(ByteBuffer.allocate(1)));
   }
-  
+
   @Test
   public void position_getAndSet() throws IOException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
