@@ -12,6 +12,7 @@ import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.StorageException;
+import com.google.common.collect.ImmutableList;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -27,8 +28,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntFunction;
-
-import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 
 public class GoogleCloudStorageBidiReadChannelTest {
@@ -328,17 +327,19 @@ public class GoogleCloudStorageBidiReadChannelTest {
     FakeBlobReadSession fakeSession =
         spy(
             new FakeBlobReadSession(
-                ImmutableList.of(FakeBlobReadSession.Behavior.IO_EXCEPTION, FakeBlobReadSession.Behavior.DEFAULT),
+                ImmutableList.of(
+                    FakeBlobReadSession.Behavior.IO_EXCEPTION,
+                    FakeBlobReadSession.Behavior.DEFAULT),
                 null));
     when(storage.blobReadSession(any(), any(BlobSourceOption.class)))
-            .thenReturn(ApiFutures.immediateFuture(fakeSession));
+        .thenReturn(ApiFutures.immediateFuture(fakeSession));
 
     GoogleCloudStorageBidiReadChannel bidiReadChannel =
-            new GoogleCloudStorageBidiReadChannel(
-                    storage,
-                    DEFAULT_ITEM_INFO,
-                    GoogleCloudStorageReadOptions.builder().build(),
-                    Executors.newSingleThreadExecutor());
+        new GoogleCloudStorageBidiReadChannel(
+            storage,
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder().build(),
+            Executors.newSingleThreadExecutor());
 
     IOException e = assertThrows(IOException.class, () -> bidiReadChannel.read(buffer));
     assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);

@@ -97,8 +97,7 @@ public class FakeBlobReadSession implements BlobReadSession {
                   public void close() {}
                 });
       case IO_EXCEPTION:
-        return (Projection)
-                ApiFutures.immediateFailedFuture(new IOException());
+        return (Projection) ApiFutures.immediateFailedFuture(new IOException());
       case FAIL_FUTURE:
         return (Projection)
             ApiFutures.immediateFailedFuture(new StorageException(404, "Not Found"));
