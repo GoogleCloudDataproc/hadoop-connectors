@@ -1,5 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
