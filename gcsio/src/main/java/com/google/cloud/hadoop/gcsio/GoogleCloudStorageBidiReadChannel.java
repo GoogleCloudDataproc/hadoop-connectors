@@ -408,8 +408,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private ByteString readBytes(long offset, long length)
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
     ApiFuture<DisposableByteString> futureBytes =
-            blobReadSession.readAs(
-                    ReadProjectionConfigs.asFutureByteString().withRangeSpec(RangeSpec.of(offset, length)));
+        blobReadSession.readAs(
+            ReadProjectionConfigs.asFutureByteString().withRangeSpec(RangeSpec.of(offset, length)));
     try (DisposableByteString dbs = futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
       return dbs.byteString();
     }

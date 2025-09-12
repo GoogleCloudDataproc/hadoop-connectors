@@ -142,10 +142,10 @@ public class FakeBlobReadSession implements BlobReadSession {
         Math.toIntExact(range.begin() + range.maxLength().getAsLong()));
   }
 
-    private String getPartialSubstring(RangeSpec range) {
+  private String getPartialSubstring(RangeSpec range) {
     return TEST_STRING.substring(
         Math.toIntExact(range.begin()),
-        Math.toIntExact(range.begin() + (range.maxLength().getAsLong())/2));
+        Math.toIntExact(range.begin() + (range.maxLength().getAsLong()) / 2));
   }
 
   @Override
