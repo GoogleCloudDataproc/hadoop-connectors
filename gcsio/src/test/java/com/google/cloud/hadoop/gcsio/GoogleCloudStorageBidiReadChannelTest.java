@@ -233,29 +233,10 @@ public class GoogleCloudStorageBidiReadChannelTest {
   }
 
   @Test
-  public void position_onClosedChannel_throwsClosedChannelException() throws IOException {
-    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(DEFAULT_ITEM_INFO);
-
-    bidiReadChannel.close();
-
-    assertThrows(ClosedChannelException.class, () -> bidiReadChannel.position(1));
-    assertThrows(ClosedChannelException.class, bidiReadChannel::position);
-  }
-
-  @Test
   public void size_successful() throws IOException {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(DEFAULT_ITEM_INFO);
 
     assertEquals(OBJECT_SIZE, bidiReadChannel.size());
-  }
-
-  @Test
-  public void size_onClosedChannel_throwsClosedChannelException() throws IOException {
-    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(DEFAULT_ITEM_INFO);
-
-    bidiReadChannel.close();
-
-    assertThrows(ClosedChannelException.class, bidiReadChannel::size);
   }
 
   @Test

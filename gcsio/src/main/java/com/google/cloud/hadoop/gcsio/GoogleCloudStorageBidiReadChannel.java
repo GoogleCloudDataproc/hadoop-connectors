@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final int EOF_RETURN_VALUE = -1;
+  private static final int EOF = -1;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final BlobReadSession blobReadSession;
@@ -84,7 +84,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
 
     if (position >= objectSize) {
-      return EOF_RETURN_VALUE;
+      return EOF;
     }
 
     logger.atFinest().log(
@@ -113,7 +113,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         position += bytesRead;
       }
 
-      return bytesRead > 0 ? bytesRead : EOF_RETURN_VALUE;
+      return bytesRead > 0 ? bytesRead : EOF;
 
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       GoogleCloudStorageEventBus.postOnException();
@@ -124,7 +124,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public long position() throws IOException {
-    throwIfNotOpen();
     return position;
   }
 
@@ -150,7 +149,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public long size() throws IOException {
-    throwIfNotOpen();
     if (objectSize == -1) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException("Size of file is not available");
