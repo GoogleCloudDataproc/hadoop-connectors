@@ -45,10 +45,11 @@ installed automatically.
 When you set up a Hadoop cluster by following the directions in `INSTALL.md`,
 the cluster is automatically configured for optimal use with the connector.
 Typically, there is no need for further configuration.
-
 To customize the connector, specify configuration values in `core-site.xml` in
 the Hadoop configuration directory on the machine on which the connector is
-installed.
+installed. For `distcp`-specific tuning and troubleshooting in self-managed
+Hadoop environments with HNS, especially when encountering
+`DEADLINE_EXCEEDED` errors, refer to `CONFIGURATION.md`.
 
 For a complete list of configuration keys and their default values see
 [CONFIGURATION.md](/gcs/CONFIGURATION.md).
