@@ -499,4 +499,18 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     mkdir(bucketName);
     return bucketName;
   }
+
+  /** Creates a bucket and adds it to the list of buckets to delete at the end of tests. */
+  public String createUniqueBucket(String suffix, CreateBucketOptions options) throws IOException {
+    String bucketName = getUniqueBucketName(suffix);
+    gcs.createBucket(bucketName, options);
+    return bucketName;
+  }
+
+  /** Creates a bucket and adds it to the list of buckets to delete at the end of tests. */
+  public String createUniqueBucket(String suffix, CreateBucketOptions options) throws IOException {
+    String bucketName = getUniqueBucketName(suffix);
+    gcs.createBucket(bucketName, options);
+    return bucketName;
+  }
 }
