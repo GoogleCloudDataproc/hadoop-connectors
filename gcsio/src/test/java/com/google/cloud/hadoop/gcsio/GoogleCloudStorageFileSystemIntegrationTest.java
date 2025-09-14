@@ -472,7 +472,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
-        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
+        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemBidiTest.class)) {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
@@ -488,7 +489,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
-        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
+        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemBidiTest.class)) {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
@@ -589,6 +591,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void read_failure_ifObjectWasModifiedDuringRead() throws IOException {
     URI testObject = gcsiHelper.getUniqueObjectUri("generation-strict");
+    if (bidiEnabled) {
+      return;
+    }
     String message1 = "Hello world!\n";
     String message2 = "Sayonara world!\n";
 
@@ -622,18 +627,16 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testOpenNonExistentObject() throws IOException {
     String bucketName = sharedBucketName1;
-    assertThrows(
-        FileNotFoundException.class,
-        () -> gcsiHelper.readTextFile(bucketName, objectName + "_open-non-existent", 0, 100, true));
+    URI path = gcsiHelper.getPath(bucketName, objectName + "_open-non-existent");
+    assertThrows(FileNotFoundException.class, () -> gcsfs.open(path));
   }
 
   /** Validates that we cannot open an object in non-existent bucket. */
   @Test
   public void testOpenInNonExistentBucket() throws IOException {
     String bucketName = gcsiHelper.getUniqueBucketName("open-non-existent");
-    assertThrows(
-        FileNotFoundException.class,
-        () -> gcsiHelper.readTextFile(bucketName, objectName, 0, 100, true));
+    URI path = gcsiHelper.getPath(bucketName, objectName);
+    assertThrows(FileNotFoundException.class, () -> gcsfs.open(path));
   }
 
   /** Validates delete(). */
