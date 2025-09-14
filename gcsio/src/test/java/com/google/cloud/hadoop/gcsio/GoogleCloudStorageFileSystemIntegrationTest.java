@@ -154,10 +154,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     gcsiHelper = helper;
     if (bidiEnabled) {
-      CreateBucketOptions zonalBucketOptions =
-          CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build();
-      gcsiHelper.sharedBucketName1 = gcsiHelper.createUniqueBucket("bidi-fs-1", zonalBucketOptions);
-      gcsiHelper.sharedBucketName2 = gcsiHelper.createUniqueBucket("bidi-fs-2", zonalBucketOptions);
+      if (gcsiHelper.gcsfs.getGcs() instanceof GoogleCloudStorageImpl) {
+        CreateBucketOptions zonalBucketOptions =
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build();
+        gcsiHelper.sharedBucketName1 =
+            gcsiHelper.createUniqueBucket("bidi-fs-1", zonalBucketOptions);
+        gcsiHelper.sharedBucketName2 =
+            gcsiHelper.createUniqueBucket("bidi-fs-2", zonalBucketOptions);
+      }
+      gcsiHelper.beforeAllTests();
     } else {
       gcsiHelper.beforeAllTests();
     }
