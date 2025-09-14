@@ -154,12 +154,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     gcsiHelper = helper;
     if (bidiEnabled) {
-      String testBucket = TestConfiguration.getInstance().getZonalBucket();
       CreateBucketOptions zonalBucketOptions =
-          CreateBucketOptions.builder()
-              .setZonalPlacement(testBucket.substring(testBucket.lastIndexOf('/') + 1))
-              .setHierarchicalNamespaceEnabled(true)
-              .build();
+          CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build();
       gcsiHelper.sharedBucketName1 = gcsiHelper.createUniqueBucket("bidi-fs-1", zonalBucketOptions);
       gcsiHelper.sharedBucketName2 = gcsiHelper.createUniqueBucket("bidi-fs-2", zonalBucketOptions);
     } else {
