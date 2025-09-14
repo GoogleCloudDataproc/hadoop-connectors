@@ -238,6 +238,37 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     BucketInfo.Builder bucketInfoBuilder =
         BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
 
+    if (options.getZonalPlacement() != null) {
+      if (!options.getHierarchicalNamespaceEnabled()) {
+        throw new UnsupportedOperationException("Zonal buckets must have HNS Enabled.");
+      }
+      // Note: Currently StorageClass does not have RAPID as an enum value. Since at the time of
+      // writing zonal buckets
+      // only support RAPID storage class we default the storage class to RAPID whenever a zonal
+      // placement is set
+      // and the storageClass is unset or null. Having storage class set as any other value will
+      // lead to an
+      // Exception thrown. Added Check for storage class equal to RAPID set by the user for when
+      // StorageClass enum
+      // adds RAPID as a value to make sure this does not start breaking.
+      if (options.getStorageClass() != null
+          && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
+        throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
+      }
+      bucketInfoBuilder
+          .setCustomPlacementConfig(
+              BucketInfo.CustomPlacementConfig.newBuilder()
+                  .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
+                  .build())
+          .setStorageClass(StorageClass.valueOf("RAPID"))
+          .setHierarchicalNamespace(
+              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
+          .setIamConfiguration(
+              BucketInfo.IamConfiguration.newBuilder()
+                  .setIsUniformBucketLevelAccessEnabled(true)
+                  .build());
+    }
+
     if (options.getStorageClass() != null) {
       bucketInfoBuilder.setStorageClass(
           StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
