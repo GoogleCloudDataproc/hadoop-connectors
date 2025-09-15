@@ -318,7 +318,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
     try {
+      logger.atSevere().log("Dhriti_Debug: Triggering create empty object internal");
       createEmptyObjectInternal(resourceId, options);
+      logger.atSevere().log("Dhriti_Debug: Created create Empty Object internal");
     } catch (StorageException e) {
       if (canIgnoreExceptionForEmptyObject(e, resourceId, options)) {
         logger.atInfo().log(
@@ -426,6 +428,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       StorageResourceId resourceId, CreateObjectOptions createObjectOptions) {
     Map<String, String> rewrittenMetadata = encodeMetadata(createObjectOptions.getMetadata());
 
+    logger.atSevere().log("Dhriti_Debug: Reached Create Empty Object internal");
     List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
     blobTargetOptions.add(BlobTargetOption.disableGzipContent());
     if (resourceId.hasGenerationId()) {
@@ -439,6 +442,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
+    logger.atSevere().log("Dhriti_Debug: Creating empty object with zonal buckets");
     storageWrapper.create(
         BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
             .setMetadata(rewrittenMetadata)
@@ -446,6 +450,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setContentType(createObjectOptions.getContentType())
             .build(),
         blobTargetOptions.toArray(BlobTargetOption[]::new));
+
+    logger.atSevere().log("Dhriti_Debug: Created empty object for the zonal bucket");
   }
 
   /**
