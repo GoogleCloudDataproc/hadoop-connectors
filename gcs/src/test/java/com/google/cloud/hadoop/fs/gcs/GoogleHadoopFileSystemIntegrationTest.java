@@ -2665,10 +2665,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     expected =
         ImmutableMap.<String, Long>builder()
-            .put(
-                GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(),
-                2L) // 1 for file; 1 for directory.
-            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // copy file;
+            .put(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(), 1L) // 1 for directory.
+            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // move file;
             .put(
                 GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT.getSymbol(),
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2677,7 +2675,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                9L) // 2 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
+                8L) // 1 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
             .put(
                 GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(),
                 1L) // list src files to copy/delete
