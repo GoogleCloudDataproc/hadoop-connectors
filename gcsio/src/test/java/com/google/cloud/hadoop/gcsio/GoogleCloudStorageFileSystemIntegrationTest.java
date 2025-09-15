@@ -117,6 +117,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                   .setProjectId(projectId)
                   .setBidiEnabled(bidiEnabled)
+                  .setGrpcWriteEnabled(bidiEnabled)
                   .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
                   .setWriteChannelOptions(
                       AsyncWriteChannelOptions.builder()
