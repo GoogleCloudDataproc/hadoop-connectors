@@ -153,16 +153,17 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       throws IOException {
 
     gcsiHelper = helper;
-    if (bidiEnabled) {
-      if (gcsiHelper.gcsfs.getGcs() instanceof GoogleCloudStorageImpl) {
-        CreateBucketOptions zonalBucketOptions =
-            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build();
-        gcsiHelper.sharedBucketName1 =
-            gcsiHelper.createUniqueBucket("bidi-fs-1", zonalBucketOptions);
-        gcsiHelper.sharedBucketName2 =
-            gcsiHelper.createUniqueBucket("bidi-fs-2", zonalBucketOptions);
-      }
-      gcsiHelper.beforeAllTests();
+    if (bidiEnabled && gcsiHelper.gcsfs.getGcs() instanceof GoogleCloudStorageClientImpl) {
+      logger.atSevere().log("Creating zonal bucket for bidi integration test");
+      CreateBucketOptions zonalBucketOptions =
+          CreateBucketOptions.builder()
+              .setZonalPlacement("us-central1-a")
+              .setHierarchicalNamespaceEnabled(true)
+              .build();
+      gcsiHelper.sharedBucketName1 =
+          gcsiHelper.createUniqueBucket("zonal-shared-1", zonalBucketOptions);
+      gcsiHelper.sharedBucketName2 =
+          gcsiHelper.createUniqueBucket("zonal-shared-2", zonalBucketOptions);
     } else {
       gcsiHelper.beforeAllTests();
     }
