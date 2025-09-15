@@ -1,6 +1,13 @@
 # Release Notes
 
 ## Next
+1. PR #1511 - [Feature] Storage Client Caching for downscoped token
+
+## 3.1.7 - 2025-09-10
+1. PR #1484 - [Feature] Enabled write checksum by default
+1. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
+
+## 3.1.6 - 2025-09-04
 1. Add listStatusStartingFrom API.
 
 ## 3.1.5 - 2025-09-01
