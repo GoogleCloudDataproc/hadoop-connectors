@@ -228,13 +228,13 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   @Test
-  public void testRenameWithMoveOperation() throws Exception {
+  public void testRenameWithMoveDisabled() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("move");
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
-    config.setBoolean("fs.gs.operation.move.enable", true);
+    config.setBoolean("fs.gs.operation.move.enable", false);
     googleHadoopFileSystem.initialize(initUri, config);
 
     GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
@@ -2665,10 +2665,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     expected =
         ImmutableMap.<String, Long>builder()
-            .put(
-                GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(),
-                2L) // 1 for file; 1 for directory.
-            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // copy file;
+            .put(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(), 1L) // 1 for directory.
+            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // move file;
             .put(
                 GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT.getSymbol(),
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2677,7 +2675,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                9L) // 2 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
+                8L) // 1 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
             .put(
                 GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(),
                 1L) // list src files to copy/delete
@@ -2818,7 +2816,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     myghfs.rename(testFilePath, dst);
     // TODO: Operations done async in a separate thread are not tracked. This will be fixed in a
     // separate change.
-    verify(metrics, 2L, stats);
+    verify(metrics, 1L, stats);
 
     myghfs.delete(dst);
     verify(metrics, 2L, stats);
