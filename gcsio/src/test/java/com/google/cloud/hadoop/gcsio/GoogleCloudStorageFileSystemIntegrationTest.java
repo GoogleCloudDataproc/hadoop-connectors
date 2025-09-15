@@ -157,6 +157,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       logger.atSevere().log("Creating zonal bucket for bidi integration test");
       CreateBucketOptions zonalBucketOptions =
           CreateBucketOptions.builder()
+              .setLocation("us-central1")
               .setZonalPlacement("us-central1-a")
               .setHierarchicalNamespaceEnabled(true)
               .build();
