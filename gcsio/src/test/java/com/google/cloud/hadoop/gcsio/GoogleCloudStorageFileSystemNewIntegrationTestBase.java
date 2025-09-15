@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
@@ -983,6 +984,48 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                   "moveTo",
                   /* generationId= */ 1,
                   /* sourceGenerationId= */ 1));
+    }
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
+  }
+
+  @Test
+  public void rename_file_withMoveDisabled_usesCopyAndDelete() throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setMoveOperationEnabled(false).build())
+                .setStatusParallelEnabled(false)
+                .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+
+    gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
+
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/"),
+              copyRequestString(
+                  bucketName,
+                  dirObject + "/f1",
+                  bucketName,
+                  dirObject + "/f2",
+                  "copyTo",
+                  /* generationId= */ 1),
+              deleteRequestString(bucketName, dirObject + "/f1", 2));
     }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
