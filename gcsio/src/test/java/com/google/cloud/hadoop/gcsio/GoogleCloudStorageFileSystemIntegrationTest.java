@@ -627,16 +627,18 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testOpenNonExistentObject() throws IOException {
     String bucketName = sharedBucketName1;
-    URI path = gcsiHelper.getPath(bucketName, objectName + "_open-non-existent");
-    assertThrows(FileNotFoundException.class, () -> gcsfs.open(path));
+    assertThrows(
+        FileNotFoundException.class,
+        () -> gcsiHelper.readTextFile(bucketName, objectName + "_open-non-existent", 0, 100, true));
   }
 
   /** Validates that we cannot open an object in non-existent bucket. */
   @Test
   public void testOpenInNonExistentBucket() throws IOException {
     String bucketName = gcsiHelper.getUniqueBucketName("open-non-existent");
-    URI path = gcsiHelper.getPath(bucketName, objectName);
-    assertThrows(FileNotFoundException.class, () -> gcsfs.open(path));
+    assertThrows(
+        FileNotFoundException.class,
+        () -> gcsiHelper.readTextFile(bucketName, objectName, 0, 100, true));
   }
 
   /** Validates delete(). */
