@@ -2816,7 +2816,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     myghfs.rename(testFilePath, dst);
     // TODO: Operations done async in a separate thread are not tracked. This will be fixed in a
     // separate change.
-    verify(metrics, 2L, stats);
+    verify(metrics, 1L, stats);
 
     myghfs.delete(dst);
     verify(metrics, 2L, stats);
