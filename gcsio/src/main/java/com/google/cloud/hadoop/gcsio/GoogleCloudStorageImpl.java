@@ -2442,9 +2442,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
     logger.atInfo().log("getFolderInfo(%s)", resourceId);
 
+    // If the provided resource ID is for a bucket, retrieve its information directly.
     if (resourceId.isBucket()) {
-      // This is not a folder. Do not proceed.
-      // Throwing a NotFoundException is the appropriate GCS client library pattern.
+      Bucket bucket = getBucket(resourceId.getBucketName());
+      if (bucket != null) {
+        return createItemInfoForBucket(resourceId, bucket);
+      }
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 

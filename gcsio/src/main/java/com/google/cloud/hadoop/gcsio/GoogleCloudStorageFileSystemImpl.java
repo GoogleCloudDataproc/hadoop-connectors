@@ -1079,6 +1079,13 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     return getFileInfoInternal(resourceId, inferImplicitDirectories, PathTypeHint.NONE);
   }
 
+  private boolean isHnsOptimized(URI path) throws IOException {
+    GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
+    return gcsOptions.isHnBucketRenameEnabled()
+        && gcsOptions.isHnOptimizationEnabled()
+        && gcs.isHnBucket(path);
+  }
+
   /**
    * @see #getFileInfo(URI)
    */

@@ -138,14 +138,15 @@ public class GoogleCloudStorageItemInfoTest {
   public void testCreateFolderEquals() {
     StorageResourceId testFolder =
         StorageResourceId.fromStringPath("gs://test-bucket/test-folder/");
-    long createTimeMillis = 1672531200000L;
-    long updateTimeMillis = 1672617600000L;
+    long createTimeSeconds = 1672531200L; // Jan 01 2023 00:00:00 GMT
+    long updateTimeSeconds = 1672617600L; // Jan 02 2023 00:00:00 GMT
+
     long metaGeneration = 5L;
 
     com.google.protobuf.Timestamp createTime =
-        com.google.protobuf.Timestamp.newBuilder().setSeconds(createTimeMillis / 1000).build();
+        com.google.protobuf.Timestamp.newBuilder().setSeconds(createTimeSeconds).build();
     com.google.protobuf.Timestamp updateTime =
-        com.google.protobuf.Timestamp.newBuilder().setSeconds(updateTimeMillis / 1000).build();
+        com.google.protobuf.Timestamp.newBuilder().setSeconds(updateTimeSeconds).build();
 
     com.google.storage.control.v2.Folder folder =
         com.google.storage.control.v2.Folder.newBuilder()
@@ -159,13 +160,9 @@ public class GoogleCloudStorageItemInfoTest {
     StorageResourceId differentFolderId =
         StorageResourceId.fromStringPath("gs://test-bucket/different-folder/");
     com.google.protobuf.Timestamp differentCreateTime =
-        com.google.protobuf.Timestamp.newBuilder()
-            .setSeconds((createTimeMillis / 1000) + 1)
-            .build();
+        com.google.protobuf.Timestamp.newBuilder().setSeconds((createTimeSeconds) + 1).build();
     com.google.protobuf.Timestamp differentUpdateTime =
-        com.google.protobuf.Timestamp.newBuilder()
-            .setSeconds((updateTimeMillis / 1000) + 1)
-            .build();
+        com.google.protobuf.Timestamp.newBuilder().setSeconds((updateTimeSeconds) + 1).build();
     long differentMetaGeneration = metaGeneration + 1;
 
     new EqualsTester()

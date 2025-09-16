@@ -137,14 +137,8 @@ public class GoogleCloudStorageItemInfo {
     checkArgument(resourceId.isDirectory(), "resourceId for a folder must be a directory");
 
     // Convert Protobuf Timestamps to milliseconds since epoch.
-    long creationTime =
-        folder.hasCreateTime()
-            ? toMillis(folder.getCreateTime())
-            : 0;
-    long modificationTime =
-        folder.hasUpdateTime()
-            ? toMillis(folder.getCreateTime())
-            : 0;
+    long creationTime = folder.hasCreateTime() ? toMillis(folder.getCreateTime()) : 0;
+    long modificationTime = folder.hasUpdateTime() ? toMillis(folder.getCreateTime()) : 0;
 
     return new GoogleCloudStorageItemInfo(
         resourceId,
