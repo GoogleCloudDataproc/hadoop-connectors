@@ -186,6 +186,76 @@ public class GoogleCloudStorageClientTest {
   }
 
   @Test
+  public void
+      createBucket_withZonalBucketCreateOptions_unsetStorageClass_succeedsAndDefaultsToRapid()
+          throws Exception {
+    mockStorage.addResponse(TEST_BUCKET_WITH_OPTIONS);
+
+    String zonalPlacement = "zonal-placement";
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setLocation(BUCKET_LOCATION)
+            .setZonalPlacement(zonalPlacement)
+            .setHierarchicalNamespaceEnabled(true)
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+      gcs.createBucket(TEST_BUCKET_NAME, bucketOptions);
+    }
+
+    assertThat(mockStorage.getRequests()).hasSize(1);
+
+    CreateBucketRequest bucketRequest = (CreateBucketRequest) mockStorage.getRequests().get(0);
+    assertThat(bucketRequest.getBucketId()).isEqualTo(TEST_BUCKET_NAME);
+    assertThat(bucketRequest.getBucket().getCustomPlacementConfig().getDataLocationsList())
+        .containsExactly(zonalPlacement);
+    System.out.println("Storage Class: " + bucketRequest.getBucket().getStorageClass());
+    assertThat(bucketRequest.getBucket().getStorageClass()).isEqualTo("RAPID");
+    assertThat(bucketRequest.getBucket().getHierarchicalNamespace().getEnabled()).isTrue();
+  }
+
+  @Test
+  public void createZonalBucket_throwsException_whenHnsDisabled() throws Exception {
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setZonalPlacement("zonal-placement")
+            .setHierarchicalNamespaceEnabled(false)
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+      UnsupportedOperationException thrown =
+          assertThrows(
+              UnsupportedOperationException.class,
+              () -> gcs.createBucket(TEST_BUCKET_NAME, bucketOptions));
+      assertThat(thrown).hasMessageThat().isEqualTo("Zonal buckets must have HNS Enabled.");
+    }
+  }
+
+  @Test
+  public void createZonalBucket_throwsException_whenStorageClassIsNotRapid() throws Exception {
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setZonalPlacement("zonal-placement")
+            .setHierarchicalNamespaceEnabled(true)
+            .setStorageClass("STANDARD")
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+      UnsupportedOperationException thrown =
+          assertThrows(
+              UnsupportedOperationException.class,
+              () -> gcs.createBucket(TEST_BUCKET_NAME, bucketOptions));
+      assertThat(thrown).hasMessageThat().isEqualTo("Zonal bucket storage class must be RAPID");
+    }
+  }
+
+  @Test
   public void createBucket_throwsFileAlreadyExistsException() throws Exception {
     mockStorage.addException(new StatusRuntimeException(Status.ALREADY_EXISTS));
     try (FakeServer fakeServer = FakeServer.of(mockStorage)) {

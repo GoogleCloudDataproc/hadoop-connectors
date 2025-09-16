@@ -1,5 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.api.client.util.Preconditions.checkArgument;
+import static com.google.api.client.util.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.max;
 
@@ -13,6 +15,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -53,6 +56,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       ExecutorService boundedThreadPool)
       throws IOException {
     // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
+    validate(itemInfo);
     this.readTimeout = readOptions.getGrpcReadTimeout();
     this.resourceId =
         new StorageResourceId(
@@ -101,8 +105,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return bytesReadFromCache.get();
     }
 
-    if (isBufferValid()) return readBytesFromInternalBuffer(dst);
-
+    if (isBufferValid()) {
+      return readBytesFromInternalBuffer(dst);
+    }
     if (dst.remaining() >= readOptions.getMinRangeRequestSize()) {
       return performStandardRead(dst);
     }
@@ -481,6 +486,17 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                     .withRangeSpec(RangeSpec.of(offset, length)));
     try (DisposableByteString dbs = futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
       return dbs.byteString();
+    }
+  }
+
+  private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
+    checkNotNull(itemInfo, "itemInfo cannot be null");
+    StorageResourceId resourceId = itemInfo.getResourceId();
+    checkArgument(
+        resourceId.isStorageObject(), "Can not open a non-file object for read: %s", resourceId);
+    if (!itemInfo.exists()) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
     }
   }
 }
