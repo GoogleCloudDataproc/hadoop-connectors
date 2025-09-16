@@ -127,16 +127,17 @@ public class LoggingFormatterTest {
           }
         });
 
-    // First call should wrap the formatter.
+    // First call to wrap the formatter.
     LoggingFormatter.addFormatterToHandler(handler);
     Formatter formatter1 = handler.getFormatter();
-    assertTrue(formatter1 instanceof LoggingFormatter);
 
     // Second call should be a no-op.
     LoggingFormatter.addFormatterToHandler(handler);
     Formatter formatter2 = handler.getFormatter();
 
-    // Assert that the formatter instance is the same, meaning it wasn't wrapped again.
+    // Assert first call wraps the formatter and the second formatter instance is the same, meaning
+    // it wasn't wrapped again.
+    assertTrue(formatter1 instanceof LoggingFormatter);
     assertSame(formatter1, formatter2);
   }
 }
