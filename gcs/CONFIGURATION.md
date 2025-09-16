@@ -516,6 +516,7 @@ better latency and increased bandwidth. Currently supported only for read/write 
      `fs.gs.outputstream.upload.chunk.size`
 * `fs.gs.storage.client.cache.enable` (default: `false`) enables gRPC storage client caching so FileSystem objects with similar configs can share the client.
 
+
 ### Bidi configurations
 
 * `fs.gs.bidi.enable` (default: `false`) is effective only if grpc is enabled.
