@@ -138,7 +138,7 @@ public class GoogleCloudStorageItemInfo {
 
     // Convert Protobuf Timestamps to milliseconds since epoch.
     long creationTime = folder.hasCreateTime() ? toMillis(folder.getCreateTime()) : 0;
-    long modificationTime = folder.hasUpdateTime() ? toMillis(folder.getCreateTime()) : 0;
+    long modificationTime = folder.hasUpdateTime() ? toMillis(folder.getUpdateTime()) : 0;
 
     return new GoogleCloudStorageItemInfo(
         resourceId,
