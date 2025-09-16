@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -86,6 +87,8 @@ public class GoogleCloudStorageMockitoTest {
   @Mock private UnaryCallable<GetFolderRequest, Folder> mockGetFolderCallable;
   @Mock private AlreadyExistsException mockAlreadyExistsException;
   @Mock PermissionDeniedException mockPermissionDeniedException;
+  @Mock private Storage.Buckets mockBuckets;
+  @Mock private Storage.Buckets.Get mockGetBucket;
 
   /**
    * Sets up new mocks and create new instance of GoogleCloudStorage configured to only interact
@@ -436,15 +439,31 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageControlStub).getFolderCallable();
   }
 
-  /** Verifies the early-exit logic for bucket resources, ensuring the API is never called. */
+  /** Verifies that for bucket resources, valid bucket resource is returned */
   @Test
   public void testGetFolderInfo_whenResourceIdIsBucket_returnsNotFound() throws IOException {
     StorageResourceId bucketResourceId = new StorageResourceId(BUCKET_NAME);
 
+    Bucket fakeBucket =
+        new Bucket()
+            .setName(BUCKET_NAME)
+            .setTimeCreated(new com.google.api.client.util.DateTime(System.currentTimeMillis()))
+            .setUpdated(new com.google.api.client.util.DateTime(System.currentTimeMillis()));
+
+    Storage spiedStorage = spy(gcs.storage);
+    doReturn(mockBuckets).when(spiedStorage).buckets();
+    doReturn(mockGetBucket).when(mockBuckets).get(BUCKET_NAME);
+    doReturn(fakeBucket).when(mockGetBucket).execute();
+    gcs.storage = spiedStorage;
+
     GoogleCloudStorageItemInfo itemInfo = gcs.getFolderInfo(bucketResourceId);
 
     assertThat(itemInfo).isNotNull();
-    assertThat(itemInfo.exists()).isFalse();
+    assertThat(itemInfo.exists()).isTrue();
+    assertThat(itemInfo.isBucket()).isTrue();
+    assertThat(itemInfo.getResourceId()).isEqualTo(bucketResourceId);
+
+    // Verify that the folder-specific API was not called
     verify(mockStorageControlStub, never()).getFolderCallable();
   }
 }
