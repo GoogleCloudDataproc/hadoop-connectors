@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Enable move by default
 
 ## 3.0.11 - 2025-09-09
 1. PR #1484 - [Feature] Enabled write checksum by default
