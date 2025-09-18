@@ -404,8 +404,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     deleteInternalWithFolders(itemsToDelete, listOfFolders, bucketsToDelete);
 
-    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && gcs.isHnBucket(path))) {
+    if (!isHnsOptimized(path)) {
       repairImplicitDirectory(parentInfoFuture);
     }
   }
@@ -673,8 +672,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    if (!(this.options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && this.gcs.isHnBucket(src))) {
+    if (!isHnsOptimized(src)) {
       repairImplicitDirectory(srcParentInfoFuture);
     }
   }
@@ -1063,8 +1061,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     StorageResourceId dirId = pathId.toDirectoryId();
 
-    boolean isHnBucket =
-        this.options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path);
+    boolean isHnBucket = isHnsOptimized(path);
 
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
         (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
@@ -1099,7 +1096,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
-      if (options.getCloudStorageOptions().isHnOptimizationEnabled() && gcs.isHnBucket(path)) {
+      if (isHnsOptimized(path)) {
         if (gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true)).exists()) {
           return FileInfo.fromItemInfos(dirItemInfos);
         }

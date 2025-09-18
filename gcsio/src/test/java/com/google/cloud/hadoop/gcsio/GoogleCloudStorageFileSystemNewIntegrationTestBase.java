@@ -783,7 +783,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo folderCheck = gcsFs.getFileInfo(folderUri);
     assertThat(folderCheck.exists()).isTrue();
-    assertThat(folderCheck.getItemInfo().isNativeFolder()).isTrue();
+    assertThat(folderCheck.getItemInfo().isNativeHNSFolder()).isTrue();
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(folderUri);
 
@@ -867,7 +867,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     assertThat(gcsFs.exists(fileInSrcUri)).isTrue();
     FileInfo emptySubDirInfo = gcsFs.getFileInfo(emptyNativeSubDirInSrcUri);
     assertThat(emptySubDirInfo.exists()).isTrue();
-    assertThat(emptySubDirInfo.getItemInfo().isNativeFolder()).isTrue();
+    assertThat(emptySubDirInfo.getItemInfo().isNativeHNSFolder()).isTrue();
 
     gcsFs.rename(srcDirUri, dstDirUri);
 
@@ -939,7 +939,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     assertThat(gcsFs.exists(dstDirUri.resolve("nonEmptyFolder/emptyFolder2/"))).isTrue();
 
     FileInfo finalEmptyFolder = gcsFs.getFileInfo(dstDirUri.resolve("emptyFolder1/"));
-    assertThat(finalEmptyFolder.getItemInfo().isNativeFolder()).isTrue();
+    assertThat(finalEmptyFolder.getItemInfo().isNativeHNSFolder()).isTrue();
   }
 
   @Test
@@ -983,7 +983,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     assertThat(gcsFs.exists(dstDirUri.resolve("file.txt"))).isTrue();
     assertThat(gcsFs.exists(dstDirUri.resolve("empty-native-subdir/"))).isTrue();
     FileInfo finalEmptyFolder = gcsFs.getFileInfo(dstDirUri.resolve("empty-native-subdir/"));
-    assertThat(finalEmptyFolder.getItemInfo().isNativeFolder()).isTrue();
+    assertThat(finalEmptyFolder.getItemInfo().isNativeHNSFolder()).isTrue();
   }
 
   @Test
@@ -1060,7 +1060,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
         new URI(String.format("gs://%s/%s/", hnsBucketName, getTestResource() + "-dst"));
 
     gcsFs.mkdir(srcFolderUri);
-    assertThat(gcsFs.getFileInfo(srcFolderUri).getItemInfo().isNativeFolder()).isTrue();
+    assertThat(gcsFs.getFileInfo(srcFolderUri).getItemInfo().isNativeHNSFolder()).isTrue();
 
     StorageResourceId srcId = StorageResourceId.fromUriPath(srcFolderUri, true);
     StorageResourceId dstId = StorageResourceId.fromUriPath(dstFolderUri, true);
@@ -1096,7 +1096,8 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     gcsfsIHelper.writeTextFile(hnsBucketName, fileInSrcUri.getPath(), "test-data");
     // Use the HNS-aware client to create the native folder.
     hnsAwareGcsFs.mkdir(emptyNativeSubDirInSrcUri);
-    assertThat(hnsAwareGcsFs.getFileInfo(emptyNativeSubDirInSrcUri).getItemInfo().isNativeFolder())
+    assertThat(
+            hnsAwareGcsFs.getFileInfo(emptyNativeSubDirInSrcUri).getItemInfo().isNativeHNSFolder())
         .isTrue();
     hnsAwareGcsFs.close();
 

@@ -580,7 +580,7 @@ public class GoogleCloudStorageImplTest {
 
     GoogleCloudStorageItemInfo folderInfo = helperGcs.getFolderInfo(folderId);
     assertThat(folderInfo.exists()).isTrue();
-    assertThat(folderInfo.isNativeFolder()).isTrue();
+    assertThat(folderInfo.isNativeHNSFolder()).isTrue();
     trackingGcs.delegate.close();
   }
 
@@ -635,9 +635,9 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageItemInfo folderC =
         helperGcs.getFolderInfo(new StorageResourceId(hnsBucket, "a/b/c/"));
 
-    assertThat(folderA.isNativeFolder()).isTrue();
-    assertThat(folderB.isNativeFolder()).isTrue();
-    assertThat(folderC.isNativeFolder()).isTrue();
+    assertThat(folderA.isNativeHNSFolder()).isTrue();
+    assertThat(folderB.isNativeHNSFolder()).isTrue();
+    assertThat(folderC.isNativeHNSFolder()).isTrue();
     trackingGcs.delegate.close();
   }
 
