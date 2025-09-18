@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Enable move by default
 
 ## 2.2.28 - 2025-05-28
 1. Skip Soft delete using move API during rename
