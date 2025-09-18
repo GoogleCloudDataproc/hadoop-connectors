@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio.testing;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -162,6 +163,24 @@ public class InMemoryObjectEntry {
             /* contentGeneration= */ 0,
             /* metaGeneration= */ 0,
             /* verificationAttributes= */ null);
+  }
+
+  /**
+   * Constructor for creating an InMemoryObjectEntry from a pre-existing, read-only
+   * GoogleCloudStorageItemInfo. This is used to simulate metadata-only entities like Native
+   * Folders.
+   *
+   * @param itemInfo The item info to represent. Must be for a folder or a zero-byte object.
+   */
+  public InMemoryObjectEntry(GoogleCloudStorageItemInfo itemInfo) {
+    checkArgument(
+        itemInfo.isDirectory() && itemInfo.getSize() == 0,
+        "This constructor is only for folders or empty placeholder objects.");
+
+    this.info = itemInfo;
+    this.completedContents = new byte[0];
+    this.writeStream = null;
+    this.writeChannel = null;
   }
 
   /** For internal use in getShallowCopy(2). */
