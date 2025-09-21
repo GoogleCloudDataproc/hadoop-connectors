@@ -151,6 +151,32 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+* `fs.gs.hierarchical.namespace.folders.enable` (default: `false`)
+
+    Whether to create objects for the parent directories of objects with `/` in
+    their path e.g. creating `gs://bucket/foo/` upon deleting or renaming
+    `gs://bucket/foo/bar`. When using `distcp` with Hierarchical Namespace (HNS)
+    enabled buckets, ensure this property is set to `true` in your
+    `core-site.xml` for proper interaction with the hierarchical structure of
+    the bucket. Conversely, if your bucket does not have HNS enabled, this
+    property should be `false`. Incorrect configuration can lead to
+    `DEADLINE_EXCEEDED` errors or generic SSH operator failures
+    (e.g., `exit status = 25`).
+
+* **Dependency Conflicts and Shaded JARs:** In non-Dataproc Hadoop environments,
+    you might encounter dependency conflicts (e.g.,
+    `java.lang.NoSuchMethodError` or `java.lang.ClassNotFoundException`).  To
+    resolve these, consider using a shaded version of the `gcs-connector` JAR
+    (e.g., `gcs-connector-hadoop3-*-shaded.jar`), which bundles its dependencies
+    to avoid conflicts.
+
+* **Troubleshooting Generic Exit Codes:** Generic exit codes (like `exit status
+    = 25`) from `distcp` or other Hadoop operations often indicate an underlying
+    issue that requires examining more detailed Hadoop and GCS connector logs.
+    Increasing the logging verbosity for the GCS connector can provide crucial
+    diagnostic information. Refer to `gcs/INSTALL.md` for guidance on enabling
+    verbose logging.
+
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
@@ -414,10 +440,13 @@ Knobs configure the vectoredRead API
 
     Timeout to establish a connection. Use `0` for an infinite timeout.
 
-*   `fs.gs.http.read-timeout` (default: `5s`)
+* `fs.gs.http.read-timeout` (default: `5s`)
 
     Timeout to read from an established connection. Use `0` for an infinite
-    timeout.
+    timeout. For `distcp` operations, especially with Hierarchical Namespace (HNS)
+    enabled buckets or large transfers, increasing this timeout can help
+    mitigate intermittent failures caused by network instability and prevent
+    `DEADLINE_EXCEEDED` errors.
 
 ### API client configuration
 

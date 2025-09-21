@@ -137,6 +137,34 @@ the installation.
     gs://<some-bucket>`), and that the credentials in your configuration are
     correct.
 
+* **Dependency Conflicts:** In non-Dataproc Hadoop environments, unexpected
+    errors such as `java.lang.NoSuchMethodError` or
+    `java.lang.ClassNotFoundException` can occur due to version conflicts
+    with libraries already present in your Hadoop classpath. To mitigate
+    these, consider using a shaded version of the GCS connector JAR
+    (e.g., `gcs-connector-hadoop3-*-shaded.jar`). These JARs package all of
+    the connector's dependencies, reducing the chance of conflicts.
+
+* **Enabling Verbose Logging:** For more detailed diagnostics of issues
+    beyond basic installation, such as `DEADLINE_EXCEEDED` errors, enable
+    verbose logging for the GCS connector. This can provide crucial
+    information for troubleshooting `distcp` failures or other unexpected
+    behavior. Add the following to your `hadoop-env.sh` file:
+
+    ```bash
+    export HADOOP_CLIENT_OPTS="-Djava.util.logging.config.file=/tmp/gcs-connector-logging.properties"
+    ```
+
+    Then, create a file named `/tmp/gcs-connector-logging.properties` with the
+    following content:
+
+    ```
+    handlers = java.util.logging.ConsoleHandler
+    java.util.logging.ConsoleHandler.level = ALL
+    com.google.level = FINE
+    sun.net.www.protocol.http.HttpURLConnection.level = ALL
+    ```
+
 *   To troubleshoot other issues run `hadoop fs` command with debug logs:
 
     ```
