@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1.  Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel.
 
 ## 2.2.28 - 2025-05-28
 1. Skip Soft delete using move API during rename
