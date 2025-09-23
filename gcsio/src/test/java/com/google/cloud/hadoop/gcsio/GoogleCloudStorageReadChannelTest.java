@@ -44,6 +44,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
+import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -703,6 +704,44 @@ public class GoogleCloudStorageReadChannelTest {
     byte[] byte3 = new byte[1];
     assertThat(readChannel.read(ByteBuffer.wrap(byte3))).isEqualTo(1);
     assertThat(byte3).isEqualTo(new byte[] {testData[3]});
+  }
+
+  @Test
+  public void openStream_gzipped_onPrematureEofInSkip_throwsEofException() throws IOException {
+    // Setup: Mock transport to return an InputStream that immediately signals EOF.
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setContentEncoding("gzip")
+                    .setSize(BigInteger.valueOf(100))),
+            inputStreamResponse(
+                CONTENT_LENGTH,
+                100,
+                new InputStream() {
+                  @Override
+                  public int read() {
+                    return -1;
+                  }
+                }));
+
+    Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.DEFAULT;
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, readOptions);
+
+    // Position the channel to a non-zero offset to trigger a skip.
+    readChannel.position(10);
+
+    // Attempting to read should trigger the skip, which should then fail with EOFException.
+    EOFException e =
+        assertThrows(EOFException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Unexpected end of stream trying to skip 10 bytes to seek to position 10,"
+                + " size: 9223372036854775807 for 'gs://foo-bucket/bar-object'");
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
