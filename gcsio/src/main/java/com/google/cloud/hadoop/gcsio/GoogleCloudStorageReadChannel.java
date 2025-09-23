@@ -21,7 +21,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
-import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpHeaders;
@@ -591,7 +590,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
     long totalBytesSkipped = 0;
     while (bytesToSkip > 0) {
-      int bufferSize = toIntExact(min(skipBuffer.length, bytesToSkip));
+      int bufferSize = toIntExact(Math.min(skipBuffer.length, bytesToSkip));
       int bytesRead = channel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
       if (bytesRead < 0) {
         throw new EOFException(
@@ -903,17 +902,17 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       if (fileAccessManager.shouldAdaptToRandomAccess()) {
         long randomRangeSize = Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
         // Limit rangeSize to the randomRangeSize.
-        rangeSize = min(randomRangeSize, rangeSize);
+        rangeSize = Math.min(randomRangeSize, rangeSize);
       } else {
         if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
-          rangeSize = min(rangeSize, readOptions.getBlockSize());
+          rangeSize = Math.min(rangeSize, readOptions.getBlockSize());
         }
       }
 
       contentChannelEnd = contentChannelPosition + rangeSize;
       // Do not read footer again, if it was already pre-fetched.
       if (footerContent != null) {
-        contentChannelEnd = min(contentChannelEnd, size - footerContent.length);
+        contentChannelEnd = Math.min(contentChannelEnd, size - footerContent.length);
       }
 
       checkState(
