@@ -800,14 +800,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // List of individual paths to rename;
     // we will try to carry out the copies in this list's order.
     List<FileInfo> srcItemInfos = listFileInfoForPrefix(src, DELETE_RENAME_LIST_OPTIONS);
-    List<FolderInfo> srcFolderInfos = new LinkedList<>();
-    if (options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && gcs.isHnBucket(srcInfo.getPath())) {
-      srcFolderInfos =
-          listFoldersInfoForPrefixPage(
-                  srcInfo.getPath(), ListFolderOptions.DEFAULT, /* pageToke */ null)
-              .getItems();
-    }
 
     // Create a list of sub-items to copy.
     Pattern markerFilePattern = options.getMarkerFilePattern();
@@ -835,23 +827,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       // Finally, move marker items (if any) to mark rename operation success
       moveInternal(srcToDstMarkerItemNames);
 
-      // This is required for just empty native folders, other folders would be created
-      // automatically for HNS Bucket
-      if (options.getCloudStorageOptions().isHnOptimizationEnabled()
-          && gcs.isHnBucket(srcInfo.getPath())) {
-        createDestinationFolders(src, dst, srcFolderInfos);
-      }
-
       if (srcInfo.getItemInfo().isBucket()) {
         deleteBucket(Collections.singletonList(srcInfo));
       } else {
         // If src is a directory then srcItemInfos does not contain its own name,
         // we delete item separately in the list.
         deleteObjects(Collections.singletonList(srcInfo));
-        if (options.getCloudStorageOptions().isHnOptimizationEnabled()
-            && gcs.isHnBucket(srcInfo.getPath())) {
-          deleteFolders(srcFolderInfos);
-        }
       }
       return;
     }
@@ -860,13 +841,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     copyInternal(srcToDstItemNames);
     // Finally, copy marker items (if any) to mark rename operation success
     copyInternal(srcToDstMarkerItemNames);
-
-    // This is required for just empty native folders, other folders would be created automatically
-    // for HNS Bucket
-    if (options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && gcs.isHnBucket(srcInfo.getPath())) {
-      createDestinationFolders(src, dst, srcFolderInfos);
-    }
 
     List<FileInfo> bucketsToDelete = new ArrayList<>(1);
     List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
@@ -883,31 +857,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
     // Then delete rest of the items that we successfully copied.
     deleteInternal(srcItemsToDelete, bucketsToDelete);
-
-    // For the HNS Buckets, delete the empty native folders which might be left behind
-    if (options.getCloudStorageOptions().isHnOptimizationEnabled()
-        && gcs.isHnBucket(srcInfo.getPath())) {
-      deleteFolders(srcFolderInfos);
-    }
-  }
-
-  /**
-   * Helper for rename that explicitly creates native HNS folders at the destination. This is
-   * necessary for empty native folders which are not handled by object copy/move.
-   */
-  private void createDestinationFolders(URI src, URI dst, List<FolderInfo> srcFolderInfos)
-      throws IOException {
-    if (!options.getCloudStorageOptions().isHnOptimizationEnabled() || !gcs.isHnBucket(src)) {
-      return;
-    }
-    String prefix = src.toString();
-    for (FolderInfo folderInfo : srcFolderInfos) {
-      URI srcItemUri =
-          URI.create("gs://" + folderInfo.getBucket() + "/" + folderInfo.getFolderName());
-      String relativeFolderName = srcItemUri.toString().substring(prefix.length());
-      URI dstFolderPath = dst.resolve(relativeFolderName);
-      mkdirs(dstFolderPath);
-    }
   }
 
   /** Copies items in given map that maps source items to destination items. */
