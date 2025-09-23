@@ -1033,6 +1033,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
     if (isHnsOptimized(path)) {
+      // We directly call `getFolderInfo` without a prior `isDirectory()` check.
+      // This is because the trailing "/" is sometimes stripped from the input URI,
+      // making an `isDirectory()` check on the path unreliable. Instead, we rely on
+      // `getFolderInfo` to determine if the path represents a directory.
       FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getFolderInfo(resourceId.toDirectoryId()));
       if (fileInfo.exists()) {
         return fileInfo;
