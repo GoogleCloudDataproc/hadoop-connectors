@@ -78,6 +78,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.ListFolderOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
@@ -2807,7 +2808,11 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     myghfs.rename(testFilePath, dst);
     // TODO: Operations done async in a separate thread are not tracked. This will be fixed in a
     // separate change.
-    verify(metrics, 1L, stats);
+    // Do not increment api count in case of gRPC client as tracing is not enabled in gRPC client
+    verify(
+        metrics,
+        myghfs.getGcsFs().getOptions().getClientType() == ClientType.STORAGE_CLIENT ? 0L : 1L,
+        stats);
 
     myghfs.delete(dst);
     verify(metrics, 2L, stats);
