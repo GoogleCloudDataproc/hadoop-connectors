@@ -2445,19 +2445,38 @@ public class GoogleCloudStorageTest {
   @Test
   public void testIsHnBucket_disabled() throws Exception {
     BucketStorageLayout layout =
-        new BucketStorageLayout()
-            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(false));
+            new BucketStorageLayout()
+                    .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(false));
     MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
     GoogleCloudStorage gcs =
-        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+            mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     String testHnsBucket = "hns-bucket-disabled";
     URI bucketUri = new URI("gs://" + testHnsBucket);
     boolean result = gcs.isHnBucket(bucketUri);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
-        .inOrder();
+            .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
+            .inOrder();
+    assertThat(result).isFalse();
+  }
+
+  /** Test for GoogleCloudStorage.isHnBucket(1). */
+  @Test
+  public void testIsHnBucket_missing() throws Exception {
+    BucketStorageLayout layout =
+            new BucketStorageLayout();
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+            mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    String testHnsBucket = "hns-bucket-disabled";
+    URI bucketUri = new URI("gs://" + testHnsBucket);
+    boolean result = gcs.isHnBucket(bucketUri);
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+            .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
+            .inOrder();
     assertThat(result).isFalse();
   }
 
