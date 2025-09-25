@@ -381,8 +381,6 @@ Knobs configure the vectoredRead API
    shared across all readVectored invocation. If the task queue of range request
    is overloaded do consider increasing this value.
 
-### HTTP transport configuration
-
 *   `fs.gs.application.name.suffix` (not set by default)
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
@@ -402,6 +400,8 @@ Knobs configure the vectoredRead API
 *   `fs.gs.proxy.password` (not set by default)
 
     Proxy password that connector can use to send Cloud Storage requests.
+
+### HTTP transport configuration
 
 **Note: Retry configuration is only valid for client type=HTTP_API_CLIENT for now.**
 
