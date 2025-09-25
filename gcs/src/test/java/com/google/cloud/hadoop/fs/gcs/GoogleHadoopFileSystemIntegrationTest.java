@@ -86,12 +86,14 @@ import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
+import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -110,6 +112,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.logging.*;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
@@ -3096,5 +3100,56 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             INVOCATION_RENAME.getSymbol(),
             STREAM_READ_OPERATIONS.getSymbol(),
             STREAM_WRITE_OPERATIONS.getSymbol()));
+  }
+
+  @Test
+  public void testLogsContainInvocationId() throws Exception {
+    Logger logger = Logger.getLogger(GoogleHadoopFileSystem.class.getName());
+    logger.setUseParentHandlers(false);
+    logger.setLevel(Level.ALL);
+
+    // Temporarily remove other handlers on this logger
+    Handler[] otherHandlers = logger.getHandlers();
+    for (Handler h : otherHandlers) {
+      logger.removeHandler(h);
+    }
+
+    // Create a handler to capture log output with LoggingFormatter
+    ByteArrayOutputStream logOutput = new ByteArrayOutputStream();
+    Handler testLogHandler =
+        new StreamHandler(logOutput, new LoggingFormatter(new SimpleFormatter()));
+    testLogHandler.setLevel(Level.ALL);
+    logger.addHandler(testLogHandler);
+
+    try {
+      // Perform a rename operation, which should trigger logging with an invocation ID
+      Path testRoot = new Path(ghfs.getWorkingDirectory(), "testLogsContainInvocationId");
+      ghfs.mkdirs(testRoot);
+      Path src = new Path(testRoot, "src.txt");
+      createFile(src, "test-data".getBytes(UTF_8));
+      Path dst = new Path(testRoot, "dst.txt");
+      ghfs.rename(src, dst);
+
+      // Flush the handler to ensure all log records are written to the StringWriter
+      testLogHandler.flush();
+      String logs = logOutput.toString(UTF_8.name());
+
+      // Verify that the logs match the SimpleFormatter pattern with an invocation ID.
+      // It should match a two-line pattern: a header with timestamp and method,
+      // followed by the log message with level and invocation ID.
+      String expectedLogPattern =
+          "([\\w\\s,:]+ com\\.google\\.cloud\\.hadoop\\..+?\\n"
+              + "(FINE|FINER|INFO): \\[gccl-invocation-id/.*?]: .*?\\n)+";
+      assertThat(logs).matches(Pattern.compile(expectedLogPattern, Pattern.DOTALL));
+    } finally {
+      // Clean up the handler
+      logger.removeHandler(testLogHandler);
+      testLogHandler.close();
+      logger.setLevel(Level.INFO); // reset level
+      // Optional: Restore other handlers
+      for (Handler h : otherHandlers) {
+        if (h != testLogHandler) logger.addHandler(h);
+      }
+    }
   }
 }

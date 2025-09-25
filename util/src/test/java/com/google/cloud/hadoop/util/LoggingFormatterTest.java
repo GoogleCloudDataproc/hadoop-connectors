@@ -1,9 +1,9 @@
 package com.google.cloud.hadoop.util;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
+import java.util.UUID;
+import java.util.logging.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,7 +17,14 @@ public class LoggingFormatterTest {
 
   @Before
   public void setUp() {
-    formatter = new LoggingFormatter();
+    formatter =
+        new LoggingFormatter(
+            new Formatter() {
+              @Override
+              public String format(LogRecord record) {
+                return String.format("%s%n", record.getMessage());
+              }
+            });
     // Ensure a fresh Invocation ID is set for each test
     InvocationIdContext.setInvocationId();
   }
@@ -94,5 +101,43 @@ public class LoggingFormatterTest {
     for (var handler : logger.getHandlers()) {
       assertEquals(LoggingFormatter.class, handler.getFormatter().getClass());
     }
+  }
+
+  @Test
+  public void addFormatter_withLoggerWithNoHandlers_doesNotThrowException() {
+    // Get a logger that doesn't exist yet to ensure it has no handlers.
+    // A unique name prevents interference from other tests.
+    Logger loggerWithNoHandlers = Logger.getLogger("logger.with.no.handlers." + UUID.randomUUID());
+    loggerWithNoHandlers.setUseParentHandlers(false);
+    assertEquals(0, loggerWithNoHandlers.getHandlers().length);
+
+    // This call should not throw any exception.
+    LoggingFormatter.addFormatter(loggerWithNoHandlers);
+  }
+
+  @Test
+  public void addFormatterToHandler_isIdempotent() {
+    Handler handler = new StreamHandler();
+    // Set a simple formatter to be wrapped.
+    handler.setFormatter(
+        new Formatter() {
+          @Override
+          public String format(LogRecord record) {
+            return record.getMessage();
+          }
+        });
+
+    // First call to wrap the formatter.
+    LoggingFormatter.addFormatterToHandler(handler);
+    Formatter formatter1 = handler.getFormatter();
+
+    // Second call should be a no-op.
+    LoggingFormatter.addFormatterToHandler(handler);
+    Formatter formatter2 = handler.getFormatter();
+
+    // Assert first call wraps the formatter and the second formatter instance is the same, meaning
+    // it wasn't wrapped again.
+    assertTrue(formatter1 instanceof LoggingFormatter);
+    assertSame(formatter1, formatter2);
   }
 }
