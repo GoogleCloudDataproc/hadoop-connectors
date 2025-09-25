@@ -1,6 +1,12 @@
 # Release Notes
 
 ## Next
+1. Enable move by default
+
+## 3.0.11 - 2025-09-09
+1. PR #1484 - [Feature] Enabled write checksum by default
+1. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
+1. PR #1463 - [Bug] Fix for Hadoop directory copy failures in gRPC client
 
 ## 3.0.10 - 2025-08-12
 1. PR #1396 - [Bug] Throw correct exception when DeleteFolderOperation is timed out
