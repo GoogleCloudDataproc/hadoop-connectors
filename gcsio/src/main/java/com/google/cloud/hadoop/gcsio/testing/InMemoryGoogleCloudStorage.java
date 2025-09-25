@@ -37,6 +37,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -343,11 +344,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
     // Simulate the Folder object that the real API would return.
     long now = clock.currentTimeMillis();
-    Timestamp timestamp =
-        Timestamp.newBuilder()
-            .setSeconds(now / 1000)
-            .setNanos((int) ((now % 1000) * 1_000_000))
-            .build();
+    Timestamp timestamp = Timestamps.fromMillis(now);
 
     com.google.storage.control.v2.Folder fakeApiFolder =
         com.google.storage.control.v2.Folder.newBuilder()
