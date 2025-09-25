@@ -91,7 +91,10 @@ public class CoopLockRepairIntegrationTest {
     Credential credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
-    gcsOptions = getStandardOptionBuilder().build();
+    gcsOptions = getStandardOptionBuilder().
+                 //disable move as the written here are using copy + delete
+                 setMoveOperationEnabled(false)
+                .build();
     httpRequestInitializer =
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 
