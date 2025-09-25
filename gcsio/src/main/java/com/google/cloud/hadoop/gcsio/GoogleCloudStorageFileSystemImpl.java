@@ -514,10 +514,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     logger.atFiner().log("mkdirs(path: %s)", path);
     checkNotNull(path, "path should not be null");
 
-    mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
+    mkdirsInternal(path);
   }
 
-  private void mkdirsInternal(StorageResourceId resourceId) throws IOException {
+  private void mkdirsInternal(URI path) throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     if (resourceId.isRoot()) {
       // GCS_ROOT directory always exists, no need to go through the rest of the method.
       return;
@@ -546,13 +548,24 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     // Create only a leaf directory because subdirectories will be inferred
     // if leaf directory exists
+    final boolean isHns = isHnsOptimized(path);
     try {
-      gcs.createEmptyObject(resourceId);
+      if (isHns) {
+        // Create a native folder resource directly.
+        gcs.createFolder(resourceId);
+      } else {
+        // Create an empty placeholder object to represent the directory.
+        gcs.createEmptyObject(resourceId);
+      }
     } catch (FileAlreadyExistsException e) {
       GoogleCloudStorageEventBus.postOnException();
-      // This means that directory object already exist, and we do not need to do anything.
-      logger.atFiner().withCause(e).log(
-          "mkdirs: %s already exists, ignoring creation failure", resourceId);
+      // This means that directory object/native folder already exist, and we do not need to do
+      // anything.
+      String logMessage =
+          isHns
+              ? "mkdirs: Folder '%s' already exists, ignoring creation failure"
+              : "mkdirs: %s object already exists, ignoring creation failure";
+      logger.atFiner().withCause(e).log(logMessage, resourceId);
     }
   }
 
@@ -1017,10 +1030,22 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   @Override
   public FileInfo getFileInfo(URI path) throws IOException {
     checkArgument(path != null, "path must not be null");
+
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+    if (isHnsOptimized(path)) {
+      // We directly call `getFolderInfo` without a prior `isDirectory()` check.
+      // This is because the trailing "/" is sometimes stripped from the input URI,
+      // making an `isDirectory()` check on the path unreliable. Instead, we rely on
+      // `getFolderInfo` to determine if the path represents a directory.
+      FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getFolderInfo(resourceId.toDirectoryId()));
+      if (fileInfo.exists()) {
+        return fileInfo;
+      }
+    }
+
     // Validate the given path. true == allow empty object name.
     // One should be able to get info about top level directory (== bucket),
     // therefore we allow object name to be empty.
-    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
     FileInfo fileInfo =
         FileInfo.fromItemInfo(
             getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true));
@@ -1178,8 +1203,14 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // Ensure that the path looks like a directory path.
     resourceId = resourceId.toDirectoryId();
 
-    // Not a top-level directory, create 0 sized object.
-    gcs.createEmptyObject(resourceId);
+    // Check if HNS optimization is enabled, it's an HNS bucket
+    if (isHnsOptimized(path)) {
+      // Not a top-level directory, create an folder.
+      gcs.createFolder(resourceId);
+    } else {
+      // Not a top-level directory, create 0 sized object.
+      gcs.createEmptyObject(resourceId);
+    }
   }
 
   private void checkNoFilesConflictingWithDirs(StorageResourceId resourceId) throws IOException {
@@ -1206,6 +1237,13 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             "Cannot create directories because of existing file: " + fileInfo.getResourceId());
       }
     }
+  }
+
+  private boolean isHnsOptimized(URI path) throws IOException {
+    GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
+    return gcsOptions.isHnBucketRenameEnabled()
+        && gcsOptions.isHnOptimizationEnabled()
+        && gcs.isHnBucket(path);
   }
 
   private <T> Future<T> runFuture(ExecutorService service, Callable<T> task, String name) {

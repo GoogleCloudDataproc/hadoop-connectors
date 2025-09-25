@@ -587,6 +587,12 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.write.rolling.checksum.enable",
           AsyncWriteChannelOptions.DEFAULT.isRollingChecksumEnabled());
 
+  /** Configuration key to enable Hierarchical Namespace (HNS) optimizations. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_HNS_OPTIMIZATION_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.hierarchical.namespace.folders.optimization.enable",
+          GoogleCloudStorageOptions.DEFAULT.isHnOptimizationEnabled());
+
   /** Configuration key for enabling move operation in gcs instead of copy+delete. */
   public static final HadoopConfigurationProperty<Boolean> GCS_OPERATION_MOVE_ENABLE =
       new HadoopConfigurationProperty<>(
@@ -687,7 +693,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setStorageClientCachingEnabled(GCS_STORAGE_CLIENT_CACHING.get(config, config::getBoolean))
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setFinalizeBeforeClose(
-            GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean));
+            GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean))
+        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting

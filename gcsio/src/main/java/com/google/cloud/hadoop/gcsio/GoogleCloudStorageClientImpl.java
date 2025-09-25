@@ -50,6 +50,7 @@ import com.google.cloud.storage.BlobWriteSessionConfig;
 import com.google.cloud.storage.BlobWriteSessionConfigs;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
+import com.google.cloud.storage.BucketInfo.HierarchicalNamespace;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
 import com.google.cloud.storage.CopyWriter;
@@ -241,6 +242,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     if (options.getStorageClass() != null) {
       bucketInfoBuilder.setStorageClass(
           StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
+    }
+    if (options.getHierarchicalNamespaceEnabled()) {
+      bucketInfoBuilder.setIamConfiguration(
+          BucketInfo.IamConfiguration.newBuilder()
+              .setIsUniformBucketLevelAccessEnabled(true)
+              .build());
+      bucketInfoBuilder.setHierarchicalNamespace(
+          HierarchicalNamespace.newBuilder().setEnabled(true).build());
     }
     if (options.getTtl() != null) {
       bucketInfoBuilder.setLifecycleRules(
