@@ -150,7 +150,7 @@
     fs.gs.storage.http.headers.some-custom-header=custom_value
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
-    
+
 *   `fs.gs.application.name.suffix` (not set by default)
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
