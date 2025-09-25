@@ -67,7 +67,8 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setHnBucketRenameEnabled(false)
         .setGrpcWriteEnabled(false)
-        .setMoveOperationEnabled(true);
+        .setMoveOperationEnabled(true)
+        .setHnOptimizationEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -148,6 +149,15 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isMoveOperationEnabled();
 
+<<<<<<< HEAD
+=======
+  public abstract boolean isBidiEnabled();
+
+  public abstract boolean isFinalizeBeforeClose();
+
+  public abstract boolean isHnOptimizationEnabled();
+
+>>>>>>> 772e645f ([HNS Optimization] Add createFolder and getFolderInfo methods  (#1456))
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
         .setDefaultUserAgent(getAppName())
@@ -237,6 +247,18 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setMoveOperationEnabled(boolean moveOperationEnabled);
 
+<<<<<<< HEAD
+=======
+    public abstract Builder setStorageClientCachingEnabled(boolean isCachingEnabled);
+
+    public abstract Builder setHnOptimizationEnabled(boolean hnOptimizationEnabled);
+
+    /** Sets the property to use the bidirectional Rapid Storage Api. */
+    public abstract Builder setBidiEnabled(boolean bidiEnabled);
+
+    public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
+
+>>>>>>> 772e645f ([HNS Optimization] Add createFolder and getFolderInfo methods  (#1456))
     abstract GoogleCloudStorageOptions autoBuild();
 
     public GoogleCloudStorageOptions build() {
