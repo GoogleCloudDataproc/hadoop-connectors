@@ -150,6 +150,26 @@
     fs.gs.storage.http.headers.some-custom-header=custom_value
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
+    
+*   `fs.gs.application.name.suffix` (not set by default)
+
+    Suffix that will be added to HTTP `User-Agent` header set in all Cloud
+    Storage requests.
+    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
+    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
+
+*   `fs.gs.proxy.address` (not set by default)
+
+    Proxy address that connector can use to send Cloud Storage requests. The
+    proxy must be an HTTP proxy and address should be in the `host:port` form.
+
+*   `fs.gs.proxy.username` (not set by default)
+
+    Proxy username that connector can use to send Cloud Storage requests.
+
+*   `fs.gs.proxy.password` (not set by default)
+
+    Proxy password that connector can use to send Cloud Storage requests.
 
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
@@ -380,26 +400,6 @@ Knobs configure the vectoredRead API
    It controls the parallel processing of range request. These threads will be
    shared across all readVectored invocation. If the task queue of range request
    is overloaded do consider increasing this value.
-
-*   `fs.gs.application.name.suffix` (not set by default)
-
-    Suffix that will be added to HTTP `User-Agent` header set in all Cloud
-    Storage requests.
-    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
-    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
-
-*   `fs.gs.proxy.address` (not set by default)
-
-    Proxy address that connector can use to send Cloud Storage requests. The
-    proxy must be an HTTP proxy and address should be in the `host:port` form.
-
-*   `fs.gs.proxy.username` (not set by default)
-
-    Proxy username that connector can use to send Cloud Storage requests.
-
-*   `fs.gs.proxy.password` (not set by default)
-
-    Proxy password that connector can use to send Cloud Storage requests.
 
 ### HTTP transport configuration
 
