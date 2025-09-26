@@ -118,6 +118,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   private static final String GENERATION_MATCH_TOKEN_PARAM_PATTERN = "ifGenerationMatch=[^&]+";
 
+  private static final String SOURCE_GENERATION_MATCH_TOKEN_PARAM_PATTERN =
+      "ifSourceGenerationMatch=[^&]+";
+
   private static final String UPLOAD_ID_PARAM_PATTERN = "upload_id=[^&]+";
 
   private final HttpRequestInitializer delegate;
@@ -167,6 +170,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong pageTokenId = new AtomicLong();
     AtomicLong rewriteTokenId = new AtomicLong();
     AtomicLong generationMatchId = new AtomicLong();
+    AtomicLong sourceGenerationMatchId = new AtomicLong();
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
@@ -174,8 +178,17 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .map(r -> replacePageTokenWithId(r, pageTokenId))
         .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
+        .map(r -> replaceSourceGenerationMatchWithId(r, sourceGenerationMatchId))
         .map(r -> replaceResumableUploadIdWithId(r, resumableUploadId))
         .collect(toImmutableList());
+  }
+
+  private String replaceSourceGenerationMatchWithId(String request, AtomicLong generationId) {
+    String idPrefix = "ifSourceGenerationMatch=generationId_";
+    return replaceRequestParams
+        ? replaceWithId(
+            request, SOURCE_GENERATION_MATCH_TOKEN_PARAM_PATTERN, idPrefix, generationId)
+        : request;
   }
 
   public ImmutableList<String> getAllRequestInvocationIds() {
@@ -343,6 +356,27 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         POST_MOVE_REQUEST_FORMAT, bucket, urlEncode(srcObject), requestType, urlEncode(dstObject));
   }
 
+  public static String moveRequestString(
+      String bucket,
+      String srcObject,
+      String dstObject,
+      String requestType,
+      long generationId,
+      long sourceGenerationId) {
+    String request =
+        String.format(
+            POST_MOVE_REQUEST_FORMAT,
+            bucket,
+            urlEncode(srcObject),
+            requestType,
+            urlEncode(dstObject));
+    return request
+        + "?ifGenerationMatch=generationId_"
+        + generationId
+        + "&ifSourceGenerationMatch=generationId_"
+        + sourceGenerationId;
+  }
+
   public static String uploadRequestString(String bucketName, String object, Integer generationId) {
     return uploadRequestString(bucketName, object, generationId, true);
   }
@@ -483,6 +517,45 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         bucket, /* includeTrailingDelimiter= */ true, prefix, objectFields, maxResults, pageToken);
   }
 
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken, int maxResults) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        OBJECT_FIELDS,
+        maxResults,
+        pageToken,
+        startOffset);
+  }
+
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        OBJECT_FIELDS,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken,
+        startOffset);
+  }
+
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken, String fields) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        fields,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken,
+        startOffset);
+  }
+
   public static String listRequestString(
       String bucket,
       Boolean includeTrailingDelimiter,
@@ -512,7 +585,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         objectFields,
         maxResults,
-        pageToken);
+        pageToken,
+        /* startOffset */ null);
   }
 
   public static String listRequestString(
@@ -529,7 +603,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         objectFields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
-        pageToken);
+        pageToken,
+        /* startOffset */ null);
   }
 
   public static String listRequestString(
@@ -539,9 +614,11 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String prefix,
       String objectFields,
       int maxResults,
-      String pageToken) {
+      String pageToken,
+      String startOffset) {
     String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
     extraParams += prefix == null ? "" : "&prefix=" + prefix;
+    extraParams += startOffset == null ? "" : "&startOffset=" + startOffset;
     return String.format(
         LIST_REQUEST_FORMAT,
         bucket,

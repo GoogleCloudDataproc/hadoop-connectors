@@ -21,7 +21,9 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithStartOffset;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.moveRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.truth.Truth.assertThat;
@@ -29,18 +31,23 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl.PathTypeHint;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -836,6 +843,137 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   @Test
+  public void listFileInfoStartingFrom_customFields_required() throws Exception {
+    gcsFs = newGcsFs(newGcsFsOptions().build());
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource() + "/";
+    String objectName = dirObject + "I_am_file";
+    gcsfsIHelper.createObjects(bucketName, objectName);
+
+    List<FileInfo> fileInfos =
+        gcsFs.listFileInfoStartingFrom(
+            bucketUri.resolve(dirObject),
+            ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name").build());
+
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(fileInfos.get(0).getPath()).isEqualTo(bucketUri.resolve(objectName));
+    // No item info calls are made with offset based api
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(
+                bucketName, dirObject, /* pageToken= */ null, /* objectFields */ "bucket,name"));
+  }
+
+  @Test
+  public void listFileInfoStartingFrom_customFields_fail() throws Exception {
+    gcsFs = newGcsFs(newGcsFsOptions().build());
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource() + "/";
+    String objectName = dirObject + "I_am_file";
+    gcsfsIHelper.createObjects(bucketName, objectName);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gcsFs.listFileInfoStartingFrom(
+                bucketUri.resolve(dirObject),
+                ListFileOptions.DEFAULT.toBuilder().setFields("bucket").build()));
+
+    assertTrue(gcsRequestsTracker.getAllRequestStrings().isEmpty());
+  }
+
+  @Test
+  public void listFileInfoStartingFrom_emptyResponse() throws Exception {
+    gcsFs = newGcsFs(newGcsFsOptions().build());
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    // lexicographically the highest string of length 4
+    String dirObject = "~~~~" + "/";
+    gcsfsIHelper.createObjects(bucketName, dirObject);
+
+    List<FileInfo> fileInfos = gcsFs.listFileInfoStartingFrom(bucketUri.resolve(dirObject));
+
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(fileInfos.size()).isEqualTo(0);
+
+    // No item info calls are made with offset based api
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(listRequestWithStartOffset(bucketName, dirObject, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listFileInfoStartingFrom_sortedLexicographically() throws Exception {
+    gcsFs = newGcsFs(newGcsFsOptions().build());
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource() + "/";
+    int filesCount = 50;
+    List<URI> createdURIs = new ArrayList<>();
+    for (int i = 0; i < filesCount; i++) {
+      String objectName = dirObject + UUID.randomUUID();
+      gcsfsIHelper.createObjects(bucketName, objectName);
+      createdURIs.add(bucketUri.resolve(objectName));
+    }
+    List<URI> sortedURI =
+        createdURIs.stream()
+            .sorted(Comparator.comparing(URI::getPath))
+            .collect(Collectors.toList());
+
+    List<FileInfo> fileInfos = gcsFs.listFileInfoStartingFrom(bucketUri.resolve(dirObject));
+
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    for (int i = 0; i < filesCount; i++) {
+      assertThat(getURIs(fileInfos).get(i)).isEqualTo(sortedURI.get(i));
+    }
+
+    // No item info calls are made with offset based api
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(listRequestWithStartOffset(bucketName, dirObject, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listFileInfoStartingFrom_filter_directory() throws Exception {
+    gcsFs = newGcsFs(newGcsFsOptions().build());
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource() + "/";
+    String objectName = dirObject + "I_am_file";
+    gcsfsIHelper.createObjects(bucketName, dirObject);
+    gcsfsIHelper.createObjects(bucketName, objectName);
+
+    List<FileInfo> fileInfos = gcsFs.listFileInfoStartingFrom(bucketUri.resolve(dirObject));
+
+    // Can't assert that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(fileInfos.get(0).getPath()).isEqualTo(bucketUri.resolve(objectName));
+    // No item info calls are made with offset based api
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(listRequestWithStartOffset(bucketName, dirObject, /* pageToken= */ null));
+
+    // directory object was filtered
+    FileInfo dirFileInfo =
+        gcsFs.getFileInfoWithHint(bucketUri.resolve(dirObject), PathTypeHint.FILE);
+    // directory as an object do exists.
+    assertTrue(dirFileInfo.isDirectory());
+    // but directory objects are filtered out and only files are returned.
+    assertThat(getURIs(fileInfos)).doesNotContain(bucketUri.resolve(dirObject));
+  }
+
+  @Test
   public void delete_file_sequential() throws Exception {
     gcsFs = newGcsFs(newGcsFsOptions().setStatusParallelEnabled(false).build());
 
@@ -976,6 +1114,47 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
               listRequestWithTrailingDelimiter(
                   bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
               getRequestString(bucketName, dirObject + "/"),
+              moveRequestString(
+                  bucketName,
+                  dirObject + "/f1",
+                  dirObject + "/f2",
+                  "moveTo",
+                  /* generationId= */ 1,
+                  /* sourceGenerationId= */ 1));
+    }
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
+  }
+
+  @Test
+  public void rename_file_withMoveDisabled_usesCopyAndDelete() throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setMoveOperationEnabled(false).build())
+                .setStatusParallelEnabled(false)
+                .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+
+    gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
+
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/"),
               copyRequestString(
                   bucketName,
                   dirObject + "/f1",
@@ -1016,14 +1195,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
               getRequestString(bucketName, dirObject + "/"),
               listRequestWithTrailingDelimiter(
                   bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
-              copyRequestString(
+              moveRequestString(
                   bucketName,
                   dirObject + "/f1",
-                  bucketName,
                   dirObject + "/f2",
-                  "copyTo",
-                  /* generationId= */ 1),
-              deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 2));
+                  "moveTo",
+                  /* generationId= */ 1,
+                  /* sourceGenerationId= */ 1));
     }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
@@ -1113,17 +1291,14 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                   "bucket,name,generation",
 
                   /* pageToken= */ null),
-              // Copy file
-              copyRequestString(
+              // Move file
+              moveRequestString(
                   bucketName,
                   dirObject + "/srcParent/srcDir/f",
-                  bucketName,
                   dirObject + "/dstParent/dstDir/f",
-                  "copyTo"),
-              // Delete src directory and file
-              batchRequestString(),
-              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
-              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 2));
+                  "moveTo"),
+              // Delete src directory
+              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 1));
     }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir/f"))).isFalse();
@@ -1182,17 +1357,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                   "bucket,name,generation",
 
                   /* pageToken= */ null),
-              // Copy file
-              copyRequestString(
+              // Move file
+              moveRequestString(
                   bucketName,
                   dirObject + "/srcParent/srcDir/f",
-                  bucketName,
                   dirObject + "/dstParent/dstDir/f",
-                  "copyTo"),
-              // Delete src directory and file
-              batchRequestString(),
-              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
-              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 2));
+                  "moveTo"),
+              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 1));
     }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir/f"))).isFalse();
@@ -1266,6 +1437,10 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   private static GoogleCloudStorageFileSystemOptions.Builder newGcsFsOptions() {
     return GoogleCloudStorageFileSystemOptions.builder().setCloudStorageOptions(gcsOptions);
+  }
+
+  private static List<URI> getURIs(List<FileInfo> fileInfos) {
+    return fileInfos.stream().map(FileInfo::getPath).collect(toList());
   }
 
   protected abstract GoogleCloudStorageFileSystem newGcsFs(

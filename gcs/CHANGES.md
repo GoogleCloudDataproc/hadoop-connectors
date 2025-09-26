@@ -1,7 +1,24 @@
 # Release Notes
 
 ## Next
-1. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
+1. PR #1511 - [Feature] Storage Client Caching for downscoped token
+2. Enable move by default.
+3. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
+
+## 3.1.7 - 2025-09-10
+1. PR #1484 - [Feature] Enabled write checksum by default
+1. PR #1480 - [Bug] Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel
+
+## 3.1.6 - 2025-09-04
+1. Add listStatusStartingFrom API.
+
+## 3.1.5 - 2025-09-01
+1. Fix cloud logging issue.
+
+## 3.1.4 - 2025-08-28
+1. Add checksum verification in upload.
+2. PR #1463: [Bug] Fix for Hadoop directory copy failures in gRPC client.
+3. PR #1420: Update readBytes via vectoredRead
 
 ## 3.1.3 - 2025-05-29
 1. Skip Soft delete using move API during rename
