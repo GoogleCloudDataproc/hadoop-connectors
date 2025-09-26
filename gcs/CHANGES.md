@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
 
 ## 3.1.3 - 2025-05-29
 1. Skip Soft delete using move API during rename
