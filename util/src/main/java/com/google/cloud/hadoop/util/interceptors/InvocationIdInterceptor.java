@@ -19,12 +19,12 @@ package com.google.cloud.hadoop.util.interceptors;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
+import com.google.cloud.hadoop.util.InvocationIdContext;
 import com.google.cloud.hadoop.util.RequestTracker;
 import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.UUID;
 
 /**
  * HTTP request interceptor to attach unique identifier i.e. invocationId to each new request and
@@ -65,8 +65,12 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
     final String signatureKey = "Signature="; // For V2 and V4 signedURLs
     final String builtURL = request.getUrl().build();
     if (!builtURL.contains(signatureKey)) {
-      UUID invocationId = UUID.randomUUID();
-      String invocationEntry = GCCL_INVOCATION_ID_PREFIX + invocationId;
+      // Thread-safe: InvocationIdContext uses thread-local storage, so each thread has its own
+      // invocationId.
+      if (InvocationIdContext.getInvocationId().isEmpty()) {
+        InvocationIdContext.setInvocationId();
+      }
+      String invocationEntry = InvocationIdContext.getInvocationId();
       final String newValue;
       if (existing != null && !existing.isEmpty()) {
         newValue = existing + " " + invocationEntry;
