@@ -2451,7 +2451,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
             mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    String testHnsBucket = "hns-bucket-disabled";
+    String testHnsBucket = "hns-bucket-missing-ns";
     URI bucketUri = new URI("gs://" + testHnsBucket);
     boolean result = gcs.isHnBucket(bucketUri);
 
