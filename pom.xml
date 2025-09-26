@@ -287,6 +287,9 @@
                 </goals>
               </execution>
             </executions>
+            <configuration>
+               <skip>true</skip>
+            </configuration>
           </plugin>
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
