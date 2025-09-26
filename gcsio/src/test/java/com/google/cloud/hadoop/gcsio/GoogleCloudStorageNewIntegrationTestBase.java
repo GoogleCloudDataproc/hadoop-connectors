@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.LIST_MAX_RESULTS;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
@@ -24,6 +25,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBu
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithStartOffset;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
@@ -33,6 +35,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
@@ -43,12 +46,16 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.zip.GZIPOutputStream;
 import org.junit.After;
 import org.junit.Before;
@@ -75,7 +82,7 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
   @Rule public TestName name = new TestName();
   protected TrackingHttpRequestInitializer gcsRequestsTracker;
 
-  protected boolean isTracingSupported = false;
+  protected boolean isTracingSupported = true;
 
   private GoogleCloudStorage gcs;
 
@@ -797,6 +804,259 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
   }
 
   @Test
+  public void listObjectInfoStartingFrom_negativeMaxResult() throws Exception {
+    gcs = createGoogleCloudStorage(gcsOptions);
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+
+    String testDirName = name.getMethodName() + "/";
+
+    String fileName = testDirName + "I_am_file";
+    StorageResourceId fileResource = new StorageResourceId(bucketName, fileName);
+
+    gcsfsIHelper.gcs.createEmptyObject(fileResource);
+
+    int maxResults = -1;
+
+    ListObjectOptions listOptionsLimitResults =
+        ListObjectOptions.DEFAULT_USING_START_OFFSET.toBuilder().setMaxResults(maxResults).build();
+    gcs.listObjectInfoStartingFrom(bucketName, testDirName, listOptionsLimitResults);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(
+                // maxResults is override with default value
+                bucketName,
+                testDirName,
+                /* pageToken= */ null,
+                /* maxResults= */ (int) LIST_MAX_RESULTS));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_startOffsetNotObject() throws Exception {
+    gcs = createGoogleCloudStorage(gcsOptions);
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+
+    String testDirName = name.getMethodName() + "/";
+
+    String fileName = testDirName + "I_am_file";
+    StorageResourceId fileResource = new StorageResourceId(bucketName, fileName);
+
+    gcsfsIHelper.gcs.createEmptyObject(fileResource);
+    String startOffset = testDirName.substring(5, testDirName.length() - 1);
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfoStartingFrom(bucketName, startOffset);
+
+    verifyListedFilesOrder(listedObjects, startOffset);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(bucketName, startOffset, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_sortedListFiles() throws Exception {
+
+    gcs = createGoogleCloudStorage(gcsOptions);
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+
+    String testDirName = name.getMethodName() + "/";
+    List<StorageResourceId> resources = new ArrayList<>();
+    int filesCount = 50;
+    for (int i = 0; i < filesCount; i++) {
+      String uniqueFilename = UUID.randomUUID().toString().replaceAll("-", "").substring(0, 12);
+      StorageResourceId file = new StorageResourceId(bucketName, testDirName + uniqueFilename);
+      gcsfsIHelper.gcs.createEmptyObject(file);
+      resources.add(file);
+    }
+    List<StorageResourceId> sortedResources =
+        resources.stream()
+            .sorted(Comparator.comparing(StorageResourceId::getObjectName))
+            .collect(Collectors.toList());
+    assertTrue(sortedResources.size() == resources.size());
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfoStartingFrom(bucketName, testDirName);
+    verifyListedFilesOrder(listedObjects, testDirName);
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    for (int i = 0; i < filesCount; i++) {
+      assertThat(getObjectNames(listedObjects).get(i))
+          .isEqualTo(sortedResources.get(i).getObjectName());
+    }
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(bucketName, testDirName, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_invalidListOptions() throws Exception {
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    gcs = createGoogleCloudStorage(gcsOptions);
+
+    String dir = name.getMethodName() + "2/";
+
+    String fileName = dir + "I_am_file";
+    StorageResourceId fileResource = new StorageResourceId(bucketName, fileName);
+
+    gcsfsIHelper.gcs.createEmptyObject(fileResource);
+
+    assertThrows(
+        IOException.class,
+        () ->
+            gcs.listObjectInfoStartingFrom(
+                gcsfsIHelper.sharedBucketName1, dir, ListObjectOptions.DEFAULT));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_multipleListCalls() throws Exception {
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    gcs = createGoogleCloudStorage(gcsOptions);
+
+    String dir1 = name.getMethodName() + "1/";
+    StorageResourceId dirResource1 = new StorageResourceId(bucketName, dir1);
+
+    String dir2 = name.getMethodName() + "2/";
+    StorageResourceId dirResource2 = new StorageResourceId(bucketName, dir2);
+
+    String fileName = dir2 + "I_am_file";
+    StorageResourceId fileResource = new StorageResourceId(bucketName, fileName);
+
+    gcsfsIHelper.gcs.createEmptyObject(dirResource1);
+    gcsfsIHelper.gcs.createEmptyObject(dirResource2);
+    gcsfsIHelper.gcs.createEmptyObject(fileResource);
+    int maxResults = 2;
+
+    ListObjectOptions listOptionsLimitResults =
+        ListObjectOptions.DEFAULT_USING_START_OFFSET.toBuilder().setMaxResults(maxResults).build();
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfoStartingFrom(
+            gcsfsIHelper.sharedBucketName1, dir1, listOptionsLimitResults);
+    assertThat(getObjectNames(listedObjects)).doesNotContain(dirResource1);
+    assertThat(getObjectNames(listedObjects)).doesNotContain(dirResource2);
+
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(getObjectNames(listedObjects).get(0)).isEqualTo(fileResource.getObjectName());
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(bucketName, dir1, /* pageToken= */ null, maxResults),
+            listRequestWithStartOffset(bucketName, dir1, /* pageToken= */ "token_1", maxResults));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_filterDirObjects() throws Exception {
+    gcs = createGoogleCloudStorage(gcsOptions);
+
+    String testDirName = name.getMethodName() + "/";
+    StorageResourceId objectId1 =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object1");
+    String subDirName = testDirName + "subDir/";
+    StorageResourceId directoryResource =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, subDirName);
+    StorageResourceId objectId2 =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, subDirName + "subObject1");
+
+    gcsfsIHelper.gcs.createEmptyObject(objectId1);
+    gcsfsIHelper.gcs.createEmptyObject(directoryResource);
+    gcsfsIHelper.gcs.createEmptyObject(objectId2);
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfoStartingFrom(gcsfsIHelper.sharedBucketName1, testDirName);
+    verifyListedFilesOrder(listedObjects, testDirName);
+
+    assertThat(getObjectNames(listedObjects)).doesNotContain(directoryResource);
+
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(getObjectNames(listedObjects).get(0)).isEqualTo(objectId1.getObjectName());
+    assertThat(getObjectNames(listedObjects).get(1)).isEqualTo(objectId2.getObjectName());
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(
+                objectId1.getBucketName(), testDirName, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_listSubDirFiles() throws Exception {
+
+    gcs = createGoogleCloudStorage(gcsOptions);
+
+    String testDirName = name.getMethodName() + "/";
+    StorageResourceId objectId1 =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object1");
+    String subDirName = testDirName + "subDir/";
+    StorageResourceId objectId2 =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, subDirName + "subObject1");
+
+    gcsfsIHelper.gcs.createEmptyObject(objectId2);
+    gcsfsIHelper.gcs.createEmptyObject(objectId1);
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfoStartingFrom(gcsfsIHelper.sharedBucketName1, testDirName);
+    verifyListedFilesOrder(listedObjects, testDirName);
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(getObjectNames(listedObjects).get(0)).isEqualTo(objectId1.getObjectName());
+    assertThat(getObjectNames(listedObjects).get(1)).isEqualTo(objectId2.getObjectName());
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(
+                objectId1.getBucketName(), testDirName, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_allMetadataFieldsCorrect() throws Exception {
+    gcs = createGoogleCloudStorage(gcsOptions);
+
+    String testDirName = name.getMethodName() + "/";
+    StorageResourceId objectId2 =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object2");
+    StorageResourceId objectId1 =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object1");
+
+    // Create gzipped file so Content-Encoding will be not null
+    CreateObjectOptions createOptions =
+        GZIP_CREATE_OPTIONS.toBuilder()
+            .setMetadata(ImmutableMap.of("test-key", "val".getBytes(UTF_8)))
+            .build();
+
+    gcsfsIHelper.gcs.createEmptyObject(objectId2, createOptions);
+    gcsfsIHelper.gcs.createEmptyObject(objectId1, createOptions);
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfoStartingFrom(gcsfsIHelper.sharedBucketName1, testDirName);
+
+    verifyListedFilesOrder(listedObjects, testDirName);
+    // Can't asset that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    assertThat(getObjectNames(listedObjects).get(0)).isEqualTo(objectId1.getObjectName());
+    assertThat(getObjectNames(listedObjects).get(1)).isEqualTo(objectId2.getObjectName());
+
+    assertObjectFields(objectId1, listedObjects.get(0));
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(
+                objectId1.getBucketName(), testDirName, /* pageToken= */ null));
+  }
+
+  @Test
   public void getItemInfo_allMetadataFieldsCorrect() throws Exception {
     gcs = createGoogleCloudStorage(gcsOptions);
 
@@ -1375,6 +1635,26 @@ public abstract class GoogleCloudStorageNewIntegrationTestBase {
     String[] objectPaths = Arrays.stream(objects).map(o -> testDir + o).toArray(String[]::new);
     gcsfsIHelper.createObjects(bucketName, objectPaths);
     return testDir;
+  }
+
+  private void verifyListedFilesOrder(
+      List<GoogleCloudStorageItemInfo> listedObjects, String startOffset) {
+    // provided item list is sorted
+    if (listedObjects.size() > 1) {
+      assertTrue(
+          IntStream.range(0, listedObjects.size() - 1)
+              .allMatch(
+                  i ->
+                      listedObjects
+                              .get(i)
+                              .getObjectName()
+                              .compareTo(listedObjects.get(i + 1).getObjectName())
+                          <= 0));
+    }
+
+    assertTrue(
+        IntStream.range(0, listedObjects.size() - 1)
+            .allMatch(i -> listedObjects.get(i).getObjectName().compareTo(startOffset) >= 0));
   }
 
   protected abstract GoogleCloudStorage createGoogleCloudStorage(GoogleCloudStorageOptions options)

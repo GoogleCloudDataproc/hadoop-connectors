@@ -94,7 +94,7 @@ public abstract class AsyncWriteChannelOptions {
         .setPCUBufferCapacity(PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY)
         .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
         .setPartFileNamePrefix(PART_FILE_PREFIX)
-        .setRollingChecksumEnabled(false);
+        .setRollingChecksumEnabled(true);
   }
 
   public abstract Builder toBuilder();

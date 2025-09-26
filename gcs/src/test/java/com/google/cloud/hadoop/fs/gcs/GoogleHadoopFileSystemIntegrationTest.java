@@ -64,6 +64,7 @@ import static java.util.Arrays.stream;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.fail;
 
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
@@ -136,6 +137,9 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   private static final String GCS_API_COUNT = "gcsApiCount";
   private static final String HADOOP_API_COUNT = "hadoopApiCount";
+
+  private static final long BUCKET_DELETION_TIMEOUT_MS = 30_000;
+  private static final long RETRY_INTERVAL_MS = 1_000;
 
   @Before
   public void before() throws Exception {
@@ -227,13 +231,13 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   @Test
-  public void testRenameWithMoveOperation() throws Exception {
+  public void testRenameWithMoveDisabled() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("move");
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
-    config.setBoolean("fs.gs.operation.move.enable", true);
+    config.setBoolean("fs.gs.operation.move.enable", false);
     googleHadoopFileSystem.initialize(initUri, config);
 
     GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
@@ -2416,10 +2420,27 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 .exists())
         .isFalse();
 
-    assertThrows(
-        "The specified bucket does not exist : " + bucketPath,
-        com.google.api.gax.rpc.NotFoundException.class,
-        () -> assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath)).isEqualTo(0));
+    // Bucket delete is an eventually consistent operation can take upto 30 seconds
+    // More details on consistency https://cloud.google.com/storage/docs/consistency.
+    long deadline = System.currentTimeMillis() + BUCKET_DELETION_TIMEOUT_MS;
+    boolean notFound = false;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        getSubFolderCount(googleHadoopFileSystem, bucketPath);
+        // If the call succeeds, the bucket is not yet fully deleted from this view.
+        // Wait a bit before retrying.
+        Thread.sleep(RETRY_INTERVAL_MS);
+      } catch (com.google.api.gax.rpc.NotFoundException e) {
+        notFound = true;
+        break;
+      }
+    }
+
+    if (!notFound) {
+      fail("getSubFolderCount should have thrown NotFoundException after bucket deletion.");
+    }
+
+    googleHadoopFileSystem.close();
   }
 
   @Test
@@ -2614,10 +2635,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     expected =
         ImmutableMap.<String, Long>builder()
-            .put(
-                GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(),
-                2L) // 1 for file; 1 for directory.
-            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // copy file;
+            .put(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(), 1L) // 1 for directory.
+            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // move file;
             .put(
                 GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT.getSymbol(),
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2626,7 +2645,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                9L) // 2 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
+                8L) // 1 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
             .put(
                 GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(),
                 1L) // list src files to copy/delete
@@ -2764,7 +2783,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     myghfs.rename(testFilePath, dst);
     // TODO: Operations done async in a separate thread are not tracked. This will be fixed in a
     // separate change.
-    verify(metrics, 2L, stats);
+    verify(metrics, 1L, stats);
 
     myghfs.delete(dst);
     verify(metrics, 2L, stats);
