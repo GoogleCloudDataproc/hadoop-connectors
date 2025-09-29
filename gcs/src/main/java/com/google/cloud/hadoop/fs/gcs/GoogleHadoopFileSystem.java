@@ -18,6 +18,8 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPLICATION_NAME_SUFFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
@@ -56,8 +58,11 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.TraceFactory;
+import com.google.cloud.hadoop.util.interceptors.LoggingInterceptor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
@@ -93,6 +98,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.conf.Configuration;
@@ -176,6 +182,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   static final String GETFILESTATUS_FILETYPE_HINT = "fs.gs.getfilestatus.filetype.hint";
 
   static {
+    // Add formatter to root logger.
+    LoggingFormatter.addFormatter(Logger.getLogger(""));
     VERSION =
         PropertyUtil.getPropertyOrDefault(
             GoogleHadoopFileSystem.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
@@ -228,6 +236,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private FsPermission reportedPermissions;
 
   private ITraceFactory traceFactory = TraceFactory.get(/* isEnabled */ false);
+
+  private LoggingInterceptor loggingInterceptor;
 
   /** Instrumentation to track Statistics */
   ITraceFactory getTraceFactory() {
@@ -293,6 +303,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     // will perform some file-system-specific adjustments, but the original should
     // be sufficient (and is required) for the delegation token binding initialization.
     setConf(config);
+
+    if (GCS_CLOUD_LOGGING_ENABLE.get(getConf(), getConf()::getBoolean)) {
+      initializeCloudLogger(config);
+    }
 
     globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
@@ -414,6 +428,20 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private void initializeGcsFs(GoogleCloudStorageFileSystem gcsFs) {
     gcsFsSupplier = Suppliers.ofInstance(gcsFs);
     gcsFsInitialized = true;
+  }
+
+  private void initializeCloudLogger(Configuration config) throws IOException {
+    GoogleCredentials credentials = getCredentials(config);
+    String suffix = GCS_APPLICATION_NAME_SUFFIX.get(getConf(), getConf()::get);
+    loggingInterceptor = createLoggingInterceptor(credentials, suffix);
+    // Add the LoggingInterceptor to the root logger
+    Logger rootLogger = Logger.getLogger("");
+    rootLogger.addHandler(loggingInterceptor);
+  }
+
+  @VisibleForTesting
+  LoggingInterceptor createLoggingInterceptor(GoogleCredentials credentials, String suffix) {
+    return new LoggingInterceptor(credentials, suffix);
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
@@ -759,7 +787,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-
+    InvocationIdContext.setInvocationId();
     return GhfsGlobalStorageStatistics.trackDuration(
         factory, stats, statistic, context, traceFactory, operation);
   }
@@ -997,6 +1025,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
     checkOpen();
 
@@ -1025,6 +1054,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
     Token<?> result = null;
     if (delegationTokens != null) {
@@ -1038,6 +1068,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
@@ -1048,6 +1079,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
 
     logger.atFiner().log(
@@ -1058,6 +1090,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
@@ -1084,6 +1117,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
+    InvocationIdContext.setInvocationId();
     incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
   }
@@ -1819,6 +1853,17 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           vectoredIOSupplier = null;
           vectoredIOInitialized = false;
         }
+      }
+    }
+
+    if (loggingInterceptor != null) {
+      try {
+        Logger.getLogger("").removeHandler(loggingInterceptor);
+        loggingInterceptor.close();
+      } catch (RuntimeException e) {
+        logger.atSevere().withCause(e).log("Failed to stop cloud logging service");
+      } finally {
+        loggingInterceptor = null;
       }
     }
 
