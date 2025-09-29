@@ -1797,6 +1797,7 @@ public class GoogleCloudStorageTest {
     assertThat(nativeFolderInfo.exists()).isFalse();
   }
 
+  @Test
   public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
     String bucketName = getSharedBucketName();
     StorageResourceId placeholderId =
