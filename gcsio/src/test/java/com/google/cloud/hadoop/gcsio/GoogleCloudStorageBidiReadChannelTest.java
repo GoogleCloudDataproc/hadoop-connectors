@@ -677,11 +677,17 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   @Test
   public void invalidateBuffer_resetsState() throws Exception {
-    GoogleCloudStorageBidiReadChannel channel = getMockedBidiReadChannel();
-    setPrivateField(channel, "internalBuffer", ByteBuffer.allocate(10));
-    setPrivateField(channel, "bufferStartPosition", 5L);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build();
+    GoogleCloudStorageBidiReadChannel channel = getMockedBidiReadChannel(readOptions);
 
-    channel.invalidateBuffer();
+    // 1. Read from the channel to populate the internal buffer.
+    channel.position(5L);
+    channel.read(ByteBuffer.allocate(1));
+
+    // 2. Seek to a position outside the current buffer's range.
+    // This will trigger invalidateBuffer() internally.
+    channel.position(20L);
 
     assertNull(getPrivateField(channel, "internalBuffer"));
     assertEquals(-1L, getPrivateField(channel, "bufferStartPosition"));

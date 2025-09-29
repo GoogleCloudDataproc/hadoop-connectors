@@ -89,7 +89,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       try {
         readSession = sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
       } catch (InterruptedException | ExecutionException | TimeoutException e) {
-        throw new RuntimeException("Failed to get BlobReadSession", e);
+        throw new IOException("Failed to get BlobReadSession", e);
       }
       this.blobReadSession = readSession;
     }
@@ -412,8 +412,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         && position < bufferStartPosition + internalBuffer.limit();
   }
 
-  @VisibleForTesting
-  public void invalidateBuffer() {
+  private void invalidateBuffer() {
     internalBuffer = null;
     bufferStartPosition = -1;
   }
