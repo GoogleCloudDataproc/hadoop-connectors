@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 3.0.12 - 2025-09-26
 1. Enable move by default
 
 ## 3.0.11 - 2025-09-09
