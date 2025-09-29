@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -661,11 +677,17 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   @Test
   public void invalidateBuffer_resetsState() throws Exception {
-    GoogleCloudStorageBidiReadChannel channel = getMockedBidiReadChannel();
-    setPrivateField(channel, "internalBuffer", ByteBuffer.allocate(10));
-    setPrivateField(channel, "bufferStartPosition", 5L);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build();
+    GoogleCloudStorageBidiReadChannel channel = getMockedBidiReadChannel(readOptions);
 
-    channel.invalidateBuffer();
+    // 1. Read from the channel to populate the internal buffer.
+    channel.position(5L);
+    channel.read(ByteBuffer.allocate(1));
+
+    // 2. Seek to a position outside the current buffer's range.
+    // This will trigger invalidateBuffer() internally.
+    channel.position(20L);
 
     assertNull(getPrivateField(channel, "internalBuffer"));
     assertEquals(-1L, getPrivateField(channel, "bufferStartPosition"));

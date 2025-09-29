@@ -2451,6 +2451,24 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
+    String testHnsBucket = "hns-bucket-missing-ns";
+    URI bucketUri = new URI("gs://" + testHnsBucket);
+    boolean result = gcs.isHnBucket(bucketUri);
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
+        .inOrder();
+    assertThat(result).isFalse();
+  }
+
+  /** Test for GoogleCloudStorage.isHnBucket(1). */
+  @Test
+  public void testIsHnBucket_missing() throws Exception {
+    BucketStorageLayout layout = new BucketStorageLayout();
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
     String testHnsBucket = "hns-bucket-disabled";
     URI bucketUri = new URI("gs://" + testHnsBucket);
     boolean result = gcs.isHnBucket(bucketUri);

@@ -88,12 +88,14 @@ import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
+import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -112,6 +114,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.logging.*;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
@@ -228,13 +232,13 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   @Test
-  public void testRenameWithMoveOperation() throws Exception {
+  public void testRenameWithMoveDisabled() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("move");
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
-    config.setBoolean("fs.gs.operation.move.enable", true);
+    config.setBoolean("fs.gs.operation.move.enable", false);
     googleHadoopFileSystem.initialize(initUri, config);
 
     GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();
@@ -2665,10 +2669,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     expected =
         ImmutableMap.<String, Long>builder()
-            .put(
-                GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(),
-                2L) // 1 for file; 1 for directory.
-            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // copy file;
+            .put(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(), 1L) // 1 for directory.
+            .put(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 1L) // move file;
             .put(
                 GoogleCloudStorageStatistics.GCS_API_CLIENT_NOT_FOUND_RESPONSE_COUNT.getSymbol(),
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
@@ -2677,7 +2679,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 2L) // Check for each parent dirs fails due to NOT FOUND - expected
             .put(
                 GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT.getSymbol(),
-                9L) // 2 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
+                8L) // 1 delete + 3 metadata + 2 POST + 1 listDir + 3 listFile
             .put(
                 GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST.getSymbol(),
                 1L) // list src files to copy/delete
@@ -2818,7 +2820,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     myghfs.rename(testFilePath, dst);
     // TODO: Operations done async in a separate thread are not tracked. This will be fixed in a
     // separate change.
-    verify(metrics, 2L, stats);
+    verify(metrics, 1L, stats);
 
     myghfs.delete(dst);
     verify(metrics, 2L, stats);
@@ -3124,5 +3126,56 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             INVOCATION_RENAME.getSymbol(),
             STREAM_READ_OPERATIONS.getSymbol(),
             STREAM_WRITE_OPERATIONS.getSymbol()));
+  }
+
+  @Test
+  public void testLogsContainInvocationId() throws Exception {
+    Logger logger = Logger.getLogger(GoogleHadoopFileSystem.class.getName());
+    logger.setUseParentHandlers(false);
+    logger.setLevel(Level.ALL);
+
+    // Temporarily remove other handlers on this logger
+    Handler[] otherHandlers = logger.getHandlers();
+    for (Handler h : otherHandlers) {
+      logger.removeHandler(h);
+    }
+
+    // Create a handler to capture log output with LoggingFormatter
+    ByteArrayOutputStream logOutput = new ByteArrayOutputStream();
+    Handler testLogHandler =
+        new StreamHandler(logOutput, new LoggingFormatter(new SimpleFormatter()));
+    testLogHandler.setLevel(Level.ALL);
+    logger.addHandler(testLogHandler);
+
+    try {
+      // Perform a rename operation, which should trigger logging with an invocation ID
+      Path testRoot = new Path(ghfs.getWorkingDirectory(), "testLogsContainInvocationId");
+      ghfs.mkdirs(testRoot);
+      Path src = new Path(testRoot, "src.txt");
+      createFile(src, "test-data".getBytes(UTF_8));
+      Path dst = new Path(testRoot, "dst.txt");
+      ghfs.rename(src, dst);
+
+      // Flush the handler to ensure all log records are written to the StringWriter
+      testLogHandler.flush();
+      String logs = logOutput.toString(UTF_8.name());
+
+      // Verify that the logs match the SimpleFormatter pattern with an invocation ID.
+      // It should match a two-line pattern: a header with timestamp and method,
+      // followed by the log message with level and invocation ID.
+      String expectedLogPattern =
+          "([\\w\\s,:]+ com\\.google\\.cloud\\.hadoop\\..+?\\n"
+              + "(FINE|FINER|INFO): \\[gccl-invocation-id/.*?]: .*?\\n)+";
+      assertThat(logs).matches(Pattern.compile(expectedLogPattern, Pattern.DOTALL));
+    } finally {
+      // Clean up the handler
+      logger.removeHandler(testLogHandler);
+      testLogHandler.close();
+      logger.setLevel(Level.INFO); // reset level
+      // Optional: Restore other handlers
+      for (Handler h : otherHandlers) {
+        if (h != testLogHandler) logger.addHandler(h);
+      }
+    }
   }
 }

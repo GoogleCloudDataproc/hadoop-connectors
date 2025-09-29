@@ -85,6 +85,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.write.message.timeout", 3_000L);
           put("fs.gs.grpc.write.enable", false);
           put("fs.gs.hierarchical.namespace.folders.enable", false);
+          put("fs.gs.hierarchical.namespace.folders.optimization.enable", false);
           put("fs.gs.grpc.write.timeout", 600_000L);
           put("fs.gs.http.connect-timeout", 5_000L);
           put("fs.gs.http.max.retry", 10);
@@ -131,7 +132,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
               PartFileCleanupType.ALWAYS);
           put("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "");
           put("fs.gs.fadvise.request.track.count", 3);
-          put("fs.gs.operation.move.enable", false);
+          put("fs.gs.operation.move.enable", true);
           put("fs.gs.write.rolling.checksum.enable", true);
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
