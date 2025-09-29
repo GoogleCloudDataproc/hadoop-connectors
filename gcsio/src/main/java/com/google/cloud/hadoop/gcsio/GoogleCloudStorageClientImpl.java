@@ -43,21 +43,14 @@ import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
-import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.BlobWriteSessionConfig;
-import com.google.cloud.storage.BlobWriteSessionConfigs;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.BucketInfo;
+import com.google.cloud.storage.*;
+import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
-import com.google.cloud.storage.CopyWriter;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.BufferAllocationStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.ExecutorSupplier;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartCleanupStrategy;
 import com.google.cloud.storage.ParallelCompositeUploadBlobWriteSessionConfig.PartNamingStrategy;
-import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobField;
 import com.google.cloud.storage.Storage.BlobGetOption;
 import com.google.cloud.storage.Storage.BlobSourceOption;
@@ -67,8 +60,6 @@ import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.Storage.ComposeRequest;
 import com.google.cloud.storage.Storage.CopyRequest;
 import com.google.cloud.storage.Storage.MoveBlobRequest;
-import com.google.cloud.storage.StorageClass;
-import com.google.cloud.storage.StorageException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
@@ -425,10 +416,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private void createEmptyObjectInternal(
-      StorageResourceId resourceId, CreateObjectOptions createObjectOptions) {
+      StorageResourceId resourceId, CreateObjectOptions createObjectOptions) throws IOException {
     Map<String, String> rewrittenMetadata = encodeMetadata(createObjectOptions.getMetadata());
 
-    logger.atSevere().log("Dhriti_Debug: Reached Create Empty Object internal");
     List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
     blobTargetOptions.add(BlobTargetOption.disableGzipContent());
     if (resourceId.hasGenerationId()) {
@@ -442,7 +432,20 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    logger.atSevere().log("Dhriti_Debug: Creating empty object with zonal buckets");
+    if (getBucket(resourceId.getBucketName()).getStorageClass().toString().equals("RAPID")) {
+      BlobAppendableUpload upload =
+          storageWrapper.blobAppendableUpload(
+              BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                  .setMetadata(rewrittenMetadata)
+                  .setContentEncoding(createObjectOptions.getContentEncoding())
+                  .setContentType(createObjectOptions.getContentType())
+                  .build(),
+              BlobAppendableUploadConfig.of(),
+              Storage.BlobWriteOption.doesNotExist());
+      try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+        channel.finalizeAndClose();
+      }
+    }
     storageWrapper.create(
         BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
             .setMetadata(rewrittenMetadata)
@@ -450,8 +453,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setContentType(createObjectOptions.getContentType())
             .build(),
         blobTargetOptions.toArray(BlobTargetOption[]::new));
-
-    logger.atSevere().log("Dhriti_Debug: Created empty object for the zonal bucket");
   }
 
   /**
