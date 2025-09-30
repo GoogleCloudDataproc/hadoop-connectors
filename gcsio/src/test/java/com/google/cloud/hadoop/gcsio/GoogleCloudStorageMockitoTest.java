@@ -337,7 +337,7 @@ public class GoogleCloudStorageMockitoTest {
   }
 
   @Test
-  public void testCreateFolder_Success() throws IOException {
+  public void testCreateFolder_nonRecursive_Success() throws IOException {
     StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "new-folder/");
     Folder apiResponse = Folder.newBuilder().setName("folders/new-folder/").build();
 
@@ -346,7 +346,7 @@ public class GoogleCloudStorageMockitoTest {
 
     when(mockCreateFolderCallable.call(any(CreateFolderRequest.class))).thenReturn(apiResponse);
 
-    gcs.createFolder(folderId);
+    gcs.createFolder(folderId, /* recursive= */ false);
 
     ArgumentCaptor<CreateFolderRequest> requestCaptor =
         ArgumentCaptor.forClass(CreateFolderRequest.class);
@@ -358,10 +358,11 @@ public class GoogleCloudStorageMockitoTest {
     CreateFolderRequest capturedRequest = requestCaptor.getValue();
     assertThat(capturedRequest.getParent()).isEqualTo("projects/_/buckets/" + BUCKET_NAME);
     assertThat(capturedRequest.getFolderId()).isEqualTo("new-folder/");
+    assertThat(capturedRequest.getRecursive()).isFalse();
   }
 
   @Test
-  public void testCreateFolder_alreadyExists_isRethrownAsFileAlreadyExists() {
+  public void testCreateFolder_nonRecursive_alreadyExists_isRethrownAsFileAlreadyExists() {
     StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "existing-folder/");
 
     // Stub the stub to return the mock callable.
@@ -372,7 +373,7 @@ public class GoogleCloudStorageMockitoTest {
         .thenThrow(mockAlreadyExistsException);
 
     FileAlreadyExistsException exception =
-        assertThrows(FileAlreadyExistsException.class, () -> gcs.createFolder(folderId));
+        assertThrows(FileAlreadyExistsException.class, () -> gcs.createFolder(folderId, false));
 
     assertThat(exception.getCause()).isEqualTo(mockAlreadyExistsException);
     assertThat(exception.getMessage()).contains("already exists");
@@ -382,17 +383,72 @@ public class GoogleCloudStorageMockitoTest {
   }
 
   @Test
-  public void testCreateFolder_permissionDenied_isRethrown() {
+  public void testCreateFolder_nonRecursive_permissionDenied_isRethrown() {
     StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "protected-folder/");
     when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
     when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
         .thenThrow(mockPermissionDeniedException);
 
     PermissionDeniedException exception =
-        assertThrows(PermissionDeniedException.class, () -> gcs.createFolder(folderId));
+        assertThrows(PermissionDeniedException.class, () -> gcs.createFolder(folderId, false));
 
     assertThat(exception).isEqualTo(mockPermissionDeniedException);
     verify(mockStorageControlStub).createFolderCallable();
+  }
+
+  @Test
+  public void testCreateFolder_recursive_Success() throws IOException {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "a/b/c/");
+    Folder apiResponse = Folder.newBuilder().setName("folders/a/b/c/").build();
+
+    when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
+    when(mockCreateFolderCallable.call(any(CreateFolderRequest.class))).thenReturn(apiResponse);
+
+    gcs.createFolder(folderId, /* recursive= */ true);
+
+    ArgumentCaptor<CreateFolderRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateFolderRequest.class);
+
+    verify(mockStorageControlStub).createFolderCallable();
+    verify(mockCreateFolderCallable).call(requestCaptor.capture());
+
+    CreateFolderRequest capturedRequest = requestCaptor.getValue();
+    assertThat(capturedRequest.getParent()).isEqualTo("projects/_/buckets/" + BUCKET_NAME);
+    assertThat(capturedRequest.getFolderId()).isEqualTo("a/b/c/");
+    assertThat(capturedRequest.getRecursive()).isTrue();
+  }
+
+  @Test
+  public void testCreateFolder_recursive_alreadyExists_isRethrownAsFileAlreadyExists()
+      throws IOException {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "existing-folder/");
+
+    when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
+    when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
+        .thenThrow(mockAlreadyExistsException);
+
+    assertThrows(
+        FileAlreadyExistsException.class, () -> gcs.createFolder(folderId, /* recursive= */ true));
+
+    verify(mockStorageControlStub).createFolderCallable();
+    verify(mockCreateFolderCallable).call(any(CreateFolderRequest.class));
+  }
+
+  @Test
+  public void testCreateFolder_recursive_permissionDenied_isRethrown() {
+    StorageResourceId folderId = new StorageResourceId(BUCKET_NAME, "a/b/protected/");
+
+    when(mockStorageControlStub.createFolderCallable()).thenReturn(mockCreateFolderCallable);
+    when(mockCreateFolderCallable.call(any(CreateFolderRequest.class)))
+        .thenThrow(mockPermissionDeniedException);
+
+    PermissionDeniedException exception =
+        assertThrows(PermissionDeniedException.class, () -> gcs.createFolder(folderId, true));
+
+    assertThat(exception).isEqualTo(mockPermissionDeniedException);
+
+    verify(mockStorageControlStub).createFolderCallable();
+    verify(mockCreateFolderCallable).call(any(CreateFolderRequest.class));
   }
 
   @Test
