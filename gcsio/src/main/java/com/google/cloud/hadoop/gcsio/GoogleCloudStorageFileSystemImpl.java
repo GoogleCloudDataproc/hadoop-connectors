@@ -1015,20 +1015,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     boolean isHnBucket = isHnsOptimized(path);
 
+    ExecutorService executor = options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor;
     Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
-        (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
-            .submit(
-                () ->
-                    dirId.isRoot()
-                        ? gcs.listBucketInfo()
-                        : gcs.listObjectInfo(
-                            dirId.getBucketName(),
-                            dirId.getObjectName(),
-                            updateListObjectOptions(
-                                isHnBucket
-                                    ? LIST_OPTIONS_INCLUDE_FOLDERS
-                                    : LIST_FILE_INFO_LIST_OPTIONS,
-                                listOptions)));
+        executor.submit(() -> listDirectory(dirId, isHnBucket, listOptions));
 
     if (!pathId.isDirectory()) {
       try {
@@ -1114,6 +1103,18 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     FileInfo fileInfo = FileInfo.fromItemInfo(gcs.getItemInfo(resourceId));
     logger.atFiner().log("getFileInfoObject(path: %s): %s", path, fileInfo);
     return fileInfo;
+  }
+
+  private List<GoogleCloudStorageItemInfo> listDirectory(
+      StorageResourceId dirId, boolean isHnBucket, ListFileOptions listOptions) throws IOException {
+    if (dirId.isRoot()) {
+      return gcs.listBucketInfo();
+    }
+    return gcs.listObjectInfo(
+        dirId.getBucketName(),
+        dirId.getObjectName(),
+        updateListObjectOptions(
+            isHnBucket ? LIST_OPTIONS_INCLUDE_FOLDERS : LIST_FILE_INFO_LIST_OPTIONS, listOptions));
   }
 
   private GoogleCloudStorageItemInfo getFileInfoInternal(
