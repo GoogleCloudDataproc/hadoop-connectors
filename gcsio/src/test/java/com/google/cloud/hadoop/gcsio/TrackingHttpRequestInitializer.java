@@ -96,10 +96,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?maxResults=5000&project=%s";
 
   private static final String LIST_REQUEST_FORMAT =
-      "GET:"
-          + GOOGLEAPIS_ENDPOINT
-          + "/storage/v1/b/%s/o?%sfields=items(%s),prefixes,nextPageToken"
-          + "%s&maxResults=%d%s";
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o";
 
   private static final String LIST_SIMPLE_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o?maxResults=%d&prefix=%s";
@@ -527,7 +524,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         OBJECT_FIELDS,
         maxResults,
         pageToken,
-        startOffset);
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestWithStartOffset(
@@ -540,7 +538,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         OBJECT_FIELDS,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken,
-        startOffset);
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestWithStartOffset(
@@ -553,7 +552,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         fields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken,
-        startOffset);
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestString(
@@ -586,7 +586,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         objectFields,
         maxResults,
         pageToken,
-        /* startOffset */ null);
+        /* startOffset */ null,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestString(
@@ -604,7 +605,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         objectFields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken,
-        /* startOffset */ null);
+        /* startOffset */ null,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestString(
@@ -615,24 +617,39 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String objectFields,
       int maxResults,
       String pageToken,
-      String startOffset) {
-    String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
-    extraParams += prefix == null ? "" : "&prefix=" + prefix;
-    extraParams += startOffset == null ? "" : "&startOffset=" + startOffset;
-    return String.format(
-        LIST_REQUEST_FORMAT,
-        bucket,
-        flatList ? "" : "delimiter=/&",
-        objectFields,
-        includeTrailingDelimiter == null
-            ? ""
-            : "&includeTrailingDelimiter=" + includeTrailingDelimiter,
-        maxResults,
-        extraParams);
+      String startOffset,
+      Boolean includeFoldersAsPrefixes) {
+
+    String baseUrl = String.format(LIST_REQUEST_FORMAT, bucket);
+
+    List<String> params = new ArrayList<>();
+    if (!flatList) {
+      params.add("delimiter=/");
+    }
+    params.add("fields=items(" + objectFields + "),prefixes,nextPageToken");
+
+    addIfNotnull(params, "includeFoldersAsPrefixes", includeFoldersAsPrefixes);
+    addIfNotnull(params, "includeTrailingDelimiter", includeTrailingDelimiter);
+
+    params.add("maxResults=" + maxResults);
+
+    addIfNotnull(params, "pageToken", pageToken);
+    addIfNotnull(params, "prefix", prefix);
+
+    addIfNotnull(params, "startOffset=", startOffset);
+
+    return baseUrl + "?" + String.join("&", params);
   }
 
   public static String createBucketRequestString(String projectId) {
     return String.format(CREATE_BUCKET_REQUEST_FORMAT, projectId);
+  }
+
+  /** Adds a key-value pair to the list of parameters if the value is not null. */
+  private static void addIfNotnull(List<String> params, String key, Object value) {
+    if (value != null) {
+      params.add(key + "=" + value);
+    }
   }
 
   private static String urlEncode(String string) {
