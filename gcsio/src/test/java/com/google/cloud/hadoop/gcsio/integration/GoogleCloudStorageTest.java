@@ -1728,7 +1728,7 @@ public class GoogleCloudStorageTest {
     rawStorage.deleteObjects(ImmutableList.of(folderId));
     assertThat(rawStorage.getItemInfo(folderId).exists()).isFalse();
 
-    rawStorage.createFolder(folderId);
+    rawStorage.createFolder(folderId, false);
 
     GoogleCloudStorageItemInfo folderInfo = rawStorage.getFolderInfo(folderId);
 
@@ -1748,11 +1748,12 @@ public class GoogleCloudStorageTest {
     StorageResourceId folderId =
         new StorageResourceId(bucketName, "testCreateFolder_alreadyExists/");
 
-    rawStorage.createFolder(folderId);
+    rawStorage.createFolder(folderId, false);
     assertThat(rawStorage.getFolderInfo(folderId).exists()).isTrue();
 
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(folderId));
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> rawStorage.createFolder(folderId, false));
   }
 
   @Test
@@ -1765,7 +1766,8 @@ public class GoogleCloudStorageTest {
     assertThat(rawStorage.getItemInfo(resourceId).exists()).isTrue();
 
     assertThrows(
-        java.nio.file.FileAlreadyExistsException.class, () -> rawStorage.createFolder(resourceId));
+        java.nio.file.FileAlreadyExistsException.class,
+        () -> rawStorage.createFolder(resourceId, false));
   }
 
   @Test
@@ -1792,6 +1794,22 @@ public class GoogleCloudStorageTest {
     assertThat(genericInfo.isNativeHNSFolder()).isFalse();
 
     GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(object1);
+    assertThat(nativeFolderInfo.exists()).isFalse();
+  }
+
+  @Test
+  public void testGetFolderInfo_forPlaceholderObject_isNotFound() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId placeholderId =
+        new StorageResourceId(bucketName, "this-is-a-placeholder-folder/");
+
+    rawStorage.createEmptyObject(placeholderId);
+
+    GoogleCloudStorageItemInfo genericInfo = rawStorage.getItemInfo(placeholderId);
+    assertThat(genericInfo.exists()).isTrue();
+    assertThat(genericInfo.isNativeHNSFolder()).isFalse();
+
+    GoogleCloudStorageItemInfo nativeFolderInfo = rawStorage.getFolderInfo(placeholderId);
 
     assertThat(nativeFolderInfo.exists()).isFalse();
   }
