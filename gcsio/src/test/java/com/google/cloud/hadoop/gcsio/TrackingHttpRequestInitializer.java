@@ -582,26 +582,27 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       params.add("delimiter=/");
     }
     params.add("fields=items(" + objectFields + "),prefixes,nextPageToken");
-    params.add("includeFoldersAsPrefixes=" + includeFoldersAsPrefixes);
 
-    if (includeTrailingDelimiter != null) {
-      params.add("includeTrailingDelimiter=" + includeTrailingDelimiter);
-    }
+    addIfNotnull(params, "includeFoldersAsPrefixes", includeFoldersAsPrefixes);
+    addIfNotnull(params, "includeTrailingDelimiter", includeTrailingDelimiter);
 
     params.add("maxResults=" + maxResults);
 
-    if (pageToken != null) {
-      params.add("pageToken=" + pageToken);
-    }
+    addIfNotnull(params, "pageToken", pageToken);
+    addIfNotnull(params, "prefix", prefix);
 
-    if (prefix != null) {
-      params.add("prefix=" + prefix);
-    }
     return baseUrl + "?" + String.join("&", params);
   }
 
   public static String createBucketRequestString(String projectId) {
     return String.format(CREATE_BUCKET_REQUEST_FORMAT, projectId);
+  }
+
+  /** Adds a key-value pair to the list of parameters if the value is not null. */
+  private static void addIfNotnull(List<String> params, String key, Object value) {
+    if (value != null) {
+      params.add(key + "=" + value);
+    }
   }
 
   private static String urlEncode(String string) {

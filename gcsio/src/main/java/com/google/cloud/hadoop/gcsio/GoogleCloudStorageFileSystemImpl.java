@@ -350,21 +350,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
     if (fileInfo.isDirectory()) {
-      itemsToDelete =
-          recursive
-              ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
-              // TODO: optimize by listing just one object instead of whole page
-              //  (up to 1024 objects now)
-              : this.options.getCloudStorageOptions().isHnOptimizationEnabled()
-                  ? FileInfo.fromItemInfos(
-                      gcs.listObjectInfo(
-                          fileInfo.getItemInfo().getBucketName(),
-                          fileInfo.getItemInfo().getObjectName(),
-                          updateListObjectOptions(
-                              DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)))
-                  : listFileInfoForPrefixPage(
-                          fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
-                      .getItems();
+      itemsToDelete = getItemsToDelete(fileInfo, recursive);
 
       /*TODO : making listing of folder and object resources in parallel*/
       if (isHnBucket) {
@@ -407,6 +393,23 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     if (!isHnsOptimized(path)) {
       repairImplicitDirectory(parentInfoFuture);
     }
+  }
+
+  private List<FileInfo> getItemsToDelete(FileInfo fileInfo, boolean recursive) throws IOException {
+    if (recursive) {
+      return listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS);
+    }
+    if (this.options.getCloudStorageOptions().isHnOptimizationEnabled()) {
+      return FileInfo.fromItemInfos(
+          gcs.listObjectInfo(
+              fileInfo.getItemInfo().getBucketName(),
+              fileInfo.getItemInfo().getObjectName(),
+              updateListObjectOptions(
+                  DIRECTORY_EMPTINESS_CHECK_OPTIONS, DELETE_RENAME_LIST_OPTIONS)));
+    }
+    return listFileInfoForPrefixPage(
+            fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+        .getItems();
   }
 
   /**
@@ -1045,10 +1048,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
-      if (isHnsOptimized(path)) {
-        if (gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true)).exists()) {
-          return FileInfo.fromItemInfos(dirItemInfos);
-        }
+      if (isHnsOptimized(path)
+          && gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true)).exists()) {
+        return FileInfo.fromItemInfos(dirItemInfos);
       }
       GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException("Item not found: " + path);
