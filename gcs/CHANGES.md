@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade google-cloud-storage to 2.46.0
 
 ## 2.2.29 - 2025-09-29
 1. Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel.
