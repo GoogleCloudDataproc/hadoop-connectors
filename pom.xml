@@ -336,18 +336,6 @@
         <version>${google.guava.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-iam-v1</artifactId>
-        <version>${google.api.grpc.proto-google-iam-v1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-bom</artifactId>
-        <version>${google.protobuf.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
         <groupId>com.google.flogger</groupId>
         <artifactId>flogger</artifactId>
         <version>${google.flogger.version}</version>
