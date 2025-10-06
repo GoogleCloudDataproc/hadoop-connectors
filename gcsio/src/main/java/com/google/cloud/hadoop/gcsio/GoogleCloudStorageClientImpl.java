@@ -45,7 +45,9 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobAppendableUpload;
 import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
+import com.google.cloud.storage.BlobAppendableUploadConfig;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSessionConfig;
@@ -448,7 +450,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    if (getBucket(resourceId.getBucketName()).getStorageClass().toString().equals("RAPID")) {
+    if (getBucket(resourceId.getBucketName()).getStorageClass().equals("RAPID")) {
+      logger.atSevere().log("Dhriti_Debug: Creating empty object with zonal bucket");
       BlobAppendableUpload upload =
           storageWrapper.blobAppendableUpload(
               BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
@@ -461,14 +464,19 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
         channel.finalizeAndClose();
       }
+      logger.atSevere().log("Dhriti_Debug: Created empty object for the zonal bucket");
+    } else {
+      logger.atSevere().log("Dhriti_Debug: Creating empty object with regional buckets");
+      storageWrapper.create(
+          BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+              .setMetadata(rewrittenMetadata)
+              .setContentEncoding(createObjectOptions.getContentEncoding())
+              .setContentType(createObjectOptions.getContentType())
+              .build(),
+          blobTargetOptions.toArray(BlobTargetOption[]::new));
+
+      logger.atSevere().log("Dhriti_Debug: Created empty object for the regional bucket");
     }
-    storageWrapper.create(
-        BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-            .setMetadata(rewrittenMetadata)
-            .setContentEncoding(createObjectOptions.getContentEncoding())
-            .setContentType(createObjectOptions.getContentType())
-            .build(),
-        blobTargetOptions.toArray(BlobTargetOption[]::new));
   }
 
   /**
@@ -1185,7 +1193,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
    * @throws IOException if the bucket exists but cannot be accessed
    */
   @Nullable
-  private Bucket getBucket(String bucketName) throws IOException {
+  public Bucket getBucket(String bucketName) throws IOException {
     logger.atFiner().log("getBucket(%s)", bucketName);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     try {
