@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Update documentation
 
 ## 3.0.12 - 2025-09-26
 1. Enable move by default
