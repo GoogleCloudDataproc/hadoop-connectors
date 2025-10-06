@@ -2,6 +2,7 @@
 
 ## Next
 1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayou
+1. Update documentation
 
 ## 3.1.8 - 2025-09-26
 1. PR #1511 - [Feature] Storage Client Caching for downscoped token
