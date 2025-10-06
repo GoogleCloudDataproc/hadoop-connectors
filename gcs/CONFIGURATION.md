@@ -545,7 +545,7 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
     If true, the connector will use native HNS APIs for `rename` and `delete` operations
     on Hierarchical Namespace (HNS) enabled buckets. This includes using the `renameFolder` API for directory renames
-    and deleting native folders during `delete operations.
+    and deleting native folders during `delete` operations.
 
 * `fs.gs.hierarchical.namespace.folders.optimization.enable` (default: `false`)
 
