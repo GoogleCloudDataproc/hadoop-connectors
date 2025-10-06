@@ -636,7 +636,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     addIfNotnull(params, "pageToken", pageToken);
     addIfNotnull(params, "prefix", prefix);
 
-    addIfNotnull(params, "startOffset=", startOffset);
+    addIfNotnull(params, "startOffset", startOffset);
 
     return baseUrl + "?" + String.join("&", params);
   }

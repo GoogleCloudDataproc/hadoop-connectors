@@ -1292,6 +1292,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                   dirObject + "/d1/",
                   "bucket,name,generation",
                   /* maxResults= */ 2,
+                  /* startOffset */ null,
                   /* pageToken= */ null,
                   /* includeFoldersAsPrefixes= */ true),
               getRequestString(bucketName, dirObject + "/"),

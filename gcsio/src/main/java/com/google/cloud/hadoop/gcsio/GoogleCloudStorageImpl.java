@@ -81,8 +81,10 @@ import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.storage.control.v2.CreateFolderRequest;
 import com.google.storage.control.v2.Folder;
 import com.google.storage.control.v2.FolderName;
+import com.google.storage.control.v2.GetFolderRequest;
 import com.google.storage.control.v2.ListFoldersRequest;
 import com.google.storage.control.v2.RenameFolderRequest;
 import com.google.storage.control.v2.StorageControlClient;
@@ -1507,7 +1509,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             startOffset,
             listOptions.getFields(),
             /* delimiter */ null,
-            maxResults);
+            maxResults,
+            listOptions.isIncludeFoldersAsPrefixes());
     String pageToken = null;
     LinkedList<StorageObject> listedObjects = new LinkedList<>();
     // paginated call is required because we may filter all the items, if they are "directory"
