@@ -44,16 +44,7 @@ import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.*;
-import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.BlobAppendableUpload;
 import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
-import com.google.cloud.storage.BlobAppendableUploadConfig;
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.BlobWriteSessionConfig;
-import com.google.cloud.storage.BlobWriteSessionConfigs;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.BucketInfo.HierarchicalNamespace;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleAction;
 import com.google.cloud.storage.BucketInfo.LifecycleRule.LifecycleCondition;
@@ -450,7 +441,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    if (getBucket(resourceId.getBucketName()).getStorageClass().equals("RAPID")) {
+    logger.atSevere().log(
+        "Dhriti_Debug: Storage Class is: %s",
+        getBucket(resourceId.getBucketName()).getStorageClass().toString().toUpperCase());
+    if (getBucket(resourceId.getBucketName())
+        .getStorageClass()
+        .toString()
+        .toUpperCase()
+        .equals("RAPID")) {
       logger.atSevere().log("Dhriti_Debug: Creating empty object with zonal bucket");
       BlobAppendableUpload upload =
           storageWrapper.blobAppendableUpload(
