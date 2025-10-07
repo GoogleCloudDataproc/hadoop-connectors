@@ -441,9 +441,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    logger.atSevere().log(
-        "Dhriti_Debug: Storage Class is: %s",
-        getBucket(resourceId.getBucketName()).getStorageClass().toString().toUpperCase());
     if (getBucket(resourceId.getBucketName())
         .getStorageClass()
         .toString()

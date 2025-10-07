@@ -46,7 +46,7 @@ License for the specific language governing permissions and limitations under th
     <google.api-iamcredentials.version>v1-rev20211203-${google.api-client-libraries.version}</google.api-iamcredentials.version>
     <google.api-storage.version>v1-rev20250312-${google.api-client-libraries.version}</google.api-storage.version>
     <google.auto-value.version>1.10.4</google.auto-value.version>
-    <google.cloud.library.bom.version>26.64.0</google.cloud.library.bom.version>
+    <google.cloud.library.bom.version>26.69.0</google.cloud.library.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
     <google.guava.version>33.1.0-jre</google.guava.version>
