@@ -26,6 +26,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -106,7 +107,10 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
   public int write(ByteBuffer src) throws IOException {
     if (!open) throw new ClosedChannelException();
     checkNotNull(src, "Source ByteBuffer (src) cannot be null");
-    return gcsAppendChannel.write(src);
+    // return gcsAppendChannel.write(src);
+
+    int written = blockingEmptyTo(src, gcsAppendChannel);
+    return written;
   }
 
   @Override
@@ -135,5 +139,16 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
     }
 
     gcsAppendChannel.finalizeAndClose();
+  }
+
+  private static int blockingEmptyTo(ByteBuffer buf, WritableByteChannel c) throws IOException {
+    int total = 0;
+    while (buf.hasRemaining()) {
+      int written = c.write(buf);
+      if (written != 0) {
+        total += written;
+      }
+    }
+    return total;
   }
 }
