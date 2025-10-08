@@ -457,7 +457,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               BlobAppendableUploadConfig.of(),
               Storage.BlobWriteOption.doesNotExist());
       try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
-        channel.write(java.nio.ByteBuffer.wrap(new byte[] { 'a' }));
+        channel.write(java.nio.ByteBuffer.wrap(new byte[] {'a'}));
         channel.finalizeAndClose();
       }
       logger.atSevere().log("Dhriti_Debug: Created empty object for the zonal bucket");
