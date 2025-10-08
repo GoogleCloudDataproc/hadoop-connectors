@@ -94,9 +94,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Parameters(name = "clientType={0}, bidiEnabled={1}")
   public static Collection<Object[]> getParameters() {
     return List.of(
+        new Object[] {ClientType.STORAGE_CLIENT, true},
         new Object[] {ClientType.HTTP_API_CLIENT, false},
-        new Object[] {ClientType.STORAGE_CLIENT, false},
-        new Object[] {ClientType.STORAGE_CLIENT, true});
+        new Object[] {ClientType.STORAGE_CLIENT, false});
   }
 
   /** Perform initialization once before tests are run. */
