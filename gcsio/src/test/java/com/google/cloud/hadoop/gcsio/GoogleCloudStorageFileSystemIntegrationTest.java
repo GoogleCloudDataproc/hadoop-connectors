@@ -1724,8 +1724,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   @Test
   public void testComposeSuccess() throws IOException {
-    if(bidiEnabled)
-    {
+    if (bidiEnabled) {
       return;
     }
     String bucketName = sharedBucketName1;
