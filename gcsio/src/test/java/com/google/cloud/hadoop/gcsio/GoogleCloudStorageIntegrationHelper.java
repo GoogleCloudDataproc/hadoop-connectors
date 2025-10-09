@@ -27,10 +27,15 @@ import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.Iterables;
+import com.google.common.flogger.GoogleLogger;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -47,6 +52,7 @@ import java.util.concurrent.TimeUnit;
 
 /** Integration tests for GoogleCloudStorage class. */
 public abstract class GoogleCloudStorageIntegrationHelper {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Prefix used for naming test buckets.
   public static final String TEST_BUCKET_NAME_PREFIX = "dataproc-gcs-gcsio";
@@ -505,5 +511,49 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     String bucketName = getUniqueBucketName(suffix);
     gcs.createBucket(bucketName, options);
     return bucketName;
+  }
+
+  public String createUniqueZonalOrRegionalBucket(String suffix, boolean isBucketZonal)
+      throws IOException {
+    if (!isBucketZonal) {
+      return createUniqueBucket(suffix);
+    } else {
+      logger.atSevere().log("Creating zonal bucket for bidi integration test");
+
+      String zone = "us-central1-a"; // Default zone
+      String region = "us-central1"; // Default region
+
+      try {
+        URL metadataServerUrl =
+            new URL("http://metadata.google.internal/computeMetadata/v1/instance/zone");
+        HttpURLConnection connection = (HttpURLConnection) metadataServerUrl.openConnection();
+        connection.setRequestProperty("Metadata-Flavor", "Google");
+        connection.setConnectTimeout(5000); // 5-second connection timeout
+        connection.setReadTimeout(5000); // 5-second read timeout
+
+        try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+          String response = reader.readLine();
+          // The response is in the format "projects/PROJECT_NUMBER/zones/ZONE"
+          String[] parts = response.split("/");
+          String fullZone = parts[parts.length - 1];
+          zone = fullZone;
+          region = fullZone.substring(0, fullZone.lastIndexOf('-'));
+          logger.atSevere().log("Successfully detected GCE zone: %s and region: %s", zone, region);
+        }
+      } catch (IOException e) {
+        logger.atSevere().log(
+            "Failed to get GCE zone from metadata server. Falling back to default region '%s' and zone '%s'.",
+            region, zone);
+      }
+
+      CreateBucketOptions zonalBucketOptions =
+          CreateBucketOptions.builder()
+              .setLocation(region)
+              .setZonalPlacement(zone)
+              .setHierarchicalNamespaceEnabled(true)
+              .build();
+      return createUniqueBucket(suffix, zonalBucketOptions);
+    }
   }
 }

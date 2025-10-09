@@ -35,13 +35,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
-import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -156,48 +152,12 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Perform initialization after creating test instances. */
   public void postCreateInit(GoogleCloudStorageFileSystemIntegrationHelper helper)
       throws IOException {
-
     gcsiHelper = helper;
     if (bidiEnabled && gcsiHelper.gcsfs.getGcs() instanceof GoogleCloudStorageClientImpl) {
-      logger.atSevere().log("Creating zonal bucket for bidi integration test");
-
-      String zone = "us-central1-a"; // Default zone
-      String region = "us-central1"; // Default region
-
-      try {
-        URL metadataServerUrl =
-            new URL("http://metadata.google.internal/computeMetadata/v1/instance/zone");
-        HttpURLConnection connection = (HttpURLConnection) metadataServerUrl.openConnection();
-        connection.setRequestProperty("Metadata-Flavor", "Google");
-        connection.setConnectTimeout(5000); // 5-second connection timeout
-        connection.setReadTimeout(5000); // 5-second read timeout
-
-        try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-          String response = reader.readLine();
-          // The response is in the format "projects/PROJECT_NUMBER/zones/ZONE"
-          String[] parts = response.split("/");
-          String fullZone = parts[parts.length - 1];
-          zone = fullZone;
-          region = fullZone.substring(0, fullZone.lastIndexOf('-'));
-          logger.atSevere().log("Successfully detected GCE zone: %s and region: %s", zone, region);
-        }
-      } catch (IOException e) {
-        logger.atSevere().log(
-            "Failed to get GCE zone from metadata server. Falling back to default region '%s' and zone '%s'.",
-            region, zone);
-      }
-
-      CreateBucketOptions zonalBucketOptions =
-          CreateBucketOptions.builder()
-              .setLocation(region)
-              .setZonalPlacement(zone)
-              .setHierarchicalNamespaceEnabled(true)
-              .build();
       gcsiHelper.sharedBucketName1 =
-          gcsiHelper.createUniqueBucket("zonal-shared-1", zonalBucketOptions);
+          gcsiHelper.createUniqueZonalOrRegionalBucket("zonal-shared-1", bidiEnabled);
       gcsiHelper.sharedBucketName2 =
-          gcsiHelper.createUniqueBucket("zonal-shared-2", zonalBucketOptions);
+          gcsiHelper.createUniqueZonalOrRegionalBucket("zonal-shared-2", bidiEnabled);
     } else {
       gcsiHelper.beforeAllTests();
     }
@@ -466,7 +426,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String testBucket = gcsiHelper.createUniqueBucket("list");
+    String testBucket = gcsiHelper.createUniqueZonalOrRegionalBucket("list", bidiEnabled);
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
@@ -559,7 +519,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String testBucket = gcsiHelper.createUniqueBucket("list");
+    String testBucket = gcsiHelper.createUniqueZonalOrRegionalBucket("list", bidiEnabled);
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
@@ -698,7 +658,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // The same set of objects are also created under a bucket that
     // we will delete as a part of the test.
-    String tempBucket = gcsiHelper.createUniqueBucket("delete");
+    String tempBucket = gcsiHelper.createUniqueZonalOrRegionalBucket("delete", bidiEnabled);
     gcsiHelper.createObjectsWithSubdirs(tempBucket, objectNames);
 
     // -------------------------------------------------------

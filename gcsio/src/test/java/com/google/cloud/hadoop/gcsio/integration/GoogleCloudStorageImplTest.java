@@ -49,6 +49,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
@@ -74,6 +75,8 @@ import org.junit.runners.Parameterized.Parameters;
 /** Tests that require a particular configuration of GoogleCloudStorageImpl. */
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private TestBucketHelper bucketHelper;
   private String testBucket;
@@ -125,6 +128,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void open_lazyInit_whenFastFailOnNotFound_isFalse() throws IOException {
+    logger.atSevere().log("Ran Test: open_lazyInit_whenFastFailOnNotFound_isFalse");
     int expectedSize = 5 * 1024 * 1024;
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
@@ -158,6 +162,8 @@ public class GoogleCloudStorageImplTest {
    */
   @Test
   public void writeObject_withGrpcWriteDisabled() throws IOException {
+    logger.atSevere().log("Ran Test: writeObject_withGrpcWriteDisabled");
+
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
     int uploadChunkSize = 2 * 1024 * 1024;
@@ -206,6 +212,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void moveObject_successful() throws IOException {
+    logger.atSevere().log("Ran Test: moveObject_successful");
+
     int expectedSize = 5 * 1024 * 1024;
     StorageResourceId srcResourceId =
         new StorageResourceId(testBucket, name.getMethodName() + "_src.txt");
@@ -252,6 +260,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void moveObject_sourceAndDestinationSame_throwsError() throws IOException {
+    logger.atSevere().log("Ran Test: moveObject_sourceAndDestinationSame_throwsError");
     StorageResourceId resourceId =
         new StorageResourceId(testBucket, name.getMethodName() + "_samesrcdst.txt");
 
@@ -277,6 +286,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void moveObject_differentBuckets_throwsError() throws IOException {
+    logger.atSevere().log("Ran Test: moveObject_differentBuckets_throwsError");
+
     StorageResourceId srcResourceId =
         new StorageResourceId(testBucket, name.getMethodName() + "_src_diffbuckets.txt");
     // Create a unique name for the other bucket to avoid conflicts if it were created.
@@ -305,6 +316,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void moveObject_sourceNotFound_throwsError() throws IOException {
+    logger.atSevere().log("Ran Test: moveObject_sourceNotFound_throwsError");
+
     StorageResourceId srcResourceId =
         new StorageResourceId(testBucket, name.getMethodName() + "_src_notfound.txt");
     StorageResourceId dstResourceId =
@@ -352,6 +365,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void open_withItemInfo() throws IOException {
+    logger.atSevere().log("Ran Test: open_withItemInfo");
+
     int expectedSize = 5 * 1024 * 1024;
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
@@ -373,6 +388,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void writeLargeObject_withSmallUploadChunk() throws IOException {
+    logger.atSevere().log("Ran Test: writeLargeObject_withSmallUploadChunk");
+
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
     int uploadChunkSize = 2 * 1024 * 1024;
@@ -401,6 +418,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void getStatistics_writeReadDeleteLargeObject() throws IOException {
+    logger.atSevere().log("Ran Test: getStatistics_writeReadDeleteLargeObject");
+
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
@@ -449,6 +468,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void writeObject_withNonAlignedUploadChunk() throws IOException {
+    logger.atSevere().log("Ran Test: writeObject_withNonAlignedUploadChunk");
+
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
 
     int uploadChunkSize = 2 * 1024 * 1024;
@@ -475,6 +496,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void conflictingWrites_noOverwrite_lastFails() throws IOException {
+    logger.atSevere().log("Ran Test: conflictingWrites_noOverwrite_lastFails");
+
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
     int uploadChunkSize = 2 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
@@ -532,6 +555,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void create_doesNotRepairImplicitDirectories() throws IOException {
+    logger.atSevere().log("Ran Test: create_doesNotRepairImplicitDirectories");
+
     String testDirectory = name.getMethodName();
     StorageResourceId resourceId = new StorageResourceId(testBucket, testDirectory + "/obj");
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
@@ -554,8 +579,10 @@ public class GoogleCloudStorageImplTest {
     assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
         .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
+    // Updated assertion to include the GetBucket call
     assertThat(trackingGcs.getAllRequestStrings())
         .containsExactly(
+            getBucketRequestString(resourceId.getBucketName()),
             emptyUploadRequestString(
                 resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl));
     trackingGcs.delegate.close();
@@ -563,6 +590,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void create_correctlySetsContentType() throws IOException {
+    logger.atSevere().log("Ran Test: create_correctlySetsContentType");
+
     StorageResourceId resourceId1 =
         new StorageResourceId(testBucket, name.getMethodName() + "_obj1");
     StorageResourceId resourceId2 =
@@ -655,6 +684,8 @@ public class GoogleCloudStorageImplTest {
   @Ignore("Test is failing")
   @Test
   public void copy_withRewrite_multipleRequests() throws IOException {
+    logger.atSevere().log("Ran Test: copy_withRewrite_multipleRequests");
+
     int maxRewriteChunkSize = 256 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(
@@ -719,6 +750,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void create_gcsItemInfo_metadataEquals() throws IOException {
+    logger.atSevere().log("Ran Test: create_gcsItemInfo_metadataEquals");
+
     StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
@@ -772,6 +805,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void tracelog_enabled() throws IOException {
+    logger.atSevere().log("Ran Test: tracelog_enabled");
+
     if (!testStorageClientImpl) {
       doTestTraceLog(true, 3, 5);
     }
@@ -779,6 +814,8 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void tracelog_disabled() throws IOException {
+    logger.atSevere().log("Ran Test: tracelog_disabled");
+
     doTestTraceLog(false, 0, 0);
   }
 
