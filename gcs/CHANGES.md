@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.9 - 2025-10-09
 1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayout
 2. Added HNS-optimizations for mkdir, getFileInfo,list,rename and delete.
 3. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
