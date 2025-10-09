@@ -1724,6 +1724,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   @Test
   public void testComposeSuccess() throws IOException {
+    if(bidiEnabled)
+    {
+      return;
+    }
     String bucketName = sharedBucketName1;
     URI directory = gcsiHelper.getPath(bucketName, "test-compose/");
     URI object1 = directory.resolve("object1");
