@@ -43,6 +43,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -80,8 +81,10 @@ import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.storage.control.v2.CreateFolderRequest;
 import com.google.storage.control.v2.Folder;
 import com.google.storage.control.v2.FolderName;
+import com.google.storage.control.v2.GetFolderRequest;
 import com.google.storage.control.v2.ListFoldersRequest;
 import com.google.storage.control.v2.RenameFolderRequest;
 import com.google.storage.control.v2.StorageControlClient;
@@ -1506,7 +1509,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             startOffset,
             listOptions.getFields(),
             /* delimiter */ null,
-            maxResults);
+            maxResults,
+            listOptions.isIncludeFoldersAsPrefixes());
     String pageToken = null;
     LinkedList<StorageObject> listedObjects = new LinkedList<>();
     // paginated call is required because we may filter all the items, if they are "directory"
@@ -1583,7 +1587,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             /* startOffset */ null,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            maxResults);
+            maxResults,
+            listOptions.isIncludeFoldersAsPrefixes());
 
     String pageToken = null;
     int page = 0;
@@ -1742,11 +1747,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String startOffset,
       String objectFields,
       String delimiter,
-      long maxResults)
+      long maxResults,
+      boolean includeFoldersAsPrefixes)
       throws IOException {
     logger.atFiner().log(
-        "createListRequest(%s, %s, %s, %s, %d)",
-        bucketName, objectNamePrefix, objectFields, delimiter, maxResults);
+        "createListRequest(%s, %s, %s, %s, %d, %b)",
+        bucketName,
+        objectNamePrefix,
+        objectFields,
+        delimiter,
+        maxResults,
+        includeFoldersAsPrefixes);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject =
@@ -1762,6 +1773,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (delimiter != null) {
       listObject.setDelimiter(delimiter).setIncludeTrailingDelimiter(true);
     }
+
+    listObject.setIncludeFoldersAsPrefixes(includeFoldersAsPrefixes);
 
     // Set number of items to retrieve per call.
     listObject.setMaxResults(
@@ -1854,7 +1867,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             /* startOffset */ null,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            listOptions.getMaxResults());
+            listOptions.getMaxResults(),
+            listOptions.isIncludeFoldersAsPrefixes());
     if (pageToken != null) {
       logger.atFiner().log("listObjectInfoPage: next page %s", pageToken);
       listObject.setPageToken(pageToken);
@@ -2550,6 +2564,78 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return this.storageControlClient;
   }
 
+  /**
+   * See {@link GoogleCloudStorage#getFolderInfo(StorageResourceId)} for details about expected
+   * behavior.
+   */
+  @Override
+  public GoogleCloudStorageItemInfo getFolderInfo(StorageResourceId resourceId) throws IOException {
+    logger.atInfo().log("getFolderInfo(%s)", resourceId);
+
+    // If the provided resource ID is for a bucket, retrieve its information directly.
+    if (resourceId.isBucket()) {
+      Bucket bucket = getBucket(resourceId.getBucketName());
+      if (bucket != null) {
+        return createItemInfoForBucket(resourceId, bucket);
+      }
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+
+    GetFolderRequest request =
+        GetFolderRequest.newBuilder()
+            .setName(FolderName.format("_", resourceId.getBucketName(), resourceId.getObjectName()))
+            .build();
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.get")) {
+      Folder folder = lazyGetStorageControlClient().getFolder(request);
+      return GoogleCloudStorageItemInfo.createFolder(resourceId, folder);
+    } catch (Exception e) {
+      // Any exception, including NotFound or PermissionDenied, is treated as not found.
+      // This is intentional. The primary caller of this method, getFileInfo(),
+      // relies on this behavior to trigger its fallback logic which uses a different
+      // method (getFileInfoInternal) to check for the file.
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#createFolder(StorageResourceId,boolean)} for details about
+   * expected behavior.
+   */
+  @Override
+  public void createFolder(StorageResourceId resourceId, boolean recursive) throws IOException {
+    logger.atInfo().log("createFolder(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    String bucketName = resourceId.getBucketName();
+
+    // Format the bucket name into the fully-qualified resource name
+    // that the StorageControlClient API requires.
+    String parentResourceName = String.format("projects/_/buckets/%s", bucketName);
+
+    // Build the request with the correctly formatted parent name.
+    CreateFolderRequest request =
+        CreateFolderRequest.newBuilder()
+            .setFolderId(resourceId.getObjectName())
+            .setParent(parentResourceName)
+            .setRecursive(recursive)
+            .build();
+    // Add the tracing wrapper
+    try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.folders.create")) {
+      logger.atFine().log("Create folder: %s%n", resourceId);
+      Folder newFolder = lazyGetStorageControlClient().createFolder(request);
+      logger.atFine().log("Created folder: %s%n", newFolder.getName());
+    } catch (AlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw (FileAlreadyExistsException)
+          new FileAlreadyExistsException(String.format("Folder '%s' already exists.", resourceId))
+              .initCause(e);
+    } catch (Throwable t) {
+      logger.atSevere().withCause(t).log("CreateFolder for %s failed", resourceId);
+      throw t;
+    }
+  }
+
   @Override
   public void renameHnFolder(URI src, URI dst) throws IOException {
     String bucketName = src.getAuthority();
@@ -2743,6 +2829,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       default:
         return false;
     }
+  }
+
+  @VisibleForTesting
+  void setStorageControlClient(StorageControlClient storageControlClient) {
+    this.storageControlClient = storageControlClient;
   }
 
   private static <RequestT extends StorageRequest<?>> void setUserProject(

@@ -1,12 +1,13 @@
 # Release Notes
 
 ## Next
-1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayou
+1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayout
+2. Added HNS-optimizations for mkdir, getFileInfo,list,rename and delete.
+3. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
 
 ## 3.1.8 - 2025-09-26
 1. PR #1511 - [Feature] Storage Client Caching for downscoped token
 2. Enable move by default.
-3. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
 
 ## 3.1.7 - 2025-09-10
 1. PR #1484 - [Feature] Enabled write checksum by default
