@@ -62,9 +62,11 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
       CreateObjectOptions createOptions,
       GoogleCloudStorageOptions storageOptions) {
     BlobAppendableUploadConfig.CloseAction closeAction =
-        storageOptions.isFinalizeBeforeClose()
-            ? BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING
-            : BlobAppendableUploadConfig.CloseAction.CLOSE_WITHOUT_FINALIZING;
+        BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING;
+    // BlobAppendableUploadConfig.CloseAction closeAction =
+    //     storageOptions.isFinalizeBeforeClose()
+    //         ? BlobAppendableUploadConfig.CloseAction.FINALIZE_WHEN_CLOSING
+    // : BlobAppendableUploadConfig.CloseAction.CLOSE_WITHOUT_FINALIZING;
     return storage.blobAppendableUpload(
         getBlobInfo(resourceId, createOptions),
         BlobAppendableUploadConfig.of().withCloseAction(closeAction),
