@@ -121,7 +121,7 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
       blobWriteOptions.add(Storage.BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
     if (storageOptions.getWriteChannelOptions().isGrpcChecksumsEnabled()) {
-      blobWriteOptions.add(Storage.BlobWriteOption.crc3cMatch());
+      blobWriteOptions.add(Storage.BlobWriteOption.crc32cMatch());
     }
     if (storageOptions.getEncryptionKey() != null) {
       blobWriteOptions.add(
