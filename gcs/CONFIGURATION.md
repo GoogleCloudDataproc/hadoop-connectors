@@ -55,6 +55,17 @@
     return `null` for that file. Supported checksum types are `NONE`, `CRC32C`
     and `MD5`
 
+*   `fs.gs.cloud.logging.enable` (default: `false`)
+
+    If `true`, exports Cloud Storage Connector logs to the GCP Logging service. The service account
+    used by the connector must have `roles/logging.logWriter` IAM permission in the GCP project
+    for this feature to work.
+
+    The logs will be labelled with the log name `gcs-connector`, which will be suffixed with the
+    value of `fs.gs.application.name.suffix` if set. For example, if
+    `fs.gs.application.name.suffix` is set to `my-app`, the log name will be
+    `gcs-connector-my-app`.
+
 *   `fs.gs.status.parallel.enable` (default: `true`)
 
     If `true`, executes Cloud Storage object requests in `FileSystem`'s
@@ -392,6 +403,25 @@ Knobs configure the vectoredRead API
 
 ### HTTP transport configuration
 
+*   `fs.gs.application.name.suffix` (not set by default)
+
+    Suffix that will be added to HTTP `User-Agent` header set in all Cloud
+    Storage requests.
+    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
+    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
+
+*   `fs.gs.proxy.address` (not set by default)
+
+    Proxy address that connector can use to send Cloud Storage requests. The
+    proxy must be an HTTP proxy and address should be in the `host:port` form.
+
+*   `fs.gs.proxy.username` (not set by default)
+
+    Proxy username that connector can use to send Cloud Storage requests.
+
+*   `fs.gs.proxy.password` (not set by default)
+
+    Proxy password that connector can use to send Cloud Storage requests.
 **Note: Retry configuration is only valid for client type=HTTP_API_CLIENT for now.**
 
 *   `fs.gs.http.max.retry` (default: `10`)

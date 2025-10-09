@@ -1,7 +1,8 @@
 # Release Notes
 
 ## Next
-1. Update documentation
+1. Added HNS optimizations for mkdir, getFileInfo, list, rename and delete.
+1. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
 
 ## 3.0.12 - 2025-09-26
 1. Enable move by default
