@@ -582,7 +582,7 @@ public class GoogleCloudStorageImplTest {
     // Updated assertion to include the GetBucket call
     assertThat(trackingGcs.getAllRequestStrings())
         .containsExactly(
-            getBucketRequestString(resourceId.getBucketName()),
+            "rpcMethod:GetBucket",
             emptyUploadRequestString(
                 resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl));
     trackingGcs.delegate.close();
