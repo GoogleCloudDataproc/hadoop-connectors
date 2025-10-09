@@ -329,7 +329,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void createFolder(StorageResourceId resourceId) throws IOException {
+  public void createFolder(StorageResourceId resourceId, boolean recursive) throws IOException {
     String bucketName = resourceId.getBucketName();
     if (!validateBucketName(bucketName)) {
       throw new IOException("Error creating folder. Invalid bucket name: " + bucketName);

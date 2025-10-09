@@ -539,6 +539,22 @@ better latency and increased bandwidth. Currently supported only for read/write 
     Maximum number of time to store a cached metadata in the performance cache
     before it's invalidated.
 
+### Hierarchical Namespace (HNS) Configuration
+
+* `fs.gs.hierarchical.namespace.folders.enable` (default: `false`)
+
+    If true, the connector will use native HNS APIs for `rename` and `delete` operations
+    on Hierarchical Namespace (HNS) enabled buckets. This includes using the `renameFolder` API for directory renames
+    and deleting native folders during `delete` operations.
+
+* `fs.gs.hierarchical.namespace.folders.optimization.enable` (default: `false`)
+
+    If true, this flag enables a set of optimizations for HNS-enabled buckets to improve performance and correctness.
+    These optimizations are only active when `fs.gs.hierarchical.namespace.folders.enable` is also set to `true`.
+    The optimizations include using native HNS folder APIs for operations like `mkdir`, `getFileInfo`, and `list`,
+    and skipping the "implicit directory repair" step for rename and delete. Enabling this flag may introduce backward
+    compatibility issues with older connector versions.
+
 ### Cloud Storage [Requester Pays](https://cloud.google.com/storage/docs/requester-pays) feature configuration:
 
 *   `fs.gs.requester.pays.mode` (default: `DISABLED`)
