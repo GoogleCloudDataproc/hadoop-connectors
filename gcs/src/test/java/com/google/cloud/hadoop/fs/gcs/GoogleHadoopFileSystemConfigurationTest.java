@@ -83,6 +83,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.write.message.timeout", 3_000L);
           put("fs.gs.grpc.write.enable", false);
           put("fs.gs.hierarchical.namespace.folders.enable", false);
+          put("fs.gs.hierarchical.namespace.folders.optimization.enable", false);
           put("fs.gs.grpc.write.timeout", 600_000L);
           put("fs.gs.http.connect-timeout", 5_000L);
           put("fs.gs.http.max.retry", 10);

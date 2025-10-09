@@ -151,6 +151,26 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+*   `fs.gs.application.name.suffix` (not set by default)
+
+    Suffix that will be added to HTTP `User-Agent` header set in all Cloud
+    Storage requests.
+    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
+    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
+
+*   `fs.gs.proxy.address` (not set by default)
+
+    Proxy address that connector can use to send Cloud Storage requests. The
+    proxy must be an HTTP proxy and address should be in the `host:port` form.
+
+*   `fs.gs.proxy.username` (not set by default)
+
+    Proxy username that connector can use to send Cloud Storage requests.
+
+*   `fs.gs.proxy.password` (not set by default)
+
+    Proxy password that connector can use to send Cloud Storage requests.
+
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
@@ -402,6 +422,7 @@ Knobs configure the vectoredRead API
 *   `fs.gs.proxy.password` (not set by default)
 
     Proxy password that connector can use to send Cloud Storage requests.
+**Note: Retry configuration is only valid for client type=HTTP_API_CLIENT for now.**
 
 *   `fs.gs.http.max.retry` (default: `10`)
 
@@ -527,6 +548,22 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
     Maximum number of time to store a cached metadata in the performance cache
     before it's invalidated.
+
+### Hierarchical Namespace (HNS) Configuration
+
+* `fs.gs.hierarchical.namespace.folders.enable` (default: `false`)
+
+    If true, the connector will use native HNS APIs for `rename` and `delete` operations
+    on Hierarchical Namespace (HNS) enabled buckets. This includes using the `renameFolder` API for directory renames
+    and deleting native folders during `delete` operations.
+
+* `fs.gs.hierarchical.namespace.folders.optimization.enable` (default: `false`)
+
+    If true, this flag enables a set of optimizations for HNS-enabled buckets to improve performance and correctness.
+    These optimizations are only active when `fs.gs.hierarchical.namespace.folders.enable` is also set to `true`.
+    The optimizations include using native HNS folder APIs for operations like `mkdir`, `getFileInfo`, and `list`,
+    and skipping the "implicit directory repair" step for rename and delete. Enabling this flag may introduce backward
+    compatibility issues with older connector versions.
 
 ### Cloud Storage [Requester Pays](https://cloud.google.com/storage/docs/requester-pays) feature configuration:
 
