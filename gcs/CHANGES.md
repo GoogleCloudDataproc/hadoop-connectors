@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.13 - 2025-10-09
 1. Added HNS optimizations for mkdir, getFileInfo, list, rename and delete.
 1. [Feature] Add support for cloud logging and prefix invocation ID to logs for correlation.
 
