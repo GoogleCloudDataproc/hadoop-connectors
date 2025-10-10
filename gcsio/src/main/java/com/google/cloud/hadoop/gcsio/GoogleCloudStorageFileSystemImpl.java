@@ -517,64 +517,56 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     mkdirsInternal(path);
   }
 
-  private void mkdirsInternal(StorageResourceId resourceId) throws IOException {
-    logger.atSevere().log("mkdirsInternal: Starting for resourceId: " + resourceId);
+  private void mkdirsInternal(URI path) throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
     if (resourceId.isRoot()) {
-      logger.atSevere().log("mkdirsInternal: resourceId is root. Returning.");
       // GCS_ROOT directory always exists, no need to go through the rest of the method.
       return;
     }
 
     // In case path is a bucket we just attempt to create it without additional checks
     if (resourceId.isBucket()) {
-      logger.atSevere().log(
-          "mkdirsInternal: resourceId is a bucket: " + resourceId.getBucketName());
       try {
-        logger.atSevere().log(
-            "mkdirsInternal: Attempting to create bucket: " + resourceId.getBucketName());
+        getBucketName(path);
         gcs.createBucket(resourceId.getBucketName());
-        logger.atSevere().log(
-            "mkdirsInternal: Successfully created bucket: " + resourceId.getBucketName());
       } catch (FileAlreadyExistsException e) {
         GoogleCloudStorageEventBus.postOnException();
         // This means that bucket already exist, and we do not need to do anything.
-        logger.atSevere().withCause(e).log(
+        logger.atFiner().withCause(e).log(
             "mkdirs: %s already exists, ignoring creation failure", resourceId);
-      } catch (IOException e) {
-        logger.atSevere().withCause(e).log(
-            "mkdirsInternal: FAILED to create bucket %s", resourceId);
-        throw e;
       }
       return;
     }
 
     resourceId = resourceId.toDirectoryId();
-    logger.atSevere().log("mkdirsInternal: Converted to directoryId: " + resourceId);
 
     // Before creating a leaf directory we need to check if there are no conflicting files
     // with the same name as any subdirectory
     if (options.isEnsureNoConflictingItems()) {
-      logger.atSevere().log("mkdirsInternal: Checking for conflicting files for: " + resourceId);
       checkNoFilesConflictingWithDirs(resourceId);
     }
 
     // Create only a leaf directory because subdirectories will be inferred
     // if leaf directory exists
+    final boolean isHns = isHnsOptimized(path);
     try {
-      logger.atSevere().log(
-          "mkdirsInternal: Attempting to create empty object for directory: " + resourceId);
-      gcs.createEmptyObject(resourceId);
-      logger.atSevere().log("mkdirsInternal: Successfully created empty object for: " + resourceId);
+      if (isHns) {
+        // Create a native folder resource directly.
+        gcs.createFolder(resourceId);
+      } else {
+        // Create an empty placeholder object to represent the directory.
+        gcs.createEmptyObject(resourceId);
+      }
     } catch (FileAlreadyExistsException e) {
       GoogleCloudStorageEventBus.postOnException();
-      // This means that directory object already exist, and we do not need to do anything.
-      logger.atSevere().withCause(e).log(
-          "mkdirs: %s already exists, ignoring creation failure", resourceId);
-    } catch (IOException e) {
-      // This block will catch the FAILED_PRECONDITION error and log it with context.
-      logger.atSevere().withCause(e).log(
-          "mkdirsInternal: FAILED to create empty object for %s", resourceId);
-      throw e;
+      // This means that directory object/native folder already exist, and we do not need to do
+      // anything.
+      String logMessage =
+          isHns
+              ? "mkdirs: Folder '%s' already exists, ignoring creation failure"
+              : "mkdirs: %s object already exists, ignoring creation failure";
+      logger.atFiner().withCause(e).log(logMessage, resourceId);
     }
   }
 
