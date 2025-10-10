@@ -821,21 +821,24 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   }
 
   /** Validates mkdirs(). */
-  // @Test
-  // public void testMkdirs() throws Exception {
-  //   mkdirsHelper(
-  //       new MkdirsBehavior() {
-  //         @Override
-  //         public MethodOutcome mkdirsRootOutcome() {
-  //           return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
-  //         }
+  @Test
+  public void testMkdirs() throws Exception {
+    if (bidiEnabled) {
+      return;
+    }
+    mkdirsHelper(
+        new MkdirsBehavior() {
+          @Override
+          public MethodOutcome mkdirsRootOutcome() {
+            return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+          }
 
-  //         @Override
-  //         public MethodOutcome fileAlreadyExistsOutcome() {
-  //           return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-  //         }
-  //       });
-  // }
+          @Override
+          public MethodOutcome fileAlreadyExistsOutcome() {
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
+        });
+  }
 
   /** Validates mkdirs(). */
   public void mkdirsHelper(MkdirsBehavior behavior) throws Exception {
