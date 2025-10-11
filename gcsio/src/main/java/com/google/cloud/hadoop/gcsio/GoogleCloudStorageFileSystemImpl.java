@@ -552,9 +552,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     final boolean isHns = isHnsOptimized(path);
     try {
       if (isHns) {
+        logger.atSevere().log("Path is an HNS Optimised bucket path");
         // Create a native folder resource directly.
         gcs.createFolder(resourceId);
       } else {
+        logger.atSevere().log("Going via a normal route path");
         // Create an empty placeholder object to represent the directory.
         gcs.createEmptyObject(resourceId);
       }
@@ -1242,6 +1244,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
   private boolean isHnsOptimized(URI path) throws IOException {
     GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
+    logger.atSevere().log("Dhriti_Debug: isHnBucket %s", gcs.isHnBucket(path));
     return gcsOptions.isHnBucketRenameEnabled()
         && gcsOptions.isHnOptimizationEnabled()
         && gcs.isHnBucket(path);

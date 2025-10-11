@@ -2476,6 +2476,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void createFolder(StorageResourceId resourceId) throws IOException {
     logger.atInfo().log("createFolder(%s)", resourceId);
+    logger.atSevere().log("Create Folder for hns with zonal bucket");
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
