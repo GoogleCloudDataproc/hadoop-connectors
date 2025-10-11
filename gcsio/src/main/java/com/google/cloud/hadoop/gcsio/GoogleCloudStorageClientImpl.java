@@ -450,7 +450,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       try {
         BlobAppendableUpload upload =
             storageWrapper.blobAppendableUpload(
-                BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                BlobInfo.newBuilder(
+                        BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
                     .setMetadata(rewrittenMetadata)
                     .setContentEncoding(createObjectOptions.getContentEncoding())
                     .setContentType(createObjectOptions.getContentType())
@@ -465,12 +466,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       } catch (IOException e) {
         // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
         if (e.getCause() instanceof StorageException
-            && ((StorageException) e.getCause()).getCode() == HttpURLConnection.HTTP_PRECON_FAILED) {
-          
+            && ((StorageException) e.getCause()).getCode()
+                == HttpURLConnection.HTTP_PRECON_FAILED) {
+
           // This is the expected error when the object already exists.
           // Translate it to the exception that the calling mkdirsInternal method expects.
-          throw new FileAlreadyExistsException(String.format(
-              "Object %s already exists (precondition failed).", resourceId));
+          throw new FileAlreadyExistsException(
+              String.format("Object %s already exists (precondition failed).", resourceId));
         } else {
           // This is a different, unexpected error (e.g., network, permissions). Re-throw it.
           throw e;
