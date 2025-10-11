@@ -1244,7 +1244,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
   private boolean isHnsOptimized(URI path) throws IOException {
     GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
-    logger.atSevere().log("Dhriti_Debug: isHnBucket %s", gcs.isHnBucket(path));
     return gcsOptions.isHnBucketRenameEnabled()
         && gcsOptions.isHnOptimizationEnabled()
         && gcs.isHnBucket(path);
