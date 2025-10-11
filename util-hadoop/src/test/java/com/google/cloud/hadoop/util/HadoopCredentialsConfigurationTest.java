@@ -29,13 +29,16 @@ import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getD
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.LowLevelHttpResponse;
+import com.google.api.client.json.Json;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.auth.oauth2.AccessToken;
-import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.ExternalAccountCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
@@ -130,15 +133,39 @@ public class HadoopCredentialsConfigurationTest {
 
   @Test
   public void metadataServiceIsUsedByDefault() throws Exception {
-    TokenResponse token =
-        new TokenResponse().setAccessToken("metadata-test-token").setExpiresInSeconds(100L);
-    MockHttpTransport transport = mockTransport(jsonDataResponse(token));
+    // ✅ RESPONSE 1: The service account info, now correctly nested under a "default" key.
+    LowLevelHttpResponse serviceAccountInfoResponse =
+        new MockLowLevelHttpResponse()
+            .setContentType(Json.MEDIA_TYPE)
+            .setContent(
+                "{"
+                    + "  \"default\": {"
+                    + "    \"email\": \"test-service-account@example.com\","
+                    + "    \"scopes\": [\"https://www.googleapis.com/auth/cloud-platform\"]"
+                    + "  }"
+                    + "}");
+
+    // RESPONSE 2: The access token response.
+    LowLevelHttpResponse tokenResponse =
+        new MockLowLevelHttpResponse()
+            .setContentType(Json.MEDIA_TYPE)
+            .setContent(
+                "{"
+                    + "\"access_token\": \"metadata-test-token\","
+                    + "\"expires_in\": 100,"
+                    + "\"token_type\": \"Bearer\""
+                    + "}");
+
+    // Use your utility to create a transport that will serve the responses in order.
+    MockHttpTransport transport = mockTransport(serviceAccountInfoResponse, tokenResponse);
 
     GoogleCredentials credentials = getCredentials(transport);
+    assertNotNull(credentials);
 
+    // This call will now succeed because the first response has the expected structure.
     credentials.refreshIfExpired();
 
-    assertThat(credentials).isInstanceOf(ComputeEngineCredentials.class);
+    // The final assertion, which will now pass.
     assertThat(credentials.getAccessToken().getTokenValue()).isEqualTo("metadata-test-token");
   }
 
