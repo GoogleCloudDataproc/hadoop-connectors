@@ -117,6 +117,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                   .setProjectId(projectId)
                   .setBidiEnabled(bidiEnabled)
+                  .setHnBucketRenameEnabled(bidiEnabled)
+                  .setHnOptimizationEnabled(bidiEnabled)
                   .setGrpcWriteEnabled(bidiEnabled)
                   .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
                   .setWriteChannelOptions(
@@ -823,9 +825,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates mkdirs(). */
   @Test
   public void testMkdirs() throws Exception {
-    if (bidiEnabled) {
-      return;
-    }
     mkdirsHelper(
         new MkdirsBehavior() {
           @Override
