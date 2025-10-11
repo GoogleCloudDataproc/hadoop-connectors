@@ -520,18 +520,28 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   private void mkdirsInternal(URI path) throws IOException {
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
+
+    logger.atSevere().log(
+        "Dhriti_Debug MkdirInternal logs: Entering mkdirsInternal %s", resourceId);
     if (resourceId.isRoot()) {
+      logger.atSevere().log("Dhriti_Debug MkdirInternal logs: Entering is Root %s", resourceId);
+
       // GCS_ROOT directory always exists, no need to go through the rest of the method.
       return;
     }
 
     // In case path is a bucket we just attempt to create it without additional checks
     if (resourceId.isBucket()) {
+      logger.atSevere().log("Dhriti_Debug MkdirInternal logs: Entering is Bucket %s", resourceId);
+
       try {
         getBucketName(path);
         gcs.createBucket(resourceId.getBucketName());
       } catch (FileAlreadyExistsException e) {
         GoogleCloudStorageEventBus.postOnException();
+        logger.atSevere().log(
+            "Dhriti_Debug MkdirInternal logs: Entering is Bucket Already Exists %s", resourceId);
+
         // This means that bucket already exist, and we do not need to do anything.
         logger.atFiner().withCause(e).log(
             "mkdirs: %s already exists, ignoring creation failure", resourceId);
@@ -544,7 +554,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // Before creating a leaf directory we need to check if there are no conflicting files
     // with the same name as any subdirectory
     if (options.isEnsureNoConflictingItems()) {
+      logger.atSevere().log("Dhriti_Debug MkdirInternal logs: Checking conflicts %s", resourceId);
+
       checkNoFilesConflictingWithDirs(resourceId);
+      logger.atSevere().log(
+          "Dhriti_Debug MkdirInternal logs: Checked for  conflicts %s", resourceId);
     }
 
     // Create only a leaf directory because subdirectories will be inferred
@@ -559,6 +573,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
         logger.atSevere().log("Going via a normal route path");
         // Create an empty placeholder object to represent the directory.
         gcs.createEmptyObject(resourceId);
+        logger.atSevere().log(
+            "Dhriti_Debug MkdirInternal logs: Completed Via Nromal route %s", resourceId);
       }
     } catch (FileAlreadyExistsException e) {
       GoogleCloudStorageEventBus.postOnException();
@@ -568,6 +584,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
           isHns
               ? "mkdirs: Folder '%s' already exists, ignoring creation failure"
               : "mkdirs: %s object already exists, ignoring creation failure";
+      logger.atSevere().withCause(e).log(logMessage, resourceId);
+
       logger.atFiner().withCause(e).log(logMessage, resourceId);
     }
   }
