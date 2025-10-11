@@ -75,6 +75,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientInterceptor;
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
@@ -446,21 +447,35 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         .toString()
         .toUpperCase()
         .equals("RAPID")) {
-      logger.atSevere().log("Dhriti_Debug: Creating empty object with zonal bucket");
-      BlobAppendableUpload upload =
-          storageWrapper.blobAppendableUpload(
-              BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-                  .setMetadata(rewrittenMetadata)
-                  .setContentEncoding(createObjectOptions.getContentEncoding())
-                  .setContentType(createObjectOptions.getContentType())
-                  .build(),
-              BlobAppendableUploadConfig.of(),
-              Storage.BlobWriteOption.doesNotExist());
-      try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
-        channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
-        channel.finalizeAndClose();
+      try {
+        BlobAppendableUpload upload =
+            storageWrapper.blobAppendableUpload(
+                BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                    .setMetadata(rewrittenMetadata)
+                    .setContentEncoding(createObjectOptions.getContentEncoding())
+                    .setContentType(createObjectOptions.getContentType())
+                    .build(),
+                BlobAppendableUploadConfig.of(),
+                Storage.BlobWriteOption.doesNotExist());
+        try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+          channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
+          channel.finalizeAndClose();
+        }
+        logger.atSevere().log("Dhriti_Debug: Created empty object for the zonal bucket");
+      } catch (IOException e) {
+        // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
+        if (e.getCause() instanceof StorageException
+            && ((StorageException) e.getCause()).getCode() == HttpURLConnection.HTTP_PRECON_FAILED) {
+          
+          // This is the expected error when the object already exists.
+          // Translate it to the exception that the calling mkdirsInternal method expects.
+          throw new FileAlreadyExistsException(String.format(
+              "Object %s already exists (precondition failed).", resourceId));
+        } else {
+          // This is a different, unexpected error (e.g., network, permissions). Re-throw it.
+          throw e;
+        }
       }
-      logger.atSevere().log("Dhriti_Debug: Created empty object for the zonal bucket");
     } else {
       logger.atSevere().log("Dhriti_Debug: Creating empty object with regional buckets");
       storageWrapper.create(
