@@ -293,7 +293,7 @@ public class GoogleCloudStorageClientTest {
   }
 
   @Test
-  public void createBucket_withZonalOptionsAndTtl_ignoresTtl() throws Exception {
+  public void createBucket_withZonalOptionsAndTtl_throwsException() throws Exception {
     CreateBucketOptions bucketOptions =
         CreateBucketOptions.builder()
             .setLocation(BUCKET_LOCATION)

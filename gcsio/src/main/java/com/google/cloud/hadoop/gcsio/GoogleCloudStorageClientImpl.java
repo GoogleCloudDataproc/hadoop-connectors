@@ -253,6 +253,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
         throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
       }
+      // Lifecycle Configs are currently not supported by zonal buckets
       if (options.getTtl() != null) {
         throw new UnsupportedOperationException("Zonal buckets do not support TTL");
       }
@@ -285,7 +286,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             HierarchicalNamespace.newBuilder().setEnabled(true).build());
       }
 
-      // Lifecycle Configs are currently not supported by zonal buckets
       if (options.getTtl() != null) {
         bucketInfoBuilder.setLifecycleRules(
             Collections.singletonList(
