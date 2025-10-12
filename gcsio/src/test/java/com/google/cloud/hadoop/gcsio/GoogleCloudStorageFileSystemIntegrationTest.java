@@ -43,6 +43,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,11 +85,16 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // Name of the test object.
   protected String objectName = "gcsio-test.txt";
 
-  @Parameterized.Parameter public ClientType storageClientType;
+  @Parameterized.Parameter(0) public ClientType storageClientType;
 
-  @Parameters
-  public static Iterable<ClientType> getClientType() {
-    return List.of(ClientType.values());
+  @Parameterized.Parameter(1) public boolean bidiEnabled;
+
+  @Parameters(name = "clientType={0}, bidiEnabled={1}")
+  public static Collection<Object[]> getParameters() {
+    return List.of(
+        new Object[] {ClientType.STORAGE_CLIENT, true},
+        new Object[] {ClientType.HTTP_API_CLIENT, false},
+        new Object[] {ClientType.STORAGE_CLIENT, false});
   }
 
   /** Perform initialization once before tests are run. */
@@ -108,6 +114,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
               GoogleCloudStorageOptions.builder()
                   .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                   .setProjectId(projectId)
+                  .setBidiEnabled(bidiEnabled)
+                  .setGrpcWriteEnabled(bidiEnabled)
                   .setDirectPathPreferred(TestConfiguration.getInstance().isDirectPathPreferred())
                   .setWriteChannelOptions(
                       AsyncWriteChannelOptions.builder()
@@ -144,7 +152,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       throws IOException {
 
     gcsiHelper = helper;
-    gcsiHelper.beforeAllTests();
+    if (bidiEnabled && gcsiHelper.gcsfs.getGcs() instanceof GoogleCloudStorageClientImpl) {
+      gcsiHelper.sharedBucketName1 =
+          gcsiHelper.createUniqueZonalOrRegionalBucket("zonal-shared-1", bidiEnabled);
+      gcsiHelper.sharedBucketName2 =
+          gcsiHelper.createUniqueZonalOrRegionalBucket("zonal-shared-2", bidiEnabled);
+    } else {
+      gcsiHelper.beforeAllTests();
+    }
     sharedBucketName1 = gcsiHelper.sharedBucketName1;
     sharedBucketName2 = gcsiHelper.sharedBucketName2;
   }
@@ -410,7 +425,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String testBucket = gcsiHelper.createUniqueBucket("list");
+    String testBucket = gcsiHelper.createUniqueZonalOrRegionalBucket("list", bidiEnabled);
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
@@ -451,7 +466,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
-        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
+        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemBidiTest.class)) {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
@@ -467,7 +483,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
     if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemHTTPClientTest.class)
-        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)) {
+        || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemBidiTest.class)) {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
@@ -501,7 +518,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String testBucket = gcsiHelper.createUniqueBucket("list");
+    String testBucket = gcsiHelper.createUniqueZonalOrRegionalBucket("list", bidiEnabled);
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
@@ -637,7 +654,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // The same set of objects are also created under a bucket that
     // we will delete as a part of the test.
-    String tempBucket = gcsiHelper.createUniqueBucket("delete");
+    String tempBucket = gcsiHelper.createUniqueZonalOrRegionalBucket("delete", bidiEnabled);
     gcsiHelper.createObjectsWithSubdirs(tempBucket, objectNames);
 
     // -------------------------------------------------------
@@ -1703,6 +1720,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   @Test
   public void testComposeSuccess() throws IOException {
+    // Zonal buckets done support compose operation.
+    if (bidiEnabled) {
+      return;
+    }
     String bucketName = sharedBucketName1;
     URI directory = gcsiHelper.getPath(bucketName, "test-compose/");
     URI object1 = directory.resolve("object1");

@@ -27,10 +27,15 @@ import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.Iterables;
+
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -498,5 +503,51 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     String bucketName = getUniqueBucketName(suffix);
     mkdir(bucketName);
     return bucketName;
+  }
+
+  public String createUniqueBucket(String suffix, CreateBucketOptions options) throws IOException {
+    String bucketName = getUniqueBucketName(suffix);
+    gcs.createBucket(bucketName, options);
+    return bucketName;
+  }
+  
+  public String createUniqueZonalOrRegionalBucket(String suffix, boolean isBucketZonal)
+      throws IOException {
+    if (!isBucketZonal) {
+      return createUniqueBucket(suffix);
+    } else {
+
+      String zone = "us-central1-a"; // Default zone
+      String region = "us-central1"; // Default region
+
+      try {
+        URL metadataServerUrl =
+            new URL("http://metadata.google.internal/computeMetadata/v1/instance/zone");
+        HttpURLConnection connection = (HttpURLConnection) metadataServerUrl.openConnection();
+        connection.setRequestProperty("Metadata-Flavor", "Google");
+        connection.setConnectTimeout(5000); // 5-second connection timeout
+        connection.setReadTimeout(5000); // 5-second read timeout
+
+        try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+          String response = reader.readLine();
+          // The response is in the format "projects/PROJECT_NUMBER/zones/ZONE"
+          String[] parts = response.split("/");
+          String fullZone = parts[parts.length - 1];
+          zone = fullZone;
+          region = fullZone.substring(0, fullZone.lastIndexOf('-'));
+        }
+      } catch (IOException e) {
+        // Fallback to default region and zone if metadata server is unreachable.
+      }
+
+      CreateBucketOptions zonalBucketOptions =
+          CreateBucketOptions.builder()
+              .setLocation(region)
+              .setZonalPlacement(zone)
+              .setHierarchicalNamespaceEnabled(true)
+              .build();
+      return createUniqueBucket(suffix, zonalBucketOptions);
+    }
   }
 }
