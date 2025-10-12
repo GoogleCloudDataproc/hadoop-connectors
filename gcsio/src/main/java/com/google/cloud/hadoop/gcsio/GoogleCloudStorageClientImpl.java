@@ -463,43 +463,45 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    if (getBucket(resourceId.getBucketName())
-        .getStorageClass()
-        .toString()
-        .toUpperCase()
-        .equals("RAPID")) {
-      try {
-        BlobAppendableUpload upload =
-            storageWrapper.blobAppendableUpload(
-                BlobInfo.newBuilder(
-                        BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-                    .setMetadata(rewrittenMetadata)
-                    .setContentEncoding(createObjectOptions.getContentEncoding())
-                    .setContentType(createObjectOptions.getContentType())
-                    .build(),
-                BlobAppendableUploadConfig.of(),
-                Storage.BlobWriteOption.doesNotExist());
-        try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
-          channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
-          channel.finalizeAndClose();
-        }
-      } catch (IOException e) {
-        // Check if the cause is a StorageException.
-        if (e.getCause() instanceof StorageException) {
-          StorageException storageException = (StorageException) e.getCause();
-          // // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
-          // if (storageException.getCode() == HttpURLConnection.HTTP_PRECON_FAILED) {
-
-          //   // This is the expected error when the object already exists. Translate it to the
-          // exception
-          //   // that the calling mkdirsInternal method expects, similar to storage.create()
-          // exceptions.
-          //   throw new FileAlreadyExistsException(
-          //       String.format("Object %s already exists (precondition failed).", resourceId));
-          // This is a different, unexpected StorageException. Re-throw it.
-          throw storageException;
-        } else {
-          throw e;
+    Bucket bucket = getBucket(resourceId.getBucketName());
+    boolean isRapid =
+        bucket != null
+            && bucket.getStorageClass() != null
+            && "RAPID".equalsIgnoreCase(bucket.getStorageClass().toString());
+    if (isRapid) {
+      {
+        try {
+          BlobAppendableUpload upload =
+              storageWrapper.blobAppendableUpload(
+                  BlobInfo.newBuilder(
+                          BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                      .setMetadata(rewrittenMetadata)
+                      .setContentEncoding(createObjectOptions.getContentEncoding())
+                      .setContentType(createObjectOptions.getContentType())
+                      .build(),
+                  BlobAppendableUploadConfig.of(),
+                  Storage.BlobWriteOption.doesNotExist());
+          try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+            channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
+            channel.finalizeAndClose();
+          }
+        } catch (IOException e) {
+          // Check if the cause is a StorageException.
+          if (e.getCause() instanceof StorageException) {
+            StorageException storageException = (StorageException) e.getCause();
+            // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
+            if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
+              // This is the expected error when the object already exists. Translate it to
+              // the
+              // exception that the calling method expects, similar to storage.create()
+              // exceptions.
+              throw new FileAlreadyExistsException(
+                  String.format("Object %s already exists.", resourceId));
+            }
+            throw storageException;
+          } else {
+            throw e;
+          }
         }
       }
     } else {
