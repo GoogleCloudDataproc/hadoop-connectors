@@ -52,7 +52,8 @@ public abstract class GoogleCloudStorageFileSystemTestBase
     // configuration, but the "root" logger is always present.
     Logger.getLogger("").setLevel(Level.OFF);
     if (gcsfs == null) {
-      GoogleCloudStorageOptions gcsOptions = getInMemoryGoogleCloudStorageOptions().toBuilder().setBidiEnabled(bidiEnabled).build();
+      GoogleCloudStorageOptions gcsOptions =
+          getInMemoryGoogleCloudStorageOptions().toBuilder().setBidiEnabled(bidiEnabled).build();
       gcsfs =
           new GoogleCloudStorageFileSystemImpl(
               InMemoryGoogleCloudStorage::new,

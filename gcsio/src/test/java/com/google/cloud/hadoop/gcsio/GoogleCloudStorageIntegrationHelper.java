@@ -27,7 +27,6 @@ import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.Iterables;
-
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -510,7 +509,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     gcs.createBucket(bucketName, options);
     return bucketName;
   }
-  
+
   public String createUniqueZonalOrRegionalBucket(String suffix, boolean isBucketZonal)
       throws IOException {
     if (!isBucketZonal) {

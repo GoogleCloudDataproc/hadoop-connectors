@@ -85,9 +85,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // Name of the test object.
   protected String objectName = "gcsio-test.txt";
 
-  @Parameterized.Parameter(0) public ClientType storageClientType;
+  @Parameterized.Parameter(0)
+  public ClientType storageClientType;
 
-  @Parameterized.Parameter(1) public boolean bidiEnabled;
+  @Parameterized.Parameter(1)
+  public boolean bidiEnabled;
 
   @Parameters(name = "clientType={0}, bidiEnabled={1}")
   public static Collection<Object[]> getParameters() {
