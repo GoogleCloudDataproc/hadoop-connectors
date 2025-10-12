@@ -44,6 +44,9 @@ import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobAppendableUpload;
+import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
+import com.google.cloud.storage.BlobAppendableUploadConfig;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSessionConfig;
@@ -117,7 +120,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // Maximum number of times to retry deletes in the case of precondition failures.
+  // Maximum number of times to retry deletes in the case of precondition
+  // failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
@@ -243,11 +247,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       if (!options.getHierarchicalNamespaceEnabled()) {
         throw new UnsupportedOperationException("Zonal buckets must have HNS Enabled.");
       }
-      // Note: Currently StorageClass does not have RAPID as an enum value. Since at the time of
-      // writing zonal buckets only support RAPID storage class we default the storage class to
-      // RAPID whenever a zonal placement is set and the storageClass is unset or null.
+      // Note: Currently StorageClass does not have RAPID as an enum value. Since at
+      // the time of
+      // writing zonal buckets only support RAPID storage class we default the storage
+      // class to
+      // RAPID whenever a zonal placement is set and the storageClass is unset or
+      // null.
       // Having storage class set as any other value will lead to an Exception thrown.
-      // Added Check for storage class equal to RAPID set by the user for when StorageClass enum
+      // Added Check for storage class equal to RAPID set by the user for when
+      // StorageClass enum
       // adds RAPID as a value to make sure this does not start breaking.
       if (options.getStorageClass() != null
           && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
@@ -373,7 +381,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       return;
     }
 
-    // Don't go through batch interface for a single-item case to avoid batching overhead.
+    // Don't go through batch interface for a single-item case to avoid batching
+    // overhead.
     if (resourceIds.size() == 1) {
       createEmptyObject(Iterables.getOnlyElement(resourceIds), options);
       return;
@@ -438,7 +447,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private void createEmptyObjectInternal(
-      StorageResourceId resourceId, CreateObjectOptions createObjectOptions) {
+      StorageResourceId resourceId, CreateObjectOptions createObjectOptions) throws IOException {
     Map<String, String> rewrittenMetadata = encodeMetadata(createObjectOptions.getMetadata());
 
     List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
@@ -454,13 +463,54 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    storageWrapper.create(
-        BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-            .setMetadata(rewrittenMetadata)
-            .setContentEncoding(createObjectOptions.getContentEncoding())
-            .setContentType(createObjectOptions.getContentType())
-            .build(),
-        blobTargetOptions.toArray(BlobTargetOption[]::new));
+    if (getBucket(resourceId.getBucketName())
+        .getStorageClass()
+        .toString()
+        .toUpperCase()
+        .equals("RAPID")) {
+      try {
+        BlobAppendableUpload upload =
+            storageWrapper.blobAppendableUpload(
+                BlobInfo.newBuilder(
+                        BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                    .setMetadata(rewrittenMetadata)
+                    .setContentEncoding(createObjectOptions.getContentEncoding())
+                    .setContentType(createObjectOptions.getContentType())
+                    .build(),
+                BlobAppendableUploadConfig.of(),
+                Storage.BlobWriteOption.doesNotExist());
+        try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+          channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
+          channel.finalizeAndClose();
+        }
+      } catch (IOException e) {
+        // Check if the cause is a StorageException.
+        if (e.getCause() instanceof StorageException) {
+          StorageException storageException = (StorageException) e.getCause();
+          // // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
+          // if (storageException.getCode() == HttpURLConnection.HTTP_PRECON_FAILED) {
+
+          //   // This is the expected error when the object already exists. Translate it to the
+          // exception
+          //   // that the calling mkdirsInternal method expects, similar to storage.create()
+          // exceptions.
+          //   throw new FileAlreadyExistsException(
+          //       String.format("Object %s already exists (precondition failed).", resourceId));
+          // This is a different, unexpected StorageException. Re-throw it.
+          throw storageException;
+        } else {
+          throw e;
+        }
+      }
+    } else {
+      storageWrapper.create(
+          BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+              .setMetadata(rewrittenMetadata)
+              .setContentEncoding(createObjectOptions.getContentEncoding())
+              .setContentType(createObjectOptions.getContentType())
+              .build(),
+          blobTargetOptions.toArray(BlobTargetOption[]::new));
+    }
   }
 
   /**
@@ -494,7 +544,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           try {
             sleeper.sleep(nextSleep);
           } catch (InterruptedException e) {
-            // We caught an InterruptedException, we should set the interrupted bit on this thread.
+            // We caught an InterruptedException, we should set the interrupted bit on this
+            // thread.
             Thread.currentThread().interrupt();
             nextSleep = BackOff.STOP;
           }
@@ -503,7 +554,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         nextSleep = nextSleep == BackOff.STOP ? BackOff.STOP : backOff.nextBackOffMillis();
       } while (!existingInfo.exists() && nextSleep != BackOff.STOP);
 
-      // Compare existence, size, and metadata; for 429 errors creating an empty object,
+      // Compare existence, size, and metadata; for 429 errors creating an empty
+      // object,
       // we don't care about metaGeneration/contentGeneration as long as the metadata
       // matches, since we don't know for sure whether our low-level request succeeded
       // first or some other client succeeded first.
@@ -906,7 +958,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               resourceId, innerExceptions, batchExecutor, attempt, resourceId.getGenerationId()));
 
     } else {
-      // We first need to get the current object version to issue a safe delete for only the latest
+      // We first need to get the current object version to issue a safe delete for
+      // only the latest
       // version of the object.
       batchExecutor.queue(
           () ->
@@ -954,9 +1007,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       public void onSuccess(Boolean result) {
         if (!result) {
           // Ignore item-not-found scenario. We do not have to delete what we cannot find.
-          // This situation typically shows up when we make a request to delete something and the
-          // server receives the request, but we get a retry-able error before we get a response.
-          // During a retry, we no longer find the item because the server had deleted it already.
+          // This situation typically shows up when we make a request to delete something
+          // and the
+          // server receives the request, but we get a retry-able error before we get a
+          // response.
+          // During a retry, we no longer find the item because the server had deleted it
+          // already.
           logger.atFiner().log("Delete object %s not found.", resourceId);
         } else {
           logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
@@ -1030,7 +1086,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         new ConcurrentHashMap<>(resourceIds.size());
     Set<IOException> innerExceptions = newConcurrentHashSet();
     BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
-    // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request,
+    // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket
+    // fetch request,
     // or enqueue a StorageObject fetch request.
     try {
       for (StorageResourceId resourceId : resourceIds) {
@@ -1065,7 +1122,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       sortedItemInfos.add(itemInfos.get(resourceId));
     }
 
-    // We expect the return list to be the same size, even if some entries were "not found".
+    // We expect the return list to be the same size, even if some entries were "not
+    // found".
     checkState(
         sortedItemInfos.size() == resourceIds.size(),
         "sortedItemInfos.size() (%s) != resourceIds.size() (%s). infos: %s, ids: %s",
@@ -1245,7 +1303,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       throws IOException {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
     // TODO(dhritichorpa) Microbenchmark the latency of using
-    // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
+    // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of
+    // flag
     if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storageWrapper.getStorage(),
@@ -1374,7 +1433,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       sortedItemInfos.add(resultItemInfos.get(itemInfo.getStorageResourceId()));
     }
 
-    // We expect the return list to be the same size, even if some entries were "not found".
+    // We expect the return list to be the same size, even if some entries were "not
+    // found".
     checkState(
         sortedItemInfos.size() == itemInfoList.size(),
         "sortedItemInfos.size() (%s) != resourceIds.size() (%s). infos: %s, updateItemInfos: %s",

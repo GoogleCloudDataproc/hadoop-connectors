@@ -18,6 +18,8 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
+import com.google.storage.v2.BidiWriteObjectRequest;
+import com.google.storage.v2.BidiWriteObjectResponse;
 import com.google.storage.v2.Bucket;
 import com.google.storage.v2.ComposeObjectRequest;
 import com.google.storage.v2.CreateBucketRequest;
@@ -299,5 +301,44 @@ final class MockStorage extends StorageImplBase {
                   Object.class.getName(),
                   Exception.class.getName())));
     }
+  }
+
+  @Override
+  public StreamObserver<BidiWriteObjectRequest> bidiWriteObject(
+      final StreamObserver<BidiWriteObjectResponse> responseObserver) {
+    return new StreamObserver<>() {
+      @Override
+      public void onNext(BidiWriteObjectRequest value) {
+        // Record the incoming request.
+        requests.add(value);
+
+        java.lang.Object response = responses.poll();
+        if (response instanceof BidiWriteObjectResponse) {
+          responseObserver.onNext(((BidiWriteObjectResponse) response));
+        } else if (response instanceof Exception) {
+          responseObserver.onError(((Exception) response));
+        } else {
+          responseObserver.onError(
+              new IllegalArgumentException(
+                  String.format(
+                      "Unrecognized response type %s for method BidiWriteObject, expected %s or %s",
+                      response == null ? "null" : response.getClass().getName(),
+                      BidiWriteObjectResponse.class.getName(),
+                      Exception.class.getName())));
+        }
+      }
+
+      @Override
+      public void onError(Throwable throwable) {
+        // Mock implementation can be empty.
+      }
+
+      @Override
+      public void onCompleted() {
+        // The client is acknowledging the end of the stream.
+        // We can now safely close our side.
+        responseObserver.onCompleted();
+      }
+    };
   }
 }

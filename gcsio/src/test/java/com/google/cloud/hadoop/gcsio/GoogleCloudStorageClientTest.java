@@ -26,8 +26,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.gax.retrying.RetrySettings;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
+import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -370,6 +373,12 @@ public class GoogleCloudStorageClientTest {
 
   @Test
   public void createEmptyObject_ignoresException() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
     mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
     // Mock for getItemInfo in case the object already exists.
     mockStorage.addResponse(
@@ -381,11 +390,17 @@ public class GoogleCloudStorageClientTest {
 
       gcs.createEmptyObject(TEST_RESOURCE_ID);
     }
-    assertThat(mockStorage.getRequests().size()).isEqualTo(2);
+    assertThat(mockStorage.getRequests().size()).isEqualTo(3);
   }
 
   @Test
   public void createEmptyObject_mismatchedMetadata_doesNotIgnoreException() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
     mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
     // Mock for getItemInfo in case the object already exists.
     mockStorage.addResponse(
@@ -409,6 +424,12 @@ public class GoogleCloudStorageClientTest {
 
   @Test
   public void createEmptyObject_mismatchedMetadata_ignoreException() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
     mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
     // Mock for getItemInfo in case the object already exists.
     mockStorage.addResponse(
@@ -423,11 +444,17 @@ public class GoogleCloudStorageClientTest {
       // will be false, so the call will complete successfully.
       gcs.createEmptyObject(TEST_RESOURCE_ID);
     }
-    assertThat(mockStorage.getRequests().size()).isEqualTo(2);
+    assertThat(mockStorage.getRequests().size()).isEqualTo(3);
   }
 
   @Test
   public void createEmptyObject_doesNotIgnoreExceptions() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
     // Non-Ignorable exception.
     mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
     // Mock for getItemInfo in case the object already exists.
@@ -446,6 +473,12 @@ public class GoogleCloudStorageClientTest {
 
   @Test
   public void createEmptyObject_alreadyExists_throwsException() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
     mockStorage.addException(new StatusRuntimeException(Status.ALREADY_EXISTS));
 
     try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
@@ -465,6 +498,13 @@ public class GoogleCloudStorageClientTest {
 
   @Test
   public void createEmptyObjects_ignoresExceptions() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
+    mockStorage.addResponse(mockBucket);
     mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
     mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
     // Mock for getItemInfo in case the object already exists.
@@ -479,11 +519,18 @@ public class GoogleCloudStorageClientTest {
 
       gcs.createEmptyObjects(ImmutableList.of(TEST_RESOURCE_ID, TEST_RESOURCE_ID));
     }
-    assertThat(mockStorage.getRequests().size()).isEqualTo(4);
+    assertThat(mockStorage.getRequests().size()).isEqualTo(6);
   }
 
   @Test
   public void createEmptyObjects_doesNotIgnoreExceptions() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("STANDARD") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
+    mockStorage.addResponse(mockBucket);
     mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
     mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
 
@@ -496,6 +543,103 @@ public class GoogleCloudStorageClientTest {
               IOException.class,
               () -> gcs.createEmptyObjects(ImmutableList.of(TEST_RESOURCE_ID, TEST_RESOURCE_ID)));
       assertThat(thrown).hasMessageThat().isEqualTo("Multiple IOExceptions.");
+    }
+  }
+
+  @Test
+  public void createEmptyObject_rapidStorage_ignoresException() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("RAPID") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
+
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+
+    mockStorage.addResponse(
+        TEST_OBJECT.toBuilder()
+            .setSize(0L)
+            .putAllMetadata(ImmutableMap.of())
+            .setStorageClass("RAPID")
+            .build());
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      StorageOptions originalOptions = fakeServer.getGrpcStorageOptions();
+
+      // Customize RetrySettings
+      RetrySettings customRetrySettings =
+          originalOptions.getRetrySettings().toBuilder()
+              .setMaxAttempts(2) // Set max attempts to 2 (1 initial + 1 retry)
+              .build();
+
+      StorageOptions customStorageOptions =
+          originalOptions.toBuilder().setRetrySettings(customRetrySettings).build();
+
+      Storage customStorage = customStorageOptions.getService();
+
+      GoogleCloudStorage gcs = mockedGcsClientImpl(transport, customStorage);
+
+      gcs.createEmptyObject(TEST_RESOURCE_ID);
+    }
+    assertThat(mockStorage.getRequests().size()).isEqualTo(4);
+  }
+
+  @Test
+  public void createEmptyObject_rapidStorage_doesNotIgnoreExceptions() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("RAPID") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
+    // Non-Ignorable exception.
+    mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      StorageOptions originalOptions = fakeServer.getGrpcStorageOptions();
+
+      RetrySettings customRetrySettings =
+          originalOptions.getRetrySettings().toBuilder()
+              .setMaxAttempts(1) // No retries
+              .build();
+
+      StorageOptions customStorageOptions =
+          originalOptions.toBuilder().setRetrySettings(customRetrySettings).build();
+
+      Storage customStorage = customStorageOptions.getService();
+
+      GoogleCloudStorage gcs = mockedGcsClientImpl(transport, customStorage);
+
+      IOException thrown =
+          assertThrows(IOException.class, () -> gcs.createEmptyObject(TEST_RESOURCE_ID));
+      assertThat(thrown).hasMessageThat().contains(Status.UNAVAILABLE.getCode().toString());
+    }
+  }
+
+  @Test
+  public void createEmptyObject_rapidStorage_alreadyExists_throwsException() throws Exception {
+    Bucket mockBucket =
+        Bucket.newBuilder()
+            .setName("projects/_/buckets/foo-bucket")
+            .setStorageClass("RAPID") // Or any other valid storage class
+            .build();
+    mockStorage.addResponse(mockBucket);
+    mockStorage.addException(new StatusRuntimeException(Status.ALREADY_EXISTS));
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      IOException thrown =
+          assertThrows(
+              FileAlreadyExistsException.class, () -> gcs.createEmptyObject(TEST_RESOURCE_ID));
+      assertThat(thrown)
+          .hasMessageThat()
+          .isEqualTo(
+              String.format(
+                  "Object 'gs://%s/%s' already exists.", TEST_BUCKET_NAME, TEST_OBJECT_NAME));
     }
   }
 
