@@ -587,8 +587,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   @Test
   public void read_failure_ifObjectWasModifiedDuringRead() throws IOException {
-    if(bidiEnabled)
-    {
+    if (bidiEnabled) {
       return;
     }
     URI testObject = gcsiHelper.getUniqueObjectUri("generation-strict");
