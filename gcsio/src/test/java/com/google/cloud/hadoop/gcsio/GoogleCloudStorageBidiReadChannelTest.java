@@ -71,7 +71,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   @Test
   public void getBlobReadSession_whenFutureFails_throwsIOException() throws IOException {
-    
+
     Storage storage = mock(Storage.class);
     when(storage.blobReadSession(any()))
         .thenReturn(ApiFutures.immediateFailedFuture(new ExecutionException(new Throwable())));
