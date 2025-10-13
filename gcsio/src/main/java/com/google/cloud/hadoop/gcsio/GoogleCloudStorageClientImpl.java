@@ -120,8 +120,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // Maximum number of times to retry deletes in the case of precondition
-  // failures.
+  // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private final GoogleCloudStorageOptions storageOptions;
@@ -243,68 +242,27 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     BucketInfo.Builder bucketInfoBuilder =
         BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
 
-    if (options.getZonalPlacement() != null) {
-      if (!options.getHierarchicalNamespaceEnabled()) {
-        throw new UnsupportedOperationException("Zonal buckets must have HNS Enabled.");
-      }
-      // Note: Currently StorageClass does not have RAPID as an enum value. Since at
-      // the time of
-      // writing zonal buckets only support RAPID storage class we default the storage
-      // class to
-      // RAPID whenever a zonal placement is set and the storageClass is unset or
-      // null.
-      // Having storage class set as any other value will lead to an Exception thrown.
-      // Added Check for storage class equal to RAPID set by the user for when
-      // StorageClass enum
-      // adds RAPID as a value to make sure this does not start breaking.
-      if (options.getStorageClass() != null
-          && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
-        throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
-      }
-      // Lifecycle Configs are currently not supported by zonal buckets
-      if (options.getTtl() != null) {
-        throw new UnsupportedOperationException("Zonal buckets do not support TTL");
-      }
-
-      bucketInfoBuilder
-          .setCustomPlacementConfig(
-              BucketInfo.CustomPlacementConfig.newBuilder()
-                  .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
-                  .build())
-          .setStorageClass(StorageClass.valueOf("RAPID"))
-          // A zonal bucket must be an HNS Bucket.
-          .setHierarchicalNamespace(
-              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
-          .setIamConfiguration(
-              BucketInfo.IamConfiguration.newBuilder()
-                  .setIsUniformBucketLevelAccessEnabled(true)
-                  .build());
-
-    } else {
-      if (options.getStorageClass() != null) {
-        bucketInfoBuilder.setStorageClass(
-            StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
-      }
-      if (options.getHierarchicalNamespaceEnabled()) {
-        bucketInfoBuilder.setIamConfiguration(
-            BucketInfo.IamConfiguration.newBuilder()
-                .setIsUniformBucketLevelAccessEnabled(true)
-                .build());
-        bucketInfoBuilder.setHierarchicalNamespace(
-            HierarchicalNamespace.newBuilder().setEnabled(true).build());
-      }
-
-      if (options.getTtl() != null) {
-        bucketInfoBuilder.setLifecycleRules(
-            Collections.singletonList(
-                new BucketInfo.LifecycleRule(
-                    LifecycleAction.newDeleteAction(),
-                    LifecycleCondition.newBuilder()
-                        .setAge(toIntExact(options.getTtl().toDays()))
-                        .build())));
-      }
+    if (options.getStorageClass() != null) {
+      bucketInfoBuilder.setStorageClass(
+          StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
     }
-
+    if (options.getHierarchicalNamespaceEnabled()) {
+      bucketInfoBuilder.setIamConfiguration(
+          BucketInfo.IamConfiguration.newBuilder()
+              .setIsUniformBucketLevelAccessEnabled(true)
+              .build());
+      bucketInfoBuilder.setHierarchicalNamespace(
+          HierarchicalNamespace.newBuilder().setEnabled(true).build());
+    }
+    if (options.getTtl() != null) {
+      bucketInfoBuilder.setLifecycleRules(
+          Collections.singletonList(
+              new BucketInfo.LifecycleRule(
+                  LifecycleAction.newDeleteAction(),
+                  LifecycleCondition.newBuilder()
+                      .setAge(toIntExact(options.getTtl().toDays()))
+                      .build())));
+    }
     try {
       storageWrapper.create(bucketInfoBuilder.build());
     } catch (StorageException e) {
@@ -381,8 +339,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       return;
     }
 
-    // Don't go through batch interface for a single-item case to avoid batching
-    // overhead.
+    // Don't go through batch interface for a single-item case to avoid batching overhead.
     if (resourceIds.size() == 1) {
       createEmptyObject(Iterables.getOnlyElement(resourceIds), options);
       return;
@@ -491,10 +448,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             StorageException storageException = (StorageException) e.getCause();
             // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
             if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
-              // This is the expected error when the object already exists. Translate it to
-              // the
-              // exception that the calling method expects, similar to storage.create()
-              // exceptions.
+              // This is the expected error when the object already exists. Translate it to the
+              // exception that the calling method expects, similar to storage.create() exceptions.
               throw new FileAlreadyExistsException(
                   String.format("Object %s already exists.", resourceId));
             }
@@ -546,8 +501,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           try {
             sleeper.sleep(nextSleep);
           } catch (InterruptedException e) {
-            // We caught an InterruptedException, we should set the interrupted bit on this
-            // thread.
+            // We caught an InterruptedException, we should set the interrupted bit on this thread.
             Thread.currentThread().interrupt();
             nextSleep = BackOff.STOP;
           }
@@ -556,8 +510,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         nextSleep = nextSleep == BackOff.STOP ? BackOff.STOP : backOff.nextBackOffMillis();
       } while (!existingInfo.exists() && nextSleep != BackOff.STOP);
 
-      // Compare existence, size, and metadata; for 429 errors creating an empty
-      // object,
+      // Compare existence, size, and metadata; for 429 errors creating an empty object,
       // we don't care about metaGeneration/contentGeneration as long as the metadata
       // matches, since we don't know for sure whether our low-level request succeeded
       // first or some other client succeeded first.
@@ -960,8 +913,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               resourceId, innerExceptions, batchExecutor, attempt, resourceId.getGenerationId()));
 
     } else {
-      // We first need to get the current object version to issue a safe delete for
-      // only the latest
+      // We first need to get the current object version to issue a safe delete for only the latest
       // version of the object.
       batchExecutor.queue(
           () ->
@@ -1009,12 +961,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       public void onSuccess(Boolean result) {
         if (!result) {
           // Ignore item-not-found scenario. We do not have to delete what we cannot find.
-          // This situation typically shows up when we make a request to delete something
-          // and the
-          // server receives the request, but we get a retry-able error before we get a
-          // response.
-          // During a retry, we no longer find the item because the server had deleted it
-          // already.
+          // This situation typically shows up when we make a request to delete something and the
+          // server receives the request, but we get a retry-able error before we get a response.
+          // During a retry, we no longer find the item because the server had deleted it already.
           logger.atFiner().log("Delete object %s not found.", resourceId);
         } else {
           logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
@@ -1088,8 +1037,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         new ConcurrentHashMap<>(resourceIds.size());
     Set<IOException> innerExceptions = newConcurrentHashSet();
     BatchExecutor executor = new BatchExecutor(storageOptions.getBatchThreads());
-    // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket
-    // fetch request,
+    // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request,
     // or enqueue a StorageObject fetch request.
     try {
       for (StorageResourceId resourceId : resourceIds) {
@@ -1124,8 +1072,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       sortedItemInfos.add(itemInfos.get(resourceId));
     }
 
-    // We expect the return list to be the same size, even if some entries were "not
-    // found".
+    // We expect the return list to be the same size, even if some entries were "not found".
     checkState(
         sortedItemInfos.size() == resourceIds.size(),
         "sortedItemInfos.size() (%s) != resourceIds.size() (%s). infos: %s, ids: %s",
@@ -1305,8 +1252,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       throws IOException {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
     // TODO(dhritichorpa) Microbenchmark the latency of using
-    // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of
-    // flag
+    // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of flag
     if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storageWrapper.getStorage(),
@@ -1435,8 +1381,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       sortedItemInfos.add(resultItemInfos.get(itemInfo.getStorageResourceId()));
     }
 
-    // We expect the return list to be the same size, even if some entries were "not
-    // found".
+    // We expect the return list to be the same size, even if some entries were "not found".
     checkState(
         sortedItemInfos.size() == itemInfoList.size(),
         "sortedItemInfos.size() (%s) != resourceIds.size() (%s). infos: %s, updateItemInfos: %s",
