@@ -471,7 +471,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     try (DisposableByteString dbs = readBytes(position, bytesToRequest)) {
       ByteString byteString = dbs.byteString();
       bytesRead = byteString.size();
-      bytesRead = byteString.size();
 
       if (bytesRead == 0 && position < objectSize) {
         throw new IOException(
