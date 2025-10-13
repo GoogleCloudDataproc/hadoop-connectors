@@ -242,27 +242,68 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     BucketInfo.Builder bucketInfoBuilder =
         BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
 
-    if (options.getStorageClass() != null) {
-      bucketInfoBuilder.setStorageClass(
-          StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
+    if (options.getZonalPlacement() != null) {
+      if (!options.getHierarchicalNamespaceEnabled()) {
+        throw new UnsupportedOperationException("Zonal buckets must have HNS Enabled.");
+      }
+      // Note: Currently StorageClass does not have RAPID as an enum value. Since at
+      // the time of
+      // writing zonal buckets only support RAPID storage class we default the storage
+      // class to
+      // RAPID whenever a zonal placement is set and the storageClass is unset or
+      // null.
+      // Having storage class set as any other value will lead to an Exception thrown.
+      // Added Check for storage class equal to RAPID set by the user for when
+      // StorageClass enum
+      // adds RAPID as a value to make sure this does not start breaking.
+      if (options.getStorageClass() != null
+          && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
+        throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
+      }
+      // Lifecycle Configs are currently not supported by zonal buckets
+      if (options.getTtl() != null) {
+        throw new UnsupportedOperationException("Zonal buckets do not support TTL");
+      }
+
+      bucketInfoBuilder
+          .setCustomPlacementConfig(
+              BucketInfo.CustomPlacementConfig.newBuilder()
+                  .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
+                  .build())
+          .setStorageClass(StorageClass.valueOf("RAPID"))
+          // A zonal bucket must be an HNS Bucket.
+          .setHierarchicalNamespace(
+              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
+          .setIamConfiguration(
+              BucketInfo.IamConfiguration.newBuilder()
+                  .setIsUniformBucketLevelAccessEnabled(true)
+                  .build());
+
+    } else {
+      if (options.getStorageClass() != null) {
+        bucketInfoBuilder.setStorageClass(
+            StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
+      }
+      if (options.getHierarchicalNamespaceEnabled()) {
+        bucketInfoBuilder.setIamConfiguration(
+            BucketInfo.IamConfiguration.newBuilder()
+                .setIsUniformBucketLevelAccessEnabled(true)
+                .build());
+        bucketInfoBuilder.setHierarchicalNamespace(
+            HierarchicalNamespace.newBuilder().setEnabled(true).build());
+      }
+
+      if (options.getTtl() != null) {
+        bucketInfoBuilder.setLifecycleRules(
+            Collections.singletonList(
+                new BucketInfo.LifecycleRule(
+                    LifecycleAction.newDeleteAction(),
+                    LifecycleCondition.newBuilder()
+                        .setAge(toIntExact(options.getTtl().toDays()))
+                        .build())));
+      }
     }
-    if (options.getHierarchicalNamespaceEnabled()) {
-      bucketInfoBuilder.setIamConfiguration(
-          BucketInfo.IamConfiguration.newBuilder()
-              .setIsUniformBucketLevelAccessEnabled(true)
-              .build());
-      bucketInfoBuilder.setHierarchicalNamespace(
-          HierarchicalNamespace.newBuilder().setEnabled(true).build());
-    }
-    if (options.getTtl() != null) {
-      bucketInfoBuilder.setLifecycleRules(
-          Collections.singletonList(
-              new BucketInfo.LifecycleRule(
-                  LifecycleAction.newDeleteAction(),
-                  LifecycleCondition.newBuilder()
-                      .setAge(toIntExact(options.getTtl().toDays()))
-                      .build())));
-    }
+
     try {
       storageWrapper.create(bucketInfoBuilder.build());
     } catch (StorageException e) {
