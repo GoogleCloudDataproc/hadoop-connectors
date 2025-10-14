@@ -27,6 +27,7 @@ import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.Iterables;
+import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -51,6 +52,8 @@ import java.util.concurrent.TimeUnit;
 
 /** Integration tests for GoogleCloudStorage class. */
 public abstract class GoogleCloudStorageIntegrationHelper {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Prefix used for naming test buckets.
   public static final String TEST_BUCKET_NAME_PREFIX = "dataproc-gcs-gcsio";
@@ -537,7 +540,9 @@ public abstract class GoogleCloudStorageIntegrationHelper {
           region = fullZone.substring(0, fullZone.lastIndexOf('-'));
         }
       } catch (IOException e) {
-        // Fallback to default region and zone if metadata server is unreachable.
+        logger.atWarning().log(
+            "Falling back to default region (%s) and zone (%s) because metadata server is unreachable.",
+            region, zone);
       }
 
       CreateBucketOptions zonalBucketOptions =

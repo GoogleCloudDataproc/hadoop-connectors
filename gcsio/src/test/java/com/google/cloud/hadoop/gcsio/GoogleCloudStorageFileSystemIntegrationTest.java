@@ -1726,7 +1726,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   @Test
   public void testComposeSuccess() throws IOException {
-    // Zonal buckets done support compose operation.
+    // Zonal buckets don't support compose operation.
     if (bidiEnabled) {
       return;
     }
