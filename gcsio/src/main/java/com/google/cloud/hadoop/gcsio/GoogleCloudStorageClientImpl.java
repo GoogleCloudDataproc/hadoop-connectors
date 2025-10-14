@@ -463,8 +463,20 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             && bucket.getStorageClass() != null
             && "RAPID".equalsIgnoreCase(bucket.getStorageClass().toString());
     if (isRapid) {
-      {
-        try {
+        createAppendableEmptyObject(resourceId, createObjectOptions, rewrittenMetadata);
+    } else {
+      storageWrapper.create(
+          BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+              .setMetadata(rewrittenMetadata)
+              .setContentEncoding(createObjectOptions.getContentEncoding())
+              .setContentType(createObjectOptions.getContentType())
+              .build(),
+          blobTargetOptions.toArray(BlobTargetOption[]::new));
+    }
+  }
+
+  private void createAppendableEmptyObject(StorageResourceId resourceId, CreateObjectOptions createObjectOptions, Map<String, String> rewrittenMetadata) throws IOException{
+    try {
           BlobAppendableUpload upload =
               storageWrapper.blobAppendableUpload(
                   BlobInfo.newBuilder(
@@ -483,28 +495,21 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           // Check if the cause is a StorageException.
           if (e.getCause() instanceof StorageException) {
             StorageException storageException = (StorageException) e.getCause();
-            // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
-            if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
-              // This is the expected error when the object already exists. Translate it to the
-              // exception that the calling method expects, similar to storage.create() exceptions.
-              throw new FileAlreadyExistsException(
-                  String.format("Object %s already exists.", resourceId));
-            }
+            isFileAlreadyExistsError(storageException, resourceId);
             throw storageException;
           } else {
             throw e;
           }
         }
+  }
+
+  private void isFileAlreadyExistsError(StorageException storageException, StorageResourceId resourceId) throws FileAlreadyExistsException{
+    if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
+      // This is the expected error when the object already exists. Translate it to the
+      // exception that the calling method expects, similar to storage.create() exceptions.
+      throw new FileAlreadyExistsException(
+        String.format("Object %s already exists.", resourceId));
       }
-    } else {
-      storageWrapper.create(
-          BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-              .setMetadata(rewrittenMetadata)
-              .setContentEncoding(createObjectOptions.getContentEncoding())
-              .setContentType(createObjectOptions.getContentType())
-              .build(),
-          blobTargetOptions.toArray(BlobTargetOption[]::new));
-    }
   }
 
   /**
