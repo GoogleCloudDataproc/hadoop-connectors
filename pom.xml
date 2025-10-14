@@ -285,10 +285,10 @@
         <scope>runtime</scope>
       </dependency>
       <dependency>
-      <groupId>com.google.errorprone</groupId>
-      <artifactId>error_prone_annotations</artifactId>
-      <version>${google.error-prone-annotations.version}</version>
-    </dependency>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>${google.error-prone-annotations.version}</version>
+      </dependency>
       <dependency>
         <groupId>io.opencensus</groupId>
         <artifactId>opencensus-impl</artifactId>
