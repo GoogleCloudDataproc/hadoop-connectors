@@ -28,7 +28,9 @@ public abstract class CreateBucketOptions {
   public static final CreateBucketOptions DEFAULT = builder().build();
 
   public static Builder builder() {
-    return new AutoValue_CreateBucketOptions.Builder().setHierarchicalNamespaceEnabled(false);
+    return new AutoValue_CreateBucketOptions.Builder()
+        .setHierarchicalNamespaceEnabled(false)
+        .setZonalPlacement(null);
   }
 
   public abstract Builder toBuilder();
@@ -47,6 +49,10 @@ public abstract class CreateBucketOptions {
   @Nullable
   public abstract Duration getTtl();
 
+  /** Returns the zone for a zonal bucket. Returns null if not a zonal bucket. */
+  @Nullable
+  public abstract String getZonalPlacement();
+
   /** Builder for {@link CreateBucketOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -55,6 +61,8 @@ public abstract class CreateBucketOptions {
     public abstract Builder setLocation(String location);
 
     public abstract Builder setStorageClass(String storageClass);
+
+    public abstract Builder setZonalPlacement(String zonalPlacement);
 
     public abstract Builder setTtl(Duration ttl);
 

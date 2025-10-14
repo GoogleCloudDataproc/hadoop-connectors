@@ -35,6 +35,7 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Timestamp;
 import com.google.storage.v2.Bucket;
+import com.google.storage.v2.Bucket.HierarchicalNamespace;
 import com.google.storage.v2.Bucket.Lifecycle;
 import com.google.storage.v2.Bucket.Lifecycle.Rule;
 import com.google.storage.v2.Bucket.Lifecycle.Rule.Action;
@@ -95,6 +96,8 @@ public class GoogleCloudStorageClientTest {
 
   private static final int GENERATION = 123456;
 
+  private static final String ZONAL_PLACEMENT = "us-central1-a";
+
   private static final Bucket TEST_BUCKET =
       Bucket.newBuilder()
           .setName(TEST_BUCKET_NAME)
@@ -117,6 +120,23 @@ public class GoogleCloudStorageClientTest {
                           .setCondition(Condition.newBuilder().setAgeDays(TTL_DAYS).build())
                           .build())
                   .build())
+          .build();
+
+  private static final Bucket TEST_BUCKET_WITH_ZONAL_OPTIONS =
+      Bucket.newBuilder()
+          .setName(TEST_BUCKET_NAME)
+          .setLocation(BUCKET_LOCATION)
+          .setCustomPlacementConfig(
+              Bucket.CustomPlacementConfig.newBuilder().addDataLocations(ZONAL_PLACEMENT).build())
+          .setStorageClass("RAPID")
+          .setIamConfig(
+              Bucket.IamConfig.newBuilder()
+                  .setUniformBucketLevelAccess(
+                      Bucket.IamConfig.UniformBucketLevelAccess.newBuilder()
+                          .setEnabled(true)
+                          .build())
+                  .build())
+          .setHierarchicalNamespace(HierarchicalNamespace.newBuilder().setEnabled(true).build())
           .build();
 
   private static final Object TEST_OBJECT =
@@ -183,6 +203,136 @@ public class GoogleCloudStorageClientTest {
         bucketRequest.getBucket().getLifecycle().getRule(0).getAction().getType(), "Delete");
     assertEquals(
         bucketRequest.getBucket().getLifecycle().getRule(0).getCondition().getAgeDays(), TTL_DAYS);
+  }
+
+  @Test
+  public void createBucket_withZonalOptions_succeeds() throws Exception {
+    mockStorage.addResponse(TEST_BUCKET_WITH_ZONAL_OPTIONS);
+
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setLocation(BUCKET_LOCATION)
+            .setZonalPlacement(ZONAL_PLACEMENT)
+            .setStorageClass("RAPID")
+            .setHierarchicalNamespaceEnabled(true)
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+      gcs.createBucket(TEST_BUCKET_NAME, bucketOptions);
+    }
+
+    assertEquals(mockStorage.getRequests().size(), 1);
+
+    CreateBucketRequest bucketRequest = (CreateBucketRequest) mockStorage.getRequests().get(0);
+    // Assert correct fields were set in request.
+    assertEquals(bucketRequest.getBucketId(), TEST_BUCKET_NAME);
+    assertEquals(bucketRequest.getBucket().getLocation(), BUCKET_LOCATION);
+    assertEquals(
+        bucketRequest.getBucket().getCustomPlacementConfig().getDataLocations(0), ZONAL_PLACEMENT);
+    assertEquals(bucketRequest.getBucket().getStorageClass(), "RAPID");
+    assertThat(bucketRequest.getBucket().getHierarchicalNamespace().getEnabled()).isTrue();
+    assertThat(bucketRequest.getBucket().getIamConfig().getUniformBucketLevelAccess().getEnabled())
+        .isTrue();
+    // Assert TTL was not set for zonal bucket
+    assertThat(bucketRequest.getBucket().getLifecycle().getRuleList()).isEmpty();
+  }
+
+  @Test
+  public void createBucket_withZonalUnsetStorageClass_defaultsToRapid() throws Exception {
+    mockStorage.addResponse(TEST_BUCKET_WITH_ZONAL_OPTIONS);
+
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setLocation(BUCKET_LOCATION)
+            .setZonalPlacement(ZONAL_PLACEMENT)
+            .setHierarchicalNamespaceEnabled(true)
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+      gcs.createBucket(TEST_BUCKET_NAME, bucketOptions);
+    }
+
+    assertEquals(mockStorage.getRequests().size(), 1);
+
+    CreateBucketRequest bucketRequest = (CreateBucketRequest) mockStorage.getRequests().get(0);
+    // Assert correct fields were set in request.
+    assertEquals(bucketRequest.getBucketId(), TEST_BUCKET_NAME);
+    assertEquals(bucketRequest.getBucket().getLocation(), BUCKET_LOCATION);
+    assertEquals(
+        bucketRequest.getBucket().getCustomPlacementConfig().getDataLocations(0), ZONAL_PLACEMENT);
+    assertEquals(bucketRequest.getBucket().getStorageClass(), "RAPID");
+    assertThat(bucketRequest.getBucket().getHierarchicalNamespace().getEnabled()).isTrue();
+    assertThat(bucketRequest.getBucket().getIamConfig().getUniformBucketLevelAccess().getEnabled())
+        .isTrue();
+    // Assert TTL was not set for zonal bucket
+    assertThat(bucketRequest.getBucket().getLifecycle().getRuleList()).isEmpty();
+  }
+
+  @Test
+  public void createBucket_zonalButHnsDisabled_throwsException() throws Exception {
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setZonalPlacement(ZONAL_PLACEMENT)
+            .setHierarchicalNamespaceEnabled(false)
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      UnsupportedOperationException thrown =
+          assertThrows(
+              UnsupportedOperationException.class,
+              () -> gcs.createBucket(TEST_BUCKET_NAME, bucketOptions));
+      assertThat(thrown).hasMessageThat().isEqualTo("Zonal buckets must have HNS Enabled.");
+    }
+  }
+
+  @Test
+  public void createBucket_withZonalOptionsAndTtl_throwsException() throws Exception {
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setLocation(BUCKET_LOCATION)
+            .setZonalPlacement(ZONAL_PLACEMENT)
+            .setHierarchicalNamespaceEnabled(true)
+            .setTtl(Duration.ofDays(TTL_DAYS))
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      UnsupportedOperationException thrown =
+          assertThrows(
+              UnsupportedOperationException.class,
+              () -> gcs.createBucket(TEST_BUCKET_NAME, bucketOptions));
+      assertThat(thrown).hasMessageThat().isEqualTo("Zonal buckets do not support TTL");
+    }
+  }
+
+  @Test
+  public void createBucket_zonalWithInvalidStorageClass_throwsException() throws Exception {
+    CreateBucketOptions bucketOptions =
+        CreateBucketOptions.builder()
+            .setZonalPlacement(ZONAL_PLACEMENT)
+            .setHierarchicalNamespaceEnabled(true)
+            .setStorageClass("STANDARD") // Invalid for zonal
+            .build();
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      UnsupportedOperationException thrown =
+          assertThrows(
+              UnsupportedOperationException.class,
+              () -> gcs.createBucket(TEST_BUCKET_NAME, bucketOptions));
+      assertThat(thrown).hasMessageThat().isEqualTo("Zonal bucket storage class must be RAPID");
+    }
   }
 
   @Test
