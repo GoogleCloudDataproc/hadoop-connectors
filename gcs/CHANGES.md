@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1530 - [Bug] Set projectId in Storage client creation
 
 ## 3.1.9 - 2025-10-09
 1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayout
