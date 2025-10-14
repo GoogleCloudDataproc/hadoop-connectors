@@ -107,9 +107,8 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
   public int write(ByteBuffer src) throws IOException {
     if (!open) throw new ClosedChannelException();
     checkNotNull(src, "Source ByteBuffer (src) cannot be null");
-    int written = StorageChannelUtils.blockingEmptyTo(src, gcsAppendChannel);
 
-    return written;
+    return StorageChannelUtils.blockingEmptyTo(src, gcsAppendChannel);
   }
 
   @Override
