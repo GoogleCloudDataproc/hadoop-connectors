@@ -49,10 +49,10 @@ import javax.annotation.Nullable;
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final int EOF = -1;
+
   private final StorageResourceId resourceId;
   private final BlobId blobId;
-  private final ApiFuture<BlobReadSession> sessionFuture;
-  private volatile BlobReadSession blobReadSession;
+  private final BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
   private long objectSize;
@@ -62,8 +62,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private long position = 0;
   private final GoogleCloudStorageReadOptions readOptions;
   private byte[] footerContent;
-  private ByteBuffer internalBuffer;
-  private long bufferStartPosition = -1;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
@@ -71,8 +69,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-    // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
     validate(itemInfo);
+    // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
     this.readTimeout = readOptions.getGrpcReadTimeout();
     this.resourceId =
         new StorageResourceId(
@@ -80,24 +78,27 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.blobId =
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
+    this.blobReadSession =
+        initializeBlobReadSession(storage, blobId, readOptions.getBidiClientTimeout());
     this.readOptions = readOptions;
-    this.sessionFuture = storage.blobReadSession(blobId);
-    this.blobReadSession = null;
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
   }
 
-  private synchronized BlobReadSession getBlobReadSession() throws IOException {
-    if (blobReadSession == null) {
-      BlobReadSession readSession = null;
-      try {
-        readSession = sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
-      } catch (InterruptedException | ExecutionException | TimeoutException e) {
-        throw new IOException("Failed to get BlobReadSession", e);
-      }
-      this.blobReadSession = readSession;
+  private static BlobReadSession initializeBlobReadSession(
+      Storage storage, BlobId blobId, int clientTimeout) throws IOException {
+    long clientInitializationDurationStartTime = System.currentTimeMillis();
+    BlobReadSession readSession = null;
+    try {
+      readSession = storage.blobReadSession(blobId).get(clientTimeout, TimeUnit.SECONDS);
+      logger.atFiner().log(
+          "Client Initialization successful in %d ms.",
+          System.currentTimeMillis() - clientInitializationDurationStartTime);
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException(e);
     }
-    return blobReadSession;
+    return readSession;
   }
 
   @Override
@@ -121,23 +122,11 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return bytesReadFromCache.get();
     }
 
-    if (isBufferValid()) {
-      return readBytesFromInternalBuffer(dst);
-    }
-    if (dst.remaining() >= readOptions.getMinRangeRequestSize()) {
-      return performStandardRead(dst);
-    }
-
-    // For small requests, refill the buffer using the same consistent chunk size.
-    refillInternalBuffer();
-
-    // Tried to refill buffer but buffer is still invalid, it means there was no data left to get.
-    // Therefore, we have reached the end of the file and must return -1.
-    if (!isBufferValid()) return -1;
-
-    return readBytesFromInternalBuffer(dst);
+    // If not handled by the cache, perform a standard read.
+    return performStandardRead(dst);
   }
 
+  @Override
   public long position() throws IOException {
     return position;
   }
@@ -154,19 +143,11 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         "Seek from %d to %d position for '%s'", this.position, newPosition, resourceId);
 
     this.position = newPosition;
-
-    if (isBufferValid()) {
-      internalBuffer.position((int) (newPosition - bufferStartPosition));
-    } else {
-      invalidateBuffer();
-    }
-
     return this;
   }
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    GoogleCloudStorageEventBus.postOnException();
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
@@ -206,11 +187,10 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       throws IOException {
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long vectoredReadStartTime = System.currentTimeMillis();
-    BlobReadSession session = getBlobReadSession();
     ranges.forEach(
         range -> {
           ApiFuture<DisposableByteString> futureBytes =
-              session.readAs(
+              blobReadSession.readAs(
                   ReadProjectionConfigs.asFutureByteString()
                       .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
           ApiFutures.addCallback(
@@ -333,16 +313,14 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     logger.atFiner().log(
         "Prefetching footer for '%s'. Position: %d, Size: %d",
         resourceId, footerStartPosition, footerSize);
-    try (DisposableByteString dbs = readBytes(footerStartPosition, footerSize)) {
-      ByteString byteString = dbs.byteString();
-      if (byteString.size() != footerSize) {
-        throw new IOException(
-            String.format(
-                "Failed to read complete footer for '%s'. Expected %d, got %d",
-                resourceId, footerSize, byteString.size()));
-      }
-      this.footerContent = byteString.toByteArray();
+    ByteString byteString = readBytes(footerStartPosition, footerSize);
+    if (byteString.size() != footerSize) {
+      throw new IOException(
+          String.format(
+              "Failed to read complete footer for '%s'. Expected %d, got %d",
+              resourceId, footerSize, byteString.size()));
     }
+    this.footerContent = byteString.toByteArray();
     logger.atFiner().log("Prefetched %d bytes footer for '%s'", footerContent.length, resourceId);
   }
 
@@ -410,53 +388,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     return Optional.empty();
   }
 
-  // Helper functions for the Look ahead read buffer.
-  public boolean isBufferValid() {
-    return internalBuffer != null
-        && position >= bufferStartPosition
-        && position < bufferStartPosition + internalBuffer.limit();
-  }
-
-  private void invalidateBuffer() {
-    internalBuffer = null;
-    bufferStartPosition = -1;
-  }
-
-  @VisibleForTesting
-  public int readBytesFromInternalBuffer(ByteBuffer dst) {
-    int bytesToRead = Math.min(dst.remaining(), internalBuffer.remaining());
-    if (bytesToRead == 0) return 0;
-
-    byte[] tempArray = new byte[bytesToRead];
-    internalBuffer.get(tempArray);
-    dst.put(tempArray);
-
-    position += bytesToRead;
-    return bytesToRead;
-  }
-
-  /** Refills the internal buffer by fetching a fixed-size chunk from GCS. */
-  @VisibleForTesting
-  public void refillInternalBuffer() throws IOException {
-    invalidateBuffer();
-    if (position >= objectSize) return;
-
-    long bytesToRequest = Math.min(readOptions.getMinRangeRequestSize(), objectSize - position);
-
-    if (bytesToRequest <= 0) return;
-
-    try (DisposableByteString dbs = readBytes(position, bytesToRequest)) {
-      ByteString byteString = dbs.byteString();
-      if (!byteString.isEmpty()) {
-        this.bufferStartPosition = position;
-        this.internalBuffer = byteString.asReadOnlyByteBuffer();
-      }
-    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      throw new IOException(
-          String.format("Look ahead read failed on %s at position %d", resourceId, position), e);
-    }
-  }
-
   /**
    * Performs a standard read from the current position.
    *
@@ -471,43 +402,37 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
     long bytesToRequest = Math.min(dst.remaining(), objectSize - position);
 
-    int bytesRead;
-
-    try (DisposableByteString dbs = readBytes(position, bytesToRequest)) {
-      ByteString byteString = dbs.byteString();
-      bytesRead = byteString.size();
-      bytesRead = byteString.size();
-
-      if (bytesRead == 0 && position < objectSize) {
-        throw new IOException(
-            String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
-      }
-
-      if (bytesRead > 0) {
-        byteString.copyTo(dst);
-        position += bytesRead;
-      }
+    ByteString byteString;
+    try {
+      byteString = readBytes(position, bytesToRequest);
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format("Read failed on %s at position %d", resourceId, position), e);
     }
+    int bytesRead = byteString.size();
+
+    if (bytesRead == 0 && position < objectSize) {
+      throw new IOException(
+          String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
+    }
+
+    if (bytesRead > 0) {
+      byteString.copyTo(dst);
+      position += bytesRead;
+    }
+
     return bytesRead > 0 ? bytesRead : EOF;
   }
 
-  /**
-   * Reads a range of bytes from the object and returns the disposable, zero-copy resource. The
-   * CALLER of this method is responsible for closing the returned resource, typically with a
-   * try-with-resources block.
-   */
-  private DisposableByteString readBytes(long offset, long length)
+  private ByteString readBytes(long offset, long length)
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
     ApiFuture<DisposableByteString> futureBytes =
-        getBlobReadSession()
-            .readAs(
-                ReadProjectionConfigs.asFutureByteString()
-                    .withRangeSpec(RangeSpec.of(offset, length)));
-    return futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        blobReadSession.readAs(
+            ReadProjectionConfigs.asFutureByteString().withRangeSpec(RangeSpec.of(offset, length)));
+    try (DisposableByteString dbs = futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
+      return dbs.byteString();
+    }
   }
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {

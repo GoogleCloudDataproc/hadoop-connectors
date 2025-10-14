@@ -70,28 +70,28 @@ public class GoogleCloudStorageBidiReadChannelTest {
           /* verificationAttributes= */ null);
 
   @Test
-  public void getBlobReadSession_whenFutureFails_throwsIOException() throws IOException {
-
+  public void constructor_whenSessionInitializationFails_throwsIOException() {
     Storage storage = mock(Storage.class);
     when(storage.blobReadSession(any()))
-        .thenReturn(ApiFutures.immediateFailedFuture(new ExecutionException(new Throwable())));
-
-    GoogleCloudStorageBidiReadChannel channel =
-        new GoogleCloudStorageBidiReadChannel(
-            storage,
-            DEFAULT_ITEM_INFO,
-            GoogleCloudStorageReadOptions.builder().build(),
-            Executors.newSingleThreadExecutor());
+        .thenReturn(
+            ApiFutures.immediateFailedFuture(
+                new ExecutionException("Failed to create session", null)));
 
     IOException e =
         assertThrows(
             IOException.class,
-            // Calling read() will trigger getBlobReadSession()
-            () -> channel.read(ByteBuffer.allocate(1)));
+            () ->
+                new GoogleCloudStorageBidiReadChannel(
+                    storage,
+                    DEFAULT_ITEM_INFO,
+                    GoogleCloudStorageReadOptions.builder().build(),
+                    Executors.newSingleThreadExecutor()));
 
-    assertThat(e).hasMessageThat().isEqualTo("Failed to get BlobReadSession");
+    // The original exception is wrapped in IOException by initializeBlobReadSession
     assertThat(e).hasCauseThat().isInstanceOf(ExecutionException.class);
+    assertThat(e).hasCauseThat().hasMessageThat().contains("Failed to create session");
   }
+
   // TODO(dhritichopra): Remove test after support for Gzip is added
   @Test
   public void constructor_whenItemIsGzipEncoded_throwsUnsupportedOperationException()
