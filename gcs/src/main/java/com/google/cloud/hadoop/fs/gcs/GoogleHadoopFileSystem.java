@@ -1833,8 +1833,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       }
     }
 
-    backgroundTasksThreadPool.shutdown();
-    backgroundTasksThreadPool = null;
+    if (instrumentation != null) {
+      instrumentation.close();
+      instrumentation = null;
+    }
+
+    if (backgroundTasksThreadPool != null) {
+      backgroundTasksThreadPool.shutdown();
+      backgroundTasksThreadPool = null;
+    }
   }
 
   @Override
