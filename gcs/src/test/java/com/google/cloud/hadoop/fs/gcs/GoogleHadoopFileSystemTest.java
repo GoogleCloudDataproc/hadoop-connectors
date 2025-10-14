@@ -458,6 +458,23 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(logOutput.toString()).contains("Failed to stop cloud logging service");
   }
 
+  @Test
+  public void close_closesAndNullifiesInstrumentation() throws Exception {
+    // Get the instrumentation field
+    java.lang.reflect.Field instrumentationField =
+        GoogleHadoopFileSystem.class.getDeclaredField("instrumentation");
+    instrumentationField.setAccessible(true);
+
+    // Assert that instrumentation is not null before close
+    assertThat(instrumentationField.get(ghfs)).isNotNull();
+
+    // Close the file system
+    ghfs.close();
+
+    // Assert that instrumentation is null after close
+    assertThat(instrumentationField.get(ghfs)).isNull();
+  }
+
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.
@@ -616,4 +633,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testGetFileStatusWithHint() {}
+
+  @Test
+  public void close_canBeCalledMultipleTimes() throws Exception {
+    // Close the file system
+    ghfs.close();
+    // Close again - should not throw.
+    ghfs.close();
+  }
 }
