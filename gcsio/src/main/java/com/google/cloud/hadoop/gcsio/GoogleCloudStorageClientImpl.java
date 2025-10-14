@@ -263,14 +263,10 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               BucketInfo.CustomPlacementConfig.newBuilder()
                   .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
                   .build())
-          .setStorageClass(StorageClass.valueOf("RAPID"))
-          // A zonal bucket must be an HNS Bucket.
-          .setHierarchicalNamespace(
-              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
-          .setIamConfiguration(
-              BucketInfo.IamConfiguration.newBuilder()
-                  .setIsUniformBucketLevelAccessEnabled(true)
-                  .build());
+          .setStorageClass(StorageClass.valueOf("RAPID"));
+
+      // A zonal bucket must be an HNS Bucket
+      enableHns(bucketInfoBuilder);
 
     } else {
       if (options.getStorageClass() != null) {
@@ -278,12 +274,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
       }
       if (options.getHierarchicalNamespaceEnabled()) {
-        bucketInfoBuilder.setIamConfiguration(
-            BucketInfo.IamConfiguration.newBuilder()
-                .setIsUniformBucketLevelAccessEnabled(true)
-                .build());
-        bucketInfoBuilder.setHierarchicalNamespace(
-            HierarchicalNamespace.newBuilder().setEnabled(true).build());
+        enableHns(bucketInfoBuilder);
       }
 
       if (options.getTtl() != null) {
@@ -308,6 +299,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  private void enableHns(BucketInfo.Builder bucketInfoBuilder) {
+    bucketInfoBuilder
+        .setIamConfiguration(
+            BucketInfo.IamConfiguration.newBuilder()
+                .setIsUniformBucketLevelAccessEnabled(true)
+                .build())
+        .setHierarchicalNamespace(HierarchicalNamespace.newBuilder().setEnabled(true).build());
   }
 
   /**
