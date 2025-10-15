@@ -463,7 +463,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             && bucket.getStorageClass() != null
             && "RAPID".equalsIgnoreCase(bucket.getStorageClass().toString());
     if (isRapid) {
-        createAppendableEmptyObject(resourceId, createObjectOptions, rewrittenMetadata);
+      createAppendableEmptyObject(resourceId, createObjectOptions, rewrittenMetadata);
     } else {
       storageWrapper.create(
           BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
@@ -475,41 +475,45 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
-  private void createAppendableEmptyObject(StorageResourceId resourceId, CreateObjectOptions createObjectOptions, Map<String, String> rewrittenMetadata) throws IOException{
+  private void createAppendableEmptyObject(
+      StorageResourceId resourceId,
+      CreateObjectOptions createObjectOptions,
+      Map<String, String> rewrittenMetadata)
+      throws IOException {
     try {
-          BlobAppendableUpload upload =
-              storageWrapper.blobAppendableUpload(
-                  BlobInfo.newBuilder(
-                          BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-                      .setMetadata(rewrittenMetadata)
-                      .setContentEncoding(createObjectOptions.getContentEncoding())
-                      .setContentType(createObjectOptions.getContentType())
-                      .build(),
-                  BlobAppendableUploadConfig.of(),
-                  Storage.BlobWriteOption.doesNotExist());
-          try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
-            channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
-            channel.finalizeAndClose();
-          }
-        } catch (IOException e) {
-          // Check if the cause is a StorageException.
-          if (e.getCause() instanceof StorageException) {
-            StorageException storageException = (StorageException) e.getCause();
-            throwIfFileAlreadyExistsError(storageException, resourceId);
-            throw storageException;
-          } else {
-            throw e;
-          }
-        }
+      BlobAppendableUpload upload =
+          storageWrapper.blobAppendableUpload(
+              BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                  .setMetadata(rewrittenMetadata)
+                  .setContentEncoding(createObjectOptions.getContentEncoding())
+                  .setContentType(createObjectOptions.getContentType())
+                  .build(),
+              BlobAppendableUploadConfig.of(),
+              Storage.BlobWriteOption.doesNotExist());
+      try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+        channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
+        channel.finalizeAndClose();
+      }
+    } catch (IOException e) {
+      // Check if the cause is a StorageException.
+      if (e.getCause() instanceof StorageException) {
+        StorageException storageException = (StorageException) e.getCause();
+        throwIfFileAlreadyExistsError(storageException, resourceId);
+        throw storageException;
+      } else {
+        throw e;
+      }
+    }
   }
 
-  private void throwIfFileAlreadyExistsError(StorageException storageException, StorageResourceId resourceId) throws FileAlreadyExistsException{
+  private void throwIfFileAlreadyExistsError(
+      StorageException storageException, StorageResourceId resourceId)
+      throws FileAlreadyExistsException {
     if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
       // This is the expected error when the object already exists. Translate it to the
       // exception that the calling method expects, similar to storage.create() exceptions.
-      throw new FileAlreadyExistsException(
-        String.format("Object %s already exists.", resourceId));
-      }
+      throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
+    }
   }
 
   /**
