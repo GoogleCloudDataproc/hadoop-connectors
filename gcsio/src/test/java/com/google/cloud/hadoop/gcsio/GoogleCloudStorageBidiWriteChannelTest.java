@@ -29,11 +29,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -64,7 +62,15 @@ public class GoogleCloudStorageBidiWriteChannelTest {
   public void testWrite_success() throws IOException {
     writeChannel = getJavaStorageChannel();
     ByteBuffer src = ByteBuffer.wrap(new byte[] {1, 2, 3});
-    when(mockGcsAppendChannel.write(src)).thenReturn(3);
+    when(mockGcsAppendChannel.write(any(ByteBuffer.class)))
+        .thenAnswer(
+            invocation -> {
+              ByteBuffer buffer = invocation.getArgument(0);
+              int remaining = buffer.remaining();
+              // Move the buffer's position to its limit to simulate a full write
+              buffer.position(buffer.limit());
+              return remaining;
+            });
 
     int bytesWritten = writeChannel.write(src);
 
@@ -122,38 +128,45 @@ public class GoogleCloudStorageBidiWriteChannelTest {
   }
 
   @Test
-  public void testWrite_success_multipleChucks() throws IOException {
+  public void testWrite_success_multipleChunks() throws IOException {
     writeChannel = getJavaStorageChannel();
-    byte[] chunk1 = new byte[] {1, 2, 3};
-    byte[] chunk2 = new byte[] {4, 5};
-    byte[] expectedContent = new byte[] {1, 2, 3, 4, 5};
+    byte[] chunk1 = {1, 2, 3};
+    byte[] chunk2 = {4, 5};
+    byte[] expectedContent = {1, 2, 3, 4, 5};
     ByteBuffer buffer1 = ByteBuffer.wrap(chunk1);
     ByteBuffer buffer2 = ByteBuffer.wrap(chunk2);
+
+    // This stream will act as our "channel" to verify what was written.
+    ByteArrayOutputStream capturedContent = new ByteArrayOutputStream();
+
     when(mockGcsAppendChannel.write(any(ByteBuffer.class)))
         .thenAnswer(
             invocation -> {
-              ByteBuffer arg = invocation.getArgument(0);
-              return arg.remaining();
+              ByteBuffer buffer = invocation.getArgument(0);
+              int bytesToWrite = buffer.remaining();
+              // Create a temporary byte array to hold the data from the buffer
+              byte[] data = new byte[bytesToWrite];
+              // This get() operation reads from the buffer and advances its position
+              buffer.get(data);
+              // Write the captured data to our stream for later verification
+              capturedContent.write(data);
+              return bytesToWrite;
             });
 
+    // Act
     int bytesWritten1 = writeChannel.write(buffer1);
     int bytesWritten2 = writeChannel.write(buffer2);
 
+    // Assert
     assertEquals(3, bytesWritten1);
     assertEquals(2, bytesWritten2);
-    ArgumentCaptor<ByteBuffer> byteBufferCaptor = ArgumentCaptor.forClass(ByteBuffer.class);
-    verify(mockGcsAppendChannel, times(2)).write(byteBufferCaptor.capture());
-    List<ByteBuffer> capturedBuffers = byteBufferCaptor.getAllValues();
-    assertEquals("Should have captured two buffers", 2, capturedBuffers.size());
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    for (ByteBuffer buffer : capturedBuffers) {
-      byte[] data = new byte[buffer.remaining()];
-      buffer.get(data);
-      outputStream.writeBytes(data); // writeBytes() doesn't throw IOException
-    }
-    byte[] actualContent = outputStream.toByteArray();
+    // Verify that the combined content written to the mock channel is correct
     assertArrayEquals(
-        "The combined content written to the channel is incorrect", expectedContent, actualContent);
+        "The combined content written to the channel is incorrect",
+        expectedContent,
+        capturedContent.toByteArray());
+
+    verify(mockGcsAppendChannel, times(2)).write(any(ByteBuffer.class));
   }
 
   private GoogleCloudStorageBidiWriteChannel getJavaStorageChannel() throws IOException {

@@ -27,6 +27,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.fail;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.auth.Credentials;
@@ -562,10 +563,30 @@ public class GoogleCloudStorageImplTest {
     assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
         .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
-    assertThat(trackingGcs.getAllRequestStrings())
-        .containsExactly(
-            emptyUploadRequestString(
-                resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl));
+    List<String> requests = trackingGcs.getAllRequestStrings();
+    String writeObjectRequest =
+        emptyUploadRequestString(
+            resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl);
+
+    // The GetBucket call is introduced in the ClientImpl to add support for RAPID storage
+    // zonal buckets and does not exist in the HTTP route.
+    switch (requests.size()) {
+      case 1:
+        // SCENARIO 1:  Only the object creation call was made.
+        assertThat(requests).containsExactly(writeObjectRequest);
+        break;
+      case 2:
+        // SCENARIO 2: GetBucket was called first, then the object creation.
+        assertThat(requests).containsExactly("rpcMethod:GetBucket", writeObjectRequest).inOrder();
+        break;
+      default:
+        // If we get 0 or >2 requests, the test has failed.
+        fail(
+            "Expected 1 or 2  RPC calls, but got "
+                + requests.size()
+                + ". Requests were: "
+                + requests);
+    }
     trackingGcs.delegate.close();
   }
 

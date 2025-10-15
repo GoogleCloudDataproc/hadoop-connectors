@@ -44,6 +44,9 @@ import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobAppendableUpload;
+import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
+import com.google.cloud.storage.BlobAppendableUploadConfig;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobWriteSessionConfig;
@@ -115,6 +118,7 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
+  private static final String RAPID = "RAPID";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -239,27 +243,54 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     BucketInfo.Builder bucketInfoBuilder =
         BucketInfo.newBuilder(bucketName).setLocation(options.getLocation());
 
-    if (options.getStorageClass() != null) {
-      bucketInfoBuilder.setStorageClass(
-          StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
+    if (options.getZonalPlacement() != null) {
+      if (!options.getHierarchicalNamespaceEnabled()) {
+        throw new UnsupportedOperationException("Zonal buckets must have HNS Enabled.");
+      }
+      // Note: Currently StorageClass does not have RAPID as an enum value. Since at the time of
+      // writing zonal buckets only support RAPID storage class we default the storage class to
+      // RAPID whenever a zonal placement is set and the storageClass is unset or null.
+      // Having storage class set as any other value will lead to an Exception thrown.
+      // Added Check for storage class equal to RAPID set by the user for when StorageClass enum
+      // adds RAPID as a value to make sure this does not start breaking.
+      if (options.getStorageClass() != null && !RAPID.equalsIgnoreCase(options.getStorageClass())) {
+        throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
+      }
+      // Lifecycle Configs are currently not supported by zonal buckets
+      if (options.getTtl() != null) {
+        throw new UnsupportedOperationException("Zonal buckets do not support TTL");
+      }
+
+      bucketInfoBuilder
+          .setCustomPlacementConfig(
+              BucketInfo.CustomPlacementConfig.newBuilder()
+                  .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
+                  .build())
+          .setStorageClass(StorageClass.valueOf("RAPID"));
+
+      // A zonal bucket must be an HNS Bucket
+      enableHns(bucketInfoBuilder);
+
+    } else {
+      if (options.getStorageClass() != null) {
+        bucketInfoBuilder.setStorageClass(
+            StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
+      }
+      if (options.getHierarchicalNamespaceEnabled()) {
+        enableHns(bucketInfoBuilder);
+      }
+
+      if (options.getTtl() != null) {
+        bucketInfoBuilder.setLifecycleRules(
+            Collections.singletonList(
+                new BucketInfo.LifecycleRule(
+                    LifecycleAction.newDeleteAction(),
+                    LifecycleCondition.newBuilder()
+                        .setAge(toIntExact(options.getTtl().toDays()))
+                        .build())));
+      }
     }
-    if (options.getHierarchicalNamespaceEnabled()) {
-      bucketInfoBuilder.setIamConfiguration(
-          BucketInfo.IamConfiguration.newBuilder()
-              .setIsUniformBucketLevelAccessEnabled(true)
-              .build());
-      bucketInfoBuilder.setHierarchicalNamespace(
-          HierarchicalNamespace.newBuilder().setEnabled(true).build());
-    }
-    if (options.getTtl() != null) {
-      bucketInfoBuilder.setLifecycleRules(
-          Collections.singletonList(
-              new BucketInfo.LifecycleRule(
-                  LifecycleAction.newDeleteAction(),
-                  LifecycleCondition.newBuilder()
-                      .setAge(toIntExact(options.getTtl().toDays()))
-                      .build())));
-    }
+
     try {
       storageWrapper.create(bucketInfoBuilder.build());
     } catch (StorageException e) {
@@ -271,6 +302,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  private void enableHns(BucketInfo.Builder bucketInfoBuilder) {
+    bucketInfoBuilder
+        .setIamConfiguration(
+            BucketInfo.IamConfiguration.newBuilder()
+                .setIsUniformBucketLevelAccessEnabled(true)
+                .build())
+        .setHierarchicalNamespace(HierarchicalNamespace.newBuilder().setEnabled(true).build());
   }
 
   /**
@@ -401,7 +441,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   }
 
   private void createEmptyObjectInternal(
-      StorageResourceId resourceId, CreateObjectOptions createObjectOptions) {
+      StorageResourceId resourceId, CreateObjectOptions createObjectOptions) throws IOException {
     Map<String, String> rewrittenMetadata = encodeMetadata(createObjectOptions.getMetadata());
 
     List<BlobTargetOption> blobTargetOptions = new ArrayList<>();
@@ -417,13 +457,63 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           BlobTargetOption.encryptionKey(storageOptions.getEncryptionKey().value()));
     }
 
-    storageWrapper.create(
-        BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-            .setMetadata(rewrittenMetadata)
-            .setContentEncoding(createObjectOptions.getContentEncoding())
-            .setContentType(createObjectOptions.getContentType())
-            .build(),
-        blobTargetOptions.toArray(BlobTargetOption[]::new));
+    Bucket bucket = getBucket(resourceId.getBucketName());
+    boolean isRapid =
+        bucket != null
+            && bucket.getStorageClass() != null
+            && "RAPID".equalsIgnoreCase(bucket.getStorageClass().toString());
+    if (isRapid) {
+      createAppendableEmptyObject(resourceId, createObjectOptions, rewrittenMetadata);
+    } else {
+      storageWrapper.create(
+          BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+              .setMetadata(rewrittenMetadata)
+              .setContentEncoding(createObjectOptions.getContentEncoding())
+              .setContentType(createObjectOptions.getContentType())
+              .build(),
+          blobTargetOptions.toArray(BlobTargetOption[]::new));
+    }
+  }
+
+  private void createAppendableEmptyObject(
+      StorageResourceId resourceId,
+      CreateObjectOptions createObjectOptions,
+      Map<String, String> rewrittenMetadata)
+      throws IOException {
+    try {
+      BlobAppendableUpload upload =
+          storageWrapper.blobAppendableUpload(
+              BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                  .setMetadata(rewrittenMetadata)
+                  .setContentEncoding(createObjectOptions.getContentEncoding())
+                  .setContentType(createObjectOptions.getContentType())
+                  .build(),
+              BlobAppendableUploadConfig.of(),
+              Storage.BlobWriteOption.doesNotExist());
+      try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+        channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
+        channel.finalizeAndClose();
+      }
+    } catch (IOException e) {
+      // Check if the cause is a StorageException.
+      if (e.getCause() instanceof StorageException) {
+        StorageException storageException = (StorageException) e.getCause();
+        throwIfFileAlreadyExistsError(storageException, resourceId);
+        throw storageException;
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private void throwIfFileAlreadyExistsError(
+      StorageException storageException, StorageResourceId resourceId)
+      throws FileAlreadyExistsException {
+    if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
+      // This is the expected error when the object already exists. Translate it to the
+      // exception that the calling method expects, similar to storage.create() exceptions.
+      throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
+    }
   }
 
   /**
