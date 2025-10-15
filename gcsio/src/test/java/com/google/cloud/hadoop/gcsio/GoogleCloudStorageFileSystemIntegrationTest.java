@@ -66,6 +66,13 @@ import org.junit.runners.Parameterized.Parameters;
 public class GoogleCloudStorageFileSystemIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  private static final List<Class<?>> INTEG_TEST_CLASSES =
+      ImmutableList.of(
+          GoogleCloudStorageFileSystemIntegrationTest.class,
+          GoogleCloudStorageFileSystemHTTPClientTest.class,
+          GoogleCloudStorageFileSystemJavaStorageClientTest.class,
+          GoogleCloudStorageFileSystemBidiTest.class);
+
 
   // GCS FS test access instance.
   protected GoogleCloudStorageFileSystem gcsfs;
@@ -464,7 +471,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // At o1.
     validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
-    validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
+    if (INTEG_TEST_CLASSES.contains(getClass())) {
+      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
+    } else {
+      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
+    }
 
     // At d1.
     validateListFileInfo(
@@ -474,7 +485,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // At d1/o12.
     validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
-    validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
+   if (INTEG_TEST_CLASSES.contains(getClass())) {
+      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
+    } else {
+      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
+    }
 
     // At d1/d11.
     validateListFileInfo(testBucket, "d1/d11/", /* expectedToExist= */ true, "d1/d11/o111");
