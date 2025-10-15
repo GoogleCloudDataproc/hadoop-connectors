@@ -73,10 +73,11 @@
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud.library.bom.version>26.69.0</google.cloud.library.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
+    <google.error-prone-annotations.version>2.38.0</google.error-prone-annotations.version>
     <google.flogger.version>0.7.4</google.flogger.version>
     <google.guava.version>33.1.0-jre</google.guava.version>
     <google.java-format.version>1.15.0</google.java-format.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.2</hadoop.version>
     <opencensus.version>0.31.1</opencensus.version>
 
     <!-- Test dependencies -->
@@ -284,10 +285,10 @@
         <scope>runtime</scope>
       </dependency>
       <dependency>
-      <groupId>com.google.errorprone</groupId>
-      <artifactId>error_prone_annotations</artifactId>
-      <version>2.38.0</version>
-    </dependency>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>${google.error-prone-annotations.version}</version>
+      </dependency>
       <dependency>
         <groupId>io.opencensus</groupId>
         <artifactId>opencensus-impl</artifactId>

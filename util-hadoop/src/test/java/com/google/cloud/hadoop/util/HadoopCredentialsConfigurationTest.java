@@ -133,7 +133,7 @@ public class HadoopCredentialsConfigurationTest {
 
   @Test
   public void metadataServiceIsUsedByDefault() throws Exception {
-    // ✅ RESPONSE 1: The service account info, now correctly nested under a "default" key.
+    // RESPONSE 1: The service account info, now correctly nested under a "default" key.
     LowLevelHttpResponse serviceAccountInfoResponse =
         new MockLowLevelHttpResponse()
             .setContentType(Json.MEDIA_TYPE)

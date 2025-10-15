@@ -118,6 +118,7 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
+  private static final String RAPID = "RAPID";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition
@@ -247,18 +248,13 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       if (!options.getHierarchicalNamespaceEnabled()) {
         throw new UnsupportedOperationException("Zonal buckets must have HNS Enabled.");
       }
-      // Note: Currently StorageClass does not have RAPID as an enum value. Since at
-      // the time of
-      // writing zonal buckets only support RAPID storage class we default the storage
-      // class to
-      // RAPID whenever a zonal placement is set and the storageClass is unset or
-      // null.
+      // Note: Currently StorageClass does not have RAPID as an enum value. Since at the time of
+      // writing zonal buckets only support RAPID storage class we default the storage class to
+      // RAPID whenever a zonal placement is set and the storageClass is unset or null.
       // Having storage class set as any other value will lead to an Exception thrown.
-      // Added Check for storage class equal to RAPID set by the user for when
-      // StorageClass enum
+      // Added Check for storage class equal to RAPID set by the user for when StorageClass enum
       // adds RAPID as a value to make sure this does not start breaking.
-      if (options.getStorageClass() != null
-          && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
+      if (options.getStorageClass() != null && !RAPID.equalsIgnoreCase(options.getStorageClass())) {
         throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
       }
       // Lifecycle Configs are currently not supported by zonal buckets
@@ -271,27 +267,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               BucketInfo.CustomPlacementConfig.newBuilder()
                   .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
                   .build())
-          .setStorageClass(StorageClass.valueOf("RAPID"))
-          // A zonal bucket must be an HNS Bucket.
-          .setHierarchicalNamespace(
-              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
-          .setIamConfiguration(
-              BucketInfo.IamConfiguration.newBuilder()
-                  .setIsUniformBucketLevelAccessEnabled(true)
-                  .build());
+          .setStorageClass(StorageClass.valueOf("RAPID"));
 
+      // A zonal bucket must be an HNS Bucket
+      enableHns(bucketInfoBuilder);
     } else {
       if (options.getStorageClass() != null) {
         bucketInfoBuilder.setStorageClass(
             StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
       }
       if (options.getHierarchicalNamespaceEnabled()) {
-        bucketInfoBuilder.setIamConfiguration(
-            BucketInfo.IamConfiguration.newBuilder()
-                .setIsUniformBucketLevelAccessEnabled(true)
-                .build());
-        bucketInfoBuilder.setHierarchicalNamespace(
-            HierarchicalNamespace.newBuilder().setEnabled(true).build());
+        enableHns(bucketInfoBuilder);
       }
 
       if (options.getTtl() != null) {
@@ -316,6 +302,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  private void enableHns(BucketInfo.Builder bucketInfoBuilder) {
+    bucketInfoBuilder
+        .setIamConfiguration(
+            BucketInfo.IamConfiguration.newBuilder()
+                .setIsUniformBucketLevelAccessEnabled(true)
+                .build())
+        .setHierarchicalNamespace(HierarchicalNamespace.newBuilder().setEnabled(true).build());
   }
 
   /**
@@ -469,41 +464,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             && bucket.getStorageClass() != null
             && "RAPID".equalsIgnoreCase(bucket.getStorageClass().toString());
     if (isRapid) {
-      {
-        try {
-          BlobAppendableUpload upload =
-              storageWrapper.blobAppendableUpload(
-                  BlobInfo.newBuilder(
-                          BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
-                      .setMetadata(rewrittenMetadata)
-                      .setContentEncoding(createObjectOptions.getContentEncoding())
-                      .setContentType(createObjectOptions.getContentType())
-                      .build(),
-                  BlobAppendableUploadConfig.of(),
-                  Storage.BlobWriteOption.doesNotExist());
-          try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
-            channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
-            channel.finalizeAndClose();
-          }
-        } catch (IOException e) {
-          // Check if the cause is a StorageException.
-          if (e.getCause() instanceof StorageException) {
-            StorageException storageException = (StorageException) e.getCause();
-            // Check if the cause is the specific "Precondition Failed" error (HTTP 412).
-            if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
-              // This is the expected error when the object already exists. Translate it to
-              // the
-              // exception that the calling method expects, similar to storage.create()
-              // exceptions.
-              throw new FileAlreadyExistsException(
-                  String.format("Object %s already exists.", resourceId));
-            }
-            throw storageException;
-          } else {
-            throw e;
-          }
-        }
-      }
+      createAppendableEmptyObject(resourceId, createObjectOptions, rewrittenMetadata);
     } else {
       storageWrapper.create(
           BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
@@ -512,6 +473,47 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
               .setContentType(createObjectOptions.getContentType())
               .build(),
           blobTargetOptions.toArray(BlobTargetOption[]::new));
+    }
+  }
+
+  private void createAppendableEmptyObject(
+      StorageResourceId resourceId,
+      CreateObjectOptions createObjectOptions,
+      Map<String, String> rewrittenMetadata)
+      throws IOException {
+    try {
+      BlobAppendableUpload upload =
+          storageWrapper.blobAppendableUpload(
+              BlobInfo.newBuilder(BlobId.of(resourceId.getBucketName(), resourceId.getObjectName()))
+                  .setMetadata(rewrittenMetadata)
+                  .setContentEncoding(createObjectOptions.getContentEncoding())
+                  .setContentType(createObjectOptions.getContentType())
+                  .build(),
+              BlobAppendableUploadConfig.of(),
+              Storage.BlobWriteOption.doesNotExist());
+      try (AppendableUploadWriteableByteChannel channel = upload.open(); ) {
+        channel.write(java.nio.ByteBuffer.wrap(new byte[0]));
+        channel.finalizeAndClose();
+      }
+    } catch (IOException e) {
+      // Check if the cause is a StorageException.
+      if (e.getCause() instanceof StorageException) {
+        StorageException storageException = (StorageException) e.getCause();
+        throwIfFileAlreadyExistsError(storageException, resourceId);
+        throw storageException;
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private void throwIfFileAlreadyExistsError(
+      StorageException storageException, StorageResourceId resourceId)
+      throws FileAlreadyExistsException {
+    if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
+      // This is the expected error when the object already exists. Translate it to the
+      // exception that the calling method expects, similar to storage.create() exceptions.
+      throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
     }
   }
 

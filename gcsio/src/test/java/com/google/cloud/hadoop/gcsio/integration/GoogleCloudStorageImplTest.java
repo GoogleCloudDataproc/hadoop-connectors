@@ -568,6 +568,8 @@ public class GoogleCloudStorageImplTest {
         emptyUploadRequestString(
             resourceId.getBucketName(), resourceId.getObjectName(), testStorageClientImpl);
 
+    // The GetBucket call is introduced in the ClientImpl to add support for RAPID storage
+    // zonal buckets and does not exist in the HTTP route.
     switch (requests.size()) {
       case 1:
         // SCENARIO 1:  Only the object creation call was made.

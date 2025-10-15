@@ -66,14 +66,12 @@ public class GoogleCloudStorageBidiWriteChannelTest {
     ByteBuffer src = ByteBuffer.wrap(new byte[] {1, 2, 3});
     when(mockGcsAppendChannel.write(any(ByteBuffer.class)))
         .thenAnswer(
-            new Answer<Integer>() {
-              public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = invocation.getArgument(0);
-                int remaining = buffer.remaining();
-                // Move the buffer's position to its limit to simulate a full write
-                buffer.position(buffer.limit());
-                return remaining;
-              }
+            invocation -> {
+              ByteBuffer buffer = invocation.getArgument(0);
+              int remaining = buffer.remaining();
+              // Move the buffer's position to its limit to simulate a full write
+              buffer.position(buffer.limit());
+              return remaining;
             });
 
     int bytesWritten = writeChannel.write(src);
