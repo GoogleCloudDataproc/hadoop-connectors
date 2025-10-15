@@ -267,7 +267,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                   .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
                   .build())
           .setStorageClass(StorageClass.valueOf("RAPID"));
-         
+
       // A zonal bucket must be an HNS Bucket
       enableHns(bucketInfoBuilder);
 
