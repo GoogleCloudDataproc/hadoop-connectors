@@ -60,6 +60,14 @@ public abstract class GoogleCloudStorageIntegrationHelper {
 
   private final TestBucketHelper bucketHelper = new TestBucketHelper(TEST_BUCKET_NAME_PREFIX);
 
+  private static final String DEFAULT_ZONE = "us-central1-a";
+  private static final String DEFAULT_REGION = "us-central1";
+  private static final String METADATA_SERVER_ZONE_URL =
+      "http://metadata.google.internal/computeMetadata/v1/instance/zone";
+  private static final String METADATA_FLAVOR_HEADER = "Metadata-Flavor";
+  private static final String METADATA_FLAVOR_VALUE = "Google";
+  private static final int METADATA_SERVER_TIMEOUT_MS = 5000;
+
   // Name of test buckets.
   public String sharedBucketName1;
   public String sharedBucketName2;
@@ -524,16 +532,14 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       return createUniqueBucket(suffix);
     } else {
 
-      String zone = "us-central1-a"; // Default zone
-      String region = "us-central1"; // Default region
-
+      String zone = DEFAULT_ZONE; // Default zone
+      String region = DEFAULT_REGION; // Default region
       try {
-        URL metadataServerUrl =
-            new URL("http://metadata.google.internal/computeMetadata/v1/instance/zone");
+        URL metadataServerUrl = new URL(METADATA_SERVER_ZONE_URL);
         HttpURLConnection connection = (HttpURLConnection) metadataServerUrl.openConnection();
-        connection.setRequestProperty("Metadata-Flavor", "Google");
-        connection.setConnectTimeout(5000); // 5-second connection timeout
-        connection.setReadTimeout(5000); // 5-second read timeout
+        connection.setRequestProperty(METADATA_FLAVOR_HEADER, METADATA_FLAVOR_VALUE);
+        connection.setConnectTimeout(METADATA_SERVER_TIMEOUT_MS); // 5-second connection timeout
+        connection.setReadTimeout(METADATA_SERVER_TIMEOUT_MS); // 5-second read timeout
 
         try (BufferedReader reader =
             new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
