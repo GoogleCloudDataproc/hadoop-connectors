@@ -118,6 +118,7 @@ import javax.annotation.Nullable;
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static final String USER_AGENT = "user-agent";
+  private static final String RAPID = "RAPID";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
@@ -252,8 +253,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       // Having storage class set as any other value will lead to an Exception thrown.
       // Added Check for storage class equal to RAPID set by the user for when StorageClass enum
       // adds RAPID as a value to make sure this does not start breaking.
-      if (options.getStorageClass() != null
-          && !"RAPID".equalsIgnoreCase(options.getStorageClass())) {
+      if (options.getStorageClass() != null && !RAPID.equalsIgnoreCase(options.getStorageClass())) {
         throw new UnsupportedOperationException("Zonal bucket storage class must be RAPID");
       }
       // Lifecycle Configs are currently not supported by zonal buckets
@@ -267,13 +267,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                   .setDataLocations(ImmutableList.of(options.getZonalPlacement()))
                   .build())
           .setStorageClass(StorageClass.valueOf("RAPID"))
-          // A zonal bucket must be an HNS Bucket.
-          .setHierarchicalNamespace(
-              BucketInfo.HierarchicalNamespace.newBuilder().setEnabled(true).build())
-          .setIamConfiguration(
-              BucketInfo.IamConfiguration.newBuilder()
-                  .setIsUniformBucketLevelAccessEnabled(true)
-                  .build());
+         
+      // A zonal bucket must be an HNS Bucket
+      enableHns(bucketInfoBuilder);
 
     } else {
       if (options.getStorageClass() != null) {
@@ -281,12 +277,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             StorageClass.valueOfStrict(options.getStorageClass().toUpperCase()));
       }
       if (options.getHierarchicalNamespaceEnabled()) {
-        bucketInfoBuilder.setIamConfiguration(
-            BucketInfo.IamConfiguration.newBuilder()
-                .setIsUniformBucketLevelAccessEnabled(true)
-                .build());
-        bucketInfoBuilder.setHierarchicalNamespace(
-            HierarchicalNamespace.newBuilder().setEnabled(true).build());
+        enableHns(bucketInfoBuilder);
       }
 
       if (options.getTtl() != null) {
@@ -311,6 +302,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       }
       throw new IOException(e);
     }
+  }
+
+  private void enableHns(BucketInfo.Builder bucketInfoBuilder) {
+    bucketInfoBuilder
+        .setIamConfiguration(
+            BucketInfo.IamConfiguration.newBuilder()
+                .setIsUniformBucketLevelAccessEnabled(true)
+                .build())
+        .setHierarchicalNamespace(HierarchicalNamespace.newBuilder().setEnabled(true).build());
   }
 
   /**
