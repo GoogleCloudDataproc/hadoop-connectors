@@ -73,7 +73,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           GoogleCloudStorageFileSystemJavaStorageClientTest.class,
           GoogleCloudStorageFileSystemBidiTest.class);
 
-
   // GCS FS test access instance.
   protected GoogleCloudStorageFileSystem gcsfs;
 
@@ -485,7 +484,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // At d1/o12.
     validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
-   if (INTEG_TEST_CLASSES.contains(getClass())) {
+    if (INTEG_TEST_CLASSES.contains(getClass())) {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
     } else {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
