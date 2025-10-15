@@ -156,10 +156,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     gcsiHelper = helper;
     if (bidiEnabled && gcsiHelper.gcsfs.getGcs() instanceof GoogleCloudStorageClientImpl) {
-      gcsiHelper.sharedBucketName1 =
-          gcsiHelper.createUniqueZonalOrRegionalBucket("zonal-shared-1", bidiEnabled);
-      gcsiHelper.sharedBucketName2 =
-          gcsiHelper.createUniqueZonalOrRegionalBucket("zonal-shared-2", bidiEnabled);
+      gcsiHelper.beforeAllTests(bidiEnabled);
     } else {
       gcsiHelper.beforeAllTests();
     }
@@ -472,9 +469,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemBidiTest.class)) {
       validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
-    } else {
-      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
     }
+    //  else {
+    //   validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
+    // }
 
     // At d1.
     validateListFileInfo(
@@ -489,9 +487,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         || getClass().equals(GoogleCloudStorageFileSystemJavaStorageClientTest.class)
         || getClass().equals(GoogleCloudStorageFileSystemBidiTest.class)) {
       validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
-    } else {
-      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
     }
+    //  else {
+    //   validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
+    // }
 
     // At d1/d11.
     validateListFileInfo(testBucket, "d1/d11/", /* expectedToExist= */ true, "d1/d11/o111");

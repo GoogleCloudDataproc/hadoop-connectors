@@ -78,6 +78,11 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     sharedBucketName2 = createUniqueBucket("shared-2");
   }
 
+  public void beforeAllTests(boolean isZonalEnabled) throws IOException{
+    sharedBucketName1 = createUniqueZonalOrRegionalBucket("shared-1", isZonalEnabled);
+    sharedBucketName2 = createUniqueZonalOrRegionalBucket("shared-2", isZonalEnabled);
+  }
+
   /** Perform clean-up once after all tests are turn. */
   public void afterAllTests() {
     try {
