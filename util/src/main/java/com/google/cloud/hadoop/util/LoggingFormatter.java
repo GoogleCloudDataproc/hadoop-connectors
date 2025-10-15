@@ -113,7 +113,7 @@ public class LoggingFormatter extends Formatter {
       return false;
     }
     try {
-      JsonParser.parseString(message);
+      var unused = JsonParser.parseString(message);
       return true; // If parsing succeeds, it's valid JSON.
     } catch (JsonSyntaxException e) {
       return false;

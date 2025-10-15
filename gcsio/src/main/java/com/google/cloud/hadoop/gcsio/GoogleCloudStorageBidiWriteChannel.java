@@ -22,6 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
+import com.google.cloud.storage.StorageChannelUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -106,7 +107,7 @@ public class GoogleCloudStorageBidiWriteChannel implements FinalizableWritableBy
   public int write(ByteBuffer src) throws IOException {
     if (!open) throw new ClosedChannelException();
     checkNotNull(src, "Source ByteBuffer (src) cannot be null");
-    return gcsAppendChannel.write(src);
+    return StorageChannelUtils.blockingEmptyTo(src, gcsAppendChannel);
   }
 
   @Override
