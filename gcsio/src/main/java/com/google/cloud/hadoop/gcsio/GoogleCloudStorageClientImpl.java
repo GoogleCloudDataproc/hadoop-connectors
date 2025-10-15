@@ -495,7 +495,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           // Check if the cause is a StorageException.
           if (e.getCause() instanceof StorageException) {
             StorageException storageException = (StorageException) e.getCause();
-            isFileAlreadyExistsError(storageException, resourceId);
+            throwIfFileAlreadyExistsError(storageException, resourceId);
             throw storageException;
           } else {
             throw e;
@@ -503,7 +503,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         }
   }
 
-  private void isFileAlreadyExistsError(StorageException storageException, StorageResourceId resourceId) throws FileAlreadyExistsException{
+  private void throwIfFileAlreadyExistsError(StorageException storageException, StorageResourceId resourceId) throws FileAlreadyExistsException{
     if (errorExtractor.getErrorType(storageException) == ErrorType.FAILED_PRECONDITION) {
       // This is the expected error when the object already exists. Translate it to the
       // exception that the calling method expects, similar to storage.create() exceptions.
