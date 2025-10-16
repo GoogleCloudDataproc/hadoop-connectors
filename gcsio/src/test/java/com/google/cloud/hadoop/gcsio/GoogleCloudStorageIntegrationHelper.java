@@ -28,14 +28,10 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.GoogleLogger;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -552,7 +548,8 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       //   }
       // } catch (IOException e) {
       //   logger.atWarning().log(
-      //       "Falling back to default region (%s) and zone (%s) because metadata server is unreachable.",
+      //       "Falling back to default region (%s) and zone (%s) because metadata server is
+      // unreachable.",
       //       region, zone);
       // }
 
