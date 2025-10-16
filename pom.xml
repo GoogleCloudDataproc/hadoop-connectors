@@ -25,7 +25,7 @@
 
   <groupId>com.google.cloud.bigdataoss</groupId>
   <artifactId>bigdataoss-parent</artifactId>
-  <version>4.0.0-RC01</version>
+  <version>4.0.000001-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <url>https://github.com/GoogleCloudDataproc/hadoop-connectors</url>
@@ -68,7 +68,7 @@
 
     <gpg.skip>true</gpg.skip>
 
-    <bigdataoss.version>4.0.0-RC01</bigdataoss.version>
+    <bigdataoss.version>4.0.000001-SNAPSHOT</bigdataoss.version>
 
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud.library.bom.version>26.69.0</google.cloud.library.bom.version>
