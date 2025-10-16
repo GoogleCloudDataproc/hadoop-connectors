@@ -50,5 +50,7 @@ steps:
 timeout: 2400s
 
 options:
-  machineType: 'N1_HIGHCPU_32'
+   pool:
+    name: 'projects/cloud-dataproc-ci/locations/us-central1/workerPools/integ-test-connector-pool'
+
 
