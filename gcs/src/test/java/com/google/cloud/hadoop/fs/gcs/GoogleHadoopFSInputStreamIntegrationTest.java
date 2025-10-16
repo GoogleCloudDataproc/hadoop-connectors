@@ -79,7 +79,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
 
-    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
 
     List<FileRange> ranges = new ArrayList<>();
     ranges.add(FileRange.createFileRange(0, 5));
