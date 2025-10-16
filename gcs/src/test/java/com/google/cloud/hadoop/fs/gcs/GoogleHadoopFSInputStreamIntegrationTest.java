@@ -69,6 +69,27 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   }
 
   @Test
+  public void testBidiVectoredRead() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getBidiTestConfiguration());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+
+    List<FileRange> ranges = new ArrayList<>();
+    ranges.add(FileRange.createFileRange(0, 5));
+    ranges.add(FileRange.createFileRange(5, 6));
+
+    in.readVectored(ranges, ByteBuffer::allocate);
+    validateVectoredReadResult(ranges, path);
+  }
+
+  @Test
   public void seek_illegalArgument() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
 
