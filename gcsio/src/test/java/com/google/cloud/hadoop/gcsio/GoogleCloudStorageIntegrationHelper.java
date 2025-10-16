@@ -28,14 +28,10 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.GoogleLogger;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -534,27 +530,28 @@ public abstract class GoogleCloudStorageIntegrationHelper {
 
       String zone = DEFAULT_ZONE; // Default zone
       String region = DEFAULT_REGION; // Default region
-      try {
-        URL metadataServerUrl = new URL(METADATA_SERVER_ZONE_URL);
-        HttpURLConnection connection = (HttpURLConnection) metadataServerUrl.openConnection();
-        connection.setRequestProperty(METADATA_FLAVOR_HEADER, METADATA_FLAVOR_VALUE);
-        connection.setConnectTimeout(METADATA_SERVER_TIMEOUT_MS); // 5-second connection timeout
-        connection.setReadTimeout(METADATA_SERVER_TIMEOUT_MS); // 5-second read timeout
+      // try {
+      //   URL metadataServerUrl = new URL(METADATA_SERVER_ZONE_URL);
+      //   HttpURLConnection connection = (HttpURLConnection) metadataServerUrl.openConnection();
+      //   connection.setRequestProperty(METADATA_FLAVOR_HEADER, METADATA_FLAVOR_VALUE);
+      //   connection.setConnectTimeout(METADATA_SERVER_TIMEOUT_MS); // 5-second connection timeout
+      //   connection.setReadTimeout(METADATA_SERVER_TIMEOUT_MS); // 5-second read timeout
 
-        try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-          String response = reader.readLine();
-          // The response is in the format "projects/PROJECT_NUMBER/zones/ZONE"
-          String[] parts = response.split("/");
-          String fullZone = parts[parts.length - 1];
-          zone = fullZone;
-          region = fullZone.substring(0, fullZone.lastIndexOf('-'));
-        }
-      } catch (IOException e) {
-        logger.atWarning().log(
-            "Falling back to default region (%s) and zone (%s) because metadata server is unreachable.",
-            region, zone);
-      }
+      //   try (BufferedReader reader =
+      //       new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+      //     String response = reader.readLine();
+      //     // The response is in the format "projects/PROJECT_NUMBER/zones/ZONE"
+      //     String[] parts = response.split("/");
+      //     String fullZone = parts[parts.length - 1];
+      //     zone = fullZone;
+      //     region = fullZone.substring(0, fullZone.lastIndexOf('-'));
+      //   }
+      // } catch (IOException e) {
+      //   logger.atWarning().log(
+      //       "Falling back to default region (%s) and zone (%s) because metadata server is
+      // unreachable.",
+      //       region, zone);
+      // }
 
       CreateBucketOptions zonalBucketOptions =
           CreateBucketOptions.builder()
