@@ -93,6 +93,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       try {
         readSession = sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
       } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Failed to get BlobReadSession", e);
       }
       this.blobReadSession = readSession;
