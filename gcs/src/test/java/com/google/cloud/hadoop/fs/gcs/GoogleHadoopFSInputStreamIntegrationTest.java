@@ -72,7 +72,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   @Test
   public void testBidiVectoredRead() throws Exception {
-    logger.atSevere().log("Dhriti_Debug, testBidiVectoredRead is called")
+    logger.atSevere().log("Dhriti_Debug, testBidiVectoredRead is called");
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testBidiVectoredRead");
 
     GoogleHadoopFileSystem ghfs =
@@ -90,8 +90,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     in.readVectored(ranges, ByteBuffer::allocate);
     validateVectoredReadResult(ranges, path);
-    logger.atSevere().log("Dhriti_Debug, testBidiVectoredRead is complete")
-
+    logger.atSevere().log("Dhriti_Debug, testBidiVectoredRead is complete");
   }
 
   @Test

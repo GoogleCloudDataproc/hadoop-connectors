@@ -67,7 +67,7 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     return config;
   }
 
-   public static Configuration getBidiTestConfiguration() {
+  public static Configuration getBidiTestConfiguration() {
     Configuration config = getTestConfig();
     config.setBoolean("fs.gs.bidi.enable", true);
     config.setEnum("fs.gs.client.type", ClientType.STORAGE_CLIENT);
