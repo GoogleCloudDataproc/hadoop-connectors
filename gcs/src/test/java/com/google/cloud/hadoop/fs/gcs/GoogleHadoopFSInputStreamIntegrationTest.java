@@ -32,6 +32,7 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURE
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.common.flogger.GoogleLogger;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
@@ -56,6 +57,7 @@ import org.junit.runners.JUnit4;
 public class GoogleHadoopFSInputStreamIntegrationTest {
 
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   @BeforeClass
   public static void beforeClass() throws Exception {
@@ -70,6 +72,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   @Test
   public void testBidiVectoredRead() throws Exception {
+    logger.atSevere().log("Dhriti_Debug, test bidi vectored read called");
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
 
     GoogleHadoopFileSystem ghfs =
@@ -87,6 +90,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     in.readVectored(ranges, ByteBuffer::allocate);
     validateVectoredReadResult(ranges, path);
+    logger.atSevere().log("Dhriti_Debug, test bidi vectored read complete ?");
   }
 
   @Test
