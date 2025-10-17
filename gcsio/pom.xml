@@ -33,6 +33,11 @@
   <artifactId>gcsio</artifactId>
   <version>3.0.0-SNAPSHOT</version>
 
+  <properties>
+    <gmavenplus.plugin.version>3.0.2</gmavenplus.plugin.version>
+    <groovy.version>3.0.21</groovy.version>
+  </properties>
+
   <profiles>
     <profile>
       <id>integration-test</id>
@@ -217,6 +222,39 @@
             <exclude>**/GoogleCloudStorageImplTest.java</exclude>
           </excludes>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.gmavenplus</groupId>
+        <artifactId>gmavenplus-plugin</artifactId>
+        <version>${gmavenplus.plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-json</artifactId>
+            <scope>runtime</scope>
+            <version>${groovy.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-templates</artifactId>
+            <version>${groovy.version}</version>
+            <scope>runtime</scope>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <id>generate-enum-from-json</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>execute</goal>
+            </goals>
+            <configuration>
+              <scripts>
+                <script>${project.basedir}/src/main/groovy/generate-enum.groovy</script>
+              </scripts>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
