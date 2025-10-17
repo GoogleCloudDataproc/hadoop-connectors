@@ -67,34 +67,11 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     return config;
   }
 
-  public static Configuration getBidiTestConfiguration() {
-    Configuration config = new Configuration();
-    config.setBoolean("fs.gs.implicit.dir.repair.enable", true);
-    // Allow buckets to be deleted in test cleanup:
-    config.setBoolean("fs.gs.bucket.delete.enable", true);
+   public static Configuration getBidiTestConfiguration() {
+    Configuration config = getTestConfig();
     config.setBoolean("fs.gs.bidi.enable", true);
     config.setEnum("fs.gs.client.type", ClientType.STORAGE_CLIENT);
     config.setBoolean("fs.gs.grpc.enable", true);
-
-    // Configure test authentication
-    TestConfiguration testConf = TestConfiguration.getInstance();
-    String projectId = checkNotNull(testConf.getProjectId(), ENV_VAR_MSG_FMT, GCS_TEST_PROJECT_ID);
-    config.set("fs.gs.project.id", projectId);
-
-    Boolean isApplicationDefaultModeEnabled =
-        TestConfiguration.getInstance().isApplicationDefaultModeEnabled();
-
-    if (testConf.getServiceAccountJsonKeyFile() != null) {
-      config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
-      config.set(
-          "fs.gs.auth.service.account.json.keyfile", testConf.getServiceAccountJsonKeyFile());
-
-    } else if (isApplicationDefaultModeEnabled) {
-      config.setEnum("fs.gs.auth.type", AuthenticationType.APPLICATION_DEFAULT);
-    }
-
-    config.setBoolean("fs.gs.grpc.directpath.enable", testConf.isDirectPathPreferred());
-
     return config;
   }
 
