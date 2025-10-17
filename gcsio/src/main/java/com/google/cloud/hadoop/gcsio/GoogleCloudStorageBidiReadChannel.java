@@ -197,6 +197,15 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       logger.atFinest().log("Closing channel for '%s'", resourceId);
       if (blobReadSession != null) {
         blobReadSession.close();
+      } else if (sessionFuture != null) {
+        try {
+          BlobReadSession readSession =
+              sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
+          this.blobReadSession = readSession;
+          readSession.close();
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+          throw new IOException("Failed to get/close BlobReadSession during close()", e);
+        }
       }
     }
   }
