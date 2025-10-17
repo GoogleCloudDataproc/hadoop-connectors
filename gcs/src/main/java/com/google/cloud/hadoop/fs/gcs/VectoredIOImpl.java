@@ -58,6 +58,7 @@ public class VectoredIOImpl implements Closeable {
 
   public VectoredIOImpl(
       VectoredReadOptions vectoredReadOptions, GhfsGlobalStorageStatistics storageStatistics) {
+    logger.atSevere().log("Dhriti_Debug Non Bidi VEctored IO Impl is called");    
     this.vectoredReadOptions = vectoredReadOptions;
     // same fixedThreadPool executor, but provided a way to query task queue
     this.boundedThreadPool =

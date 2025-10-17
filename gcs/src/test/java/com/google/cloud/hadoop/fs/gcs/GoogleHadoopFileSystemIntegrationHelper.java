@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.gcsio.testing.TestConfiguration.GCS_TEST_PROJECT_ID;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import java.net.URI;
@@ -72,6 +73,8 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     // Allow buckets to be deleted in test cleanup:
     config.setBoolean("fs.gs.bucket.delete.enable", true);
     config.setBoolean("fs.gs.bidi.enable", true);
+    config.setEnum("fs.gs.client.type", ClientType.STORAGE_CLIENT);
+    config.setBoolean("fs.gs.grpc.enable", true);
 
     // Configure test authentication
     TestConfiguration testConf = TestConfiguration.getInstance();
