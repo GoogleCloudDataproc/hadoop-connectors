@@ -204,6 +204,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   @Override
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
+    logger.atSevere().log("Dhriti_Debug, vectored read called");
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long vectoredReadStartTime = System.currentTimeMillis();
     BlobReadSession session = getBlobReadSession();

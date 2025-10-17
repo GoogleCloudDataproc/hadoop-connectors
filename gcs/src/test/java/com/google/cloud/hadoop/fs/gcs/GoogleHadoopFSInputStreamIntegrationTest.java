@@ -32,6 +32,7 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURE
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.common.flogger.GoogleLogger;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
@@ -56,6 +57,7 @@ import org.junit.runners.JUnit4;
 public class GoogleHadoopFSInputStreamIntegrationTest {
 
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   @BeforeClass
   public static void beforeClass() throws Exception {
@@ -66,6 +68,29 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   @AfterClass
   public static void afterClass() {
     gcsFsIHelper.afterAllTests();
+  }
+
+  @Test
+  public void testBidiVectoredRead() throws Exception {
+    logger.atSevere().log("Dhriti_Debug, testBidiVectoredRead is called");
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testBidiVectoredRead");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getBidiTestConfiguration());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+
+    List<FileRange> ranges = new ArrayList<>();
+    ranges.add(FileRange.createFileRange(0, 5));
+    ranges.add(FileRange.createFileRange(5, 6));
+
+    in.readVectored(ranges, ByteBuffer::allocate);
+    validateVectoredReadResult(ranges, path);
+    logger.atSevere().log("Dhriti_Debug, testBidiVectoredRead is complete");
   }
 
   @Test
