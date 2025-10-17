@@ -27,6 +27,8 @@ public class GoogleCloudStorageEventBus {
   private static EventBus eventBus = new EventBus();
 
   private static IOException exception = new IOException();
+  private static GCSChecksumFailureException checksumFailureException =
+      new GCSChecksumFailureException();
 
   /**
    * Method to register an obj to event bus
@@ -75,5 +77,9 @@ public class GoogleCloudStorageEventBus {
 
   public static void postGcsJsonApiEvent(IGcsJsonApiEvent gcsJsonApiEvent) {
     eventBus.post(gcsJsonApiEvent);
+  }
+
+  public static void postWriteCheckSumFailure() {
+    eventBus.post(checksumFailureException);
   }
 }
