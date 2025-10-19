@@ -237,7 +237,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                     long bytesRead =
                         processBytesAndCompleteRange(disposableByteString, range, allocate);
                     logger.atFiner().log(
-                        "Vectored Read successful for range starting from %d with length %d. Total Bytes Read are: %d within %d ms",
+                        "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
                         range.getOffset(),
                         range.getLength(),
                         bytesRead,
@@ -456,7 +456,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       ByteString byteString = dbs.byteString();
       if (!byteString.isEmpty()) {
         this.bufferStartPosition = position;
-        this.internalBuffer = byteString.asReadOnlyByteBuffer();
+
+        byte[] copiedBytes = byteString.toByteArray();
+        this.internalBuffer = ByteBuffer.wrap(copiedBytes);
       }
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       throw new IOException(
