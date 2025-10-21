@@ -72,21 +72,21 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   public void testBidiVectoredRead() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testBidiVectoredRead");
 
-    GoogleHadoopFileSystem ghfs =
-        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
-            path, GoogleHadoopFileSystemIntegrationHelper.getBidiTestConfiguration());
-
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
-
-    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
 
     List<FileRange> ranges = new ArrayList<>();
     ranges.add(FileRange.createFileRange(0, 5));
     ranges.add(FileRange.createFileRange(5, 6));
 
-    in.readVectored(ranges, ByteBuffer::allocate);
-    validateVectoredReadResult(ranges, path);
+    try (GoogleHadoopFileSystem ghfs =
+            GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+                path, GoogleHadoopFileSystemIntegrationHelper.getBidiTestConfiguration());
+        GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path)) {
+
+      in.readVectored(ranges, ByteBuffer::allocate);
+      validateVectoredReadResult(ranges, path);
+    }
   }
 
   @Test
