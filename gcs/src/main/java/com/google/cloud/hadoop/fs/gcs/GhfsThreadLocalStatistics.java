@@ -17,6 +17,8 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CONNECTOR_TIME;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import java.util.Arrays;
@@ -58,6 +60,10 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
   void increment(GhfsStatistic statistic, long count) {
     if (statistic == GCS_CONNECTOR_TIME) {
       Metric.HADOOP_API_TIME.increment(count);
+    } else if (statistic == STREAM_READ_VECTORED_OPERATIONS) {
+      Metric.STREAM_READ_VECTORED_COUNT.increment(count);
+    } else if (statistic == STREAM_READ_VECTORED_READ_COMBINED_RANGES) {
+      Metric.STREAM_READ_VECTORED_RANGE_COUNT.increment(count);
     } else if (statistic.getIsHadoopApi()) {
       Metric.HADOOP_API_COUNT.increment(count);
     }
@@ -104,7 +110,9 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     GCS_API_COUNT("gcsApiCount"),
     GCS_API_TIME("gcsApiTime"),
     BACKOFF_COUNT("backoffCount"),
-    BACKOFF_TIME("backoffTime");
+    BACKOFF_TIME("backoffTime"),
+    STREAM_READ_VECTORED_COUNT("readVectoredCount"),
+    STREAM_READ_VECTORED_RANGE_COUNT("readVectoredRangeCount");
 
     private final String metricName;
     private final ThreadLocalValue metricValue;
