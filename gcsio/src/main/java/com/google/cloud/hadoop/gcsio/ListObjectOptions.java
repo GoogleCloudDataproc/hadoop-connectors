@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.LIST_MAX_RESULTS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.OBJECT_FIELDS;
@@ -29,6 +30,10 @@ public abstract class ListObjectOptions {
 
   /** List all objects in the directory. */
   public static final ListObjectOptions DEFAULT = builder().build();
+
+  /** List objects starting from an offset. */
+  public static final ListObjectOptions DEFAULT_USING_START_OFFSET =
+      builder().setDelimiter(null).setMaxResults(LIST_MAX_RESULTS).build();
 
   /** List all objects with the prefix. */
   public static final ListObjectOptions DEFAULT_FLAT_LIST = builder().setDelimiter(null).build();
