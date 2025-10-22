@@ -524,7 +524,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         OBJECT_FIELDS,
         maxResults,
         pageToken,
-        startOffset);
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestWithStartOffset(
@@ -537,7 +538,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         OBJECT_FIELDS,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken,
-        startOffset);
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestWithStartOffset(
@@ -550,7 +552,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         fields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken,
-        startOffset);
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
   }
 
   public static String listRequestString(
