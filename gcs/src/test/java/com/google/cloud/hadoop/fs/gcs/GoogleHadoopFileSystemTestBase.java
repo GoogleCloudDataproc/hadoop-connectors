@@ -89,7 +89,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         // With parametrization method name will get [index] appended in their name.
         @Override
         public String getMethodName() {
-          return super.getMethodName().replaceAll("[\\[,\\]]", "");
+          return super.getMethodName().replaceAll("[\\[,\\],\\s+]", "");
         }
       };
 
