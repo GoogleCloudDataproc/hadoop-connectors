@@ -24,8 +24,12 @@ import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
-import com.google.cloud.hadoop.gcsio.*;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -34,15 +38,20 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 
 /**
  * Abstract base class for test suites targeting variants of GoogleHadoopFileSystem via the Hadoop
@@ -73,6 +82,16 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     newConfig.setEnum("fs.gs.client.type", storageClientType);
     return newConfig;
   }
+
+  @Rule
+  public TestName name =
+      new TestName() {
+        // With parametrization method name will get [index] appended in their name.
+        @Override
+        public String getMethodName() {
+          return super.getMethodName().replaceAll("[\\[,\\],\\s+]", "");
+        }
+      };
 
   // -----------------------------------------------------------------------------------------
   // Tests that vary according to the GHFS variant, but which we want to make sure get tested.
@@ -544,6 +563,31 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   }
 
   @Test
+  public void listStatusStartingFrom_sortedFileStatus() throws Exception {
+    int fileCount = 10;
+    List<Path> objectPath = new ArrayList<>();
+    URI dirObjectURI = new URI(name.getMethodName() + "/");
+    for (int i = 0; i < fileCount; i++) {
+      // create a random path file
+      Path filePath =
+          ghfsHelper.castAsHadoopPath(dirObjectURI.resolve(UUID.randomUUID().toString()));
+      ghfsHelper.writeFile(filePath, UUID.randomUUID().toString(), 1, /* overwrite= */ false);
+      objectPath.add(filePath);
+    }
+    List<Path> sortedPaths = objectPath.stream().sorted().collect(Collectors.toList());
+
+    FileStatus[] fileStatuses =
+        invokeListStatusStartingFromMethod(ghfsHelper.castAsHadoopPath(dirObjectURI));
+    // Can't assert that this is the only object we get in response, other object lexicographically
+    // higher would also come in response.
+    // Only thing we can assert strongly is, list would start with the files created in this
+    // directory.
+    for (int i = 0; i < fileCount; i++) {
+      assertThat(fileStatuses[i].getPath()).isEqualTo(sortedPaths.get(i));
+    }
+  }
+
+  @Test
   public void testGetFileStatusWithHint() throws Exception {
     Path hadoopPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
     ghfsHelper.writeFile(hadoopPath, UUID.randomUUID().toString(), 1, /* overwrite= */ false);
@@ -600,6 +644,19 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     }
 
     assertThat(getStatisticValue(GCS_METADATA_REQUEST)).isEqualTo(numTimes);
+  }
+
+  private Method getListStatusStartingFromMethod() throws NoSuchMethodException {
+    return ghfs.getClass().getMethod("listStatusStartingFrom", Path.class);
+  }
+
+  private FileStatus[] invokeListStatusStartingFromMethod(Path startFrom) throws Exception {
+    resetStats();
+
+    FileStatus[] fileStatus =
+        (FileStatus[]) getListStatusStartingFromMethod().invoke(ghfs, startFrom);
+
+    return fileStatus;
   }
 
   private Long getStatisticValue(GoogleCloudStorageStatistics stat) {

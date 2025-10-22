@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+1. Add listStatusStartingFrom API.
+
 1. Add AUTO_RANDOM as new fadvise mode.
 
 1. Add getFileStatusWithHint() API
