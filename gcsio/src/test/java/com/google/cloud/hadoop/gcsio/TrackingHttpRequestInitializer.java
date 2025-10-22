@@ -514,6 +514,48 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         bucket, /* includeTrailingDelimiter= */ true, prefix, objectFields, maxResults, pageToken);
   }
 
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken, int maxResults) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        OBJECT_FIELDS,
+        maxResults,
+        pageToken,
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
+  }
+
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        OBJECT_FIELDS,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken,
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
+  }
+
+  public static String listRequestWithStartOffset(
+      String bucket, String startOffset, String pageToken, String fields) {
+    return listRequestString(
+        bucket,
+        /* flatList */ true,
+        /* includeTrailingDelimiter */ null,
+        /* prefix */ null,
+        fields,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken,
+        startOffset,
+        /* includeFoldersAsPrefixes= */ false);
+  }
+
   public static String listRequestString(
       String bucket,
       Boolean includeTrailingDelimiter,
@@ -544,6 +586,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         objectFields,
         maxResults,
         pageToken,
+        /* startOffset */ null,
         /* includeFoldersAsPrefixes= */ false);
   }
 
@@ -562,6 +605,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         objectFields,
         GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken,
+        /* startOffset */ null,
         /* includeFoldersAsPrefixes= */ false);
   }
 
@@ -573,6 +617,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String objectFields,
       int maxResults,
       String pageToken,
+      String startOffset,
       Boolean includeFoldersAsPrefixes) {
 
     String baseUrl = String.format(LIST_REQUEST_FORMAT, bucket);
@@ -590,6 +635,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
     addIfNotnull(params, "pageToken", pageToken);
     addIfNotnull(params, "prefix", prefix);
+
+    addIfNotnull(params, "startOffset", startOffset);
 
     return baseUrl + "?" + String.join("&", params);
   }
