@@ -46,8 +46,14 @@ public interface GoogleCloudStorage {
    */
   String PATH_DELIMITER = "/";
 
-  /** Value indicating all objects should be returned from GCS, no limit. */
+  /**
+   * Value indicating all objects should be returned from GCSFileSystem. No limit i.e. get all
+   * possible items. Used while listing all files in a directory
+   */
   long MAX_RESULTS_UNLIMITED = -1;
+
+  /** Value indicates the maxResult returned by gcs List API. */
+  long LIST_MAX_RESULTS = 5000L;
 
   /** The maximum number of objects that can be composed in one operation. */
   int MAX_COMPOSE_OBJECTS = 32;
@@ -371,6 +377,33 @@ public interface GoogleCloudStorage {
   }
 
   /**
+   * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and their
+   * name is lexicographically greater than or equal the provided offset.
+   *
+   * <p>Note: As GCS doesn't implement a file system, directory is also treated as an object (if
+   * it's been created). This APi filters out all those directory object and maintain the order of
+   * items. This APi strictly expects delimiter in listOptions to be not set.
+   *
+   * <p>Consider a bucket with objects: {@code o1}, {@code d1/}, {@code d1/o1}, {@code d1/o2}
+   *
+   * <ul>
+   *   <li/>With {@code startOffset == "o1"} , we get: {@code o1}
+   *   <li/>With {@code startOffset == "d1/"} , we get: {@code d1/o1} {@code d1/o2}
+   *   <li/>With {@code startOffset == "d1/"o1} , we get: {@code d1/o1} {@code d1/o2}
+   *       <p>This is an experimental API and can change without notice.
+   *
+   * @param bucketName bucket name
+   * @param startOffset offset sting, all object with name greater and equal will be listed.
+   * @return list of objects
+   * @throws IOException on IO error
+   */
+  default List<GoogleCloudStorageItemInfo> listObjectInfoStartingFrom(
+      String bucketName, String startOffset) throws IOException {
+    return listObjectInfoStartingFrom(
+        bucketName, startOffset, ListObjectOptions.DEFAULT_USING_START_OFFSET);
+  }
+
+  /**
    * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
    * names begin with the given prefix.
    *
@@ -397,6 +430,31 @@ public interface GoogleCloudStorage {
    */
   List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions) throws IOException;
+
+  /**
+   * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and their
+   * name is lexicographically greater than or equal the provided offset.
+   *
+   * <p>Note: As GCS doesn't implement a file system, directory is also treated as an object (if
+   * it's been created). This APi filters out all those directory object and maintain the order of
+   * items. This APi strictly expects delimiter in listOptions to be not set.
+   *
+   * <p>Consider a bucket with objects: {@code o1}, {@code d1/}, {@code d1/o1}, {@code d1/o2}
+   *
+   * <ul>
+   *   <li/>With {@code startOffset == "o1"} , we get: {@code o1}
+   *   <li/>With {@code startOffset == "d1/"} , we get: {@code d1/o1} {@code d1/o2}
+   *   <li/>With {@code startOffset == "d1/"o1} , we get: {@code d1/o1} {@code d1/o2}
+   *       <p>This is an experimental API and can change without notice.
+   *
+   * @param bucketName bucket name
+   * @param startOffset offset sting, all object with name greater and equal will be listed.
+   * @param listOptions options to use when listing objects
+   * @return list of objects
+   * @throws IOException on IO error
+   */
+  List<GoogleCloudStorageItemInfo> listObjectInfoStartingFrom(
+      String bucketName, String startOffset, ListObjectOptions listOptions) throws IOException;
 
   /**
    * The same semantics as {@link #listObjectInfo}, but returns only result of single list request

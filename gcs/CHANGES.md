@@ -1,10 +1,12 @@
 # Release Notes
 
 ## Next
+
 1. Upgrade hadoop versionto `3.4.2`
 2. Add bidi-support in connector
 
-### 4.0.x
+1. Add listStatusStartingFrom API.
+
 1. Add AUTO_RANDOM as new fadvise mode.
 
 1. Add getFileStatusWithHint() API
