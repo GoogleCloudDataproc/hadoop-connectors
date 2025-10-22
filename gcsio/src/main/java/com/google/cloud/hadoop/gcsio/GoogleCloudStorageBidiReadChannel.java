@@ -193,23 +193,29 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   @Override
   public void close() throws IOException {
     if (open) {
-      open = false;
       logger.atFinest().log("Closing channel for '%s'", resourceId);
-      if (blobReadSession != null) {
-        blobReadSession.close();
-      } else if (sessionFuture != null) {
-        try (BlobReadSession readSession =
-            sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS)) {
-          // The try-with-resources statement ensures the readSession is automatically closed.
-        } catch (InterruptedException
-            | ExecutionException
-            | TimeoutException
-            | java.util.concurrent.CancellationException e) {
-          throw new IOException("Failed to get/close BlobReadSession during close()", e);
-        } catch (NullPointerException e) {
-          logger.atFine().log(
-              "sessionFuture.get() returned null during close(), nothing to close.");
+      try {
+        if (blobReadSession != null) {
+          blobReadSession.close();
+        } else if (sessionFuture != null) {
+          try (BlobReadSession readSession =
+              sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS)) {
+            // The try-with-resources statement ensures the readSession is automatically closed.
+          } catch (InterruptedException
+              | ExecutionException
+              | TimeoutException
+              | java.util.concurrent.CancellationException e) {
+            logger.atFine().withCause(e).log(
+                "Failed to get/close BlobReadSession during close() for '%s'", resourceId);
+          }
         }
+      } catch (Exception e) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IOException(
+            String.format("Exception occurred while closing channel '%s'", resourceId), e);
+      } finally {
+        blobReadSession = null;
+        open = false;
       }
     }
   }
