@@ -187,7 +187,7 @@ public class GoogleCloudStorageStatisticsTest {
 
   @Test
   public void gcs_writeChecksumFailureCount() throws IOException {
-    GoogleCloudStorageEventBus.postWriteCheckSumFailure();
+    GoogleCloudStorageEventBus.postWriteChecksumFailure();
     GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
     verifyCounterStats.incrementCounter(WRITE_CHECKSUM_FAILURE_COUNT, 1);
     verifyStatistics(verifyCounterStats);
