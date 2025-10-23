@@ -27,8 +27,7 @@ public class GoogleCloudStorageEventBus {
   private static EventBus eventBus = new EventBus();
 
   private static IOException exception = new IOException();
-  private static GCSChecksumFailureEvent checksumFailureEvent =
-      new GCSChecksumFailureEvent();
+  private static GCSChecksumFailureEvent checksumFailureEvent = new GCSChecksumFailureEvent();
 
   /**
    * Method to register an obj to event bus

@@ -16,7 +16,5 @@
 
 package com.google.cloud.hadoop.util;
 
-/**
- * A thin class to emit checksum failure event for EventBus notification.
- */
+/** A thin class to emit checksum failure event for EventBus notification. */
 public class GCSChecksumFailureEvent extends Exception {}
