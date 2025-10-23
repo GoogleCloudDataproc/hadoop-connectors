@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.gcsio.testing.TestConfiguration.GCS_TEST_PROJECT_ID;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import java.net.URI;
@@ -63,6 +64,14 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
 
     config.setBoolean("fs.gs.grpc.directpath.enable", testConf.isDirectPathPreferred());
 
+    return config;
+  }
+
+  public static Configuration getBidiTestConfiguration() {
+    Configuration config = getTestConfig();
+    config.setBoolean("fs.gs.bidi.enable", true);
+    config.setEnum("fs.gs.client.type", ClientType.STORAGE_CLIENT);
+    config.setBoolean("fs.gs.grpc.enable", true);
     return config;
   }
 
