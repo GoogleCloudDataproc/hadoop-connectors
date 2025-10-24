@@ -32,6 +32,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.WRITE_CHECKSUM_FAILURE_COUNT;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTAL;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -294,6 +295,10 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
 
   void incrementGcsExceptionCount() {
     increment(EXCEPTION_COUNT);
+  }
+
+  void incrementWriteChecksumFailureCount() {
+    increment(WRITE_CHECKSUM_FAILURE_COUNT);
   }
 
   void incrementGcsTotalRequestCount() {
