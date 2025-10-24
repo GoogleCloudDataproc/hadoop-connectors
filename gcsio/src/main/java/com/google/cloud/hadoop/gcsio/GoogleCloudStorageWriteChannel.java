@@ -130,6 +130,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
     String srcCrc =
         BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
     if (!srcCrc.equals(serverProvidedCrc32c)) {
+      GoogleCloudStorageEventBus.postWriteChecksumFailure();
       throw new IOException(
           String.format(
               "Data integrity check failed for resource '%s'. Client-calculated CRC32C (%s) did not match server-provided CRC32C (%s).",
