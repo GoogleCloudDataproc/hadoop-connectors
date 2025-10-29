@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.14 - 2025-10-29
 1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayout.
 
 ## 3.0.13 - 2025-10-09
