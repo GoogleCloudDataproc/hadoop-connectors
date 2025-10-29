@@ -214,6 +214,39 @@ public class GoogleCloudStorageClientGrpcDownscopingInterceptorTest extends Test
     verify(interceptedLoggingCall, handler.getExpectedComposeHeader(sources));
   }
 
+  public void testMultipleAuthInterceptors_shouldNotSendMultipleAuthHeaders() {
+    GoogleCloudStorageClientGrpcDownscopingInterceptor interceptor1 =
+        new GoogleCloudStorageClientGrpcDownscopingInterceptor(accessBoundaries -> "token1");
+    GoogleCloudStorageClientGrpcDownscopingInterceptor interceptor2 =
+        new GoogleCloudStorageClientGrpcDownscopingInterceptor(accessBoundaries -> "token2");
+
+    Channel interceptedChannel =
+        io.grpc.ClientInterceptors.intercept(channel, interceptor1, interceptor2);
+
+    MethodDescriptor<ReadObjectRequest, byte[]> method =
+        getMethodDescriptor(GOOGLE_STORAGE_V_2_STORAGE_READ_OBJECT);
+
+    ClientCall<ReadObjectRequest, byte[]> call =
+        interceptedChannel.newCall(method, CallOptions.DEFAULT);
+
+    call.start(listener, clientInitial);
+    call.sendMessage(
+        ReadObjectRequest.newBuilder()
+            .setBucket(handler.getFormattedBucketName())
+            .setObject(handler.getObjectName())
+            .build());
+
+    List<String> actualAuthHeaders =
+        ImmutableList.copyOf(
+            actualClientInitial
+                .get()
+                .getAll(GoogleCloudStorageClientGrpcDownscopingInterceptor.AUTH_KEY));
+
+    // Only the last interceptor's header should be present.
+    assertEquals(1, actualAuthHeaders.size());
+    assertEquals("Bearer token2", actualAuthHeaders.get(0));
+  }
+
   private static MethodDescriptor getMethodDescriptor(String methodName) {
     return MethodDescriptor.<StartResumableWriteRequest, byte[]>newBuilder()
         .setType(MethodType.UNARY)
