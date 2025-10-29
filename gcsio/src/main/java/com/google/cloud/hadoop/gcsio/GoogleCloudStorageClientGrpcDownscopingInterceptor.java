@@ -140,7 +140,9 @@ class GoogleCloudStorageClientGrpcDownscopingInterceptor implements ClientInterc
         String token = getDownScopedToken(message);
         if (token != null) {
           logger.atFinest().log("Setting down-scoped auth token");
-          headers.put(AUTH_KEY, "Bearer " + token);
+          if (!headers.containsKey(AUTH_KEY)) {
+            headers.put(AUTH_KEY, "Bearer " + token);
+          }
         }
       }
 
