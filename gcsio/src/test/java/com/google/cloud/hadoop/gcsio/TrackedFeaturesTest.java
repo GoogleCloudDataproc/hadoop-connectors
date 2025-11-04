@@ -9,17 +9,28 @@ public class TrackedFeaturesTest {
   public void allBitPositions_areCorrect() {
     // This test ensures that the bit positions of all tracked features remain consistent and is not
     // changed accidentally.
-    assertThat(TrackedFeatures.FADVISE_AUTO.getBitPosition()).isEqualTo(0);
-    assertThat(TrackedFeatures.FADVISE_RANDOM.getBitPosition()).isEqualTo(1);
-    assertThat(TrackedFeatures.FADVISE_SEQUENTIAL.getBitPosition()).isEqualTo(2);
-    assertThat(TrackedFeatures.FADVISE_AUTORANDOM.getBitPosition()).isEqualTo(3);
-    assertThat(TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED.getBitPosition()).isEqualTo(4);
-    assertThat(TrackedFeatures.PERFORMANCE_CACHE_ENABLED.getBitPosition()).isEqualTo(5);
-    assertThat(TrackedFeatures.CLOUD_LOGGING_ENABLED.getBitPosition()).isEqualTo(6);
-    assertThat(TrackedFeatures.TRACE_LOG_ENABLED.getBitPosition()).isEqualTo(7);
-    assertThat(TrackedFeatures.OPERATION_TRACE_LOG_ENABLED.getBitPosition()).isEqualTo(8);
-    assertThat(TrackedFeatures.DIRECT_UPLOAD_ENABLED.getBitPosition()).isEqualTo(9);
-    assertThat(TrackedFeatures.BIDI_ENABLED.getBitPosition()).isEqualTo(10);
-    assertThat(TrackedFeatures.RENAME_API.getBitPosition()).isEqualTo(11);
+    java.util.Map<TrackedFeatures, Integer> expectedBitPositions =
+        com.google.common.collect.ImmutableMap.<TrackedFeatures, Integer>builder()
+            .put(TrackedFeatures.FADVISE_AUTO, 0)
+            .put(TrackedFeatures.FADVISE_RANDOM, 1)
+            .put(TrackedFeatures.FADVISE_SEQUENTIAL, 2)
+            .put(TrackedFeatures.FADVISE_AUTORANDOM, 3)
+            .put(TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED, 4)
+            .put(TrackedFeatures.PERFORMANCE_CACHE_ENABLED, 5)
+            .put(TrackedFeatures.CLOUD_LOGGING_ENABLED, 6)
+            .put(TrackedFeatures.TRACE_LOG_ENABLED, 7)
+            .put(TrackedFeatures.OPERATION_TRACE_LOG_ENABLED, 8)
+            .put(TrackedFeatures.DIRECT_UPLOAD_ENABLED, 9)
+            .put(TrackedFeatures.BIDI_ENABLED, 10)
+            .put(TrackedFeatures.RENAME_API, 11)
+            .build();
+
+    // Verifies that no new features have been added without updating this test.
+    assertThat(TrackedFeatures.values()).hasLength(expectedBitPositions.size());
+
+    // Verifies that the bit position for each feature is correct.
+    for (java.util.Map.Entry<TrackedFeatures, Integer> entry : expectedBitPositions.entrySet()) {
+      assertThat(entry.getKey().getBitPosition()).isEqualTo(entry.getValue());
+    }
   }
 }
