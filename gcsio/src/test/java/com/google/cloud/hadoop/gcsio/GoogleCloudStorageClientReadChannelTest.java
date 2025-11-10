@@ -68,6 +68,7 @@ public class GoogleCloudStorageClientReadChannelTest {
           .setGrpcChecksumsEnabled(true)
           .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
           .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
+          .setFastFailOnNotFoundEnabled(true)
           .build();
 
   private static final GoogleCloudStorageItemInfo DEFAULT_ITEM_INFO =

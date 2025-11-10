@@ -1305,7 +1305,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    GoogleCloudStorageItemInfo gcsItemInfo = itemInfo == null ? getItemInfo(resourceId) : itemInfo;
+    GoogleCloudStorageItemInfo gcsItemInfo;
+    if (itemInfo != null) {
+      gcsItemInfo = itemInfo;
+    } else if (readOptions.isFastFailOnNotFoundEnabled()) {
+      gcsItemInfo = getItemInfo(resourceId);
+    } else {
+      gcsItemInfo = GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of
     // flag
