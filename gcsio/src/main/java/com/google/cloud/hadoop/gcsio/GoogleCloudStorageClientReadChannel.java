@@ -274,7 +274,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               contentChannelEnd = currentPosition;
             }
 
-            if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
+            if (currentPosition < contentChannelEnd && currentPosition < objectSize) {
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
@@ -284,7 +284,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
-            if (contentChannelEnd != objectSize && currentPosition == contentChannelEnd) {
+            if (contentChannelEnd != objectSize && currentPosition >= contentChannelEnd) {
               closeContentChannel();
               continue;
             } else {
