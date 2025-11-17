@@ -236,18 +236,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
         int remainingBeforeRead = dst.remaining();
-
-        long distinctRemaining = contentChannelEnd - currentPosition;
-
-        if (distinctRemaining <= 0) {
-          // We reached the logical end, even if the stream has more data.
-          return -1;
-        }
-
-        int originalLimit = dst.limit();
-        if (dst.remaining() > distinctRemaining) {
-          dst.limit(dst.position() + (int) distinctRemaining);
-        }
         try {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
@@ -322,10 +310,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
           throw convertError(e);
-        } finally {
-          if (dst.limit() != originalLimit) {
-            dst.limit(originalLimit);
-          }
         }
       }
       return totalBytesRead;
