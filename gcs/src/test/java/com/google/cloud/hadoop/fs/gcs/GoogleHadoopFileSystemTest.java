@@ -124,6 +124,116 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         .isFalse();
   }
 
+
+  @Test
+  public void multiThreadedReadAndSeekTest() throws Exception {
+    // Create a file with some content.
+    Path testFile = new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET + "/test-file");
+    int fileSize = 1024 * 1024; // 1MB
+    byte[] data = new byte[fileSize];
+    for (int i = 0; i < fileSize; i++) {
+      data[i] = (byte) (i % 256);
+    }
+    try (org.apache.hadoop.fs.FSDataOutputStream out = ghfs.create(testFile)) {
+      out.write(data);
+    }
+
+    // Open the file.
+    final FSDataInputStream in = ghfs.open(testFile);
+    final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(
+        true);
+    final java.util.concurrent.atomic.AtomicReference<Throwable> exception = new java.util.concurrent.atomic.AtomicReference<>(
+        null);
+
+    // Thread 1: read
+    Thread readerThread = new Thread(() -> {
+      byte[] buffer = new byte[8192];
+      try {
+        while (running.get()) {
+          int bytesRead = in.read(buffer);
+          if (bytesRead == -1) {
+            in.seek(0); // seek to beginning to read again
+          }
+        }
+      } catch (IOException e) {
+        exception.set(e);
+        running.set(false);
+      }
+    });
+
+    // Thread 2: seek
+    Thread seekerThread = new Thread(() -> {
+      try {
+        while (running.get()) {
+          long newPos = (long) (Math.random() * fileSize);
+          in.seek(newPos);
+          try {
+            Thread.sleep(10);
+          } catch (InterruptedException e) {
+            // ignore
+          }
+        }
+      } catch (IOException e) {
+        exception.set(e);
+        running.set(false);
+      }
+    });
+
+    readerThread.start();
+    seekerThread.start();
+
+    // Run for 5 seconds
+    try {
+      Thread.sleep(5000);
+    } catch (InterruptedException e) {
+      // ignore
+    }
+
+    running.set(false);
+    readerThread.join();
+    seekerThread.join();
+
+    in.close();
+
+    if (exception.get() != null) {
+      throw new Exception("Test failed with exception", exception.get());
+    }
+  }
+
+
+  @Test
+  public void testReadWithVaryingBufferSizes() throws IOException {
+    Path testFile = new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET + "/test-file-varying-buffer");
+    int fileSize = 100 * 1024; // 100KB
+    byte[] data = new byte[fileSize];
+    for (int i = 0; i < fileSize; i++) {
+      data[i] = (byte) (i % 128);
+    }
+
+    try (org.apache.hadoop.fs.FSDataOutputStream out = ghfs.create(testFile)) {
+      out.write(data);
+    }
+
+    try (FSDataInputStream in = ghfs.open(testFile)) {
+      ByteArrayOutputStream readData = new ByteArrayOutputStream();
+      int[] bufferSizes = {1024, 4096, 8192, 512}; // 1K, 4K, 8K, 0.5K
+      int bufferSizeIndex = 0;
+      int bytesRead;
+
+      while (true) {
+        byte[] buffer = new byte[bufferSizes[bufferSizeIndex % bufferSizes.length]];
+        bytesRead = in.read(buffer);
+        if (bytesRead == -1) {
+          break;
+        }
+        readData.write(buffer, 0, bytesRead);
+        bufferSizeIndex++;
+      }
+
+      assertThat(readData.toByteArray()).isEqualTo(data);
+    }
+  }
+
   @Test
   @SuppressWarnings("CheckReturnValue")
   public void lazyInitialization_succeeds_withInvalidCredentialsConfiguration() throws Exception {

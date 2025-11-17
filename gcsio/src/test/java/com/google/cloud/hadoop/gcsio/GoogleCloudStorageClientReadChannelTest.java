@@ -141,11 +141,11 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void readOvershootDoesntThrowException() throws IOException {
-    int readBytes = 800;
+    int readBytes = 1024;
     fakeReadChannel = spy(new FakeReadChannel(CONTENT));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
     readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
-    int startPosition = 0;
+    int startPosition = 100;
     readChannel.position(startPosition);
     assertThat(readChannel.position()).isEqualTo(startPosition);
     ByteBuffer buffer = ByteBuffer.allocate(readBytes + 1300);
@@ -154,7 +154,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     readChannel.read(buffer);
 
-    buffer.limit(2100);
+    // buffer.limit(1924);
     buffer.position(900);
 
     readChannel.read(buffer);
