@@ -202,16 +202,18 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private static final String FORMATTED_EOF_ERROR_MESSAGE =
         "Unexpected EndOfStream detected at, ("
             + "beginDstPosition: %d, "
-            + "beginDstRemaining: %d, "
+            + "beginDstLimit: %d, "
             + "beginCurrentPosition: %d, "
             + "beginContentChannelCurrentPosition: %d, "
             + "beginContentChannelEnd: %d, "
             + "remainingBeforeRead: %d, "
             + "currentPosition: %d, "
             + "contentChannelCurrentPosition: %d, "
+            + "currentDstPosition: %d, "
+            + "currentDstLimit: %d, "
             + "totalBytesRead: %d, "
             + "expectedContentChannelEnd: %d, "
-            + "objectSize: %d,"
+            + "objectSize: %d, "
             + "resourceId: %s).";
     private final BlobId blobId;
 
@@ -255,7 +257,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       while (dst.hasRemaining()) {
         final int remainingBeforeRead = dst.remaining();
         final int beginDstPosition = dst.position();
-        final int beginDstRemaining = dst.remaining();
+        final int beginDstLimit = dst.limit();
         final long beginCurrentPosition = currentPosition;
         final long beginContentChannelCurrentPosition = contentChannelCurrentPosition;
         final long beginContentChannelEnd = contentChannelEnd;
@@ -305,13 +307,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       "Received end of stream result before all requestedBytes were received;"
                           + FORMATTED_EOF_ERROR_MESSAGE,
                       beginDstPosition,
-                      beginDstRemaining,
+                      beginDstLimit,
                       beginCurrentPosition,
                       beginContentChannelCurrentPosition,
                       beginContentChannelEnd,
                       remainingBeforeRead,
                       currentPosition,
                       contentChannelCurrentPosition,
+                      dst.position(),
+                      dst.limit(),
                       totalBytesRead,
                       contentChannelEnd,
                       objectSize,
@@ -322,13 +326,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       "Received end of stream result beyond the object size;"
                           + FORMATTED_EOF_ERROR_MESSAGE,
                       beginDstPosition,
-                      beginDstRemaining,
+                      beginDstLimit,
                       beginCurrentPosition,
                       beginContentChannelCurrentPosition,
                       beginContentChannelEnd,
                       remainingBeforeRead,
                       currentPosition,
                       contentChannelCurrentPosition,
+                      dst.position(),
+                      dst.limit(),
                       totalBytesRead,
                       contentChannelEnd,
                       objectSize,
@@ -338,13 +344,15 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   "Received end of stream result after the channel end;"
                       + FORMATTED_EOF_ERROR_MESSAGE,
                   beginDstPosition,
-                  beginDstRemaining,
+                  beginDstLimit,
                   beginCurrentPosition,
                   beginContentChannelCurrentPosition,
                   beginContentChannelEnd,
                   remainingBeforeRead,
                   currentPosition,
                   contentChannelCurrentPosition,
+                  dst.position(),
+                  dst.limit(),
                   totalBytesRead,
                   contentChannelEnd,
                   objectSize,
