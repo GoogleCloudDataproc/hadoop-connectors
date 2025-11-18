@@ -260,7 +260,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // in the first read. Therefore, loop till we either read the required number of
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
-        final int remainingBeforeRead = dst.remaining();
+        int remainingBeforeRead = dst.remaining();
         try {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
@@ -300,7 +300,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             }
 
             if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
-
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
