@@ -598,16 +598,8 @@ public class GoogleCloudStorageClientReadChannelTest {
     int startPosition = 0;
     readChannel.position(startPosition);
     IOException e = assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
-    String expectedErrorMsg =
-        String.format(
-            "Error reading '%s'. cause='%s'",
-            RESOURCE_ID,
-            String.format(
-                "Received end of stream result beyond the object size;"
-                    + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d "
-                    + "for resource: %s of size: %d; bytesRead: %d",
-                readChannel.size() + 1, CHUNK_SIZE, RESOURCE_ID, readChannel.size(), -1));
-    assertThat(e).hasMessageThat().isEqualTo(expectedErrorMsg);
+
+    assertThat(e).hasMessageThat().contains("Received end of stream result beyond the object size;");
   }
 
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {

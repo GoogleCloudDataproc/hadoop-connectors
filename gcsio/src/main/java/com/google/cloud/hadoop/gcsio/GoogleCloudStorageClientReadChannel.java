@@ -200,8 +200,19 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private static final int SKIP_BUFFER_SIZE = 8192;
 
     private static final String FORMATTED_EOF_ERROR_MESSAGE =
-        "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d "
-            + "for resource: %s of size: %d; bytesRead: %d";
+        "Unexpected EndOfStream detected at. ("
+        + "beginDstPosition: %d, "
+        + "beginDstRemaining: %d, "
+        + "beginCurrentPosition: %d, "
+        + "beginContentChannelCurrentPosition: %d, "
+        + "beginContentChannelEnd: %d, "
+        + "remainingBeforeRead: %d, "
+        + "currentPosition: %d, "
+        + "contentChannelCurrentPosition: %d, "
+        + "totalBytesRead: %d, "
+        + "expectedContentChannelEnd: %d, "
+        + "objectSize: %d,"
+        + "resourceId: %s)";
     private final BlobId blobId;
 
     // This is the actual current position in `contentChannel` from where read can happen.
@@ -243,6 +254,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
         int remainingBeforeRead = dst.remaining();
+        int beginDstPosition = dst.position();
+        int beginDstRemaining = dst.remaining();
+        long beginCurrentPosition = currentPosition;
+        long beginContentChannelCurrentPosition = contentChannelCurrentPosition;
+        long beingContentChannelEnd = contentChannelEnd;
         try {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
@@ -288,30 +304,51 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   String.format(
                       "Received end of stream result before all requestedBytes were received;"
                           + FORMATTED_EOF_ERROR_MESSAGE,
+                      beginDstPosition,
+                      beginDstRemaining,
+                      beginCurrentPosition,
+                      beginContentChannelCurrentPosition,
+                      beingContentChannelEnd,
+                      remainingBeforeRead,
                       currentPosition,
+                      contentChannelCurrentPosition,
+                      totalBytesRead,
                       contentChannelEnd,
-                      resourceId,
                       objectSize,
-                      bytesRead));
+                      resourceId));
             } else if (currentPosition > objectSize) {
               throw new IOException(
                   String.format(
                       "Received end of stream result beyond the object size;"
                           + FORMATTED_EOF_ERROR_MESSAGE,
+                      beginDstPosition,
+                      beginDstRemaining,
+                      beginCurrentPosition,
+                      beginContentChannelCurrentPosition,
+                      beingContentChannelEnd,
+                      remainingBeforeRead,
                       currentPosition,
+                      contentChannelCurrentPosition,
+                      totalBytesRead,
                       contentChannelEnd,
-                      resourceId,
                       objectSize,
-                      bytesRead));
+                      resourceId));
             } else if (currentPosition > contentChannelEnd) {
               logger.atWarning().log(
                   "Received end of stream result after the channel end;"
                       + FORMATTED_EOF_ERROR_MESSAGE,
+                  beginDstPosition,
+                  beginDstRemaining,
+                  beginCurrentPosition,
+                  beginContentChannelCurrentPosition,
+                  beingContentChannelEnd,
+                  remainingBeforeRead,
                   currentPosition,
+                  contentChannelCurrentPosition,
+                  totalBytesRead,
                   contentChannelEnd,
-                  resourceId,
                   objectSize,
-                  bytesRead);
+                  resourceId);
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
