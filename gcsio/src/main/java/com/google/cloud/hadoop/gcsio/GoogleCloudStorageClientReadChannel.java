@@ -200,19 +200,19 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private static final int SKIP_BUFFER_SIZE = 8192;
 
     private static final String FORMATTED_EOF_ERROR_MESSAGE =
-        "Unexpected EndOfStream detected at. ("
-        + "beginDstPosition: %d, "
-        + "beginDstRemaining: %d, "
-        + "beginCurrentPosition: %d, "
-        + "beginContentChannelCurrentPosition: %d, "
-        + "beginContentChannelEnd: %d, "
-        + "remainingBeforeRead: %d, "
-        + "currentPosition: %d, "
-        + "contentChannelCurrentPosition: %d, "
-        + "totalBytesRead: %d, "
-        + "expectedContentChannelEnd: %d, "
-        + "objectSize: %d,"
-        + "resourceId: %s)";
+        "Unexpected EndOfStream detected at, ("
+            + "beginDstPosition: %d, "
+            + "beginDstRemaining: %d, "
+            + "beginCurrentPosition: %d, "
+            + "beginContentChannelCurrentPosition: %d, "
+            + "beginContentChannelEnd: %d, "
+            + "remainingBeforeRead: %d, "
+            + "currentPosition: %d, "
+            + "contentChannelCurrentPosition: %d, "
+            + "totalBytesRead: %d, "
+            + "expectedContentChannelEnd: %d, "
+            + "objectSize: %d,"
+            + "resourceId: %s).";
     private final BlobId blobId;
 
     // This is the actual current position in `contentChannel` from where read can happen.
