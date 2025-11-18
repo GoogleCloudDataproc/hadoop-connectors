@@ -299,7 +299,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               contentChannelEnd = currentPosition;
             }
 
-            if (currentPosition < contentChannelEnd && currentPosition < objectSize) {
+            if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
 
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
@@ -320,45 +320,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       contentChannelEnd,
                       objectSize,
                       resourceId));
-            } else if (currentPosition > objectSize) {
-              throw new IOException(
-                  String.format(
-                      "Received end of stream result beyond the object size;"
-                          + FORMATTED_EOF_ERROR_MESSAGE,
-                      beginDstPosition,
-                      beginDstLimit,
-                      beginCurrentPosition,
-                      beginContentChannelCurrentPosition,
-                      beginContentChannelEnd,
-                      remainingBeforeRead,
-                      currentPosition,
-                      contentChannelCurrentPosition,
-                      dst.position(),
-                      dst.limit(),
-                      totalBytesRead,
-                      contentChannelEnd,
-                      objectSize,
-                      resourceId));
-            } else if (currentPosition > contentChannelEnd) {
-              logger.atWarning().log(
-                  "Received end of stream result after the channel end;"
-                      + FORMATTED_EOF_ERROR_MESSAGE,
-                  beginDstPosition,
-                  beginDstLimit,
-                  beginCurrentPosition,
-                  beginContentChannelCurrentPosition,
-                  beginContentChannelEnd,
-                  remainingBeforeRead,
-                  currentPosition,
-                  contentChannelCurrentPosition,
-                  dst.position(),
-                  dst.limit(),
-                  totalBytesRead,
-                  contentChannelEnd,
-                  objectSize,
-                  resourceId);
-              closeContentChannel();
-              break;
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
