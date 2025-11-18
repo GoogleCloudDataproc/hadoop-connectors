@@ -258,7 +258,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         int beginDstRemaining = dst.remaining();
         long beginCurrentPosition = currentPosition;
         long beginContentChannelCurrentPosition = contentChannelCurrentPosition;
-        long beingContentChannelEnd = contentChannelEnd;
+        long beginContentChannelEnd = contentChannelEnd;
         try {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
@@ -308,7 +308,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       beginDstRemaining,
                       beginCurrentPosition,
                       beginContentChannelCurrentPosition,
-                      beingContentChannelEnd,
+                      beginContentChannelEnd,
                       remainingBeforeRead,
                       currentPosition,
                       contentChannelCurrentPosition,
@@ -325,7 +325,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       beginDstRemaining,
                       beginCurrentPosition,
                       beginContentChannelCurrentPosition,
-                      beingContentChannelEnd,
+                      beginContentChannelEnd,
                       remainingBeforeRead,
                       currentPosition,
                       contentChannelCurrentPosition,
@@ -341,7 +341,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   beginDstRemaining,
                   beginCurrentPosition,
                   beginContentChannelCurrentPosition,
-                  beingContentChannelEnd,
+                  beginContentChannelEnd,
                   remainingBeforeRead,
                   currentPosition,
                   contentChannelCurrentPosition,
