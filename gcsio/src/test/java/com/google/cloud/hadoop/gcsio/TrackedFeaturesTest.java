@@ -16,13 +16,14 @@ public class TrackedFeaturesTest {
             .put(TrackedFeatures.FADVISE_SEQUENTIAL, 2)
             .put(TrackedFeatures.FADVISE_AUTORANDOM, 3)
             .put(TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED, 4)
-            .put(TrackedFeatures.PERFORMANCE_CACHE_ENABLED, 5)
-            .put(TrackedFeatures.CLOUD_LOGGING_ENABLED, 6)
-            .put(TrackedFeatures.TRACE_LOG_ENABLED, 7)
-            .put(TrackedFeatures.OPERATION_TRACE_LOG_ENABLED, 8)
-            .put(TrackedFeatures.DIRECT_UPLOAD_ENABLED, 9)
-            .put(TrackedFeatures.BIDI_ENABLED, 10)
-            .put(TrackedFeatures.RENAME_API, 11)
+            .put(TrackedFeatures.HNS_OPTIMIZATIONS_ENABLED, 5)
+            .put(TrackedFeatures.PERFORMANCE_CACHE_ENABLED, 6)
+            .put(TrackedFeatures.CLOUD_LOGGING_ENABLED, 7)
+            .put(TrackedFeatures.TRACE_LOG_ENABLED, 8)
+            .put(TrackedFeatures.OPERATION_TRACE_LOG_ENABLED, 9)
+            .put(TrackedFeatures.DIRECT_UPLOAD_ENABLED, 10)
+            .put(TrackedFeatures.BIDI_ENABLED, 11)
+            .put(TrackedFeatures.RENAME_API, 12)
             .build();
 
     // Verifies that no new features have been added without updating this test.
