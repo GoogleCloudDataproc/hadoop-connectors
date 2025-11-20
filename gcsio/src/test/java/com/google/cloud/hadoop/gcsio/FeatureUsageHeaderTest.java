@@ -122,7 +122,7 @@ public class FeatureUsageHeaderTest {
 
   /** Parameterized tests for feature flag generation based on GCS options. */
   @RunWith(Parameterized.class)
-  public static class FeatureFlagGenerationTest {
+  static class FeatureFlagGenerationTest {
 
     String testName;
     private final GoogleCloudStorageFileSystemOptions options;
