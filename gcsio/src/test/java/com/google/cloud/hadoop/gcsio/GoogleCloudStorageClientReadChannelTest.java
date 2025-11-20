@@ -33,7 +33,9 @@ import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -198,6 +200,59 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(fakeReadChannel, times((OBJECT_SIZE / chunkSize * 2) - 1)).read(any());
 
     verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void read_withPositiveGeneration_usesGenerationMatchPrecondition() throws IOException {
+    long generation = 12345L;
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME, generation),
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ generation,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+
+    readChannel = getJavaStorageChannel(itemInfo, DEFAULT_READ_OPTION);
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
+
+    assertThat(optionsCaptor.getAllValues()).contains(BlobSourceOption.generationMatch(generation));
+  }
+
+  @Test
+  public void read_withZeroGeneration_doesNotUseGenerationMatchPrecondition() throws IOException {
+    long generation = 0L;
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME, generation),
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ generation,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+
+    readChannel = getJavaStorageChannel(itemInfo, DEFAULT_READ_OPTION);
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
+
+    assertThat(optionsCaptor.getAllValues())
+        .doesNotContain(BlobSourceOption.generationMatch(generation));
   }
 
   @Test
