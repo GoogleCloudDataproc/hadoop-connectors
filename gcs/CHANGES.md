@@ -3,6 +3,7 @@
 ## Next
 1. PR #1530 - [Bug] Set projectId in Storage client creation
 1. PR #1560 - [Bug] Prevent multiple auth headers with chained DownscopingInterceptors
+1. Disable move by default
 
 ## 3.1.9 - 2025-10-09
 1. PR #1521 - [Bug] Fix NPE when HierarchicalNamespace is missing from BucketStorageLayout
@@ -11,6 +12,7 @@
 
 ## 3.1.8 - 2025-09-26
 1. PR #1511 - [Feature] Storage Client Caching for downscoped token
+2. Enable move by default
 
 ## 3.1.7 - 2025-09-10
 1. PR #1484 - [Feature] Enabled write checksum by default
