@@ -189,13 +189,13 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   @Test
-  public void testRenameWithMoveDisabled() throws Exception {
+  public void testRenameWithMoveOperation() throws Exception {
     String bucketName = this.gcsiHelper.getUniqueBucketName("move");
     GoogleHadoopFileSystem googleHadoopFileSystem = new GoogleHadoopFileSystem();
 
     URI initUri = new URI("gs://" + bucketName);
     Configuration config = loadConfig();
-    config.setBoolean("fs.gs.operation.move.enable", false);
+    config.setBoolean("fs.gs.operation.move.enable", true);
     googleHadoopFileSystem.initialize(initUri, config);
 
     GoogleCloudStorage theGcs = googleHadoopFileSystem.getGcsFs().getGcs();

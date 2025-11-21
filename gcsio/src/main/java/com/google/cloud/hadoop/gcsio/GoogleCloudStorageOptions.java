@@ -142,7 +142,7 @@ public abstract class GoogleCloudStorageOptions {
         .setTraceLogExcludeProperties(ImmutableSet.of())
         .setHnBucketRenameEnabled(SET_HN_BUCKET_CREATE_ENABLED_DEFAULT)
         .setGrpcWriteEnabled(GRPC_WRITE_DEFAULT)
-        .setMoveOperationEnabled(true);
+        .setMoveOperationEnabled(false);
   }
 
   public abstract Builder toBuilder();
