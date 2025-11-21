@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.10 - 2025-11-21
 1. PR #1530 - [Bug] Set projectId in Storage client creation
 1. PR #1560 - [Bug] Prevent multiple auth headers with chained DownscopingInterceptors
 1. Disable move by default
