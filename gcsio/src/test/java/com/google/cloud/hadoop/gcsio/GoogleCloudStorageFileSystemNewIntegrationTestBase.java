@@ -61,6 +61,11 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
   protected GoogleCloudStorageFileSystem gcsFs;
 
+  // The tests in this file explicitly check the request strings. The requests strings may vary
+  // depending on the gcs client used. This flag can be set to false for disabling these request
+  // checks.
+  protected static boolean isTracingSupported = true;
+
   @Before
   public void before() {
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
