@@ -115,9 +115,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   private static final String GENERATION_MATCH_TOKEN_PARAM_PATTERN = "ifGenerationMatch=[^&]+";
 
-  private static final String SOURCE_GENERATION_MATCH_TOKEN_PARAM_PATTERN =
-      "ifSourceGenerationMatch=[^&]+";
-
   private static final String UPLOAD_ID_PARAM_PATTERN = "upload_id=[^&]+";
 
   private final HttpRequestInitializer delegate;
@@ -167,7 +164,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong pageTokenId = new AtomicLong();
     AtomicLong rewriteTokenId = new AtomicLong();
     AtomicLong generationMatchId = new AtomicLong();
-    AtomicLong sourceGenerationMatchId = new AtomicLong();
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
@@ -175,17 +171,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .map(r -> replacePageTokenWithId(r, pageTokenId))
         .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
-        .map(r -> replaceSourceGenerationMatchWithId(r, sourceGenerationMatchId))
         .map(r -> replaceResumableUploadIdWithId(r, resumableUploadId))
         .collect(toImmutableList());
-  }
-
-  private String replaceSourceGenerationMatchWithId(String request, AtomicLong generationId) {
-    String idPrefix = "ifSourceGenerationMatch=generationId_";
-    return replaceRequestParams
-        ? replaceWithId(
-            request, SOURCE_GENERATION_MATCH_TOKEN_PARAM_PATTERN, idPrefix, generationId)
-        : request;
   }
 
   public ImmutableList<String> getAllRequestInvocationIds() {
@@ -351,27 +338,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String bucket, String srcObject, String dstObject, String requestType) {
     return String.format(
         POST_MOVE_REQUEST_FORMAT, bucket, urlEncode(srcObject), requestType, urlEncode(dstObject));
-  }
-
-  public static String moveRequestString(
-      String bucket,
-      String srcObject,
-      String dstObject,
-      String requestType,
-      long generationId,
-      long sourceGenerationId) {
-    String request =
-        String.format(
-            POST_MOVE_REQUEST_FORMAT,
-            bucket,
-            urlEncode(srcObject),
-            requestType,
-            urlEncode(dstObject));
-    return request
-        + "?ifGenerationMatch=generationId_"
-        + generationId
-        + "&ifSourceGenerationMatch=generationId_"
-        + sourceGenerationId;
   }
 
   public static String uploadRequestString(String bucketName, String object, Integer generationId) {
