@@ -31,6 +31,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_METADATA_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.WRITE_CHECKSUM_FAILURE_COUNT;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
@@ -181,6 +182,14 @@ public class GoogleCloudStorageStatisticsTest {
     verifyCounterStats.incrementCounter(GCS_METADATA_REQUEST, 1);
     verifyCounterStats.incrementCounter(GCS_API_CLIENT_BAD_REQUEST_COUNT, 1);
     verifyCounterStats.incrementCounter(GCS_API_CLIENT_SIDE_ERROR_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_writeChecksumFailureCount() throws IOException {
+    GoogleCloudStorageEventBus.postWriteChecksumFailure();
+    GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
+    verifyCounterStats.incrementCounter(WRITE_CHECKSUM_FAILURE_COUNT, 1);
     verifyStatistics(verifyCounterStats);
   }
 
