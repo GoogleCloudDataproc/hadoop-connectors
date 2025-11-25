@@ -420,6 +420,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       ReadableByteChannel readableByteChannel =
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
 
+      // Logging at warning so that we don't need to change log level.
+      logger.atWarning().log(
+          "Storage ReadChannel opened at, contentChannelCurrentPosition: %d, contentChannelEnd: %d",
+          contentChannelCurrentPosition, contentChannelEnd);
+
       if (contentChannelEnd == objectSize
           && (contentChannelEnd - contentChannelCurrentPosition)
               <= readOptions.getMinRangeRequestSize()) {
