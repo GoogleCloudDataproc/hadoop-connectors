@@ -198,6 +198,23 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
     private static final int SKIP_BUFFER_SIZE = 8192;
+
+    private static final String FORMATTED_EOF_ERROR_MESSAGE =
+        "Unexpected EndOfStream detected at, ("
+            + "beginDstPosition: %d, "
+            + "beginDstLimit: %d, "
+            + "beginCurrentPosition: %d, "
+            + "beginContentChannelCurrentPosition: %d, "
+            + "beginContentChannelEnd: %d, "
+            + "remainingBeforeRead: %d, "
+            + "currentPosition: %d, "
+            + "contentChannelCurrentPosition: %d, "
+            + "currentDstPosition: %d, "
+            + "currentDstLimit: %d, "
+            + "totalBytesRead: %d, "
+            + "expectedContentChannelEnd: %d, "
+            + "objectSize: %d, "
+            + "resourceId: %s).";
     private final BlobId blobId;
 
     // This is the actual current position in `contentChannel` from where read can happen.
@@ -234,6 +251,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           currentPosition);
 
       int totalBytesRead = 0;
+      final int beginDstPosition = dst.position();
+      final int beginDstLimit = dst.limit();
+      final long beginCurrentPosition = currentPosition;
+      final long beginContentChannelCurrentPosition = contentChannelCurrentPosition;
+      final long beginContentChannelEnd = contentChannelEnd;
       // We read from a streaming source. We may not get all the bytes we asked for
       // in the first read. Therefore, loop till we either read the required number of
       // bytes or we reach end-of-stream.
@@ -282,8 +304,21 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               throw new IOException(
                   String.format(
                       "Received end of stream result before all requestedBytes were received;"
-                          + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
-                      currentPosition, contentChannelEnd, resourceId, objectSize));
+                          + FORMATTED_EOF_ERROR_MESSAGE,
+                      beginDstPosition,
+                      beginDstLimit,
+                      beginCurrentPosition,
+                      beginContentChannelCurrentPosition,
+                      beginContentChannelEnd,
+                      remainingBeforeRead,
+                      currentPosition,
+                      contentChannelCurrentPosition,
+                      dst.position(),
+                      dst.limit(),
+                      totalBytesRead,
+                      contentChannelEnd,
+                      objectSize,
+                      resourceId));
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
@@ -344,6 +379,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
       ReadableByteChannel readableByteChannel =
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
+
+      // Logging at warning so that we don't need to change log level.
+      logger.atWarning().log(
+          "Storage ReadChannel opened at, contentChannelCurrentPosition: %d, contentChannelEnd: %d",
+          contentChannelCurrentPosition, contentChannelEnd);
 
       if (contentChannelEnd == objectSize
           && (contentChannelEnd - contentChannelCurrentPosition)
