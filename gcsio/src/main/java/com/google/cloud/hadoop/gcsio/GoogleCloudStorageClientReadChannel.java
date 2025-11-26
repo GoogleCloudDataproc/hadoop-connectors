@@ -358,7 +358,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   objectSize,
                   resourceId);
               closeContentChannel();
-              break;
+              continue;
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
