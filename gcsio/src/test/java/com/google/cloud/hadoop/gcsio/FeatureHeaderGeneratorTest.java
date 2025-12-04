@@ -15,7 +15,7 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.FeatureUsageHeader.BITMASK_SIZE;
+import static com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator.BITMASK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -32,24 +32,24 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 /**
- * Unit tests for {@link FeatureUsageHeader}. This class contains non-parameterized tests for the
- * encoding logic. The parameterized tests for feature flag generation are in the inner class {@link
- * FeatureFlagGenerationTest}.
+ * Unit tests for {@link FeatureHeaderGenerator}. This class contains non-parameterized tests for
+ * the encoding logic. The parameterized tests for feature flag generation are in the inner class
+ * {@link FeatureFlagGenerationTest}.
  */
 @RunWith(JUnit4.class)
-public class FeatureUsageHeaderTest {
+public class FeatureHeaderGeneratorTest {
 
   @Before
   public void setUp() {
     // Clear any request-specific features.
-    FeatureUsageHeader.requestFeatures.remove();
+    FeatureHeaderGenerator.requestFeatures.remove();
   }
 
   // --- Tests for the encode method ---
 
   @Test
   public void encode_withEmptyBitmask_returnsNull() {
-    assertThat(FeatureUsageHeader.encode(new BitSet(BITMASK_SIZE))).isNull();
+    assertThat(FeatureHeaderGenerator.encode(new BitSet(BITMASK_SIZE))).isNull();
   }
 
   @Test
@@ -57,14 +57,14 @@ public class FeatureUsageHeaderTest {
     BitSet features = new BitSet(BITMASK_SIZE);
     features.set(1);
     features.set(9);
-    assertThat(FeatureUsageHeader.encode(features)).isEqualTo("AgI=");
+    assertThat(FeatureHeaderGenerator.encode(features)).isEqualTo("AgI=");
   }
 
   @Test
   public void encode_withHighBitsSet_returnsCorrectString() {
     BitSet features = new BitSet(BITMASK_SIZE);
     features.set(65);
-    assertThat(FeatureUsageHeader.encode(features)).isEqualTo("AgAAAAAAAAAA");
+    assertThat(FeatureHeaderGenerator.encode(features)).isEqualTo("AgAAAAAAAAAA");
   }
 
   @Test
@@ -72,7 +72,7 @@ public class FeatureUsageHeaderTest {
     BitSet features = new BitSet(BITMASK_SIZE);
     features.set(0);
     features.set(64);
-    assertThat(FeatureUsageHeader.encode(features)).isEqualTo("AQAAAAAAAAAB");
+    assertThat(FeatureHeaderGenerator.encode(features)).isEqualTo("AQAAAAAAAAAB");
   }
 
   // --- Tests for the track method ---
@@ -80,7 +80,8 @@ public class FeatureUsageHeaderTest {
   @Test
   public void track_withCallable_setsAndClearsFeature() throws IOException {
     // Initially, the header should be based on default options
-    FeatureUsageHeader header = new FeatureUsageHeader(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    FeatureHeaderGenerator header =
+        new FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions.DEFAULT);
     String initialHeader = "AQ==";
     assertThat(header.getValue()).isEqualTo(initialHeader);
 
@@ -88,7 +89,7 @@ public class FeatureUsageHeaderTest {
     TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // This is likely bit 12, not 11
 
     String result =
-        FeatureUsageHeader.track( // track is still static for request-level features
+        FeatureHeaderGenerator.track( // track is still static for request-level features
             testFeature,
             () -> {
               // Inside track, the header should include the new feature
@@ -107,7 +108,8 @@ public class FeatureUsageHeaderTest {
 
   @Test
   public void track_clearsFeatureOnException() {
-    FeatureUsageHeader header = new FeatureUsageHeader(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    FeatureHeaderGenerator header =
+        new FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions.DEFAULT);
     String initialHeader = header.getValue();
     TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // bit 12
 
@@ -115,7 +117,7 @@ public class FeatureUsageHeaderTest {
         assertThrows(
             IOException.class,
             () ->
-                FeatureUsageHeader.track(
+                FeatureHeaderGenerator.track(
                     testFeature,
                     () -> {
                       throw new IOException("test exception");
@@ -155,6 +157,7 @@ public class FeatureUsageHeaderTest {
             {"Default Options", GoogleCloudStorageFileSystemOptions.DEFAULT, createBitSet(0)},
             {"Fadvise Random", buildOptionsWithFadvise(Fadvise.RANDOM), createBitSet(1)},
             {"Fadvise Sequential", buildOptionsWithFadvise(Fadvise.SEQUENTIAL), createBitSet(2)},
+            {"Fadvise AutoRandom", buildOptionsWithFadvise(Fadvise.AUTO_RANDOM), createBitSet(3)},
             {
               "Hierarchical Namespace",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
@@ -228,8 +231,8 @@ public class FeatureUsageHeaderTest {
 
     @Test
     public void generatesCorrectHeaderValue() {
-      FeatureUsageHeader header = new FeatureUsageHeader(options);
-      String expectedHeaderValue = FeatureUsageHeader.encode(expectedBitSet);
+      FeatureHeaderGenerator header = new FeatureHeaderGenerator(options);
+      String expectedHeaderValue = FeatureHeaderGenerator.encode(expectedBitSet);
       assertThat(header.getValue()).isEqualTo(expectedHeaderValue);
     }
   }

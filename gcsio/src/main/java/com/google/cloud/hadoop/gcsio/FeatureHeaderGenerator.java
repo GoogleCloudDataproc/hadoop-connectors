@@ -27,7 +27,7 @@ import java.util.BitSet;
  * Generates the x-goog-storage-hadoop-connector-features header value by combining
  * configuration-derived and request-specific features.
  */
-public class FeatureUsageHeader {
+public class FeatureHeaderGenerator {
 
   /**
    * The size of the bitmask in bits. This was chosen to allow tracking all current connector
@@ -44,7 +44,7 @@ public class FeatureUsageHeader {
         }
       };
 
-  public static final String NAME = "X-Goog-Storage-Hadoop-Connector-Features";
+  public static final String HEADER_NAME = "X-Goog-Storage-Hadoop-Connector-Features";
   private final BitSet configFeatures;
 
   @FunctionalInterface
@@ -52,7 +52,7 @@ public class FeatureUsageHeader {
     V call() throws IOException;
   }
 
-  public FeatureUsageHeader(GoogleCloudStorageFileSystemOptions options) {
+  public FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions options) {
     this.configFeatures = new BitSet(BITMASK_SIZE);
     populateBitMask(this.configFeatures, options);
   }
@@ -96,6 +96,9 @@ public class FeatureUsageHeader {
           break;
         case SEQUENTIAL:
           features.set(TrackedFeatures.FADVISE_SEQUENTIAL.getBitPosition());
+          break;
+        case AUTO_RANDOM:
+          features.set(TrackedFeatures.FADVISE_AUTORANDOM.getBitPosition());
           break;
       }
     }
