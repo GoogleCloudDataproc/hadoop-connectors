@@ -25,6 +25,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
@@ -83,6 +84,9 @@ public class RetryHttpInitializerTest {
     assertThat(res).isNotNull();
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(
+            req.getHeaders().containsKey(JsonIdempotencyTokenInterceptor.IDEMPOTENCY_TOKEN_HEADER))
+        .isTrue();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
 
     requestTracker.verifyEvents(
@@ -107,6 +111,9 @@ public class RetryHttpInitializerTest {
     HttpResponseException thrown = assertThrows(HttpResponseException.class, req::execute);
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(
+            req.getHeaders().containsKey(JsonIdempotencyTokenInterceptor.IDEMPOTENCY_TOKEN_HEADER))
+        .isTrue();
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_FORBIDDEN);
 
     requestTracker.verifyEvents(
@@ -133,6 +140,9 @@ public class RetryHttpInitializerTest {
             .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
 
     HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(URL));
+    IdempotencyHeaderRecordInterceptor testInterceptor =
+        new IdempotencyHeaderRecordInterceptor(req.getInterceptor());
+    req.setInterceptor(testInterceptor);
 
     assertThat(req.getHeaders())
         .containsAtLeast(
@@ -143,6 +153,10 @@ public class RetryHttpInitializerTest {
     HttpResponse res = req.execute();
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(
+            req.getHeaders().containsKey(JsonIdempotencyTokenInterceptor.IDEMPOTENCY_TOKEN_HEADER))
+        .isTrue();
+    assertThat(testInterceptor.getIdempotencyTokens().stream().distinct().count()).isEqualTo(1);
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
 
@@ -224,6 +238,9 @@ public class RetryHttpInitializerTest {
     HttpResponse res = req.execute();
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(
+            req.getHeaders().containsKey(JsonIdempotencyTokenInterceptor.IDEMPOTENCY_TOKEN_HEADER))
+        .isTrue();
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
 
@@ -263,6 +280,34 @@ public class RetryHttpInitializerTest {
       }
 
       return requestTracker;
+    }
+  }
+
+  // Helper class to capture headers during intercept
+  private static class IdempotencyHeaderRecordInterceptor implements HttpExecuteInterceptor {
+    private final List<String> idempotencyTokens = new java.util.ArrayList<>();
+    private final HttpExecuteInterceptor chainedInterceptor;
+
+    public IdempotencyHeaderRecordInterceptor(HttpExecuteInterceptor chainedInterceptor) {
+      this.chainedInterceptor = chainedInterceptor;
+    }
+
+    @Override
+    public void intercept(HttpRequest request) throws IOException {
+      if (chainedInterceptor != null) {
+        chainedInterceptor.intercept(request);
+      }
+      if (request
+          .getHeaders()
+          .containsKey(JsonIdempotencyTokenInterceptor.IDEMPOTENCY_TOKEN_HEADER)) {
+        idempotencyTokens.add(
+            (String)
+                request.getHeaders().get(JsonIdempotencyTokenInterceptor.IDEMPOTENCY_TOKEN_HEADER));
+      }
+    }
+
+    public List<String> getIdempotencyTokens() {
+      return idempotencyTokens;
     }
   }
 }
