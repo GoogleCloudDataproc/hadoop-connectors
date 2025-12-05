@@ -177,7 +177,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
-      @Nullable ExecutorService pCUExecutorService)
+      @Nullable ExecutorService pCUExecutorService,
+      @Nullable FeatureHeaderGenerator featureHeaderGenerator)
       throws IOException {
     super(
         GoogleCloudStorageImpl.builder()
@@ -186,6 +187,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpTransport(httpTransport)
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .setFeatureHeaderGenerator(featureHeaderGenerator)
             .build());
 
     this.storageOptions = options;
@@ -196,7 +198,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 storageOptions,
                 gRPCInterceptors,
                 pCUExecutorService,
-                downscopedAccessTokenFn)
+                downscopedAccessTokenFn,
+                featureHeaderGenerator)
             : new StorageClientWrapper(clientLibraryStorage, storageClientProvider);
     this.boundedThreadPool = null;
   }
@@ -1544,20 +1547,26 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
-  static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
-      GoogleCloudStorageOptions storageOptions) {
+  static ImmutableMap<String, String> getUpdatedHeaders(
+      GoogleCloudStorageOptions storageOptions, FeatureHeaderGenerator featureHeaderGenerator) {
     ImmutableMap<String, String> httpRequestHeaders =
         MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
     String appName = storageOptions.getAppName();
+    ImmutableMap.Builder<String, String> headersBuilder =
+        ImmutableMap.<String, String>builder().putAll(httpRequestHeaders);
     if (!httpRequestHeaders.containsKey(USER_AGENT) && !Strings.isNullOrEmpty(appName)) {
       logger.atFiner().log("Setting useragent %s", appName);
-      return ImmutableMap.<String, String>builder()
-          .putAll(httpRequestHeaders)
-          .put(USER_AGENT, appName)
-          .build();
+      headersBuilder.put(USER_AGENT, appName);
     }
-
-    return httpRequestHeaders;
+    if (featureHeaderGenerator == null) {
+      return headersBuilder.build();
+    }
+    String featureHeaderString = featureHeaderGenerator.getValue();
+    if (!Strings.isNullOrEmpty(featureHeaderString)) {
+      logger.atFiner().log("Setting feature usage header %s", featureHeaderString);
+      headersBuilder.put(FeatureHeaderGenerator.HEADER_NAME, featureHeaderString);
+    }
+    return headersBuilder.build();
   }
 
   static BlobWriteSessionConfig getSessionConfig(
@@ -1701,6 +1710,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract Builder setFeatureHeaderGenerator(
+        @Nullable FeatureHeaderGenerator featureHeaderGenerator);
 
     public abstract Builder setGRPCInterceptors(
         @Nullable ImmutableList<ClientInterceptor> gRPCInterceptors);
