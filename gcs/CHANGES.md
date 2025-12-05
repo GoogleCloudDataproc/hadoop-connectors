@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
 
 ## 3.1.10 - 2025-11-21
 1. PR #1530 - [Bug] Set projectId in Storage client creation
