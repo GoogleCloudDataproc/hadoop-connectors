@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
 
 ## 4.0.0-RC01 - 2025-10-16
 1. Upgrade hadoop versionto `3.4.2`
