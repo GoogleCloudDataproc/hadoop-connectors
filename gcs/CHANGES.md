@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
 
 ## 3.0.15 - 2025-11-21
 1. PR #1560 - [Bug] Prevent multiple auth headers with chained DownscopingInterceptors
