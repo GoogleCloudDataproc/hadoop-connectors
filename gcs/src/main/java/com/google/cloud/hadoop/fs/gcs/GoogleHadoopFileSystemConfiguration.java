@@ -635,7 +635,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
+        .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean));
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
