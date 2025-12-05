@@ -58,6 +58,7 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
@@ -1340,6 +1341,36 @@ public class GoogleCloudStorageClientTest {
       assertEquals(results.size(), 1);
       assertThat(results.get(0).exists()).isFalse();
     }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void getUpdatedHeaders_includesFeatureUsageAndUserAgent() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
+        GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+            .setPerformanceCacheEnabled(true)
+            .build();
+    FeatureHeaderGenerator featureHeaderGenerator = new FeatureHeaderGenerator(gcsfsOptions);
+
+    // Prepare storage options
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageOptions.DEFAULT.toBuilder()
+            .setAppName("test-app")
+            .setHttpRequestHeaders(ImmutableMap.of())
+            .build();
+    // Use reflection to invoke the private static method under test.
+    Method getUpdatedHeadersMethod =
+        GoogleCloudStorageClientImpl.class.getDeclaredMethod(
+            "getUpdatedHeaders", GoogleCloudStorageOptions.class, FeatureHeaderGenerator.class);
+    getUpdatedHeadersMethod.setAccessible(true);
+    ImmutableMap<String, String> headers =
+        (ImmutableMap<String, String>)
+            getUpdatedHeadersMethod.invoke(null, storageOptions, featureHeaderGenerator);
+
+    String expectedHeaderValue = featureHeaderGenerator.getValue();
+    // Verify all expected headers are present.
+    assertThat(headers.get("user-agent")).contains("test-app");
+    assertThat(headers).containsEntry(FeatureHeaderGenerator.HEADER_NAME, expectedHeaderValue);
   }
 
   private Bucket mockBucket(String storageClass) {
