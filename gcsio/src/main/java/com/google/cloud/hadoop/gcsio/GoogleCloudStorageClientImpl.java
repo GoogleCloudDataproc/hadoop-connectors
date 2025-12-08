@@ -309,11 +309,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     return new GoogleCloudStorageClientReadChannel(
-        storage,
-        itemInfo == null ? getItemInfo(resourceId) : itemInfo,
-        readOptions,
-        errorExtractor,
-        storageOptions);
+        storage, resourceId, itemInfo, readOptions, errorExtractor, storageOptions);
   }
 
   @Override
