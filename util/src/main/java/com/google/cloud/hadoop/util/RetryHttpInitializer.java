@@ -275,8 +275,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     request.getHeaders().putAll(options.getHttpHeaders());
-    request.setInterceptor(
-        new JsonIdempotencyTokenInterceptor(new InvocationIdInterceptor(request.getInterceptor())));
+    request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor()));
   }
 
   public Credential getCredential() {
