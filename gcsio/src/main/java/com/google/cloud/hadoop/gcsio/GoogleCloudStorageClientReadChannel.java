@@ -36,6 +36,7 @@ import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
+import com.google.cloud.storage.StorageException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
@@ -122,7 +123,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
       }
       initMetadata(blob.getContentEncoding(), blob.getSize());
-    } catch (Exception e) {
+    } catch (StorageException e) {
       throw new IOException("Failed to fetch metadata for " + resourceId, e);
     }
   }
@@ -410,7 +411,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       return readableByteChannel;
     }
 
-    private void updateMetadataFromReadChannel(ReadableByteChannel readableByteChannel) {
+    private void updateMetadataFromReadChannel(ReadableByteChannel readableByteChannel)
+        throws IOException {
       if (objectSize != Long.MAX_VALUE) {
         return;
       }
@@ -438,13 +440,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
 
       if (!metadataUpdated) {
-        try {
-          logger.atInfo().log("Fallback to metadata fetch for '%s'", resourceId);
-          fetchMetadata();
-        } catch (Exception e) {
-          logger.atWarning().withCause(e).log(
-              "Failed to fallback to metadata fetch for '%s'", resourceId);
-        }
+        logger.atInfo().log("Fallback to metadata fetch for '%s'", resourceId);
+        fetchMetadata();
       }
     }
 
