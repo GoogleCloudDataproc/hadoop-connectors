@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.30 - 2025-12-09
 1. PR #1560 - [Bug] Prevent multiple auth headers with chained DownscopingInterceptors
 1. Disable move by default
