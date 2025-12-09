@@ -5,6 +5,7 @@
 ## 2.2.30 - 2025-12-09
 1. PR #1560 - [Bug] Prevent multiple auth headers with chained DownscopingInterceptors
 1. Disable move by default
+1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
 
 ## 2.2.29 - 2025-09-29
 1. Fix infinite loop issue when EOF is reached during a skip operation in ReadChannel.
