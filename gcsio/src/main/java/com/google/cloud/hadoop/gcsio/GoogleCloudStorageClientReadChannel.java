@@ -64,7 +64,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private static final String STORAGE_READ_CHANNEL = "StorageReadChannel";
   private static final String GRPC_BLOB_READ_CHANNEL = "GrpcBlobReadChannel";
 
-  private final StorageResourceId resourceId;
+  private StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
@@ -95,7 +95,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
     if (itemInfo != null) {
       validate(itemInfo);
-      initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+      initMetadata(
+          itemInfo.getContentEncoding(), itemInfo.getSize(), itemInfo.getContentGeneration());
     } else {
       if (readOptions.getFastFailOnNotFound()) {
         fetchMetadata();
@@ -122,19 +123,31 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (blob == null) {
         throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
       }
-      initMetadata(blob.getContentEncoding(), blob.getSize());
+      initMetadata(blob.getContentEncoding(), blob.getSize(), blob.getGeneration());
     } catch (StorageException e) {
       throw new IOException("Failed to fetch metadata for " + resourceId, e);
     }
   }
 
-  protected void initMetadata(@Nullable String encoding, long sizeFromMetadata) throws IOException {
+  protected void initMetadata(@Nullable String encoding, long sizeFromMetadata, long generation)
+      throws IOException {
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
     if (gzipEncoded && !readOptions.getSupportGzipEncoding()) {
       throw new IOException(
           "Cannot read GZIP encoded files - content encoding support is disabled.");
     }
     objectSize = gzipEncoded ? Long.MAX_VALUE : sizeFromMetadata;
+    if (!resourceId.hasGenerationId()) {
+      resourceId =
+          new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName(), generation);
+    } else {
+      checkState(
+          resourceId.getGenerationId() == generation,
+          "Provided generation (%s) should be equal to fetched generation (%s) for '%s'",
+          resourceId.getGenerationId(),
+          generation,
+          resourceId);
+    }
   }
 
   @Override
@@ -240,7 +253,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
     private static final int SKIP_BUFFER_SIZE = 8192;
-    private final BlobId blobId;
 
     // This is the actual current position in `contentChannel` from where read can happen.
     // This remains unchanged of position(long) method call.
@@ -256,15 +268,18 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     public ContentReadChannel(
         GoogleCloudStorageReadOptions readOptions, StorageResourceId resourceId) {
-      Long generationId =
-          resourceId.getGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID
-              ? null
-              : resourceId.getGenerationId();
-      this.blobId = BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), generationId);
       this.fileAccessManager = new FileAccessPatternManager(resourceId, readOptions);
       if (gzipEncoded) {
         fileAccessManager.overrideAccessPattern(false);
       }
+    }
+
+    private BlobId getBlobId() {
+      Long generationId =
+          resourceId.getGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID
+              ? null
+              : resourceId.getGenerationId();
+      return BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), generationId);
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
@@ -426,7 +441,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             BlobInfo blobInfo = blobInfoFuture.get();
             if (blobInfo != null) {
               objectSize = blobInfo.getSize();
-              initMetadata(blobInfo.getContentEncoding(), objectSize);
+              initMetadata(blobInfo.getContentEncoding(), objectSize, blobInfo.getGeneration());
               if (gzipEncoded) {
                 fileAccessManager.overrideAccessPattern(false);
               }
@@ -619,6 +634,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private ReadableByteChannel getStorageReadChannel(long seek, long limit) throws IOException {
+      BlobId blobId = getBlobId();
       ReadChannel readChannel = storage.reader(blobId, generateReadOptions(blobId));
       try {
         readChannel.seek(seek);

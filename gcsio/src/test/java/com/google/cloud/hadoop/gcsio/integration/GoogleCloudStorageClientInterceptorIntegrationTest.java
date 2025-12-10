@@ -29,6 +29,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientGrpcTracingInterceptor;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTracingFields;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
@@ -195,11 +196,13 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertingHandler.assertLogCount(3 * 3);
     assertingHandler.flush();
 
-    assertObjectContent(gcsImpl, resourceId, partition, partitionsCount);
-
     // One for Read Request
     // One for Read Response ( it can vary, request can be split into two chunks as well).
     // One for status
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+    assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
+
     assertingHandler.assertLogCount(3);
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
@@ -221,7 +224,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(request.getBucket()).isEqualTo(derivedResourceId.getBucketName());
     assertThat(request.getObject()).isEqualTo(derivedResourceId.getObjectName());
     assertThat(request.getReadOffset()).isEqualTo(0);
-    assertThat(request.getReadLimit()).isEqualTo(partition.length);
+    // With fastFailOnNotFound=false, object size is unknown, so read_limit is 0 (unlimited).
+    assertThat(request.getReadLimit()).isEqualTo(0);
 
     Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
 
