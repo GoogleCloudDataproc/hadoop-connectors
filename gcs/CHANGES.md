@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.16 - 2025-12-10
 1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
 
 ## 3.0.15 - 2025-11-21
