@@ -21,13 +21,13 @@
   <parent>
     <groupId>com.google.cloud.bigdataoss</groupId>
     <artifactId>bigdataoss-parent</artifactId>
-    <version>3.0.16</version>
+    <version>3.0.17-SNAPSHOT</version>
   </parent>
 
   <name>coverage</name>
 
   <artifactId>coverage</artifactId>
-  <version>3.0.16</version>
+  <version>3.0.17-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <profiles>
