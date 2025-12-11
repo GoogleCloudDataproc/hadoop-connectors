@@ -25,7 +25,6 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 
-import com.google.cloud.ReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
@@ -60,6 +59,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private final GoogleCloudStorageReadOptions readOptions;
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
+  private final BlobSourceOption[] storageReadOptions;
   // The size of this object generation, in bytes.
   private long objectSize;
   private final ErrorTypeExtractor errorExtractor;
@@ -88,6 +88,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     this.storageOptions = storageOptions;
     this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+    this.storageReadOptions = generateReadOptions(resourceId);
   }
 
   protected void initMetadata(@Nullable String encoding, long sizeFromMetadata) throws IOException {
@@ -531,42 +532,29 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private ReadableByteChannel getStorageReadChannel(long seek, long limit) throws IOException {
-      ReadChannel readChannel = storage.reader(blobId, generateReadOptions(blobId));
-      try {
-        readChannel.seek(seek);
-        readChannel.limit(limit);
-        // bypass the storage-client caching layer hence eliminates the need to maintain a copy of
-        // chunk
-        readChannel.setChunkSize(0);
-        return readChannel;
-      } catch (Exception e) {
-        GoogleCloudStorageEventBus.postOnException();
-        throw new IOException(
-            String.format(
-                "Unable to update the boundaries/Range of contentChannel %s. cause=%s",
-                resourceId, e),
-            e);
-      }
+      return RangeValidatingReadableByteChannel.of(storage, blobId, seek, limit,
+          storageReadOptions);
     }
 
-    private BlobSourceOption[] generateReadOptions(BlobId blobId) {
-      List<BlobSourceOption> blobReadOptions = new ArrayList<>();
-      // To get decoded content
-      blobReadOptions.add(BlobSourceOption.shouldReturnRawInputStream(false));
-
-      if (blobId.getGeneration() != null) {
-        blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
-      }
-      if (storageOptions.getEncryptionKey() != null) {
-        blobReadOptions.add(
-            BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
-      }
-      return blobReadOptions.toArray(new BlobSourceOption[blobReadOptions.size()]);
-    }
 
     private boolean isFooterRead() {
       return objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
     }
+  }
+
+  private BlobSourceOption[] generateReadOptions(StorageResourceId blobId) {
+    List<BlobSourceOption> blobReadOptions = new ArrayList<>();
+    // enable transparent gzip-decompression
+    blobReadOptions.add(BlobSourceOption.shouldReturnRawInputStream(false));
+
+    if (blobId.getGenerationId() > StorageResourceId.UNKNOWN_GENERATION_ID) {
+      blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGenerationId()));
+    }
+    if (storageOptions.getEncryptionKey() != null) {
+      blobReadOptions.add(
+          BlobSourceOption.decryptionKey(storageOptions.getEncryptionKey().value()));
+    }
+    return blobReadOptions.toArray(new BlobSourceOption[0]);
   }
 
   @VisibleForTesting
