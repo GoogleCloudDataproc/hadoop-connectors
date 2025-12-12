@@ -135,6 +135,26 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+*   `fs.gs.application.name.suffix` (not set by default)
+
+    Suffix that will be added to HTTP `User-Agent` header set in all Cloud
+    Storage requests.
+    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
+    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
+
+*   `fs.gs.proxy.address` (not set by default)
+
+    Proxy address that connector can use to send Cloud Storage requests. The
+    proxy must be an HTTP proxy and address should be in the `host:port` form.
+
+*   `fs.gs.proxy.username` (not set by default)
+
+    Proxy username that connector can use to send Cloud Storage requests.
+
+*   `fs.gs.proxy.password` (not set by default)
+
+    Proxy password that connector can use to send Cloud Storage requests.
+
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
@@ -419,28 +439,7 @@ permissions (not authorized) to execute these requests.
 
 ### HTTP transport configuration
 
-*   `fs.gs.http.transport.type` (default: `JAVA_NET`)
-
-    HTTP transport to use for sending Cloud Storage requests. Valid values are
-    `APACHE` or `JAVA_NET`.
-
-*   `fs.gs.application.name.suffix` (not set by default)
-
-    Suffix that will be added to HTTP `User-Agent` header set in all Cloud
-    Storage requests.
-
-*   `fs.gs.proxy.address` (not set by default)
-
-    Proxy address that connector can use to send Cloud Storage requests. The
-    proxy must be an HTTP proxy and address should be in the `host:port` form.
-
-*   `fs.gs.proxy.username` (not set by default)
-
-    Proxy username that connector can use to send Cloud Storage requests.
-
-*   `fs.gs.proxy.password` (not set by default)
-
-    Proxy password that connector can use to send Cloud Storage requests.
+**Note: Retry configuration is only valid for client type=HTTP_API_CLIENT for now.**
 
 *   `fs.gs.http.max.retry` (default: `10`)
 
