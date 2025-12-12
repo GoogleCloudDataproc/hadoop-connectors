@@ -139,8 +139,6 @@
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
     Storage requests.
-    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
-    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
 
 *   `fs.gs.proxy.address` (not set by default)
 
