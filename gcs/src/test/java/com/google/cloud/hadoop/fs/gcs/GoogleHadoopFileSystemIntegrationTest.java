@@ -40,6 +40,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.fail;
 
 import com.google.api.client.util.Lists;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -93,6 +94,9 @@ import org.junit.Test;
 /** Integration tests for GoogleHadoopFileSystem class. */
 public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
+
+  private static final long BUCKET_DELETION_TIMEOUT_MS = 30_000;
+  private static final long RETRY_INTERVAL_MS = 1_000;
 
   @Before
   public void before() throws Exception {
@@ -1627,10 +1631,27 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
                 .exists())
         .isFalse();
 
-    assertThrows(
-        "The specified bucket does not exist : " + bucketPath,
-        com.google.api.gax.rpc.NotFoundException.class,
-        () -> assertThat(getSubFolderCount(googleHadoopFileSystem, bucketPath)).isEqualTo(0));
+    // Bucket delete is an eventually consistent operation can take upto 30 seconds
+    // More details on consistency https://cloud.google.com/storage/docs/consistency.
+    long deadline = System.currentTimeMillis() + BUCKET_DELETION_TIMEOUT_MS;
+    boolean notFound = false;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        getSubFolderCount(googleHadoopFileSystem, bucketPath);
+        // If the call succeeds, the bucket is not yet fully deleted from this view.
+        // Wait a bit before retrying.
+        Thread.sleep(RETRY_INTERVAL_MS);
+      } catch (com.google.api.gax.rpc.NotFoundException e) {
+        notFound = true;
+        break;
+      }
+    }
+
+    if (!notFound) {
+      fail("getSubFolderCount should have thrown NotFoundException after bucket deletion.");
+    }
+
+    googleHadoopFileSystem.close();
   }
 
   @Test
