@@ -441,6 +441,11 @@ permissions (not authorized) to execute these requests.
 
 **Note: Retry configuration is only valid for client type=HTTP_API_CLIENT for now.**
 
+*   `fs.gs.http.transport.type` (default: `JAVA_NET`)
+
+    HTTP transport to use for sending Cloud Storage requests. Valid values are
+    `APACHE` or `JAVA_NET`.
+
 *   `fs.gs.http.max.retry` (default: `10`)
 
     The maximum number of retries for low-level HTTP requests to GCS when server
