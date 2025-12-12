@@ -19,6 +19,10 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -253,6 +257,73 @@ public class GoogleHadoopSyncableOutputStreamTest {
     fout.sync();
     assertThat(statistics.getBytesWritten()).isEqualTo(9);
     assertThat(statistics.getWriteOps()).isEqualTo(2);
+
+    verify(mockExecutorService).submit(any(Callable.class));
+  }
+
+  @Test
+  public void testCommitCurrentFile_throwsIOExceptionOnComposeFailure() throws Exception {
+    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object3.txt");
+    GoogleHadoopFileSystemBase spyGhfs = org.mockito.Mockito.spy(ghfs);
+
+    // Create a stream with a mock executor
+    GoogleHadoopSyncableOutputStream fout =
+        new GoogleHadoopSyncableOutputStream(
+            spyGhfs,
+            spyGhfs.getGcsPath(objectPath),
+            new FileSystem.Statistics(spyGhfs.getScheme()),
+            CreateFileOptions.DEFAULT_OVERWRITE,
+            SyncableOutputStreamOptions.DEFAULT,
+            mockExecutorService);
+
+    // Write and sync once to ensure the next sync triggers compose
+    fout.write(new byte[] {0x01}, 0, 1);
+    fout.sync();
+
+    // Mock composeObjects to throw IOException
+    com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem mockGcsFs =
+        mock(com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.class, RETURNS_DEEP_STUBS);
+    doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
+    when(mockGcsFs.getGcs().composeObjects(anyList(), any(), any()))
+        .thenThrow(new IOException("compose failed"));
+
+    // Write again to trigger compose on sync
+    fout.write(new byte[] {0x02}, 0, 1);
+
+    IOException thrown = assertThrows(IOException.class, fout::sync);
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("compose failed");
+
+    verify(mockExecutorService).submit(any(Callable.class));
+  }
+
+  @Test
+  public void testCommitCurrentFile_handlesNullComposedObjectGracefully() throws Exception {
+    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object4.txt");
+    GoogleHadoopFileSystemBase spyGhfs = org.mockito.Mockito.spy(ghfs);
+
+    GoogleHadoopSyncableOutputStream fout =
+        new GoogleHadoopSyncableOutputStream(
+            spyGhfs,
+            spyGhfs.getGcsPath(objectPath),
+            new FileSystem.Statistics(spyGhfs.getScheme()),
+            CreateFileOptions.DEFAULT_OVERWRITE,
+            SyncableOutputStreamOptions.DEFAULT,
+            mockExecutorService);
+
+    // Write and sync once to ensure the next sync triggers compose
+    fout.write(new byte[] {0x01}, 0, 1);
+    fout.sync();
+
+    // Mock composeObjects to return null
+    com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem mockGcsFs =
+        mock(com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.class, RETURNS_DEEP_STUBS);
+    doReturn(mockGcsFs).when(spyGhfs).getGcsFs();
+    when(mockGcsFs.getGcs().composeObjects(anyList(), any(), any())).thenReturn(null);
+
+    // Write again to trigger compose on sync, should throw IOException
+    fout.write(new byte[] {0x02}, 0, 1);
+    IOException thrown = assertThrows(IOException.class, fout::sync);
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Compose operation returned null");
 
     verify(mockExecutorService).submit(any(Callable.class));
   }
