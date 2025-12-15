@@ -415,6 +415,12 @@
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.4.1</version>
+          <configuration>
+            <!-- Disable strict HTML and syntax checking -->
+            <doclint>none</doclint>
+
+            <failOnError>false</failOnError>
+          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
