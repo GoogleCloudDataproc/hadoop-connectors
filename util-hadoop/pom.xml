@@ -15,20 +15,20 @@
  limitations under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.1-SNAPSHOT">
+  <modelVersion>4.0.1-SNAPSHOT</modelVersion>
 
   <parent>
     <groupId>com.google.cloud.bigdataoss</groupId>
     <artifactId>bigdataoss-parent</artifactId>
-    <version>4.0.0</version>
+    <version>4.0.1-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
   <name>util-hadoop</name>
 
   <artifactId>util-hadoop</artifactId>
-  <version>4.0.0</version>
+  <version>4.0.1-SNAPSHOT</version>
 
   <dependencies>
     <dependency>

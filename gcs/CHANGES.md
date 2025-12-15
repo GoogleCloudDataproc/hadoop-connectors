@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 4.0.0 - 2025-12-15
 1. Add listStatusStartingFrom API.
 
