@@ -89,6 +89,7 @@
     <assertj.version>3.14.0</assertj.version>
     <deploy.skip>true</deploy.skip>
     <central.publishing.skip>false</central.publishing.skip>
+    <java.addopens.args>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</java.addopens.args>
   </properties>
 
   <modules>
@@ -126,7 +127,7 @@
               </includes>
               <reuseForks>false</reuseForks>
               <forkCount>4</forkCount>
-              <argLine>-Xmx2g --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED @{argLine}</argLine>
+              <argLine>-Xmx2g ${java.addopens.args} @{argLine}</argLine>
               <reportNameSuffix>sponge_log</reportNameSuffix>
             </configuration>
           </plugin>
