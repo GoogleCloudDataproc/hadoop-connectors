@@ -15,8 +15,8 @@
  limitations under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.1-SNAPSHOT">
-  <modelVersion>4.0.1-SNAPSHOT</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
 
   <name>BigDataOSS Parent</name>
   <description>
