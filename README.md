@@ -11,7 +11,7 @@ open-source software and Google Cloud Platform.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop1.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop1-*)
 [![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop2.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop2-*)
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop3.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop3-*)
+[![Maven Central]([![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22com.google.cloud.bigdataoss%22%20AND%20a:%22gcs-connector%22)
 
 The Google Cloud Storage connector for Hadoop enables running MapReduce jobs
 directly on data in Google Cloud Storage by implementing the Hadoop FileSystem
@@ -19,7 +19,7 @@ interface. For details, see [the README](gcs/README.md).
 
 ## Building the Cloud Storage connector
 
-> Note that build requires Java 11+ and fails with older Java versions.
+> Note that build requires Java 17+ and fails with older Java versions.
 
 To build the connector for specific Hadoop version, run the following commands
 from the main directory:
