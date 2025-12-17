@@ -726,7 +726,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   // A fake ReadChannel that mimics StorageReadChannel by having a getObject method
   // and a class name ending in "StorageReadChannel"
-  public static class MockStorageReadChannel extends FakeReadChannel {
+  private static class MockStorageReadChannel extends FakeReadChannel {
     private final com.google.cloud.storage.BlobInfo blobInfo;
 
     public MockStorageReadChannel(ByteString content, com.google.cloud.storage.BlobInfo blobInfo) {

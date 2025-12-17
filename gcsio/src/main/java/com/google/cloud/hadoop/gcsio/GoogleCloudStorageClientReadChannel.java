@@ -69,7 +69,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private final GoogleCloudStorageOptions storageOptions;
   private final Storage storage;
   // The size of this object generation, in bytes.
-  private long objectSize;
+  private long objectSize = -1;
+  private boolean metadataInitialized = false;
   private final ErrorTypeExtractor errorExtractor;
   private ContentReadChannel contentReadChannel;
   private boolean gzipEncoded = false;
@@ -100,8 +101,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     } else {
       if (readOptions.getFastFailOnNotFound()) {
         fetchMetadata();
-      } else {
-        objectSize = Long.MAX_VALUE;
       }
     }
   }
@@ -131,12 +130,13 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   protected void initMetadata(@Nullable String encoding, long sizeFromMetadata, long generation)
       throws IOException {
+    checkState(!metadataInitialized, "Metadata already initialized");
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
     if (gzipEncoded && !readOptions.getSupportGzipEncoding()) {
       throw new IOException(
           "Cannot read GZIP encoded files - content encoding support is disabled.");
     }
-    objectSize = gzipEncoded ? Long.MAX_VALUE : sizeFromMetadata;
+    objectSize = gzipEncoded ? -1 : sizeFromMetadata;
     if (!resourceId.hasGenerationId()) {
       resourceId =
           new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName(), generation);
@@ -148,6 +148,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           generation,
           resourceId);
     }
+    metadataInitialized = true;
   }
 
   @Override
@@ -207,7 +208,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   @Override
   public long size() throws IOException {
     throwIfNotOpen();
-    if (objectSize == Long.MAX_VALUE && !gzipEncoded) {
+    if (!metadataInitialized) {
       fetchMetadata();
     }
     return objectSize;
@@ -328,19 +329,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                 bytesRead, currentPosition, contentChannelEnd, resourceId, objectSize);
           }
 
+          updateMetadataFromReadChannel(byteChannel);
+
           if (bytesRead < 0) {
-            // We handle two cases where we might hit EOF unexpectedly:
-            // 1. Gzip encoded files: We don't know the decompressed size upfront.
-            // 2. Unknown object size (fastFailOnNotFound=false):
-            //    If we hit EOF while reading the whole file (contentChannelEnd == MAX_VALUE)
-            //    OR if we hit EOF before the expected end of the current chunk (currentPosition <
-            //    contentChannelEnd), then we have found the true end of the object.
-            // Note: If currentPosition == contentChannelEnd, it just means we finished the
-            // requested chunk, not necessarily the whole file, so we don't update objectSize.
-            if (gzipEncoded
-                || (objectSize == Long.MAX_VALUE
-                    && (contentChannelEnd == Long.MAX_VALUE
-                        || currentPosition < contentChannelEnd))) {
+            // Because we don't know decompressed object size for gzip-encoded objects,
+            // assume that this is an object end.
+            if (gzipEncoded) {
               objectSize = currentPosition;
               contentChannelEnd = currentPosition;
             }
@@ -371,7 +365,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   + " after successful read",
               contentChannelCurrentPosition,
               currentPosition);
-          updateMetadataFromReadChannel(byteChannel);
         } catch (Exception e) {
           int partialBytes = partiallyReadBytes(remainingBeforeRead, dst);
           totalBytesRead += partialBytes;
@@ -428,7 +421,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private void updateMetadataFromReadChannel(ReadableByteChannel readableByteChannel)
         throws IOException {
-      if (objectSize != Long.MAX_VALUE) {
+      if (metadataInitialized) {
         return;
       }
 
@@ -524,24 +517,25 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private long getRangeRequestEnd(long startPosition, long bytesToRead) {
+      long effectiveSize = objectSize == -1 ? Long.MAX_VALUE : objectSize;
       // Always read gzip-encoded files till the end - they do not support range reads.
       if (gzipEncoded) {
-        return objectSize;
+        return effectiveSize;
       }
-      long endPosition = objectSize;
+      long endPosition = effectiveSize;
       if (fileAccessManager.shouldAdaptToRandomAccess()) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
       } else {
         if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
-          endPosition = min(startPosition + readOptions.getBlockSize(), objectSize);
+          endPosition = min(startPosition + readOptions.getBlockSize(), effectiveSize);
         }
       }
       if (footerContent != null) {
         // If footer is cached open just till footerStart.
         // Remaining content ill be served from cached footer itself.
-        endPosition = min(endPosition, objectSize - footerContent.length);
+        endPosition = min(endPosition, effectiveSize - footerContent.length);
       }
       return endPosition;
     }
@@ -669,7 +663,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private boolean isFooterRead() {
-      return objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
+      return objectSize != -1
+          && objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
     }
   }
 
