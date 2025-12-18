@@ -44,6 +44,8 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
@@ -329,7 +331,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                 bytesRead, currentPosition, contentChannelEnd, resourceId, objectSize);
           }
 
-          updateMetadataFromReadChannel(byteChannel);
+          ensureMetadataInitialized(byteChannel);
 
           if (bytesRead < 0) {
             // Because we don't know decompressed object size for gzip-encoded objects,
@@ -419,37 +421,44 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       return readableByteChannel;
     }
 
-    private void updateMetadataFromReadChannel(ReadableByteChannel readableByteChannel)
+    private void ensureMetadataInitialized(ReadableByteChannel readableByteChannel)
         throws IOException {
       if (metadataInitialized) {
         return;
       }
 
-      boolean metadataUpdated = false;
-      if (readableByteChannel instanceof ReadChannel) {
-        try {
-          ApiFuture<BlobInfo> blobInfoFuture =
-              getBlobInfoFromReadChannelFunction((ReadChannel) readableByteChannel);
-          if (blobInfoFuture.isDone()) {
-            BlobInfo blobInfo = blobInfoFuture.get();
-            if (blobInfo != null) {
-              objectSize = blobInfo.getSize();
-              initMetadata(blobInfo.getContentEncoding(), objectSize, blobInfo.getGeneration());
-              if (gzipEncoded) {
-                fileAccessManager.overrideAccessPattern(false);
-              }
-              metadataUpdated = true;
-            }
-          }
-        } catch (Exception e) {
-          logger.atWarning().withCause(e).log(
-              "Failed to get metadata from read channel for '%s'", resourceId);
-        }
-      }
-
-      if (!metadataUpdated) {
+      if (!initializeMetadataFromChannel(readableByteChannel)) {
         logger.atInfo().log("Fallback to metadata fetch for '%s'", resourceId);
         fetchMetadata();
+      }
+    }
+
+    private boolean initializeMetadataFromChannel(ReadableByteChannel readableByteChannel) {
+      if (!(readableByteChannel instanceof ReadChannel)) {
+        return false;
+      }
+
+      try {
+        ApiFuture<BlobInfo> blobInfoFuture =
+            getBlobInfoFromReadChannelFunction((ReadChannel) readableByteChannel);
+        if (!blobInfoFuture.isDone()) {
+          return false;
+        }
+        BlobInfo blobInfo = blobInfoFuture.get();
+        if (blobInfo == null) {
+          return false;
+        }
+
+        objectSize = blobInfo.getSize();
+        initMetadata(blobInfo.getContentEncoding(), objectSize, blobInfo.getGeneration());
+        if (gzipEncoded) {
+          fileAccessManager.overrideAccessPattern(false);
+        }
+        return true;
+      } catch (Exception e) {
+        logger.atWarning().withCause(e).log(
+            "Failed to get metadata from read channel for '%s'", resourceId);
+        return false;
       }
     }
 
@@ -726,24 +735,25 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
   }
 
-  public static ApiFuture<BlobInfo> getBlobInfoFromReadChannelFunction(ReadChannel c) {
+  public static ApiFuture<BlobInfo> getBlobInfoFromReadChannelFunction(ReadChannel readChannel) {
     // This method relies on the internal implementation details of the Google Cloud Storage client
     // library (specifically field names and method names). If the underlying library changes,
     // this reflection logic might break. In that case, we catch the exception and fallback to
     // explicit metadata fetching, ensuring robustness at the cost of an extra API call.
     try {
-      String channelClassName = c.getClass().getName();
+      ReadChannel targetChannel = readChannel;
+      String channelClassName = targetChannel.getClass().getName();
       if (channelClassName.endsWith(OTEL_DECORATED_READ_CHANNEL)) {
-        java.lang.reflect.Field readerField = c.getClass().getDeclaredField("reader");
+        Field readerField = targetChannel.getClass().getDeclaredField("reader");
         readerField.setAccessible(true);
-        c = (ReadChannel) readerField.get(c);
-        channelClassName = c.getClass().getName();
+        targetChannel = (ReadChannel) readerField.get(targetChannel);
+        channelClassName = targetChannel.getClass().getName();
       }
       if (channelClassName.endsWith(STORAGE_READ_CHANNEL)
           || channelClassName.endsWith(GRPC_BLOB_READ_CHANNEL)) {
-        java.lang.reflect.Method getObjectMethod = c.getClass().getMethod("getObject");
+        Method getObjectMethod = targetChannel.getClass().getMethod("getObject");
         getObjectMethod.setAccessible(true);
-        return (ApiFuture<BlobInfo>) getObjectMethod.invoke(c);
+        return (ApiFuture<BlobInfo>) getObjectMethod.invoke(targetChannel);
       } else {
         return ApiFutures.immediateFailedFuture(
             new IllegalArgumentException(
@@ -751,7 +761,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
     } catch (Exception e) {
       return ApiFutures.immediateFailedFuture(
-          new IllegalStateException("Failed to get object info from " + c.getClass().getName(), e));
+          new IllegalStateException(
+              "Failed to get object info from " + readChannel.getClass().getName(), e));
     }
   }
 }
