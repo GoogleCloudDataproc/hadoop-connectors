@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1413 - [Bug] Fixing DeleteFolder stalling issue where high CPU usage can cause timeouts
 
 ## 3.1.11 - 2025-12-10
 1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
