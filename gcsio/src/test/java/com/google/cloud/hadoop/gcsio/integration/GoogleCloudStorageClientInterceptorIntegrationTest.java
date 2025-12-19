@@ -29,6 +29,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientGrpcTracingInterceptor;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTracingFields;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
@@ -188,6 +189,82 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     int partitionsCount = 1;
     byte[] partition =
         writeObject(gcsImpl, resourceId, /* partitionSize= */ 2 * 1024 * 1024, partitionsCount);
+    // there will be three streams
+    // 1. StartResumableUpload stream with 3 messages, 1 for each Req, Resp, and status
+    // 2. WriteObject Stream with 3 messages, 1 for each Req, Resp, and status
+    // 2. WriteObject Stream to finalize object with 3 messages, 1 for each Req, Resp, and status
+    assertingHandler.assertLogCount(3 * 3);
+    assertingHandler.flush();
+
+    // One for Read Request
+    // One for Read Response ( it can vary, request can be split into two chunks as well).
+    // One for status
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.DEFAULT;
+
+    assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
+    assertingHandler.assertLogCount(6);
+    StorageResourceId derivedResourceId = derivedResourceId(resourceId);
+
+    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(3);
+    String streamInvocationId =
+        readObjectRequestRecord
+            .get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name)
+            .toString();
+
+    assertThat(
+            readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RPC_METHOD.name).toString())
+        .isEqualTo("ReadObject");
+    ReadObjectRequest request =
+        (ReadObjectRequest)
+            fromProtoToMsg(
+                readObjectRequestRecord
+                    .get(GoogleCloudStorageTracingFields.REQUEST_MESSAGE_AS_STRING.name)
+                    .toString(),
+                ReadObjectRequest.newBuilder());
+    assertThat(request.getBucket()).isEqualTo(derivedResourceId.getBucketName());
+    assertThat(request.getObject()).isEqualTo(derivedResourceId.getObjectName());
+    assertThat(request.getReadOffset()).isEqualTo(0);
+
+    // With fastFailOnNotFound=true (default), object size is known, so read_limit is set.
+    assertThat(request.getReadLimit()).isEqualTo(partition.length);
+
+    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(4);
+
+    ReadObjectResponse response =
+        (ReadObjectResponse)
+            fromProtoToMsg(
+                readObjectResponseRecord
+                    .get(GoogleCloudStorageTracingFields.RESPONSE_MESSAGE_AS_STRING.name)
+                    .toString(),
+                ReadObjectResponse.newBuilder());
+
+    assertThat(response.getChecksummedData().getContent().toStringUtf8())
+        .isEqualTo(String.format("<size (%d)>", partition.length));
+    // assert both request-response have same invocationId
+    assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.IDEMPOTENCY_TOKEN.name))
+        .isEqualTo(streamInvocationId);
+
+    Map<String, Object> readObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(5);
+    verifyCloseStatus(readObjectCloseStatusRecord, "ReadObject", streamInvocationId, Status.OK);
+    gcsImpl.close();
+  }
+
+  @Test
+  public void testReadLogs_fastFailDisabled() throws IOException {
+
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    int uploadChunkSize = 2 * 1024 * 1024;
+    GoogleCloudStorageOptions storageOption =
+        GCS_TRACE_OPTIONS
+            .toBuilder()
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder().setUploadChunkSize(uploadChunkSize).build())
+            .build();
+
+    GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
+    int partitionsCount = 1;
+    byte[] partition =
+        writeObject(gcsImpl, resourceId, /* partitionSize= */ 2 * 1024 * 1024, partitionsCount);
     // there wil lbe three streams
     // 1. StartResumableUpload stream with 3 messages, 1 for each Req, Resp, and status
     // 2. WriteObject Stream with 3 messages, 1 for each Req, Resp, and status
@@ -195,11 +272,14 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertingHandler.assertLogCount(3 * 3);
     assertingHandler.flush();
 
-    assertObjectContent(gcsImpl, resourceId, partition, partitionsCount);
-
     // One for Read Request
     // One for Read Response ( it can vary, request can be split into two chunks as well).
     // One for status
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+
+    assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
+
     assertingHandler.assertLogCount(3);
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
@@ -221,7 +301,8 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(request.getBucket()).isEqualTo(derivedResourceId.getBucketName());
     assertThat(request.getObject()).isEqualTo(derivedResourceId.getObjectName());
     assertThat(request.getReadOffset()).isEqualTo(0);
-    assertThat(request.getReadLimit()).isEqualTo(partition.length);
+    // With fastFailOnNotFound=false, object size is unknown, so read_limit is 0 (unlimited).
+    assertThat(request.getReadLimit()).isEqualTo(0);
 
     Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
 

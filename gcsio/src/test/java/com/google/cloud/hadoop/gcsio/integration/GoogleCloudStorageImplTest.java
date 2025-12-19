@@ -14,7 +14,6 @@
 
 package com.google.cloud.hadoop.gcsio.integration;
 
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.OBJECT_FIELDS;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.rewriteRequestString;
@@ -143,13 +142,12 @@ public class GoogleCloudStorageImplTest {
 
     String filelds = "contentEncoding,generation,size";
     if (testStorageClientImpl) {
-      // fail fast is not supported via java-storage as of now, overriding with default values.
-      filelds = OBJECT_FIELDS;
+      assertThat(trackingGcs.getAllRequestStrings()).containsExactly("rpcMethod:GetObject");
+    } else {
+      assertThat(trackingGcs.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(resourceId.getBucketName(), resourceId.getObjectName(), filelds));
     }
-
-    assertThat(trackingGcs.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(resourceId.getBucketName(), resourceId.getObjectName(), filelds));
     trackingGcs.delegate.close();
   }
 
