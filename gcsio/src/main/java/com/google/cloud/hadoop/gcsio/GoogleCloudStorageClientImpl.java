@@ -1317,7 +1317,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
           getBoundedThreadPool(readOptions.getBidiThreadCount()));
     } else {
       return new GoogleCloudStorageClientReadChannel(
-          storageWrapper.getStorage(), gcsItemInfo, readOptions, errorExtractor, storageOptions);
+          storageWrapper.getStorage(), resourceId, gcsItemInfo, readOptions, errorExtractor, storageOptions);
     }
   }
 

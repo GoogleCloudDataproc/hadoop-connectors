@@ -625,6 +625,169 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(limitValue.getAllValues().get(1)).isEqualTo(startPosition + 1);
   }
 
+  @Test
+  public void lazyMetadataFetch_whenFastFailFalse_usesFallback() throws IOException {
+    // Setup with fastFailOnNotFound = false and null itemInfo
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
+
+    // Create channel directly to pass null itemInfo
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null, // itemInfo
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Verify storage.get was NOT called during construction
+    verify(mockedStorage, times(0)).get(any(com.google.cloud.storage.BlobId.class));
+
+    // Mock storage.get for the fallback/lazy fetch
+    com.google.cloud.storage.Blob mockBlob = mock(com.google.cloud.storage.Blob.class);
+    when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockedStorage.get(any(com.google.cloud.storage.BlobId.class), any())).thenReturn(mockBlob);
+
+    // Perform a read, which should trigger metadata fetch (fallback since FakeReadChannel has no
+    // getObject)
+    readChannel.read(ByteBuffer.allocate(1));
+
+    // Verify storage.get WAS called now
+    verify(mockedStorage, times(1)).get(any(com.google.cloud.storage.BlobId.class), any());
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+  }
+
+  @Test
+  public void lazyMetadataFetch_viaReflection_success() throws Exception {
+    // Setup with fastFailOnNotFound = false and null itemInfo
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
+
+    // Create a mock BlobInfo to be returned by reflection
+    com.google.cloud.storage.BlobInfo mockBlobInfo = mock(com.google.cloud.storage.BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(12345L);
+
+    // Create our fake channel that supports reflection
+    MockStorageReadChannel fakeChannel = new MockStorageReadChannel(CONTENT, mockBlobInfo);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null, // itemInfo
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Verify storage.get was NOT called during construction
+    verify(mockedStorage, times(0)).get(any(com.google.cloud.storage.BlobId.class));
+
+    // Perform a read, which should trigger metadata fetch via reflection
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    readChannel.read(buffer);
+
+    // Verify storage.get was NOT called (because reflection succeeded)
+    verify(mockedStorage, times(0)).get(any(com.google.cloud.storage.BlobId.class), any());
+
+    // Verify size is correct
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+  }
+
+  @Test
+  public void size_whenFastFailFalse_triggersMetadataFetch() throws IOException {
+    // Setup with fastFailOnNotFound = false and null itemInfo
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
+
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null, // itemInfo
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Verify size is initially unknown (MAX_VALUE) internally, but size() triggers fetch
+    // Mock storage.get for the lazy fetch
+    com.google.cloud.storage.Blob mockBlob = mock(com.google.cloud.storage.Blob.class);
+    when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockedStorage.get(any(com.google.cloud.storage.BlobId.class), any())).thenReturn(mockBlob);
+
+    // Call size()
+    long size = readChannel.size();
+
+    // Verify fetch happened and size is correct
+    verify(mockedStorage, times(1)).get(any(com.google.cloud.storage.BlobId.class), any());
+    assertThat(size).isEqualTo(OBJECT_SIZE);
+  }
+
+  @Test
+  public void testChunkedRead_whenObjectSizeUnknown_doesNotTruncateSize() throws IOException {
+    // fastFailOnNotFound = false implies objectSize is initially Long.MAX_VALUE
+    // Use AUTO_RANDOM to trigger chunked reads
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION
+            .toBuilder()
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO_RANDOM)
+            .setBlockSize(10) // Small block size
+            .build();
+
+    // Content larger than block size
+    ByteString content = ByteString.copyFromUtf8("12345678901234567890"); // 20 bytes
+    com.google.cloud.storage.BlobInfo mockBlobInfo = mock(com.google.cloud.storage.BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn(20L);
+    MockStorageReadChannel fakeChannel = new MockStorageReadChannel(content, mockBlobInfo);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null, // itemInfo is null, so objectSize will be MAX_VALUE
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Read first 10 bytes (one block)
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(10);
+    // objectSize should NOT be updated to 10.
+    // Since objectSize is still MAX_VALUE (or 20 if fetched), calling size() triggers
+    // fetchMetadata() which returns 20.
+    // If it was incorrectly updated to 10, size() would return 10.
+    assertThat(readChannel.size()).isEqualTo(20L);
+
+    // Read next 10 bytes
+    buffer.clear();
+    bytesRead = readChannel.read(buffer);
+    assertThat(bytesRead).isEqualTo(10);
+  }
+
+  // A fake ReadChannel that mimics StorageReadChannel by having a getObject method
+  // and a class name ending in "StorageReadChannel"
+  private static class MockStorageReadChannel extends FakeReadChannel {
+    private final com.google.cloud.storage.BlobInfo blobInfo;
+
+    public MockStorageReadChannel(ByteString content, com.google.cloud.storage.BlobInfo blobInfo) {
+      super(content);
+      this.blobInfo = blobInfo;
+    }
+
+    public com.google.api.core.ApiFuture<com.google.cloud.storage.BlobInfo> getObject() {
+      return com.google.api.core.ApiFutures.immediateFuture(blobInfo);
+    }
+  }
+
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
     assertThat(buffer.position()).isEqualTo(length);
     assertByteArrayEquals(
@@ -640,6 +803,10 @@ public class GoogleCloudStorageClientReadChannelTest {
     }
     return new GoogleCloudStorageClientReadChannel(
         mockedStorage,
+        new StorageResourceId(
+            objectInfo.getBucketName(),
+            objectInfo.getObjectName(),
+            objectInfo.getContentGeneration()),
         objectInfo,
         readOptions,
         GrpcErrorTypeExtractor.INSTANCE,
