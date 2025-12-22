@@ -406,7 +406,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.write.parallel.composite.upload.part.file.cleanup.type", "NEVER");
     config.set("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "baz");
     config.setBoolean("fs.gs.write.rolling.checksum.enable", true);
-    config.setBoolean("fs.gs.write.trailing.checksum", false);
+    config.setBoolean("fs.gs.write.trailing.checksum.enable", false);
 
     AsyncWriteChannelOptions options =
         GoogleHadoopFileSystemConfiguration.getWriteChannelOptions(config);
