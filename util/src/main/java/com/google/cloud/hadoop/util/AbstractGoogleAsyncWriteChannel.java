@@ -128,7 +128,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
     try {
       int originalPosition = buffer.position();
       int writtenBytes = pipeSink.write(buffer);
-      if (channelOptions.isRollingChecksumEnabled() && !reuploadFromCacheInitiated) {
+
+      // Calculate checksum if either rolling checksum or trailing checksum is enabled
+      boolean calculateChecksum =
+          channelOptions.isRollingChecksumEnabled() || channelOptions.isTrailingChecksumEnabled();
+      if (calculateChecksum && !reuploadFromCacheInitiated) {
         addBytesToCumulativeChecksum(buffer, writtenBytes, originalPosition);
       }
       return writtenBytes;

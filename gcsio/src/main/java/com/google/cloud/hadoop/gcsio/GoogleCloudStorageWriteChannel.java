@@ -23,6 +23,7 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.ChecksumContext;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
@@ -193,6 +194,9 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
+        if (channelOptions.isTrailingChecksumEnabled()) {
+          ChecksumContext.CURRENT_HASHER.set(cumulativeCrc32cHasher);
+        }
         return uploadObject.execute();
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();
@@ -204,6 +208,8 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
             "Received IOException during '%s' upload, but successfully converted to response: '%s'.",
             resourceId, response);
         return response;
+      } finally {
+        ChecksumContext.CURRENT_HASHER.remove();
       }
     }
   }

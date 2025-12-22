@@ -37,6 +37,10 @@ import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+import com.google.common.io.BaseEncoding;
+import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -280,6 +284,37 @@ public class RetryHttpInitializerTest {
       }
 
       return requestTracker;
+    }
+  }
+
+  @Test
+  public void successfulRequest_addsTrailingChecksum() throws IOException {
+    String authHeaderValue = "Bearer: test-token";
+    HttpRequestFactory requestFactory =
+        mockTransport(emptyResponse(200))
+            .createRequestFactory(createRetryHttpInitializer(new FakeCredentials(authHeaderValue)));
+
+    byte[] testData = {1, 2, 3, 4};
+    Hasher hasher = Hashing.crc32c().newHasher();
+    hasher.putBytes(testData);
+    ChecksumContext.CURRENT_HASHER.set(hasher);
+
+    String expectedChecksum = BaseEncoding.base64().encode(Ints.toByteArray(hasher.hash().asInt()));
+
+    try {
+      HttpRequest req = requestFactory.buildPutRequest(new GenericUrl(URL), null);
+      req.getHeaders().setContentRange("bytes 0-3/4");
+
+      HttpResponse res = req.execute();
+
+      // Verify that Interceptor added the header
+      assertThat(res).isNotNull();
+      assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
+      assertThat(req.getHeaders()).containsKey("x-goog-hash");
+      assertThat(req.getHeaders().getFirstHeaderStringValue("x-goog-hash"))
+          .isEqualTo("crc32c=" + expectedChecksum);
+    } finally {
+      ChecksumContext.CURRENT_HASHER.remove();
     }
   }
 
