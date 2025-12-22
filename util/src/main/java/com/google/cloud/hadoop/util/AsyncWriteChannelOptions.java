@@ -94,7 +94,8 @@ public abstract class AsyncWriteChannelOptions {
         .setPCUBufferCapacity(PARALLEL_COMPOSITE_UPLOAD_BUFFER_CAPACITY)
         .setPartFileCleanupType(PartFileCleanupType.ALWAYS)
         .setPartFileNamePrefix(PART_FILE_PREFIX)
-        .setRollingChecksumEnabled(true);
+        .setRollingChecksumEnabled(true)
+        .setTrailingChecksumEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -114,6 +115,8 @@ public abstract class AsyncWriteChannelOptions {
   public abstract boolean isGrpcChecksumsEnabled();
 
   public abstract boolean isRollingChecksumEnabled();
+
+  public abstract boolean isTrailingChecksumEnabled();
 
   public abstract Duration getGrpcWriteTimeout();
 
@@ -150,6 +153,8 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
 
     public abstract Builder setRollingChecksumEnabled(boolean rollingChecksumEnabled);
+
+    public abstract Builder setTrailingChecksumEnabled(boolean trailingChecksumEnabled);
 
     public abstract Builder setGrpcWriteTimeout(Duration grpcWriteTimeout);
 

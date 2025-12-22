@@ -26,9 +26,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.util.EnumSet;
+import java.util.Random;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -236,6 +238,66 @@ public class GoogleHadoopFSIntegrationTest {
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(testDir));
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(testFilePath));
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(testDir.getParent()));
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_Enabled_MultiChunk() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    // enable trailing checksum
+    config.setBoolean("fs.gs.write.trailing.checksum.enable", true);
+    config.setInt("fs.gs.outputstream.upload.chunk.size", 1 * 1024 * 1024);
+
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    Path testPath = new Path(initUri.resolve("/testWriteWithTrailingChecksum_Enabled.bin"));
+
+    int fileSize = (int) (2.5 * 1024 * 1024);
+    byte[] expectedData = new byte[fileSize];
+    new Random().nextBytes(expectedData);
+    // write data
+    try (FSDataOutputStream out = ghfs.create(testPath)) {
+      out.write(expectedData);
+    }
+
+    byte[] actualData = new byte[fileSize];
+    // read the data
+    try (FSDataInputStream in = ghfs.open(testPath)) {
+      in.readFully(actualData);
+    }
+
+    assertThat(actualData).isEqualTo(expectedData);
+
+    ghfs.delete(testPath, false);
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_Disabled_Regression() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    // enable trailing checksum
+    config.setBoolean("fs.gs.write.trailing.checksum.enable", false);
+    config.setInt("fs.gs.outputstream.upload.chunk.size", 1 * 1024 * 1024);
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    Path testPath = new Path(initUri.resolve("/testWriteWithTrailingChecksum_Disabled.bin"));
+
+    int fileSize = 1024 * 1024;
+    byte[] expectedData = new byte[fileSize];
+    new Random().nextBytes(expectedData);
+    // write data
+    try (FSDataOutputStream out = ghfs.create(testPath)) {
+      out.write(expectedData);
+    }
+
+    byte[] actualData = new byte[fileSize];
+    // read the data
+    try (FSDataInputStream in = ghfs.open(testPath)) {
+      in.readFully(actualData);
+    }
+    assertThat(actualData).isEqualTo(expectedData);
+
+    ghfs.delete(testPath, false);
   }
 
   @Test

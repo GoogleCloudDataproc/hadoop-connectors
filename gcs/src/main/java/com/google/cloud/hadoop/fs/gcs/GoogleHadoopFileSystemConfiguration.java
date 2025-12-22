@@ -577,6 +577,13 @@ public class GoogleHadoopFileSystemConfiguration {
           AsyncWriteChannelOptions.DEFAULT.getPartFileNamePrefix());
 
   /**
+   * Configuration key to enable the trailing checksum (x-goog-hash header) on upload requests. This
+   * enables server-side validation of the data integrity before finalization.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_WRITE_TRAILING_CHECKSUM_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.write.trailing.checksum.enable", false);
+
+  /**
    * Configuration key for rolling checksum on writes.
    *
    * <p>If this is enabled, write channel will calculate rolling crc32c checksum and compare it from
@@ -769,6 +776,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPCUBufferCapacity(toIntExact(GCS_PCU_BUFFER_CAPACITY.get(config, config::getLongBytes)))
         .setPartFileCleanupType(GCS_PCU_PART_FILE_CLEANUP_TYPE.get(config, config::getEnum))
         .setPartFileNamePrefix(GCS_PCU_PART_FILE_NAME_PREFIX.get(config, config::get))
+        .setTrailingChecksumEnabled(
+            GCS_WRITE_TRAILING_CHECKSUM_ENABLE.get(config, config::getBoolean))
         .setRollingChecksumEnabled(
             GCS_WRITE_ROLLING_CHECKSUM_ENABLE.get(config, config::getBoolean))
         .build();
