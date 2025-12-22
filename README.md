@@ -19,7 +19,7 @@ interface. For details, see [the README](gcs/README.md).
 
 ## Building the Cloud Storage connector
 
-> Note that build requires Java 11+ and fails with older Java versions.
+> Note that build requires Java 17+ and fails with older Java versions.
 
 To build the connector for specific Hadoop version, run the following commands
 from the main directory:
@@ -48,7 +48,7 @@ To add a dependency on Cloud Storage connector using Maven, use the following:
 <dependency>
   <groupId>com.google.cloud.bigdataoss</groupId>
   <artifactId>gcs-connector</artifactId>
-  <version>3.0.0</version>
+  <version>4.0.0</version>
 </dependency>
 ```
 
