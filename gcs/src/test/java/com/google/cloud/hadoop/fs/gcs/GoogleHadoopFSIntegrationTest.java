@@ -19,11 +19,25 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.http.HttpExecuteInterceptor;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
-import java.io.FileNotFoundException;
+import com.google.api.client.http.HttpContent;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageWriteChannel;
+import com.google.cloud.hadoop.gcsio.ObjectWriteConditions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.ClientRequestHelper;
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.nio.file.DirectoryNotEmptyException;
 import java.util.EnumSet;
 import java.util.Random;
@@ -383,5 +397,138 @@ public class GoogleHadoopFSIntegrationTest {
 
     assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(srcPath));
     assertThat(ghfs.listStatus(dstPath)).hasLength(1);
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_SimulatedDataCorruption() throws Exception {
+    // 1. Setup Configuration
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    // 2. Build a "Sabotaging" GCS Client
+    // We want to keep all standard behaviors (like your Checksum Interceptor)
+    // but add one final step to corrupt the body.
+    HttpRequestInitializer sabotageInitializer = request -> {
+      // Initialize normal credentials and interceptors first
+      ghfs.getGcsFs().getGcs().getRequestFactory().getInitializer().initialize(request);
+
+      // Add our corruptor as the LAST step
+      final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+      request.setInterceptor(req -> {
+        if (existingInterceptor != null) {
+          existingInterceptor.intercept(req);
+        }
+
+        // Only corrupt the FINAL upload chunk (the one with the checksum header)
+        if (req.getHeaders().containsKey("x-goog-hash") && "PUT".equals(req.getRequestMethod())) {
+          // Wrap the content to corrupt it on the wire
+          HttpContent originalContent = req.getContent();
+          req.setContent(new CorruptingHttpContent(originalContent));
+        }
+      });
+    };
+
+    GoogleCloudStorageOptions gcsOptions = GoogleCloudStorageOptions.builder()
+        .setAppName("GHFS-Corruption-Test")
+        .build();
+    GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(gcsOptions, sabotageInitializer);
+
+    // 3. Configure Write Channel
+    String bucket = initUri.getAuthority();
+    String objectName = "corruption_test_" + System.currentTimeMillis() + ".bin";
+    StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
+
+    AsyncWriteChannelOptions writeOptions = AsyncWriteChannelOptions.builder()
+        .setTrailingChecksumEnabled(true) // Crucial: Enable the header generation
+        .setUploadChunkSize(1024 * 1024)  // Small chunks
+        .build();
+
+    GoogleCloudStorageWriteChannel channel = new GoogleCloudStorageWriteChannel(
+        gcs.getStorage(),
+        new ClientRequestHelper<>(),
+        Executors.newCachedThreadPool(),
+        writeOptions,
+        resourceId,
+        CreateObjectOptions.DEFAULT_OVERWRITE,
+        ObjectWriteConditions.NONE
+    );
+
+    // 4. Run the Test
+    channel.initialize();
+
+    byte[] data = new byte[2 * 1024 * 1024]; // 2MB data
+    new Random().nextBytes(data);
+    channel.write(ByteBuffer.wrap(data));
+
+    // 5. Assert: Server must REJECT the upload
+    // We are sending a Valid Checksum Header + Corrupted Data Body.
+    // GCS should detect this mismatch and throw 400 Bad Request.
+    IOException e = assertThrows(IOException.class, channel::close);
+
+    // 6. Verify the Error
+    // The error message from GCS is typically: "Provided CRC32C ... doesn't match calculated ..."
+    assertThat(e.getMessage()).contains("400");
+    assertThat(e.getMessage()).contains("CRC32C");
+
+    // Cleanup
+    try { ghfs.getGcsFs().delete(resourceId); } catch (Exception ignored) {}
+  }
+
+  // Helper class to corrupt data on the fly
+  class CorruptingHttpContent implements HttpContent {
+    private final HttpContent delegate;
+
+    public CorruptingHttpContent(HttpContent delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public long getLength() throws IOException {
+      return delegate.getLength();
+    }
+
+    @Override
+    public String getType() {
+      return delegate.getType();
+    }
+
+    @Override
+    public boolean retrySupported() {
+      return delegate.retrySupported();
+    }
+
+    @Override
+    public void writeTo(OutputStream out) throws IOException {
+      // Wrap the output stream to corrupt the first byte written
+      delegate.writeTo(new FilterOutputStream(out) {
+        private boolean corrupted = false;
+
+        @Override
+        public void write(int b) throws IOException {
+          if (!corrupted) {
+            // FLIP A BIT: XOR with 1 to change the value
+            super.write(b ^ 1);
+            corrupted = true;
+          } else {
+            super.write(b);
+          }
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+          if (!corrupted && len > 0) {
+            // Corrupt the first byte in the array
+            b[off] = (byte) (b[off] ^ 1);
+            super.write(b, off, len);
+            // Restore it so we don't corrupt the source array permanently
+            b[off] = (byte) (b[off] ^ 1);
+            corrupted = true;
+          } else {
+            super.write(b, off, len);
+          }
+        }
+      });
+    }
   }
 }
