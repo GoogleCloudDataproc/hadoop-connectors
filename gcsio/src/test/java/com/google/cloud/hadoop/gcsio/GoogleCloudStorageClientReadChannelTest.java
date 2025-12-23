@@ -629,7 +629,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void lazyMetadataFetch_whenFastFailFalse_usesFallback() throws IOException {
     // Setup with fastFailOnNotFound = false and null itemInfo
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
 
     // Create channel directly to pass null itemInfo
     readChannel =
@@ -663,7 +663,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void lazyMetadataFetch_viaReflection_success() throws Exception {
     // Setup with fastFailOnNotFound = false and null itemInfo
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
 
     // Create a mock BlobInfo to be returned by reflection
     com.google.cloud.storage.BlobInfo mockBlobInfo = mock(com.google.cloud.storage.BlobInfo.class);
@@ -702,7 +702,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void size_whenFastFailFalse_triggersMetadataFetch() throws IOException {
     // Setup with fastFailOnNotFound = false and null itemInfo
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
 
     readChannel =
         new GoogleCloudStorageClientReadChannel(
@@ -733,9 +733,8 @@ public class GoogleCloudStorageClientReadChannelTest {
     // fastFailOnNotFound = false implies objectSize is initially Long.MAX_VALUE
     // Use AUTO_RANDOM to trigger chunked reads
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION
-            .toBuilder()
-            .setFastFailOnNotFound(false)
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
             .setFadvise(Fadvise.AUTO_RANDOM)
             .setBlockSize(10) // Small block size
             .build();

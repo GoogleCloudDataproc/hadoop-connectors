@@ -101,7 +101,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       initMetadata(
           itemInfo.getContentEncoding(), itemInfo.getSize(), itemInfo.getContentGeneration());
     } else {
-      if (readOptions.getFastFailOnNotFound()) {
+      if (readOptions.isFastFailOnNotFoundEnabled()) {
         fetchMetadata();
       }
     }

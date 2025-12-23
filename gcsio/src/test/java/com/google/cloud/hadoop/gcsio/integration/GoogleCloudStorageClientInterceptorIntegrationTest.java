@@ -177,17 +177,16 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     // One for Read Request
     // One for Read Response ( it can vary, request can be split into two chunks as well).
     // One for status
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.DEFAULT;
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.DEFAULT;
 
     assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
-    assertingHandler.assertLogCount(6 + 1);
+    assertingHandler.assertLogCount(7 + 1);
 
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
-    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(0);
+    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(1);
     assertThat(
-        readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+            readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
@@ -195,9 +194,9 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
         .isEqualTo(partition.length);
 
-    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(4);
+    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(2);
     assertThat(
-        readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+            readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
@@ -206,7 +205,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.BYTES_READ.name))
         .isEqualTo(partition.length);
 
-    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(5);
+    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(3);
     verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
   }
 
@@ -239,26 +238,27 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     // One for Read Response ( it can vary, request can be split into two chunks as well).
     // One for status
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
-    assertingHandler.assertLogCount(3 + 1);
+    assertingHandler.assertLogCount(6 + 1);
 
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
-    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(0);
+    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(1);
     assertThat(
-        readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+            readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
-    // With fastFailOnNotFound=false, object size is unknown, so read_limit is 0 (unlimited).
+    // With fastFailOnNotFound=false, object size is unknown, so read_limit is
+    // 2MB (default minRangeRequestSize)
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
-        .isEqualTo(0);
+        .isEqualTo(2 * 1024 * 1024);
 
-    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
+    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(2);
     assertThat(
-        readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
+            readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
@@ -267,7 +267,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.BYTES_READ.name))
         .isEqualTo(partition.length);
 
-    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(2);
+    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(3);
     verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
   }
 
