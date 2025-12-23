@@ -19,14 +19,32 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpContent;
+import com.google.api.client.http.HttpExecuteInterceptor;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.storage.Storage;
+import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageWriteChannel;
+import com.google.cloud.hadoop.gcsio.ObjectWriteConditions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.nio.file.DirectoryNotEmptyException;
 import java.util.EnumSet;
 import java.util.Random;
+import java.util.concurrent.Executors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -383,5 +401,213 @@ public class GoogleHadoopFSIntegrationTest {
 
     assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(srcPath));
     assertThat(ghfs.listStatus(dstPath)).hasLength(1);
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_SimulatedChecksumCorruption() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    String bucket = initUri.getAuthority();
+    String objectName = "testWithCorruption_" + System.currentTimeMillis() + ".bin";
+    StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
+
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+
+    HttpRequestInitializer sabotageInitializer =
+        request -> {
+          new RetryHttpInitializer(
+                  credentials,
+                  RetryHttpInitializerOptions.builder()
+                      .setDefaultUserAgent("GHFS-Integration-Test-Corruption")
+                      .build())
+              .initialize(request);
+
+          // Inject Sabotage Interceptor
+          final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+          request.setInterceptor(
+              req -> {
+                if (existingInterceptor != null) {
+                  existingInterceptor.intercept(req);
+                }
+                // Overwrite valid checksum with a bad one
+                if (req.getHeaders().containsKey("x-goog-hash")) {
+                  req.getHeaders().set("x-goog-hash", "crc32c=AAAAAA==");
+                }
+              });
+        };
+
+    Storage storage =
+        new Storage.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                sabotageInitializer)
+            .setApplicationName("GHFS-Corruption-Test")
+            .build();
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setTrailingChecksumEnabled(true)
+            .setUploadChunkSize(1024 * 1024)
+            .build();
+
+    GoogleCloudStorageWriteChannel channel =
+        new GoogleCloudStorageWriteChannel(
+            storage,
+            new ClientRequestHelper<>(),
+            Executors.newCachedThreadPool(),
+            writeOptions,
+            resourceId,
+            CreateObjectOptions.DEFAULT_OVERWRITE,
+            ObjectWriteConditions.NONE);
+
+    channel.initialize();
+
+    byte[] data = new byte[2 * 1024 * 1024];
+    new Random().nextBytes(data);
+    channel.write(ByteBuffer.wrap(data));
+
+    IOException e = assertThrows(IOException.class, () -> channel.close());
+
+    assertThat(e.getCause().getMessage()).contains("400");
+    assertThat(e.getCause().getMessage()).contains("CRC32C");
+
+    try {
+      ghfs.getGcsFs().getGcs().deleteObjects(java.util.Collections.singletonList(resourceId));
+    } catch (Exception ignored) {
+    }
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_SimulatedDataCorruption() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    String bucket = initUri.getAuthority();
+    String objectName = "corruption_test_" + System.currentTimeMillis() + ".bin";
+    StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
+
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+
+    HttpRequestInitializer sabotageInitializer =
+        request -> {
+          new RetryHttpInitializer(
+                  credentials,
+                  RetryHttpInitializerOptions.builder()
+                      .setDefaultUserAgent("GHFS-Corruption-Test")
+                      .build())
+              .initialize(request);
+
+          final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+          request.setInterceptor(
+              req -> {
+                if (existingInterceptor != null) {
+                  existingInterceptor.intercept(req);
+                }
+
+                String method = req.getRequestMethod();
+                boolean hasHeader = req.getHeaders().containsKey("x-goog-hash");
+
+                if (hasHeader && "PUT".equals(method)) {
+                  HttpContent originalContent = req.getContent();
+                  req.setContent(new CorruptingHttpContent(originalContent));
+                }
+              });
+        };
+
+    Storage storage =
+        new Storage.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                sabotageInitializer)
+            .setApplicationName("GHFS-Corruption-Test")
+            .build();
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setTrailingChecksumEnabled(true)
+            .setUploadChunkSize(1024 * 1024)
+            .build();
+
+    GoogleCloudStorageWriteChannel channel =
+        new GoogleCloudStorageWriteChannel(
+            storage,
+            new ClientRequestHelper<>(),
+            Executors.newCachedThreadPool(),
+            writeOptions,
+            resourceId,
+            CreateObjectOptions.DEFAULT_OVERWRITE,
+            ObjectWriteConditions.NONE);
+
+    channel.initialize();
+
+    byte[] data = new byte[2 * 1024 * 1024];
+    new Random().nextBytes(data);
+    channel.write(ByteBuffer.wrap(data));
+
+    IOException e = assertThrows(IOException.class, () -> channel.close());
+    assertThat(e.getCause().getMessage()).contains("400");
+    assertThat(e.getCause().getMessage()).contains("CRC32C");
+
+    try {
+      ghfs.getGcsFs().getGcs().deleteObjects(java.util.Collections.singletonList(resourceId));
+    } catch (Exception ignored) {
+    }
+  }
+
+  private static class CorruptingHttpContent implements HttpContent {
+    private final HttpContent delegate;
+
+    public CorruptingHttpContent(HttpContent delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public long getLength() throws IOException {
+      return delegate.getLength();
+    }
+
+    @Override
+    public String getType() {
+      return delegate.getType();
+    }
+
+    @Override
+    public boolean retrySupported() {
+      return delegate.retrySupported();
+    }
+
+    @Override
+    public void writeTo(java.io.OutputStream out) throws IOException {
+      delegate.writeTo(
+          new java.io.FilterOutputStream(out) {
+            private boolean corrupted = false;
+
+            @Override
+            public void write(int b) throws IOException {
+              if (!corrupted) {
+                corrupted = true;
+                out.write(b ^ 1);
+              } else {
+                out.write(b);
+              }
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) throws IOException {
+              if (!corrupted && len > 0) {
+                byte[] corruptedCopy = new byte[len];
+                System.arraycopy(b, off, corruptedCopy, 0, len);
+                corruptedCopy[0] = (byte) (corruptedCopy[0] ^ 1);
+                corrupted = true;
+                out.write(corruptedCopy, 0, len);
+              } else {
+                out.write(b, off, len);
+              }
+            }
+          });
+    }
   }
 }
