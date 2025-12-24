@@ -775,6 +775,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           }
           return true;
         },
+        // This is a unique hadoop operation where tracking can help determine if rename is executed
+        // as a atomic GCS MOVE or emulated via non-atomic COPY+DELETE sequence.
         TrackedFeatures.RENAME_API);
   }
 
