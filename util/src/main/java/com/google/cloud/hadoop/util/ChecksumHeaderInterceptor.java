@@ -51,7 +51,7 @@ public class ChecksumHeaderInterceptor implements HttpExecuteInterceptor {
     if (hasher != null && "PUT".equals(request.getRequestMethod())) {
       String contentRange = request.getHeaders().getContentRange();
 
-      logger.atInfo().log(
+      logger.atFiner().log(
           "intercept: Analyzing PUT request for trailing checksum. Content-Range: %s",
           contentRange);
 
