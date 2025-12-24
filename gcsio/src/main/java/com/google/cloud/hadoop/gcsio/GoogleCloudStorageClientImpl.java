@@ -1562,7 +1562,11 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       return headersBuilder.build();
     }
     String featureHeaderString = featureHeaderGenerator.getValue();
-    if (!Strings.isNullOrEmpty(featureHeaderString)) {
+    if (httpRequestHeaders.containsKey(FeatureHeaderGenerator.HEADER_NAME)) {
+      logger.atFiner().log(
+          "Not setting feature usage header, unexpectedly already set to %s",
+          httpRequestHeaders.get(FeatureHeaderGenerator.HEADER_NAME));
+    } else if (!Strings.isNullOrEmpty(featureHeaderString)) {
       logger.atFiner().log("Setting feature usage header %s", featureHeaderString);
       headersBuilder.put(FeatureHeaderGenerator.HEADER_NAME, featureHeaderString);
     }
