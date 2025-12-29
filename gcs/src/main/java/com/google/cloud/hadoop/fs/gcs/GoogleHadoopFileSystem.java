@@ -40,6 +40,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -49,6 +50,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackedFeatures;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
@@ -772,7 +774,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             return false;
           }
           return true;
-        });
+        },
+        // This is a unique hadoop operation where tracking can help determine if rename is executed
+        // as a atomic GCS MOVE or emulated via non-atomic COPY+DELETE sequence.
+        TrackedFeatures.RENAME_API);
   }
 
   /**
@@ -790,6 +795,28 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     InvocationIdContext.setInvocationId();
     return GhfsGlobalStorageStatistics.trackDuration(
         factory, stats, statistic, context, traceFactory, operation);
+  }
+
+  /**
+   * Tracks the duration of the operation {@code operation} and a specific feature usage. Also setup
+   * operation tracking using {@code ThreadTrace}.
+   */
+  private <B> B trackDurationWithTracing(
+      DurationTrackerFactory factory,
+      @Nonnull GhfsGlobalStorageStatistics stats,
+      GhfsStatistic statistic,
+      Object context,
+      ITraceFactory traceFactory,
+      CallableRaisingIOE<B> operation,
+      TrackedFeatures feature)
+      throws IOException {
+    return trackDurationWithTracing(
+        factory,
+        stats,
+        statistic,
+        context,
+        traceFactory,
+        () -> FeatureHeaderGenerator.track(feature, operation::apply));
   }
 
   @Override
