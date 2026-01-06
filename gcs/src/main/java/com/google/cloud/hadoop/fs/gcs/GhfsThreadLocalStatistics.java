@@ -17,10 +17,13 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.GCS_CONNECTOR_TIME;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -57,6 +60,12 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     }
   }
 
+  void incrementDuration(GhfsStatistic statistic, long duration) {
+    if (statistic == STREAM_READ_OPERATIONS) {
+      Metric.STREAM_READ_TIME.increment(duration);
+    }
+  }
+
   void increment(GhfsStatistic statistic, long count) {
     if (statistic == GCS_CONNECTOR_TIME) {
       Metric.HADOOP_API_TIME.increment(count);
@@ -66,6 +75,10 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
       Metric.STREAM_READ_VECTORED_RANGE_COUNT.increment(count);
     } else if (statistic.getIsHadoopApi()) {
       Metric.HADOOP_API_COUNT.increment(count);
+    } else if (statistic == STREAM_READ_OPERATIONS) {
+      Metric.STREAM_READ_COUNT.increment(count);
+    } else if (statistic == STREAM_READ_BYTES) {
+      Metric.STREAM_BYTES_READ.increment(count);
     }
   }
 
@@ -78,6 +91,20 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
       Metric.BACKOFF_COUNT.increment(count);
     } else if (op == GoogleCloudStorageStatistics.GCS_BACKOFF_TIME) {
       Metric.BACKOFF_TIME.increment(count);
+    } else if (op == GoogleCloudStorageStatistics.GCS_METADATA_REQUEST) {
+      Metric.GCS_METADATA_REQUEST.increment(count);
+    } else if (op == GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST
+        || op == GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST) {
+      Metric.GCS_LIST_REQUEST.increment(count);
+    } else if (op == GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST) {
+      Metric.GCS_GET_MEDIA_REQUEST.increment(count);
+    }
+  }
+
+  void increment(String s, long count) {
+    Metric m = Metric.valueOfLabel(s);
+    if (m != null) {
+      m.increment(count);
     }
   }
 
@@ -104,7 +131,8 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     }
   }
 
-  private enum Metric {
+  @VisibleForTesting
+  public enum Metric {
     HADOOP_API_COUNT("hadoopApiCount"),
     HADOOP_API_TIME("hadoopApiTime"),
     GCS_API_COUNT("gcsApiCount"),
@@ -112,7 +140,22 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     BACKOFF_COUNT("backoffCount"),
     BACKOFF_TIME("backoffTime"),
     STREAM_READ_VECTORED_COUNT("readVectoredCount"),
-    STREAM_READ_VECTORED_RANGE_COUNT("readVectoredRangeCount");
+    STREAM_READ_VECTORED_RANGE_COUNT("readVectoredRangeCount"),
+    STREAM_READ_COUNT("streamReadCount"),
+    STREAM_READ_TIME("streamReadTime"),
+    STREAM_BYTES_READ("streamBytesRead"),
+    GCS_GET_MEDIA_REQUEST("gcsMediaRequest"),
+    GCS_METADATA_REQUEST("gcsMetadataRequest"),
+    GCS_LIST_REQUEST("gcsListRequest"),
+    GCS_GET_OTHER_REQUEST("gcsGetOtherRequest");
+
+    private static final Map<String, Metric> BY_LABEL = new HashMap<>();
+
+    static {
+      for (Metric e : values()) {
+        BY_LABEL.put(e.metricName, e);
+      }
+    }
 
     private final String metricName;
     private final ThreadLocalValue metricValue;
@@ -120,6 +163,10 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     Metric(String metricName) {
       this.metricName = metricName;
       this.metricValue = new ThreadLocalValue();
+    }
+
+    public static Metric valueOfLabel(String label) {
+      return BY_LABEL.get(label);
     }
 
     void reset() {

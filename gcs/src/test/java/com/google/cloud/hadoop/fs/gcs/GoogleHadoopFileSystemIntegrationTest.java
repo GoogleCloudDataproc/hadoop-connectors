@@ -71,15 +71,16 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
-import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.FolderInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFolderOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -114,11 +115,22 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
-import java.util.logging.*;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.logging.StreamHandler;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -2795,17 +2807,30 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     verify(metrics, 1L, stats);
 
     myghfs.getFileStatus(subdirPath);
-    verify(metrics, 2L, stats);
+    metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+    metrics.merge(GCS_API_COUNT, 2L, Long::sum);
+    metrics.merge("gcsListRequest", 1L, Long::sum);
+    metrics.merge("gcsMetadataRequest", 1L, Long::sum);
+    verify(metrics, stats);
 
     Path testFilePath = subdirPath.suffix("/test.empty");
     try (FSDataOutputStream outStream = myghfs.create(testFilePath)) {
-      verify(metrics, 1L, stats);
+      metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+      metrics.merge(GCS_API_COUNT, 1L, Long::sum);
+      metrics.merge("gcsMetadataRequest", 1L, Long::sum);
+      verify(metrics, stats);
 
       outStream.hflush();
-      verify(metrics, 1L, stats);
+      metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+      metrics.merge(GCS_API_COUNT, 1L, Long::sum);
+      metrics.merge("gcsMetadataRequest", 1L, Long::sum);
+      verify(metrics, stats);
 
       outStream.hsync();
-      verify(metrics, 3L, stats);
+      metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+      metrics.merge(GCS_API_COUNT, 3L, Long::sum);
+      metrics.merge("gcsMetadataRequest", 2L, Long::sum);
+      verify(metrics, stats);
     }
 
     metrics.merge(GCS_API_COUNT, 1L, Long::sum);
@@ -2813,7 +2838,10 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
     try (FSDataInputStream ignored = myghfs.open(testFilePath)) {
       ignored.read();
-      verify(metrics, 1L, stats);
+      metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
+      metrics.merge(GCS_API_COUNT, 1L, Long::sum);
+      metrics.merge("gcsMetadataRequest", 1L, Long::sum);
+      verify(metrics, stats);
     }
 
     Path dst = subdirPath.suffix("/test.rename.empty");
@@ -2823,9 +2851,12 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     verify(metrics, 1L, stats);
 
     myghfs.delete(dst);
+    metrics.merge("gcsMetadataRequest", 1L, Long::sum);
     verify(metrics, 2L, stats);
 
     myghfs.delete(subdirPath, true);
+    metrics.merge("gcsMetadataRequest", 1L, Long::sum);
+    metrics.merge("gcsListRequest", 2L, Long::sum);
     verify(metrics, 4L, stats);
   }
 
