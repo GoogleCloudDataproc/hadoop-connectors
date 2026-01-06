@@ -104,7 +104,9 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
 
   void increment(String s, long count) {
     Metric m = Metric.valueOfLabel(s);
-    m.increment(count);
+    if (m != null) {
+      m.increment(count);
+    }
   }
 
   @Override

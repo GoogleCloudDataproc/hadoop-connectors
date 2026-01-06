@@ -44,7 +44,7 @@ public class GhfsThreadLocalStatisticsTest {
   private static final String GCS_GET_MEDIA_REQUEST = "gcsMediaRequest";
   private static final String GCS_METADATA_REQUEST = "gcsMetadataRequest";
   private static final String GCS_LIST_REQUEST = "gcsListRequest";
-  private static final String GCS_OTHER_REQUEST = "gcsOtherRequest";
+  private static final String GCS_GET_OTHER_REQUEST = "gcsGetOtherRequest";
   private static final String STREAM_READ_COUNT = "streamReadCount";
   private static final String STREAM_READ_TIME = "streamReadTime";
   private static final String STREAM_BYTES_READ = "streamBytesRead";
@@ -59,7 +59,7 @@ public class GhfsThreadLocalStatisticsTest {
           GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, GCS_GET_MEDIA_REQUEST,
           GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST, GCS_LIST_REQUEST,
           GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST, GCS_LIST_REQUEST,
-          GoogleCloudStorageStatistics.GCS_GET_OTHER_REQUEST, GCS_OTHER_REQUEST);
+          GoogleCloudStorageStatistics.GCS_GET_OTHER_REQUEST, GCS_GET_OTHER_REQUEST);
 
   @Before
   public void init() {
@@ -83,7 +83,7 @@ public class GhfsThreadLocalStatisticsTest {
                 entry(GCS_METADATA_REQUEST, 0L),
                 entry(GCS_GET_MEDIA_REQUEST, 0L),
                 entry(GCS_LIST_REQUEST, 0L),
-                entry(GCS_OTHER_REQUEST, 0L),
+                entry(GCS_GET_OTHER_REQUEST, 0L),
                 entry(STREAM_READ_COUNT, 0L),
                 entry(STREAM_READ_TIME, 0L),
                 entry(STREAM_BYTES_READ, 0L)));
