@@ -139,9 +139,7 @@
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
     Storage requests.
-    When `fs.gs.cloud.logging.enable` is set to `true`, this suffix will be appended to the log name `gcs-connector` to
-    form the final log name. For example, if set to `my-app`, log name in GCP Logging will be `gcs-connector-my-app`.
-
+    
 *   `fs.gs.proxy.address` (not set by default)
 
     Proxy address that connector can use to send Cloud Storage requests. The
@@ -440,6 +438,12 @@ permissions (not authorized) to execute these requests.
 ### HTTP transport configuration
 
 **Note: Retry configuration is only valid for client type=HTTP_API_CLIENT for now.**
+
+*   `fs.gs.http.transport.type` (default: `JAVA_NET`)
+
+    HTTP transport to use for sending Cloud Storage requests. Valid values are
+    `APACHE` or `JAVA_NET`.
+
 
 *   `fs.gs.http.max.retry` (default: `10`)
 
