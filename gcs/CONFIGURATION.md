@@ -139,7 +139,7 @@
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
     Storage requests.
-    
+
 *   `fs.gs.proxy.address` (not set by default)
 
     Proxy address that connector can use to send Cloud Storage requests. The
@@ -443,7 +443,6 @@ permissions (not authorized) to execute these requests.
 
     HTTP transport to use for sending Cloud Storage requests. Valid values are
     `APACHE` or `JAVA_NET`.
-
 
 *   `fs.gs.http.max.retry` (default: `10`)
 
