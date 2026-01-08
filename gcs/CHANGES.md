@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade google-cloud-storage to 2.46.0
 
 ## 2.2.31 - 2025-12-11
 1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
