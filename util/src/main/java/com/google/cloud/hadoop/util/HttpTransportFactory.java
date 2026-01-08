@@ -167,7 +167,7 @@ public class HttpTransportFactory {
       @Nullable URI proxyUri, @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
     NetHttpTransport.Builder builder =
-        new NetHttpTransport();
+        new NetHttpTransport().Builder();
     SSLSocketFactory wrappedSslSocketFactory =
         requireNonNullElseGet(
             builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory);
