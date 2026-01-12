@@ -527,7 +527,12 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
 ### Bidi configurations
 **Note:  Bidi configurations are effective only if `fs.gs.client.type` is set to `STORAGE_CLIENT` (gRPC).**
-* `fs.gs.bidi.enable` (default: `false`)
+* `fs.gs.bidi.enable` (default: `false`) 
+     Enables reads and writes for Rapid Storage.
+     Other bidi configurations only apply when this flag is true. 
+* `fs.gs.bidi.client.timeout` (default: `1s`)
+     Maximum time in seconds to wait for the establishment of a Bidi session. 
+     Effective only when `fs.gs.bidi.enable` is `true`.
 * `fs.gs.bidi.finalize.on.close` (default: `false`)
      This property is valid for writing to appendable objects with the bidi channel.
      If set to false, the object will not be finalized when the channel is closed.
