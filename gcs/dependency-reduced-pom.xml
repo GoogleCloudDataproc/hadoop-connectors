@@ -3,12 +3,12 @@
   <parent>
     <artifactId>bigdataoss-parent</artifactId>
     <groupId>com.google.cloud.bigdataoss</groupId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>gcs-connector</artifactId>
   <name>gcs-connector</name>
-  <version>3.0.0-SNAPSHOT</version>
+  <version>4.0.0-SNAPSHOT</version>
   <description>An implementation of org.apache.hadoop.fs.FileSystem targeting Google Cloud Storage</description>
   <build>
     <plugins>
@@ -387,7 +387,7 @@
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcsio</artifactId>
-      <version>3.0.0-SNAPSHOT</version>
+      <version>4.0.0-SNAPSHOT</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
