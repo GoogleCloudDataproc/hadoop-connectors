@@ -26,7 +26,13 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.LowLevelHttpRequest;
+import com.google.api.client.http.LowLevelHttpResponse;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
@@ -38,16 +44,22 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.FilterInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -56,6 +68,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -885,5 +898,198 @@ public class GoogleCloudStorageImplTest {
     return ImmutableList.of(
         TrackingHttpRequestInitializer.resumableUploadChunkRequestString(
             bucketName, objectName, generationId, uploadId));
+  }
+
+  @Test
+  public void listObjects_retryOnConnectionReset_withGCS() throws Exception {
+    if (!testStorageClientImpl) {
+      String shortUuid = UUID.randomUUID().toString().substring(0, 8);
+      String bucketName = bucketHelper.getUniqueBucketName("retry-" + shortUuid);
+
+      helperGcs.createBucket(bucketName);
+      StorageResourceId resourceId = new StorageResourceId(bucketName, "test-object");
+      helperGcs.createEmptyObject(resourceId);
+
+      TrackingStorageWrapper<GoogleCloudStorage> trackingGcs = null;
+
+      try {
+        trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
+        GoogleCloudStorageImpl gcsImpl = (GoogleCloudStorageImpl) trackingGcs.delegate;
+        HttpTransport realTransport = GoogleNetHttpTransport.newTrustedTransport();
+        FaultInjectingHttpTransport faultyTransport =
+            new FaultInjectingHttpTransport(realTransport, /* failuresToInject= */ 1);
+
+        // Re-create the Storage client with the faulty transport
+        // Use getCredential() (Singular) for the legacy Initializer
+        RetryHttpInitializer initializer =
+            new RetryHttpInitializer(
+                GoogleCloudStorageTestHelper.getCredential(),
+                GCS_OPTIONS.toRetryHttpInitializerOptions());
+
+        Storage faultyStorageClient =
+            new Storage.Builder(faultyTransport, JacksonFactory.getDefaultInstance(), initializer)
+                .setApplicationName("ghfs/test")
+                .build();
+
+        // Swap the 'storage' field
+        Field storageField = GoogleCloudStorageImpl.class.getDeclaredField("storage");
+        storageField.setAccessible(true);
+        storageField.set(gcsImpl, faultyStorageClient);
+
+        // This call will now go through faultyTransport -> Real GCS
+        List<GoogleCloudStorageItemInfo> results =
+            trackingGcs.delegate.listObjectInfo(bucketName, null, ListObjectOptions.DEFAULT);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getObjectName()).isEqualTo("test-object");
+        assertThat(faultyTransport.failureCount.get()).isAtLeast(1);
+
+      } finally {
+        if (trackingGcs != null) {
+          trackingGcs.delegate.close();
+        }
+        try {
+          helperGcs.deleteObjects(ImmutableList.of(resourceId));
+          helperGcs.deleteBuckets(ImmutableList.of(bucketName));
+        } catch (Exception e) {
+          System.err.println("Warning: Cleanup failed: " + e.getMessage());
+        }
+      }
+    }
+  }
+
+  /* Adding a faulty http transport to simulate the connection reset
+   ** since we cannot force GCS for Connection reset
+   * */
+  private static class FaultInjectingHttpTransport extends HttpTransport {
+    private final HttpTransport realTransport;
+    public final AtomicInteger failureCount;
+    private final int failuresToInject;
+
+    public FaultInjectingHttpTransport(HttpTransport realTransport, int failuresToInject) {
+      this.realTransport = realTransport;
+      this.failuresToInject = failuresToInject;
+      this.failureCount = new AtomicInteger(0);
+    }
+
+    @Override
+    protected LowLevelHttpRequest buildRequest(String method, String url) throws IOException {
+      try {
+        Method buildRequestMethod =
+            HttpTransport.class.getDeclaredMethod("buildRequest", String.class, String.class);
+        buildRequestMethod.setAccessible(true);
+        final LowLevelHttpRequest realRequest =
+            (LowLevelHttpRequest) buildRequestMethod.invoke(realTransport, method, url);
+
+        return new LowLevelHttpRequest() {
+          @Override
+          public void addHeader(String name, String value) throws IOException {
+            realRequest.addHeader(name, value);
+          }
+
+          @Override
+          public void setTimeout(int connectTimeout, int readTimeout) throws IOException {
+            realRequest.setTimeout(connectTimeout, readTimeout);
+          }
+
+          @Override
+          public LowLevelHttpResponse execute() throws IOException {
+            LowLevelHttpResponse realResponse = realRequest.execute();
+            if (failureCount.getAndIncrement() < failuresToInject) {
+              return new FaultInjectingHttpResponse(realResponse);
+            }
+            return realResponse;
+          }
+        };
+      } catch (Exception e) {
+        throw new IOException("Failed to invoke buildRequest via reflection", e);
+      }
+    }
+  }
+
+  private static class FaultInjectingHttpResponse extends LowLevelHttpResponse {
+    private final LowLevelHttpResponse delegate;
+
+    public FaultInjectingHttpResponse(LowLevelHttpResponse delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public InputStream getContent() throws IOException {
+      InputStream realStream = delegate.getContent();
+      return new FilterInputStream(realStream) {
+        int bytesReadTotal = 0;
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+          int n = super.read(b, off, len);
+          if (n > 0) {
+            bytesReadTotal += n;
+            // CRASH after 10 bytes to simulate Connection Reset mid-stream
+            if (bytesReadTotal > 10) {
+              throw new java.net.SocketException("Connection reset");
+            }
+          }
+          return n;
+        }
+
+        @Override
+        public int read() throws IOException {
+          int b = super.read();
+          if (b != -1) {
+            bytesReadTotal++;
+            if (bytesReadTotal > 10) {
+              throw new java.net.SocketException("Connection reset");
+            }
+          }
+          return b;
+        }
+      };
+    }
+
+    @Override
+    public String getContentEncoding() throws IOException {
+      return delegate.getContentEncoding();
+    }
+
+    @Override
+    public long getContentLength() throws IOException {
+      return delegate.getContentLength();
+    }
+
+    @Override
+    public String getContentType() throws IOException {
+      return delegate.getContentType();
+    }
+
+    @Override
+    public String getStatusLine() throws IOException {
+      return delegate.getStatusLine();
+    }
+
+    @Override
+    public int getStatusCode() throws IOException {
+      return delegate.getStatusCode();
+    }
+
+    @Override
+    public String getReasonPhrase() throws IOException {
+      return delegate.getReasonPhrase();
+    }
+
+    @Override
+    public int getHeaderCount() throws IOException {
+      return delegate.getHeaderCount();
+    }
+
+    @Override
+    public String getHeaderName(int i) throws IOException {
+      return delegate.getHeaderName(i);
+    }
+
+    @Override
+    public String getHeaderValue(int i) throws IOException {
+      return delegate.getHeaderValue(i);
+    }
   }
 }
