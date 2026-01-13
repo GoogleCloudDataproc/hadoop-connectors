@@ -58,7 +58,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
@@ -901,7 +900,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void listObjects_retryOnConnectionReset_withGCS() throws Exception {
+  public void listObjects_recoversFromConnectionReset_withRealGCS() throws Exception {
     if (!testStorageClientImpl) {
       String shortUuid = UUID.randomUUID().toString().substring(0, 8);
       String bucketName = bucketHelper.getUniqueBucketName("retry-" + shortUuid);
@@ -910,17 +909,15 @@ public class GoogleCloudStorageImplTest {
       StorageResourceId resourceId = new StorageResourceId(bucketName, "test-object");
       helperGcs.createEmptyObject(resourceId);
 
-      TrackingStorageWrapper<GoogleCloudStorage> trackingGcs = null;
+      GoogleCloudStorage gcsWithRetry = null;
 
       try {
-        trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
-        GoogleCloudStorageImpl gcsImpl = (GoogleCloudStorageImpl) trackingGcs.delegate;
+        // Create the Fault Injector Transport
         HttpTransport realTransport = GoogleNetHttpTransport.newTrustedTransport();
         FaultInjectingHttpTransport faultyTransport =
             new FaultInjectingHttpTransport(realTransport, /* failuresToInject= */ 1);
 
-        // Re-create the Storage client with the faulty transport
-        // Use getCredential() (Singular) for the legacy Initializer
+        // Build the Storage Client manually
         RetryHttpInitializer initializer =
             new RetryHttpInitializer(
                 GoogleCloudStorageTestHelper.getCredential(),
@@ -931,22 +928,19 @@ public class GoogleCloudStorageImplTest {
                 .setApplicationName("ghfs/test")
                 .build();
 
-        // Swap the 'storage' field
-        Field storageField = GoogleCloudStorageImpl.class.getDeclaredField("storage");
-        storageField.setAccessible(true);
-        storageField.set(gcsImpl, faultyStorageClient);
+        gcsWithRetry = new GoogleCloudStorageImpl(GCS_OPTIONS, faultyStorageClient);
 
-        // This call will now go through faultyTransport -> Real GCS
+        // This call will go through faultyTransport -> Real GCS
         List<GoogleCloudStorageItemInfo> results =
-            trackingGcs.delegate.listObjectInfo(bucketName, null, ListObjectOptions.DEFAULT);
+            gcsWithRetry.listObjectInfo(bucketName, null, ListObjectOptions.DEFAULT);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getObjectName()).isEqualTo("test-object");
         assertThat(faultyTransport.failureCount.get()).isAtLeast(1);
 
       } finally {
-        if (trackingGcs != null) {
-          trackingGcs.delegate.close();
+        if (gcsWithRetry != null) {
+          gcsWithRetry.close();
         }
         try {
           helperGcs.deleteObjects(ImmutableList.of(resourceId));
