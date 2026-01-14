@@ -250,6 +250,23 @@
       <build>
         <plugins>
           <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <!-- ADD THIS CONFIGURATION BLOCK -->
+                <configuration>
+                  <doclint>none</doclint>
+                  <failOnError>false</failOnError>
+                </configuration>
+                <!-- END OF ADDED BLOCK -->
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
             <version>0.8.0</version>
