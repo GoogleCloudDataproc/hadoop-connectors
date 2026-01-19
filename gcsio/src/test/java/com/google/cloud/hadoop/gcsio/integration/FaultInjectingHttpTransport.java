@@ -30,8 +30,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A "Man-in-the-Middle" Transport that delegates to a real HttpTransport that can inject
- * different network failures based on request headers.
+ * A "Man-in-the-Middle" Transport that delegates to a real HttpTransport that can inject different
+ * network failures based on request headers.
  */
 public class FaultInjectingHttpTransport extends HttpTransport {
 
@@ -92,7 +92,10 @@ public class FaultInjectingHttpTransport extends HttpTransport {
             int offset = 10;
             String offsetStr = headers.get(FAULT_OFFSET_HEADER_NAME.toLowerCase());
             if (offsetStr != null) {
-              try { offset = Integer.parseInt(offsetStr); } catch (NumberFormatException ignored) {}
+              try {
+                offset = Integer.parseInt(offsetStr);
+              } catch (NumberFormatException ignored) {
+              }
             }
 
             return new FaultInjectingHttpResponse(realResponse, faultType, offset);
@@ -105,15 +108,14 @@ public class FaultInjectingHttpTransport extends HttpTransport {
     }
   }
 
-  /**
-   * Wrapper that injects specific faults into the InputStream.
-   */
+  /** Wrapper that injects specific faults into the InputStream. */
   private static class FaultInjectingHttpResponse extends LowLevelHttpResponse {
     private final LowLevelHttpResponse delegate;
     private final String faultType;
     private final int faultOffset;
 
-    public FaultInjectingHttpResponse(LowLevelHttpResponse delegate, String faultType, int faultOffset) {
+    public FaultInjectingHttpResponse(
+        LowLevelHttpResponse delegate, String faultType, int faultOffset) {
       this.delegate = delegate;
       this.faultType = faultType;
       this.faultOffset = faultOffset;
@@ -142,7 +144,10 @@ public class FaultInjectingHttpTransport extends HttpTransport {
 
               // Socket Timeout (Sleep then throw)
               if (FAULT_SOCKET_TIMEOUT.equals(faultType)) {
-                try { Thread.sleep(2000); } catch (InterruptedException e) {}
+                try {
+                  Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                }
                 throw new SocketTimeoutException("Read timed out");
               }
 
@@ -173,8 +178,10 @@ public class FaultInjectingHttpTransport extends HttpTransport {
           if (b != -1) {
             bytesReadTotal++;
             if (bytesReadTotal >= faultOffset) {
-              if (FAULT_CONNECTION_RESET.equals(faultType)) throw new SocketException("Connection reset");
-              if (FAULT_SOCKET_TIMEOUT.equals(faultType)) throw new SocketTimeoutException("Timeout");
+              if (FAULT_CONNECTION_RESET.equals(faultType))
+                throw new SocketException("Connection reset");
+              if (FAULT_SOCKET_TIMEOUT.equals(faultType))
+                throw new SocketTimeoutException("Timeout");
               if (FAULT_PREMATURE_EOF.equals(faultType)) return -1;
               if (FAULT_CORRUPT_BYTES.equals(faultType)) return b ^ 0xFF;
             }
@@ -184,14 +191,49 @@ public class FaultInjectingHttpTransport extends HttpTransport {
       };
     }
 
-    @Override public String getContentEncoding() throws IOException { return delegate.getContentEncoding(); }
-    @Override public long getContentLength() throws IOException { return delegate.getContentLength(); }
-    @Override public String getContentType() throws IOException { return delegate.getContentType(); }
-    @Override public String getStatusLine() throws IOException { return delegate.getStatusLine(); }
-    @Override public int getStatusCode() throws IOException { return delegate.getStatusCode(); }
-    @Override public String getReasonPhrase() throws IOException { return delegate.getReasonPhrase(); }
-    @Override public int getHeaderCount() throws IOException { return delegate.getHeaderCount(); }
-    @Override public String getHeaderName(int i) throws IOException { return delegate.getHeaderName(i); }
-    @Override public String getHeaderValue(int i) throws IOException { return delegate.getHeaderValue(i); }
+    @Override
+    public String getContentEncoding() throws IOException {
+      return delegate.getContentEncoding();
+    }
+
+    @Override
+    public long getContentLength() throws IOException {
+      return delegate.getContentLength();
+    }
+
+    @Override
+    public String getContentType() throws IOException {
+      return delegate.getContentType();
+    }
+
+    @Override
+    public String getStatusLine() throws IOException {
+      return delegate.getStatusLine();
+    }
+
+    @Override
+    public int getStatusCode() throws IOException {
+      return delegate.getStatusCode();
+    }
+
+    @Override
+    public String getReasonPhrase() throws IOException {
+      return delegate.getReasonPhrase();
+    }
+
+    @Override
+    public int getHeaderCount() throws IOException {
+      return delegate.getHeaderCount();
+    }
+
+    @Override
+    public String getHeaderName(int i) throws IOException {
+      return delegate.getHeaderName(i);
+    }
+
+    @Override
+    public String getHeaderValue(int i) throws IOException {
+      return delegate.getHeaderValue(i);
+    }
   }
 }
