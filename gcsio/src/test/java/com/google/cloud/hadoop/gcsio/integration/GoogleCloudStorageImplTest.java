@@ -28,9 +28,8 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.LowLevelHttpRequest;
-import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
@@ -55,10 +54,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.io.FilterInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -915,16 +911,33 @@ public class GoogleCloudStorageImplTest {
         // Create the Fault Injector Transport
         HttpTransport realTransport = GoogleNetHttpTransport.newTrustedTransport();
         FaultInjectingHttpTransport faultyTransport =
-            new FaultInjectingHttpTransport(realTransport, /* failuresToInject= */ 1);
+            new FaultInjectingHttpTransport(realTransport);
+
+        AtomicInteger requestCount = new AtomicInteger(0);
 
         // Build the Storage Client manually
-        RetryHttpInitializer initializer =
+        RetryHttpInitializer baseInitializer =
             new RetryHttpInitializer(
                 GoogleCloudStorageTestHelper.getCredential(),
                 GCS_OPTIONS.toRetryHttpInitializerOptions());
 
+        HttpRequestInitializer poisoningInitializer =
+            request -> {
+              baseInitializer.initialize(request);
+
+              // Insert header for the first request so that it fails and is retried
+              if (requestCount.getAndIncrement() == 0) {
+                request
+                    .getHeaders()
+                    .set(
+                        FaultInjectingHttpTransport.FAULT_HEADER_NAME,
+                        FaultInjectingHttpTransport.FAULT_CONNECTION_RESET);
+              }
+            };
+
         Storage faultyStorageClient =
-            new Storage.Builder(faultyTransport, JacksonFactory.getDefaultInstance(), initializer)
+            new Storage.Builder(
+                    faultyTransport, JacksonFactory.getDefaultInstance(), poisoningInitializer)
                 .setApplicationName("ghfs/test")
                 .build();
 
@@ -937,153 +950,13 @@ public class GoogleCloudStorageImplTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getObjectName()).isEqualTo("test-object");
         assertThat(faultyTransport.failureCount.get()).isAtLeast(1);
+        assertThat(requestCount.get()).isAtLeast(2);
 
       } finally {
         if (gcsWithRetry != null) {
           gcsWithRetry.close();
         }
-        try {
-          helperGcs.deleteObjects(ImmutableList.of(resourceId));
-          helperGcs.deleteBuckets(ImmutableList.of(bucketName));
-        } catch (Exception e) {
-          System.err.println("Warning: Cleanup failed: " + e.getMessage());
-        }
       }
-    }
-  }
-
-  /* Adding a faulty http transport to simulate the connection reset
-   ** since we cannot force GCS for Connection reset
-   * */
-  private static class FaultInjectingHttpTransport extends HttpTransport {
-    private final HttpTransport realTransport;
-    public final AtomicInteger failureCount;
-    private final int failuresToInject;
-
-    public FaultInjectingHttpTransport(HttpTransport realTransport, int failuresToInject) {
-      this.realTransport = realTransport;
-      this.failuresToInject = failuresToInject;
-      this.failureCount = new AtomicInteger(0);
-    }
-
-    @Override
-    protected LowLevelHttpRequest buildRequest(String method, String url) throws IOException {
-      try {
-        Method buildRequestMethod =
-            HttpTransport.class.getDeclaredMethod("buildRequest", String.class, String.class);
-        buildRequestMethod.setAccessible(true);
-        final LowLevelHttpRequest realRequest =
-            (LowLevelHttpRequest) buildRequestMethod.invoke(realTransport, method, url);
-
-        return new LowLevelHttpRequest() {
-          @Override
-          public void addHeader(String name, String value) throws IOException {
-            realRequest.addHeader(name, value);
-          }
-
-          @Override
-          public void setTimeout(int connectTimeout, int readTimeout) throws IOException {
-            realRequest.setTimeout(connectTimeout, readTimeout);
-          }
-
-          @Override
-          public LowLevelHttpResponse execute() throws IOException {
-            LowLevelHttpResponse realResponse = realRequest.execute();
-            if (failureCount.getAndIncrement() < failuresToInject) {
-              return new FaultInjectingHttpResponse(realResponse);
-            }
-            return realResponse;
-          }
-        };
-      } catch (Exception e) {
-        throw new IOException("Failed to invoke buildRequest via reflection", e);
-      }
-    }
-  }
-
-  private static class FaultInjectingHttpResponse extends LowLevelHttpResponse {
-    private final LowLevelHttpResponse delegate;
-
-    public FaultInjectingHttpResponse(LowLevelHttpResponse delegate) {
-      this.delegate = delegate;
-    }
-
-    @Override
-    public InputStream getContent() throws IOException {
-      InputStream realStream = delegate.getContent();
-      return new FilterInputStream(realStream) {
-        int bytesReadTotal = 0;
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-          int n = super.read(b, off, len);
-          if (n > 0) {
-            bytesReadTotal += n;
-            // CRASH after 10 bytes to simulate Connection Reset mid-stream
-            if (bytesReadTotal > 10) {
-              throw new java.net.SocketException("Connection reset");
-            }
-          }
-          return n;
-        }
-
-        @Override
-        public int read() throws IOException {
-          int b = super.read();
-          if (b != -1) {
-            bytesReadTotal++;
-            if (bytesReadTotal > 10) {
-              throw new java.net.SocketException("Connection reset");
-            }
-          }
-          return b;
-        }
-      };
-    }
-
-    @Override
-    public String getContentEncoding() throws IOException {
-      return delegate.getContentEncoding();
-    }
-
-    @Override
-    public long getContentLength() throws IOException {
-      return delegate.getContentLength();
-    }
-
-    @Override
-    public String getContentType() throws IOException {
-      return delegate.getContentType();
-    }
-
-    @Override
-    public String getStatusLine() throws IOException {
-      return delegate.getStatusLine();
-    }
-
-    @Override
-    public int getStatusCode() throws IOException {
-      return delegate.getStatusCode();
-    }
-
-    @Override
-    public String getReasonPhrase() throws IOException {
-      return delegate.getReasonPhrase();
-    }
-
-    @Override
-    public int getHeaderCount() throws IOException {
-      return delegate.getHeaderCount();
-    }
-
-    @Override
-    public String getHeaderName(int i) throws IOException {
-      return delegate.getHeaderName(i);
-    }
-
-    @Override
-    public String getHeaderValue(int i) throws IOException {
-      return delegate.getHeaderValue(i);
     }
   }
 }
