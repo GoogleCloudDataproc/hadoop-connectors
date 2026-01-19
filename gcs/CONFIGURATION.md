@@ -96,19 +96,20 @@
 *   `fs.gs.max.requests.per.batch` (default: `15`)
 
     Maximum number of Cloud Storage requests that could be sent in a single
-    batch request.
+    batch request. This is effective only for `HTTP_API_CLIENT`. `STORAGE_CLIENT` (gRPC)
+    executes requests in parallel using `fs.gs.batch.threads` without aggregation.
 
 *   `fs.gs.batch.threads` (default: `15`)
 
-    Maximum number of threads used to execute batch requests in parallel. Each
-    thread batches at most `fs.gs.max.requests.per.batch` Cloud Storage requests
-    in a single batch request. These threads are used to execute the Class A,
-    Class B and Free Cloud Storage operations as copy, list, delete, etc. These
-    operations are part of typical `hdfs` CLI commands such as `hdfs mv`, `hdfs
-    cp`, etc.
+    Maximum number of threads used to execute requests in parallel.
 
-    Depending on the number of requests the connector evenly distributes the
-    number of requests across batch threads.
+    For `HTTP_API_CLIENT`, each thread batches at most `fs.gs.max.requests.per.batch`
+    Cloud Storage requests in a single batch request. For `STORAGE_CLIENT` (gRPC),
+    this controls the size of the thread pool used for parallel operations.
+
+    These threads are used to execute the Class A, Class B and Free Cloud Storage
+    operations as copy, list, delete, etc. These operations are part of typical
+    `hdfs` CLI commands such as `hdfs mv`, `hdfs cp`, etc. Depending on the number of requests the connector evenly distributes the number of requests across batch threads.
 
 *   `fs.gs.list.max.items.per.call` (default: `5000`)
 
@@ -126,7 +127,7 @@
 
 *   `fs.gs.storage.http.headers.<HEADER>=<VALUE>` (not set by default)
 
-    Custom HTTP headers added to Cloud Storage API requests.
+    Custom HTTP headers added to Cloud Storage API requests. For `STORAGE_CLIENT` (gRPC), these headers are passed as request metadata where supported.
 
     Example:
 
@@ -347,7 +348,7 @@ permissions (not authorized) to execute these requests.
 
 *   `fs.gs.outputstream.pipe.type` (default: `IO_STREAM_PIPE`)
 
-    Pipe type used for uploading Cloud Storage objects.
+    Pipe type used for uploading Cloud Storage objects. Is effective only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.
 
     Valid values:
 
@@ -371,7 +372,7 @@ permissions (not authorized) to execute these requests.
     Pipe buffer size used for uploading Cloud Storage objects. This pipe is an
     intermediate channel which is used to receive the data on one side and allow
     for reading of the data by the Cloud Storage upload thread on the other
-    side.
+    side. Is effective only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.
 
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
@@ -395,11 +396,11 @@ permissions (not authorized) to execute these requests.
     The upload cache size in bytes used for high-level upload retries. To
     disable this feature set this property to zero or negative value. Retry will
     be performed if total size of written/uploaded data to the object is less
-    than or equal to the cache size.
+    than or equal to the cache size. Is effective only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.
 
 *   `fs.gs.outputstream.direct.upload.enable` (default: `false`)
 
-    Enables Cloud Storage direct uploads.
+    Enables Cloud Storage direct uploads. Is effective only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.
 
 *   `fs.gs.outputstream.type` (default: `BASIC`)
 
@@ -459,7 +460,7 @@ permissions (not authorized) to execute these requests.
     Timeout in milliseconds to read from an established connection. Use `0` for
     an infinite timeout.
 
-### API client configuration
+#### API client configuration
 
 *   `fs.gs.storage.root.url` (default: `https://storage.googleapis.com/`)
 
@@ -532,7 +533,7 @@ permissions (not authorized) to execute these requests.
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.
 
-### grpc configuration
+### gRPC configuration
 
 gRPC is an optimized way to connect with gcs backend. It offers
 better latency and increased bandwidth. Currently supported only for read/write operations.
@@ -576,6 +577,8 @@ better latency and increased bandwidth. Currently supported only for read/write 
     cache before it's invalidated.
 
 ### Cloud Storage [Requester Pays](https://cloud.google.com/storage/docs/requester-pays) feature configuration:
+
+**Note:  Requester Pays configurations are effective only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.**
 
 *   `fs.gs.requester.pays.mode` (default: `DISABLED`)
 
