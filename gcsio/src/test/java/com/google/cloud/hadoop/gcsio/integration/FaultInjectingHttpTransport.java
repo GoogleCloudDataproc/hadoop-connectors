@@ -45,6 +45,8 @@ public class FaultInjectingHttpTransport extends HttpTransport {
   public static final String FAULT_CORRUPT_BYTES = "corrupt-bytes";
   public static final String FAULT_SOCKET_TIMEOUT = "socket-timeout";
 
+  private static final int DEFAULT_FAULT_OFFSET = 10;
+
   private final HttpTransport realTransport;
   public final AtomicInteger failureCount;
 
@@ -89,7 +91,7 @@ public class FaultInjectingHttpTransport extends HttpTransport {
             failureCount.incrementAndGet();
 
             // Parse offset (Default to 10 bytes if missing)
-            int offset = 10;
+            int offset = DEFAULT_FAULT_OFFSET;
             String offsetStr = headers.get(FAULT_OFFSET_HEADER_NAME.toLowerCase());
             if (offsetStr != null) {
               try {
@@ -136,36 +138,34 @@ public class FaultInjectingHttpTransport extends HttpTransport {
 
             // Check if we crossed the fault offset in this chunk
             if (bytesReadTotal >= faultOffset) {
+              switch (faultType) {
+                case FAULT_CONNECTION_RESET:
+                  throw new SocketException("Connection reset");
 
-              // Connection Reset
-              if (FAULT_CONNECTION_RESET.equals(faultType)) {
-                throw new SocketException("Connection reset");
-              }
+                case FAULT_SOCKET_TIMEOUT:
+                  try {
+                    Thread.sleep(2000);
+                  } catch (InterruptedException e) {
+                  }
+                  throw new SocketTimeoutException("Read timed out");
 
-              // Socket Timeout (Sleep then throw)
-              if (FAULT_SOCKET_TIMEOUT.equals(faultType)) {
-                try {
-                  Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                }
-                throw new SocketTimeoutException("Read timed out");
-              }
+                case FAULT_PREMATURE_EOF:
+                  // Calculate how many bytes we CAN return before cutting it off
+                  int allowed = Math.max(0, faultOffset - previousTotal);
+                  if (allowed == 0) return -1;
+                  return allowed;
 
-              // Premature EOF (Return fewer bytes than requested)
-              if (FAULT_PREMATURE_EOF.equals(faultType)) {
-                // Calculate how many bytes we CAN return before cutting it off
-                int allowed = Math.max(0, faultOffset - previousTotal);
-                if (allowed == 0) return -1;
-                return allowed;
-              }
+                case FAULT_CORRUPT_BYTES:
+                  // Find the exact index in the buffer b that corresponds to faultOffset
+                  int indexToCorrupt = faultOffset - previousTotal;
+                  if (indexToCorrupt >= 0 && indexToCorrupt < n) {
+                    b[off + indexToCorrupt] ^= 0xFF; // Flip bits
+                  }
+                  break;
 
-              // Corrupt Bytes (Bit flip)
-              if (FAULT_CORRUPT_BYTES.equals(faultType)) {
-                // Find the exact index in the buffer 'b' that corresponds to 'faultOffset'
-                int indexToCorrupt = faultOffset - previousTotal;
-                if (indexToCorrupt >= 0 && indexToCorrupt < n) {
-                  b[off + indexToCorrupt] ^= 0xFF; // Flip bits
-                }
+                default:
+                  // Unknown fault type, do nothing
+                  break;
               }
             }
           }
@@ -178,12 +178,16 @@ public class FaultInjectingHttpTransport extends HttpTransport {
           if (b != -1) {
             bytesReadTotal++;
             if (bytesReadTotal >= faultOffset) {
-              if (FAULT_CONNECTION_RESET.equals(faultType))
-                throw new SocketException("Connection reset");
-              if (FAULT_SOCKET_TIMEOUT.equals(faultType))
-                throw new SocketTimeoutException("Timeout");
-              if (FAULT_PREMATURE_EOF.equals(faultType)) return -1;
-              if (FAULT_CORRUPT_BYTES.equals(faultType)) return b ^ 0xFF;
+              switch (faultType) {
+                case FAULT_CONNECTION_RESET:
+                  throw new SocketException("Connection reset");
+                case FAULT_SOCKET_TIMEOUT:
+                  throw new SocketTimeoutException("Timeout");
+                case FAULT_PREMATURE_EOF:
+                  return -1;
+                case FAULT_CORRUPT_BYTES:
+                  return b ^ 0xFF;
+              }
             }
           }
           return b;
