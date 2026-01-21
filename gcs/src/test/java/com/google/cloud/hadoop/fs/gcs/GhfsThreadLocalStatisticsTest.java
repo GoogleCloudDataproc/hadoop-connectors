@@ -58,8 +58,7 @@ public class GhfsThreadLocalStatisticsTest {
           GoogleCloudStorageStatistics.GCS_METADATA_REQUEST, GCS_METADATA_REQUEST,
           GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, GCS_GET_MEDIA_REQUEST,
           GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST, GCS_LIST_REQUEST,
-          GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST, GCS_LIST_REQUEST,
-          GoogleCloudStorageStatistics.GCS_GET_OTHER_REQUEST, GCS_GET_OTHER_REQUEST);
+          GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST, GCS_LIST_REQUEST);
 
   @Before
   public void init() {
@@ -83,7 +82,6 @@ public class GhfsThreadLocalStatisticsTest {
                 entry(GCS_METADATA_REQUEST, 0L),
                 entry(GCS_GET_MEDIA_REQUEST, 0L),
                 entry(GCS_LIST_REQUEST, 0L),
-                entry(GCS_GET_OTHER_REQUEST, 0L),
                 entry(STREAM_READ_COUNT, 0L),
                 entry(STREAM_READ_TIME, 0L),
                 entry(STREAM_BYTES_READ, 0L)));

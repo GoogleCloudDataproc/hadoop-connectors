@@ -288,6 +288,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
+    globalStorageStatistics.reset();
+    ghfsThreadLocalStatistics.reset();
 
     byte[] value = new byte[2];
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);

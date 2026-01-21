@@ -146,8 +146,7 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     STREAM_BYTES_READ("streamBytesRead"),
     GCS_GET_MEDIA_REQUEST("gcsMediaRequest"),
     GCS_METADATA_REQUEST("gcsMetadataRequest"),
-    GCS_LIST_REQUEST("gcsListRequest"),
-    GCS_GET_OTHER_REQUEST("gcsGetOtherRequest");
+    GCS_LIST_REQUEST("gcsListRequest");
 
     private static final Map<String, Metric> BY_LABEL = new HashMap<>();
 
