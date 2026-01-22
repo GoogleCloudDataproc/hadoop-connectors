@@ -115,7 +115,7 @@ public class VectoredIOImpl implements Closeable {
 
     private final GhfsInputStreamStatistics streamStatistics;
     private final ReadChannelProvider channelProvider;
-    //aggregates the threadLocal stats for individual ranges.
+    // aggregates the threadLocal stats for individual ranges.
     private final ConcurrentHashMap<String, Long> rangeStatsAccumulator;
 
     public VectoredReadChannel(
