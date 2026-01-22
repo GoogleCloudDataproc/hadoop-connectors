@@ -23,7 +23,6 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -131,8 +130,7 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     }
   }
 
-  @VisibleForTesting
-  public enum Metric {
+  private enum Metric {
     HADOOP_API_COUNT("hadoopApiCount"),
     HADOOP_API_TIME("hadoopApiTime"),
     GCS_API_COUNT("gcsApiCount"),

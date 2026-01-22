@@ -93,7 +93,8 @@ public class VectoredIOImpl implements Closeable {
    * @param fileInfo FileInfo of the gcs object agaisnt which range request are fired, this can be
    *     null for some code path fall back to URI path provided.
    * @param gcsPath URI of the gcs object for which the range requests are fired.
-   * @param rangeReadThreadStats concurrent map to capture all threadLocal stats collected during range processing.
+   * @param rangeReadThreadStats concurrent map to capture all threadLocal stats collected during
+   *     range processing.
    * @throws IOException If invalid range is requested, offset<0.
    */
   public void readVectored(
@@ -114,17 +115,18 @@ public class VectoredIOImpl implements Closeable {
 
     private final GhfsInputStreamStatistics streamStatistics;
     private final ReadChannelProvider channelProvider;
-    private final ConcurrentHashMap<String, Long> rangeReadThreadStats;
+    //aggregates the threadLocal stats for individual ranges.
+    private final ConcurrentHashMap<String, Long> rangeStatsAccumulator;
 
     public VectoredReadChannel(
         GoogleCloudStorageFileSystem gcsFs,
         FileInfo fileInfo,
         URI gcsPath,
         GhfsInputStreamStatistics streamStatistics,
-        final ConcurrentHashMap<String, Long> rangeReadThreadStats) {
+        final ConcurrentHashMap<String, Long> rangeStatsAccumulator) {
       this.channelProvider = new ReadChannelProvider(gcsFs, fileInfo, gcsPath);
       this.streamStatistics = streamStatistics;
-      this.rangeReadThreadStats = rangeReadThreadStats;
+      this.rangeStatsAccumulator = rangeStatsAccumulator;
     }
 
     private void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
@@ -195,8 +197,8 @@ public class VectoredIOImpl implements Closeable {
     }
 
     /**
-     * Function to capture the thread local stats of thread processing the range to shared stats map.
-     * It also resets them so same stats wouldn't get captured multiple times.
+     * Function to capture the thread local stats of thread processing the range to shared stats
+     * map. It also resets them so same stats wouldn't get captured multiple times.
      */
     private void captureAndResetThreadLocalStats() {
       GhfsThreadLocalStatistics tlStats = storageStatistics.getThreadLocalStatistics();
@@ -205,9 +207,10 @@ public class VectoredIOImpl implements Closeable {
         LongStatistic lStats = itr.next();
         String lKey = lStats.getName();
         long lValue = lStats.getValue();
-        rangeReadThreadStats.merge(lKey, lValue, Long::sum);
+        rangeStatsAccumulator.merge(lKey, lValue, Long::sum);
       }
-      // given we have merged the threadLocal stats, resetting it so that it wouldn't captured again.
+      // given we have merged the threadLocal stats, resetting it so that it wouldn't captured
+      // again.
       resetThreadLocalStats();
     }
 
