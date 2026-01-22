@@ -93,6 +93,7 @@ public class VectoredIOImpl implements Closeable {
    * @param fileInfo FileInfo of the gcs object agaisnt which range request are fired, this can be
    *     null for some code path fall back to URI path provided.
    * @param gcsPath URI of the gcs object for which the range requests are fired.
+   * @param rangeReadThreadStats concurrent map to capture all threadLocal stats collected during range processing.
    * @throws IOException If invalid range is requested, offset<0.
    */
   public void readVectored(
@@ -145,7 +146,7 @@ public class VectoredIOImpl implements Closeable {
                 logger.atFiner().log("Submitting range %s for execution.", sortedRange);
                 // Reset thread stats as a new task is being submitted to this thread.
                 // all required stats must be collected before task is finished.
-                storageStatistics.getThreadLocalStatistics().reset();
+                resetThreadLocalStats();
                 readSingleRange(sortedRange, allocate, channelProvider);
                 long endTimer = System.currentTimeMillis();
                 storageStatistics.updateStats(
@@ -169,7 +170,7 @@ public class VectoredIOImpl implements Closeable {
 
                 // Reset thread stats as a new task is being submitted to this thread.
                 // all required stats must be collected before task is finished.
-                storageStatistics.getThreadLocalStatistics().reset();
+                resetThreadLocalStats();
                 readCombinedRange(combinedFileRange, allocate, channelProvider);
                 long endTimer = System.currentTimeMillis();
                 storageStatistics.updateStats(
@@ -194,19 +195,24 @@ public class VectoredIOImpl implements Closeable {
     }
 
     /**
-     * Function to capture the thread local stats to shared stats map. It assumes that all stats
-     * were corresponding to a specific task and reset was performed before meaningful operations
-     * are executed in thread.
+     * Function to capture the thread local stats of thread processing the range to shared stats map.
+     * It also resets them so same stats wouldn't get captured multiple times.
      */
-    private void captureThreadLocalStats() {
+    private void captureAndResetThreadLocalStats() {
       GhfsThreadLocalStatistics tlStats = storageStatistics.getThreadLocalStatistics();
       Iterator<LongStatistic> itr = tlStats.getLongStatistics();
       while (itr.hasNext()) {
         LongStatistic lStats = itr.next();
         String lKey = lStats.getName();
         long lValue = lStats.getValue();
-        rangeReadThreadStats.compute(lKey, (key, val) -> (val == null) ? lValue : val + lValue);
+        rangeReadThreadStats.merge(lKey, lValue, Long::sum);
       }
+      // given we have merged the threadLocal stats, resetting it so that it wouldn't captured again.
+      resetThreadLocalStats();
+    }
+
+    private void resetThreadLocalStats() {
+      storageStatistics.getThreadLocalStatistics().reset();
     }
 
     private List<CombinedFileRange> getCombinedFileRange(List<? extends FileRange> sortedRanges) {
@@ -263,6 +269,7 @@ public class VectoredIOImpl implements Closeable {
           storageStatistics.incrementCounter(
               GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES, discardedBytes);
 
+          captureAndResetThreadLocalStats();
           if (numRead >= totalBytesRead) {
             ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
             child.getData().complete(childBuffer);
@@ -277,7 +284,6 @@ public class VectoredIOImpl implements Closeable {
                     channelProvider.gcsPath));
           }
         }
-        captureThreadLocalStats();
         combinedFileRange.getData().complete(readContent);
       } catch (Exception e) {
         logger.atWarning().withCause(e).log(
@@ -326,8 +332,8 @@ public class VectoredIOImpl implements Closeable {
                   "EOF reached before whole range can be read, range: %s, path: %s",
                   range, channelProvider.gcsPath));
         }
-        captureThreadLocalStats();
         updateBytesRead(range.getLength());
+        captureAndResetThreadLocalStats();
         logger.atFiner().log(
             "Read single range completed from range: %s, path: %s", range, channelProvider.gcsPath);
         range.getData().complete(dst);
