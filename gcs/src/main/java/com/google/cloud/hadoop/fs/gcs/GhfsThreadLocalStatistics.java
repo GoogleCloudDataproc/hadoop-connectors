@@ -57,12 +57,6 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     }
   }
 
-  /* void incrementDuration(GhfsStatistic statistic, long duration) {
-    if (statistic == STREAM_READ_OPERATIONS) {
-      Metric.STREAM_READ_TIME.increment(duration);
-    }
-  } */
-
   void increment(GhfsStatistic statistic, long count) {
     if (statistic == GCS_CONNECTOR_TIME) {
       Metric.HADOOP_API_TIME.increment(count);

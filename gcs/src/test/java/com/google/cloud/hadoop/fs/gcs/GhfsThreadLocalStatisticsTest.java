@@ -41,13 +41,6 @@ public class GhfsThreadLocalStatisticsTest {
   private static final String HADOOP_API_TIME = "hadoopApiTime";
   private static final String STREAM_READ_VECTORED_COUNT = "readVectoredCount";
   private static final String STREAM_READ_VECTORED_RANGE_COUNT = "readVectoredRangeCount";
-  private static final String GCS_GET_MEDIA_REQUEST = "gcsMediaRequest";
-  private static final String GCS_METADATA_REQUEST = "gcsMetadataRequest";
-  private static final String GCS_LIST_REQUEST = "gcsListRequest";
-  private static final String GCS_GET_OTHER_REQUEST = "gcsGetOtherRequest";
-  private static final String STREAM_READ_COUNT = "streamReadCount";
-  private static final String STREAM_READ_TIME = "streamReadTime";
-  private static final String STREAM_BYTES_READ = "streamBytesRead";
 
   private static Map<GoogleCloudStorageStatistics, String> typeToNameMapping =
       Map.of(
@@ -157,16 +150,6 @@ public class GhfsThreadLocalStatisticsTest {
 
       verify(expectedMetrics, actualMetrics);
     }
-
-    /* for (GhfsStatistic ghfsStatistic : GhfsStatistic.VALUES) {
-      long theValue = Math.abs(ThreadLocalRandom.current().nextLong(1, 2000));
-      actualMetrics.incrementDuration(ghfsStatistic, theValue);
-      if (ghfsStatistic == GhfsStatistic.STREAM_READ_OPERATIONS) {
-        expectedMetrics.merge(STREAM_READ_TIME, theValue, Long::sum);
-      }
-
-      verify(expectedMetrics, actualMetrics);
-    } */
   }
 
   private static void runGcsAPITests(
