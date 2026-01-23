@@ -255,7 +255,6 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
     incrementCounter(statistic, count);
 
     updateConnectorHadoopApiTime(totalDuration);
-    threadLocalStatistics.incrementDuration(statistic, totalDuration);
   }
 
   private void updateMinMaxStats(

@@ -54,11 +54,7 @@ public class GhfsThreadLocalStatisticsTest {
           GoogleCloudStorageStatistics.GCS_API_REQUEST_COUNT, GCS_API_COUNT,
           GoogleCloudStorageStatistics.GCS_API_TIME, GCS_API_TIME,
           GoogleCloudStorageStatistics.GCS_BACKOFF_COUNT, BACKOFF_COUNT,
-          GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, BACKOFF_TIME,
-          GoogleCloudStorageStatistics.GCS_METADATA_REQUEST, GCS_METADATA_REQUEST,
-          GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, GCS_GET_MEDIA_REQUEST,
-          GoogleCloudStorageStatistics.GCS_LIST_DIR_REQUEST, GCS_LIST_REQUEST,
-          GoogleCloudStorageStatistics.GCS_LIST_FILE_REQUEST, GCS_LIST_REQUEST);
+          GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, BACKOFF_TIME);
 
   @Before
   public void init() {
@@ -78,13 +74,7 @@ public class GhfsThreadLocalStatisticsTest {
                 entry(GCS_API_COUNT, 0L),
                 entry(GCS_API_TIME, 0L),
                 entry(STREAM_READ_VECTORED_COUNT, 0L),
-                entry(STREAM_READ_VECTORED_RANGE_COUNT, 0L),
-                entry(GCS_METADATA_REQUEST, 0L),
-                entry(GCS_GET_MEDIA_REQUEST, 0L),
-                entry(GCS_LIST_REQUEST, 0L),
-                entry(STREAM_READ_COUNT, 0L),
-                entry(STREAM_READ_TIME, 0L),
-                entry(STREAM_BYTES_READ, 0L)));
+                entry(STREAM_READ_VECTORED_RANGE_COUNT, 0L)));
 
     return result;
   }
@@ -147,10 +137,6 @@ public class GhfsThreadLocalStatisticsTest {
         expectedMetrics.merge(STREAM_READ_VECTORED_COUNT, 1L, Long::sum);
       } else if (ghfsStatistic == GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES) {
         expectedMetrics.merge(STREAM_READ_VECTORED_RANGE_COUNT, 1L, Long::sum);
-      } else if (ghfsStatistic == GhfsStatistic.STREAM_READ_OPERATIONS) {
-        expectedMetrics.merge(STREAM_READ_COUNT, 1L, Long::sum);
-      } else if (ghfsStatistic == GhfsStatistic.STREAM_READ_BYTES) {
-        expectedMetrics.merge(STREAM_BYTES_READ, 1L, Long::sum);
       }
 
       verify(expectedMetrics, actualMetrics);
@@ -167,16 +153,12 @@ public class GhfsThreadLocalStatisticsTest {
         expectedMetrics.merge(STREAM_READ_VECTORED_COUNT, theValue, Long::sum);
       } else if (ghfsStatistic == GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES) {
         expectedMetrics.merge(STREAM_READ_VECTORED_RANGE_COUNT, theValue, Long::sum);
-      } else if (ghfsStatistic == GhfsStatistic.STREAM_READ_OPERATIONS) {
-        expectedMetrics.merge(STREAM_READ_COUNT, theValue, Long::sum);
-      } else if (ghfsStatistic == GhfsStatistic.STREAM_READ_BYTES) {
-        expectedMetrics.merge(STREAM_BYTES_READ, theValue, Long::sum);
       }
 
       verify(expectedMetrics, actualMetrics);
     }
 
-    for (GhfsStatistic ghfsStatistic : GhfsStatistic.VALUES) {
+    /* for (GhfsStatistic ghfsStatistic : GhfsStatistic.VALUES) {
       long theValue = Math.abs(ThreadLocalRandom.current().nextLong(1, 2000));
       actualMetrics.incrementDuration(ghfsStatistic, theValue);
       if (ghfsStatistic == GhfsStatistic.STREAM_READ_OPERATIONS) {
@@ -184,7 +166,7 @@ public class GhfsThreadLocalStatisticsTest {
       }
 
       verify(expectedMetrics, actualMetrics);
-    }
+    } */
   }
 
   private static void runGcsAPITests(

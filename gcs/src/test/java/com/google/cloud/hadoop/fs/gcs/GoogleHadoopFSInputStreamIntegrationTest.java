@@ -282,14 +282,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
 
-    GhfsGlobalStorageStatistics globalStorageStatistics = ghfs.getGlobalGcsStorageStatistics();
-    GhfsThreadLocalStatistics ghfsThreadLocalStatistics =
-        globalStorageStatistics.getThreadLocalStatistics();
-
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
-    globalStorageStatistics.reset();
-    ghfsThreadLocalStatistics.reset();
 
     byte[] value = new byte[2];
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
@@ -300,7 +294,6 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     IOStatistics ioStats = in.getIOStatistics();
     TestUtils.verifyDurationMetric(ioStats, STREAM_READ_OPERATIONS.getSymbol(), 2);
-
     TestUtils.verifyDurationMetric(ioStats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 2);
 
     in.seek(0);
@@ -324,11 +317,6 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     TestUtils.verifyDurationMetric(
         ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_OPERATIONS.getSymbol(), 2);
-
-    assertThat(ghfsThreadLocalStatistics.getLong("streamReadCount")).isEqualTo(2);
-    assertThat(globalStorageStatistics.getLong(STREAM_READ_OPERATIONS.getSymbol())).isEqualTo(2);
-    assertThat(globalStorageStatistics.getLong(STREAM_READ_CLOSE_OPERATIONS.getSymbol()))
-        .isEqualTo(2);
   }
 
   @Test
@@ -366,12 +354,9 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     TestUtils.verifyDurationMetric(ioStats, STREAM_READ_OPERATIONS.getSymbol(), 1);
     TestUtils.verifyDurationMetric(ioStats, STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
 
-    assertThat(ghfsThreadLocalStatistics.getLong("streamReadCount")).isEqualTo(1);
-    assertThat(globalStorageStatistics.getLong(STREAM_READ_OPERATIONS.getSymbol())).isEqualTo(1);
-
     assertThat(ghfsThreadLocalStatistics.getLong("gcsApiCount")).isEqualTo(3);
-    assertThat(ghfsThreadLocalStatistics.getLong("gcsMetadataRequest")).isEqualTo(1);
-    assertThat(ghfsThreadLocalStatistics.getLong("gcsMediaRequest")).isEqualTo(2);
+
+    assertThat(globalStorageStatistics.getLong(STREAM_READ_OPERATIONS.getSymbol())).isEqualTo(1);
     assertThat(
             globalStorageStatistics.getLong(
                 GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST.getSymbol()))

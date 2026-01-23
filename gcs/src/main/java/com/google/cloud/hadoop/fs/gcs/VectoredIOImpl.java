@@ -214,6 +214,10 @@ public class VectoredIOImpl implements Closeable {
       resetThreadLocalStats();
     }
 
+    /**
+     * Reset the thread local stats of caller thread. It is suppose to be called form the reader
+     * thread of range request. If called on main thread all thread local stats will be lost.
+     */
     private void resetThreadLocalStats() {
       storageStatistics.getThreadLocalStatistics().reset();
     }
