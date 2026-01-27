@@ -1379,4 +1379,33 @@ public class GoogleCloudStorageClientTest {
         .setStorageClass(storageClass)
         .build();
   }
+
+  @Test
+  public void open_fastFailDisabled_doesNotInvokeGet() throws Exception {
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      GoogleCloudStorageReadOptions readOptions =
+          GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+      gcs.open(TEST_RESOURCE_ID, readOptions);
+    }
+    assertEquals(0, mockStorage.getRequests().size());
+  }
+
+  @Test
+  public void open_fastFailEnabled_invokesGet() throws Exception {
+    mockStorage.addResponse(TEST_OBJECT);
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      GoogleCloudStorageReadOptions readOptions =
+          GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
+
+      gcs.open(TEST_RESOURCE_ID, readOptions);
+    }
+    assertEquals(1, mockStorage.getRequests().size());
+  }
 }
