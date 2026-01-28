@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add configs
 
 ## 4.0.0 - 2025-12-15
 1. Add listStatusStartingFrom API.
