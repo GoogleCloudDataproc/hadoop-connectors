@@ -82,7 +82,7 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
   }
 
   void increment(String s, long count) {
-    Metric m = Metric.valueOfLabel(s);
+    Metric m = Metric.getMetricByName(s);
     if (m != null) {
       m.increment(count);
     }
@@ -137,7 +137,7 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
       this.metricValue = new ThreadLocalValue();
     }
 
-    public static Metric valueOfLabel(String label) {
+    public static Metric getMetricByName(String label) {
       return BY_LABEL.get(label);
     }
 

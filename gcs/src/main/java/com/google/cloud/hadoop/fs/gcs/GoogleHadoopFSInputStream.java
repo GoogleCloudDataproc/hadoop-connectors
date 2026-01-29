@@ -348,7 +348,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   /**
-   * Merges the range read stats collected across readVectored API to threadLocal stats of main
+   * Merges the range read stats collected in readVectored call to threadLocal stats of main
    * thread.
    */
   private void mergeRangeReadThreadStats() {
