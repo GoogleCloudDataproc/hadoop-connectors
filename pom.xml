@@ -92,6 +92,32 @@
     <java.addopens.args>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</java.addopens.args>
   </properties>
 
+  <repositories>
+    <repository>
+      <id>oss-exit-gate</id>
+      <url>https://us-maven.pkg.dev/oss-exit-gate-prod/hadoop-connectors--mavencentral</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>oss-exit-gate</id>
+      <url>https://us-maven.pkg.dev/oss-exit-gate-prod/hadoop-connectors--mavencentral</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
   <modules>
     <module>gcs/pom.xml</module>
     <module>gcsio/pom.xml</module>
