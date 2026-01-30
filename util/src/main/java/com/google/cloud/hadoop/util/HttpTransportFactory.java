@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.Objects.requireNonNullElseGet;
 
+import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.util.SecurityUtils;
@@ -171,11 +172,16 @@ public class HttpTransportFactory {
       throws IOException, GeneralSecurityException {
 
     KeyStore keyStore = SecurityUtils.getPkcs12KeyStore();
-    InputStream fis =
-        HttpTransportFactory.class.getClassLoader().getResourceAsStream(KEYSTORE_FILE_NAME);
-    keyStore.load(fis, KEYSTORE_PASSWORD.toCharArray());
+    try (InputStream fis =
+        HttpTransportFactory.class.getClassLoader().getResourceAsStream(KEYSTORE_FILE_NAME)) {
+      if (fis == null) {
+        logger.atWarning().log("Error reading " + KEYSTORE_FILE_NAME + " file from resources.");
+        keyStore = GoogleUtils.getCertificateTrustStore();
+      } else {
+        keyStore.load(fis, KEYSTORE_PASSWORD.toCharArray());
+      }
+    }
     NetHttpTransport.Builder builder = new NetHttpTransport.Builder().trustCertificates(keyStore);
-
     SSLSocketFactory wrappedSslSocketFactory =
         requireNonNullElseGet(
             builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory);
