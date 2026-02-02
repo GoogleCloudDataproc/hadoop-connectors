@@ -152,12 +152,11 @@ public class GoogleCloudStorageImplTest {
 
     String filelds = "contentEncoding,generation,size";
     if (testStorageClientImpl) {
-      // fail fast is not supported via java-storage as of now, overriding with default values.
-      filelds = OBJECT_FIELDS;
+      assertThat(trackingGcs.getAllRequestStrings()).containsExactly("rpcMethod:GetObject");
+    } else {
+      assertThat(trackingGcs.getAllRequestStrings())
+          .containsExactly(getObjectRequestString(resourceId, filelds, testStorageClientImpl));
     }
-
-    assertThat(trackingGcs.getAllRequestStrings())
-        .containsExactly(getObjectRequestString(resourceId, filelds, testStorageClientImpl));
     trackingGcs.delegate.close();
   }
 
