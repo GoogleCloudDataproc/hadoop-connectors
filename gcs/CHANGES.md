@@ -3,6 +3,8 @@
 ## Next
 1. Add fast fail feature for gRPC
 
+1. Track Client Feature Usage using Custom Header
+
 ## 4.0.0 - 2025-12-15
 1. Add listStatusStartingFrom API.
 
