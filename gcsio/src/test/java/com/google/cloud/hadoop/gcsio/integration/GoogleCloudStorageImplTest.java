@@ -1288,8 +1288,7 @@ public class GoogleCloudStorageImplTest {
                 .setApplicationName("ghfs/test")
                 .build();
 
-        trackingGcs =
-            newTrackingGoogleCloudStorage(GCS_OPTIONS);
+        trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
         // Use Reflection to GoogleCloudStorageImpl object
         GoogleCloudStorageImpl gcsImpl = (GoogleCloudStorageImpl) trackingGcs.delegate;
         Field storageField = GoogleCloudStorageImpl.class.getDeclaredField("storage");
