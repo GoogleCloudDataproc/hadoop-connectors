@@ -1253,8 +1253,7 @@ public class GoogleCloudStorageImplTest {
       StorageResourceId resourceId = new StorageResourceId(bucketName, "test-object");
       helperGcs.createEmptyObject(resourceId);
 
-      GoogleCloudStorage gcsWithRetry = null;
-
+      TrackingStorageWrapper<GoogleCloudStorage> trackingGcs = null;
       try {
         // Create the Fault Injector Transport
         HttpTransport realTransport = GoogleNetHttpTransport.newTrustedTransport();
@@ -1289,7 +1288,7 @@ public class GoogleCloudStorageImplTest {
                 .setApplicationName("ghfs/test")
                 .build();
 
-        TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        trackingGcs =
             newTrackingGoogleCloudStorage(GCS_OPTIONS);
         // Use Reflection to GoogleCloudStorageImpl object
         GoogleCloudStorageImpl gcsImpl = (GoogleCloudStorageImpl) trackingGcs.delegate;
@@ -1307,8 +1306,8 @@ public class GoogleCloudStorageImplTest {
         assertThat(requestCount.get()).isAtLeast(2);
 
       } finally {
-        if (gcsWithRetry != null) {
-          gcsWithRetry.close();
+        if (trackingGcs != null) {
+          trackingGcs.delegate.close();
         }
       }
     }
