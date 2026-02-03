@@ -156,8 +156,8 @@ public class HadoopCredentialsConfigurationTest {
                     + "\"token_type\": \"Bearer\""
                     + "}");
 
-    // Use your utility to create a transport that will serve the responses in order.
-    MockHttpTransport transport = mockTransport(serviceAccountInfoResponse, tokenResponse);
+    // Use your utility to create transport that will serve the responses in order.
+    MockHttpTransport transport = mockTransport(tokenResponse);
 
     GoogleCredentials credentials = getCredentials(transport);
     assertNotNull(credentials);
