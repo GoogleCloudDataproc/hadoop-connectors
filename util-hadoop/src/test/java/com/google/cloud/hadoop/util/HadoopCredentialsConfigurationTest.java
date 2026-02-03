@@ -133,19 +133,7 @@ public class HadoopCredentialsConfigurationTest {
 
   @Test
   public void metadataServiceIsUsedByDefault() throws Exception {
-    // RESPONSE 1: The service account info, now correctly nested under a "default" key.
-    LowLevelHttpResponse serviceAccountInfoResponse =
-        new MockLowLevelHttpResponse()
-            .setContentType(Json.MEDIA_TYPE)
-            .setContent(
-                "{"
-                    + "  \"default\": {"
-                    + "    \"email\": \"test-service-account@example.com\","
-                    + "    \"scopes\": [\"https://www.googleapis.com/auth/cloud-platform\"]"
-                    + "  }"
-                    + "}");
-
-    // RESPONSE 2: The access token response.
+    // RESPONSE: The access token response.
     LowLevelHttpResponse tokenResponse =
         new MockLowLevelHttpResponse()
             .setContentType(Json.MEDIA_TYPE)
