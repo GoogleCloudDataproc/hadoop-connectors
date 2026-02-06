@@ -1735,9 +1735,29 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try (ITraceOperation op =
         TraceOperation.addToExistingTrace(
             String.format("gcs.objects.list(page=%s)", pageContext))) {
-      Objects items = listObject.execute();
+      Objects items =
+          ResilientOperation.retry(
+              listObject::execute,
+              backOffFactory.newBackOff(),
+              (e) -> {
+                // Retry on Rate Limit
+                if (errorExtractor.rateLimited(e)) {
+                  return true;
+                }
+                // Retry on Network Errors (SocketException)
+                // Ignore 4xx errors (GoogleJsonResponseException)
+                if (e instanceof IOException && !(e instanceof GoogleJsonResponseException)) {
+                  return true;
+                }
+                return false;
+              },
+              IOException.class,
+              sleeper);
       op.annotate("resultSize", items == null ? 0 : items.size());
       return items;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Thread interrupted while listing objects", e);
     }
   }
 
