@@ -27,7 +27,12 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
@@ -39,15 +44,18 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -56,6 +64,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -863,5 +872,74 @@ public class GoogleCloudStorageImplTest {
     return ImmutableList.of(
         TrackingHttpRequestInitializer.resumableUploadChunkRequestString(
             bucketName, objectName, generationId, uploadId));
+  }
+
+  @Test
+  public void listObjects_recoversFromConnectionReset_withRealGCS() throws Exception {
+    if (!testStorageClientImpl) {
+      String shortUuid = UUID.randomUUID().toString().substring(0, 8);
+      String bucketName = bucketHelper.getUniqueBucketName("retry-" + shortUuid);
+
+      helperGcs.createBucket(bucketName);
+      StorageResourceId resourceId = new StorageResourceId(bucketName, "test-object");
+      helperGcs.createEmptyObject(resourceId);
+
+      TrackingStorageWrapper<GoogleCloudStorage> trackingGcs = null;
+      try {
+        // Create the Fault Injector Transport
+        HttpTransport realTransport = GoogleNetHttpTransport.newTrustedTransport();
+        FaultInjectingHttpTransport faultyTransport =
+            new FaultInjectingHttpTransport(realTransport);
+
+        AtomicInteger requestCount = new AtomicInteger(0);
+
+        // Build the Storage Client manually
+        RetryHttpInitializer baseInitializer =
+            new RetryHttpInitializer(
+                GoogleCloudStorageTestHelper.getCredential(),
+                GCS_OPTIONS.toRetryHttpInitializerOptions());
+
+        HttpRequestInitializer poisoningInitializer =
+            request -> {
+              baseInitializer.initialize(request);
+
+              // Insert header for the first request so that it fails and is retried
+              if (requestCount.getAndIncrement() == 0) {
+                request
+                    .getHeaders()
+                    .set(
+                        FaultInjectingHttpTransport.FAULT_HEADER_NAME,
+                        FaultInjectingHttpTransport.FAULT_CONNECTION_RESET);
+              }
+            };
+
+        Storage faultyStorageClient =
+            new Storage.Builder(
+                    faultyTransport, JacksonFactory.getDefaultInstance(), poisoningInitializer)
+                .setApplicationName("ghfs/test")
+                .build();
+
+        trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
+        // Use Reflection to GoogleCloudStorageImpl object
+        GoogleCloudStorageImpl gcsImpl = (GoogleCloudStorageImpl) trackingGcs.delegate;
+        Field storageField = GoogleCloudStorageImpl.class.getDeclaredField("storage");
+        storageField.setAccessible(true);
+        storageField.set(gcsImpl, faultyStorageClient);
+
+        // This call will go through faultyTransport -> Real GCS
+        List<GoogleCloudStorageItemInfo> results =
+            trackingGcs.delegate.listObjectInfo(bucketName, null, ListObjectOptions.DEFAULT);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getObjectName()).isEqualTo("test-object");
+        assertThat(faultyTransport.failureCount.get()).isAtLeast(1);
+        assertThat(requestCount.get()).isAtLeast(2);
+
+      } finally {
+        if (trackingGcs != null) {
+          trackingGcs.delegate.close();
+        }
+      }
+    }
   }
 }
