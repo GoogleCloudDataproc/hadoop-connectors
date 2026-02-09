@@ -86,8 +86,7 @@ public class GoogleCloudStorageWriteChannelTest {
         BaseEncoding.base64()
             .encode(Ints.toByteArray(Hashing.crc32c().hashBytes(testData).asInt()));
 
-    AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.builder().setTrailingChecksumEnabled(true).build();
+    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
 
     // Custom class to capture the method
     class CapturingHttpRequest extends MockLowLevelHttpRequest {
@@ -172,8 +171,7 @@ public class GoogleCloudStorageWriteChannelTest {
 
   @Test
   public void write_whenServerRejectsTrailingChecksum_shouldThrowException() throws IOException {
-    AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.builder().setTrailingChecksumEnabled(true).build();
+    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
 
     MockHttpTransport mockGcsServer =
         new MockHttpTransport() {
