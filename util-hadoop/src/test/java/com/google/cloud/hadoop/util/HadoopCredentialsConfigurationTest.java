@@ -133,19 +133,7 @@ public class HadoopCredentialsConfigurationTest {
 
   @Test
   public void metadataServiceIsUsedByDefault() throws Exception {
-    // RESPONSE 1: The service account info, now correctly nested under a "default" key.
-    LowLevelHttpResponse serviceAccountInfoResponse =
-        new MockLowLevelHttpResponse()
-            .setContentType(Json.MEDIA_TYPE)
-            .setContent(
-                "{"
-                    + "  \"default\": {"
-                    + "    \"email\": \"test-service-account@example.com\","
-                    + "    \"scopes\": [\"https://www.googleapis.com/auth/cloud-platform\"]"
-                    + "  }"
-                    + "}");
-
-    // RESPONSE 2: The access token response.
+    // RESPONSE: The access token response.
     LowLevelHttpResponse tokenResponse =
         new MockLowLevelHttpResponse()
             .setContentType(Json.MEDIA_TYPE)
@@ -156,8 +144,8 @@ public class HadoopCredentialsConfigurationTest {
                     + "\"token_type\": \"Bearer\""
                     + "}");
 
-    // Use your utility to create a transport that will serve the responses in order.
-    MockHttpTransport transport = mockTransport(serviceAccountInfoResponse, tokenResponse);
+    // Use your utility to create transport that will serve the responses in order.
+    MockHttpTransport transport = mockTransport(tokenResponse);
 
     GoogleCredentials credentials = getCredentials(transport);
     assertNotNull(credentials);
