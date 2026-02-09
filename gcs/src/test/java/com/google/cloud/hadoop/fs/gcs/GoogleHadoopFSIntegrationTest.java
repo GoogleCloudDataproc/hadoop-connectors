@@ -16,19 +16,39 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.CorruptionSimulatorInterceptor.CorruptionType;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpExecuteInterceptor;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.storage.Storage;
+import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageWriteChannel;
+import com.google.cloud.hadoop.gcsio.ObjectWriteConditions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.nio.file.DirectoryNotEmptyException;
 import java.util.EnumSet;
+import java.util.Random;
+import java.util.concurrent.Executors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -239,6 +259,35 @@ public class GoogleHadoopFSIntegrationTest {
   }
 
   @Test
+  public void testWriteWithTrailingChecksum_Enabled_MultiChunk() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    config.setInt("fs.gs.outputstream.upload.chunk.size", 1 * 1024 * 1024);
+
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    Path testPath = new Path(initUri.resolve("/testWriteWithTrailingChecksum_Enabled.bin"));
+
+    int fileSize = (int) (2.5 * 1024 * 1024);
+    byte[] expectedData = new byte[fileSize];
+    new Random().nextBytes(expectedData);
+    // write data
+    try (FSDataOutputStream out = ghfs.create(testPath)) {
+      out.write(expectedData);
+    }
+
+    byte[] actualData = new byte[fileSize];
+    // read the data
+    try (FSDataInputStream in = ghfs.open(testPath)) {
+      in.readFully(actualData);
+    }
+
+    assertThat(actualData).isEqualTo(expectedData);
+
+    ghfs.delete(testPath, false);
+  }
+
+  @Test
   public void testDeleteNotRecursive_shouldBeAppliedToHierarchyOfDirectories()
       throws IOException, URISyntaxException {
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
@@ -321,5 +370,135 @@ public class GoogleHadoopFSIntegrationTest {
 
     assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(srcPath));
     assertThat(ghfs.listStatus(dstPath)).hasLength(1);
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_SimulatedChecksumCorruption() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    String bucket = initUri.getAuthority();
+    String objectName = "testWithCorruption_" + System.currentTimeMillis() + ".bin";
+    StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
+
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+
+    HttpRequestInitializer sabotageInitializer =
+        request -> {
+          new RetryHttpInitializer(
+                  credentials,
+                  RetryHttpInitializerOptions.builder()
+                      .setDefaultUserAgent("GHFS-Integration-Test-Corruption")
+                      .build())
+              .initialize(request);
+
+          // Inject Sabotage Interceptor
+          final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+          // Inject Sabotage Interceptor
+          request.setInterceptor(
+              new CorruptionSimulatorInterceptor(existingInterceptor, CorruptionType.CHECKSUM));
+        };
+
+    Storage storage =
+        new Storage.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                sabotageInitializer)
+            .setApplicationName("GHFS-Corruption-Test")
+            .build();
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(1024 * 1024).build();
+
+    GoogleCloudStorageWriteChannel channel =
+        new GoogleCloudStorageWriteChannel(
+            storage,
+            new ClientRequestHelper<>(),
+            Executors.newCachedThreadPool(),
+            writeOptions,
+            resourceId,
+            CreateObjectOptions.DEFAULT_OVERWRITE,
+            ObjectWriteConditions.NONE);
+
+    channel.initialize();
+
+    byte[] data = new byte[2 * 1024 * 1024];
+    new Random().nextBytes(data);
+    channel.write(ByteBuffer.wrap(data));
+
+    IOException e = assertThrows(IOException.class, () -> channel.close());
+
+    assertThat(e.getCause().getMessage()).contains("400");
+    assertThat(e.getCause().getMessage()).contains("CRC32C");
+
+    try {
+      ghfs.getGcsFs().getGcs().deleteObjects(java.util.Collections.singletonList(resourceId));
+    } catch (Exception ignored) {
+    }
+  }
+
+  @Test
+  public void testWriteWithTrailingChecksum_SimulatedDataCorruption() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(initUri, config);
+
+    String bucket = initUri.getAuthority();
+    String objectName = "corruption_test_" + System.currentTimeMillis() + ".bin";
+    StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
+
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+
+    HttpRequestInitializer sabotageInitializer =
+        request -> {
+          new RetryHttpInitializer(
+                  credentials,
+                  RetryHttpInitializerOptions.builder()
+                      .setDefaultUserAgent("GHFS-Corruption-Test")
+                      .build())
+              .initialize(request);
+
+          final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+          // Inject Sabotage Interceptor
+          request.setInterceptor(
+              new CorruptionSimulatorInterceptor(existingInterceptor, CorruptionType.DATA));
+        };
+
+    Storage storage =
+        new Storage.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                sabotageInitializer)
+            .setApplicationName("GHFS-Corruption-Test")
+            .build();
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(1024 * 1024).build();
+
+    GoogleCloudStorageWriteChannel channel =
+        new GoogleCloudStorageWriteChannel(
+            storage,
+            new ClientRequestHelper<>(),
+            Executors.newCachedThreadPool(),
+            writeOptions,
+            resourceId,
+            CreateObjectOptions.DEFAULT_OVERWRITE,
+            ObjectWriteConditions.NONE);
+
+    channel.initialize();
+
+    byte[] data = new byte[2 * 1024 * 1024];
+    new Random().nextBytes(data);
+    channel.write(ByteBuffer.wrap(data));
+
+    IOException e = assertThrows(IOException.class, () -> channel.close());
+    assertThat(e.getCause().getMessage()).contains("400");
+    assertThat(e.getCause().getMessage()).contains("CRC32C");
+
+    try {
+      ghfs.getGcsFs().getGcs().deleteObjects(java.util.Collections.singletonList(resourceId));
+    } catch (Exception ignored) {
+    }
   }
 }
