@@ -92,6 +92,17 @@
     <java.addopens.args>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</java.addopens.args>
   </properties>
 
+  <distributionManagement>
+    <snapshotRepository>
+      <id>artifact-registry</id>
+      <url>artifactregistry://us-maven.pkg.dev/oss-exit-gate-prod/hadoop-connectors--mavencentral</url>
+    </snapshotRepository>
+    <repository>
+      <id>artifact-registry</id>
+      <url>artifactregistry://us-maven.pkg.dev/oss-exit-gate-prod/hadoop-connectors--mavencentral</url>
+    </repository>
+  </distributionManagement>
+
   <modules>
     <module>gcs/pom.xml</module>
     <module>gcsio/pom.xml</module>
@@ -158,7 +169,7 @@
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
             <version>0.8.0</version>
-            <extensions>true</extensions>
+            <extensions>false</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>false</autoPublish>
@@ -395,6 +406,13 @@
   </dependencyManagement>
 
   <build>
+    <extensions>
+      <extension>
+        <groupId>com.google.cloud.artifactregistry</groupId>
+        <artifactId>artifactregistry-maven-wagon</artifactId>
+        <version>2.2.5</version>
+      </extension>
+    </extensions>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
