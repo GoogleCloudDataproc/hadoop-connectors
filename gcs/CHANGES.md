@@ -1,7 +1,9 @@
 # Release Notes
 
 ## Next
-1. Add fast fail feature for gRPC
+1. Add fast fail feature for gRPC.
+2. Add retry for ListObjects.
+3. Update cloud library bom.
 
 ## 4.0.0 - 2025-12-15
 1. Add listStatusStartingFrom API.
