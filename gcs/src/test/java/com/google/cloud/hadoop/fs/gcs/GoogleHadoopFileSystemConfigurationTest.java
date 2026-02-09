@@ -134,7 +134,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.fadvise.request.track.count", 3);
           put("fs.gs.operation.move.enable", true);
           put("fs.gs.write.rolling.checksum.enable", true);
-          put("fs.gs.write.trailing.checksum.enable", false);
+          // put("fs.gs.write.trailing.checksum.enable", false);
           put("fs.gs.bidi.enable", false);
           put("fs.gs.bidi.thread.count", 16);
           put("fs.gs.bidi.client.timeout", 30);
@@ -406,7 +406,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.write.parallel.composite.upload.part.file.cleanup.type", "NEVER");
     config.set("fs.gs.write.parallel.composite.upload.part.file.name.prefix", "baz");
     config.setBoolean("fs.gs.write.rolling.checksum.enable", true);
-    config.setBoolean("fs.gs.write.trailing.checksum.enable", false);
 
     AsyncWriteChannelOptions options =
         GoogleHadoopFileSystemConfiguration.getWriteChannelOptions(config);
@@ -428,7 +427,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getPartFileCleanupType()).isEqualTo(PartFileCleanupType.NEVER);
     assertThat(options.getPartFileNamePrefix()).isEqualTo("baz");
     assertThat(options.isRollingChecksumEnabled()).isTrue();
-    assertThat(options.isTrailingChecksumEnabled()).isFalse();
   }
 
   @Test

@@ -194,9 +194,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
-        if (channelOptions.isTrailingChecksumEnabled()) {
-          ChecksumContext.CURRENT_HASHER.set(cumulativeCrc32cHasher);
-        }
+        ChecksumContext.CURRENT_HASHER.set(cumulativeCrc32cHasher);
         return uploadObject.execute();
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();

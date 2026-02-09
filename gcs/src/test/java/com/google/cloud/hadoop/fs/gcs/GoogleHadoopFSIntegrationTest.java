@@ -261,8 +261,6 @@ public class GoogleHadoopFSIntegrationTest {
   @Test
   public void testWriteWithTrailingChecksum_Enabled_MultiChunk() throws Exception {
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    // enable trailing checksum
-    config.setBoolean("fs.gs.write.trailing.checksum.enable", true);
     config.setInt("fs.gs.outputstream.upload.chunk.size", 1 * 1024 * 1024);
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
@@ -292,8 +290,6 @@ public class GoogleHadoopFSIntegrationTest {
   @Test
   public void testWriteWithTrailingChecksum_Disabled_Regression() throws Exception {
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    // enable trailing checksum
-    config.setBoolean("fs.gs.write.trailing.checksum.enable", false);
     config.setInt("fs.gs.outputstream.upload.chunk.size", 1 * 1024 * 1024);
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
     ghfs.initialize(initUri, config);
@@ -447,10 +443,7 @@ public class GoogleHadoopFSIntegrationTest {
             .build();
 
     AsyncWriteChannelOptions writeOptions =
-        AsyncWriteChannelOptions.builder()
-            .setTrailingChecksumEnabled(true)
-            .setUploadChunkSize(1024 * 1024)
-            .build();
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(1024 * 1024).build();
 
     GoogleCloudStorageWriteChannel channel =
         new GoogleCloudStorageWriteChannel(
@@ -526,10 +519,7 @@ public class GoogleHadoopFSIntegrationTest {
             .build();
 
     AsyncWriteChannelOptions writeOptions =
-        AsyncWriteChannelOptions.builder()
-            .setTrailingChecksumEnabled(true)
-            .setUploadChunkSize(1024 * 1024)
-            .build();
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(1024 * 1024).build();
 
     GoogleCloudStorageWriteChannel channel =
         new GoogleCloudStorageWriteChannel(
