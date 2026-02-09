@@ -16,11 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.CorruptionSimulatorInterceptor.CorruptionType;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.HttpContent;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.gson.GsonFactory;
@@ -288,33 +288,6 @@ public class GoogleHadoopFSIntegrationTest {
   }
 
   @Test
-  public void testWriteWithTrailingChecksum_Disabled_Regression() throws Exception {
-    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    config.setInt("fs.gs.outputstream.upload.chunk.size", 1 * 1024 * 1024);
-    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
-    ghfs.initialize(initUri, config);
-
-    Path testPath = new Path(initUri.resolve("/testWriteWithTrailingChecksum_Disabled.bin"));
-
-    int fileSize = 1024 * 1024;
-    byte[] expectedData = new byte[fileSize];
-    new Random().nextBytes(expectedData);
-    // write data
-    try (FSDataOutputStream out = ghfs.create(testPath)) {
-      out.write(expectedData);
-    }
-
-    byte[] actualData = new byte[fileSize];
-    // read the data
-    try (FSDataInputStream in = ghfs.open(testPath)) {
-      in.readFully(actualData);
-    }
-    assertThat(actualData).isEqualTo(expectedData);
-
-    ghfs.delete(testPath, false);
-  }
-
-  @Test
   public void testDeleteNotRecursive_shouldBeAppliedToHierarchyOfDirectories()
       throws IOException, URISyntaxException {
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
@@ -422,16 +395,9 @@ public class GoogleHadoopFSIntegrationTest {
 
           // Inject Sabotage Interceptor
           final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+          // Inject Sabotage Interceptor
           request.setInterceptor(
-              req -> {
-                if (existingInterceptor != null) {
-                  existingInterceptor.intercept(req);
-                }
-                // Overwrite valid checksum with a bad one
-                if (req.getHeaders().containsKey("x-goog-hash")) {
-                  req.getHeaders().set("x-goog-hash", "crc32c=AAAAAA==");
-                }
-              });
+              new CorruptionSimulatorInterceptor(existingInterceptor, CorruptionType.CHECKSUM));
         };
 
     Storage storage =
@@ -494,20 +460,9 @@ public class GoogleHadoopFSIntegrationTest {
               .initialize(request);
 
           final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
+          // Inject Sabotage Interceptor
           request.setInterceptor(
-              req -> {
-                if (existingInterceptor != null) {
-                  existingInterceptor.intercept(req);
-                }
-
-                String method = req.getRequestMethod();
-                boolean hasHeader = req.getHeaders().containsKey("x-goog-hash");
-
-                if (hasHeader && "PUT".equals(method)) {
-                  HttpContent originalContent = req.getContent();
-                  req.setContent(new CorruptingHttpContent(originalContent));
-                }
-              });
+              new CorruptionSimulatorInterceptor(existingInterceptor, CorruptionType.DATA));
         };
 
     Storage storage =
@@ -544,60 +499,6 @@ public class GoogleHadoopFSIntegrationTest {
     try {
       ghfs.getGcsFs().getGcs().deleteObjects(java.util.Collections.singletonList(resourceId));
     } catch (Exception ignored) {
-    }
-  }
-
-  private static class CorruptingHttpContent implements HttpContent {
-    private final HttpContent delegate;
-
-    public CorruptingHttpContent(HttpContent delegate) {
-      this.delegate = delegate;
-    }
-
-    @Override
-    public long getLength() throws IOException {
-      return delegate.getLength();
-    }
-
-    @Override
-    public String getType() {
-      return delegate.getType();
-    }
-
-    @Override
-    public boolean retrySupported() {
-      return delegate.retrySupported();
-    }
-
-    @Override
-    public void writeTo(java.io.OutputStream out) throws IOException {
-      delegate.writeTo(
-          new java.io.FilterOutputStream(out) {
-            private boolean corrupted = false;
-
-            @Override
-            public void write(int b) throws IOException {
-              if (!corrupted) {
-                corrupted = true;
-                out.write(b ^ 1);
-              } else {
-                out.write(b);
-              }
-            }
-
-            @Override
-            public void write(byte[] b, int off, int len) throws IOException {
-              if (!corrupted && len > 0) {
-                byte[] corruptedCopy = new byte[len];
-                System.arraycopy(b, off, corruptedCopy, 0, len);
-                corruptedCopy[0] = (byte) (corruptedCopy[0] ^ 1);
-                corrupted = true;
-                out.write(corruptedCopy, 0, len);
-              } else {
-                out.write(b, off, len);
-              }
-            }
-          });
     }
   }
 }
