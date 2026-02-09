@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 4.0.1 - 2026-02-09
 1. Add fast fail feature for gRPC.
 2. Add retry for ListObjects.
 3. Update cloud library bom.
