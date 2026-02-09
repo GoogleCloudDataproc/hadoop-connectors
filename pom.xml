@@ -71,7 +71,7 @@
     <bigdataoss.version>4.0.0-SNAPSHOT</bigdataoss.version>
 
     <google.auto-value.version>1.10.4</google.auto-value.version>
-    <google.cloud.library.bom.version>26.69.0</google.cloud.library.bom.version>
+    <google.cloud.library.bom.version>26.73.0</google.cloud.library.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
     <google.error-prone-annotations.version>2.38.0</google.error-prone-annotations.version>
     <google.flogger.version>0.7.4</google.flogger.version>
