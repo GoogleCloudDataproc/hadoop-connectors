@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 4.0.2 - 2026-02-09
 1. Track Client Feature Usage using Custom Header
 
 ## 4.0.1 - 2026-02-09
