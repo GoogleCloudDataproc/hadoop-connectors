@@ -157,6 +157,34 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>protobuf4-test</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <classpathDependencyExcludes>
+                <classpathDependencyExclude>com.google.protobuf:protobuf-java</classpathDependencyExclude>
+                <classpathDependencyExclude>com.google.protobuf:protobuf-java-util</classpathDependencyExclude>
+              </classpathDependencyExcludes>
+              <additionalClasspathDependencies>
+                <additionalClasspathDependency>
+                  <groupId>com.google.protobuf</groupId>
+                  <artifactId>protobuf-java</artifactId>
+                  <version>4.28.2</version>
+                </additionalClasspathDependency>
+                <additionalClasspathDependency>
+                  <groupId>com.google.protobuf</groupId>
+                  <artifactId>protobuf-java-util</artifactId>
+                  <version>4.28.2</version>
+                </additionalClasspathDependency>
+              </additionalClasspathDependencies>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
 
     <profile>
       <id>release</id>
@@ -462,7 +490,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M7</version>
+          <version>3.5.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-shade-plugin</artifactId>
