@@ -46,6 +46,7 @@ import com.google.api.client.util.Sleeper;
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Copy;
+import com.google.api.services.storage.Storage.Objects.Get;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Bucket.Lifecycle;
@@ -2521,8 +2522,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // Request only fields used in GoogleCloudStorageItemInfo:
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);
+
+    GoogleCloudStorageObjectsRequest getRequest =
+        new GoogleCloudStorageObjectsRequest<Get>(getObject, "getObject");
     try (ITraceOperation op = TraceOperation.addToExistingTrace("gcs.objects.get")) {
-      return getObject.execute();
+      return getRequest.execute();
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
         logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
