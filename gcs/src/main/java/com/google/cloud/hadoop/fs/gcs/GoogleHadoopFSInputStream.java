@@ -348,8 +348,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   /**
-   * Merges the range read stats collected in readVectored call to threadLocal stats of main
-   * thread.
+   * Merges the range read stats collected in readVectored call to threadLocal stats of main thread.
    */
   private void mergeRangeReadThreadStats() {
     GhfsThreadLocalStatistics tlStats = storageStatistics.getThreadLocalStatistics();

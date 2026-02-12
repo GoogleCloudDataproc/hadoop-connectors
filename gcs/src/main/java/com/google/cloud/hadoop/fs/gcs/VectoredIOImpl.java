@@ -296,6 +296,7 @@ public class VectoredIOImpl implements Closeable {
         logger.atWarning().withCause(e).log(
             "Exception while reading combinedFileRange:%s for path: %s",
             combinedFileRange, channelProvider.gcsPath);
+        captureAndResetThreadLocalStats();
         combinedFileRange.getData().completeExceptionally(e);
         // complete exception all the underlying ranges which have not already
         // finished.
@@ -347,6 +348,7 @@ public class VectoredIOImpl implements Closeable {
       } catch (Exception e) {
         logger.atWarning().withCause(e).log(
             "Exception while reading range:%s for path: %s", range, channelProvider.gcsPath);
+        captureAndResetThreadLocalStats();
         range.getData().completeExceptionally(e);
       }
     }
