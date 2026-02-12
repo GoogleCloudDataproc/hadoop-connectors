@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.32 - 2026-02-12
 1. Add retry for ListObjects.
 
