@@ -291,6 +291,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
+  // Feature header generator to track connector features used in requests.
+  private final FeatureHeaderGenerator featureHeaderGenerator;
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -306,7 +308,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       @Nullable Credentials credentials,
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
-      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      @Nullable FeatureHeaderGenerator featureHeaderGenerator)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
@@ -347,6 +350,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : new ChainingHttpRequestInitializer(httpStatistics, finalHttpRequestInitializer);
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+    this.featureHeaderGenerator = featureHeaderGenerator;
 
     HttpTransport finalHttpTransport =
         httpTransport == null
@@ -1735,9 +1739,29 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try (ITraceOperation op =
         TraceOperation.addToExistingTrace(
             String.format("gcs.objects.list(page=%s)", pageContext))) {
-      Objects items = listObject.execute();
+      Objects items =
+          ResilientOperation.retry(
+              listObject::execute,
+              backOffFactory.newBackOff(),
+              (e) -> {
+                // Retry on Rate Limit
+                if (errorExtractor.rateLimited(e)) {
+                  return true;
+                }
+                // Retry on Network Errors (SocketException)
+                // Ignore 4xx errors (GoogleJsonResponseException)
+                if (e instanceof IOException && !(e instanceof GoogleJsonResponseException)) {
+                  return true;
+                }
+                return false;
+              },
+              IOException.class,
+              sleeper);
       op.annotate("resultSize", items == null ? 0 : items.size());
       return items;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Thread interrupted while listing objects", e);
     }
   }
 
@@ -2759,8 +2783,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       setEncryptionHeaders(request);
       setDecryptionHeaders(request);
     }
-
+    addFeatureUsageHeader(request);
     return request;
+  }
+
+  private <RequestT extends StorageRequest<?>> void addFeatureUsageHeader(RequestT request) {
+    if (featureHeaderGenerator == null) {
+      return;
+    }
+    String featureUsageHeaderString = this.featureHeaderGenerator.getValue();
+    if (!Strings.isNullOrEmpty(featureUsageHeaderString)) {
+      logger.atFiner().log("Setting feature usage header: %s", featureUsageHeaderString);
+      request.getRequestHeaders().set(FeatureHeaderGenerator.HEADER_NAME, featureUsageHeaderString);
+    }
   }
 
   private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {
@@ -2868,6 +2903,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract Builder setFeatureHeaderGenerator(
+        @Nullable FeatureHeaderGenerator featureHeaderGenerator);
 
     public abstract GoogleCloudStorageImpl build() throws IOException;
   }

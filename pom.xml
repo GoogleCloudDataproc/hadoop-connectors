@@ -71,7 +71,7 @@
     <bigdataoss.version>4.0.0-SNAPSHOT</bigdataoss.version>
 
     <google.auto-value.version>1.10.4</google.auto-value.version>
-    <google.cloud.library.bom.version>26.69.0</google.cloud.library.bom.version>
+    <google.cloud.library.bom.version>26.73.0</google.cloud.library.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
     <google.error-prone-annotations.version>2.38.0</google.error-prone-annotations.version>
     <google.flogger.version>0.7.4</google.flogger.version>
@@ -91,6 +91,17 @@
     <central.publishing.skip>false</central.publishing.skip>
     <java.addopens.args>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</java.addopens.args>
   </properties>
+
+  <distributionManagement>
+    <snapshotRepository>
+      <id>artifact-registry</id>
+      <url>artifactregistry://us-maven.pkg.dev/oss-exit-gate-prod/hadoop-connectors--mavencentral</url>
+    </snapshotRepository>
+    <repository>
+      <id>artifact-registry</id>
+      <url>artifactregistry://us-maven.pkg.dev/oss-exit-gate-prod/hadoop-connectors--mavencentral</url>
+    </repository>
+  </distributionManagement>
 
   <modules>
     <module>gcs/pom.xml</module>
@@ -158,7 +169,7 @@
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
             <version>0.8.0</version>
-            <extensions>true</extensions>
+            <extensions>false</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>false</autoPublish>
@@ -395,6 +406,13 @@
   </dependencyManagement>
 
   <build>
+    <extensions>
+      <extension>
+        <groupId>com.google.cloud.artifactregistry</groupId>
+        <artifactId>artifactregistry-maven-wagon</artifactId>
+        <version>2.2.5</version>
+      </extension>
+    </extensions>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
