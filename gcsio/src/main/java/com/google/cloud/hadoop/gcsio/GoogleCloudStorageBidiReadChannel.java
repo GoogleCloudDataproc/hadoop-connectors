@@ -28,6 +28,7 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -226,44 +227,63 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long vectoredReadStartTime = System.currentTimeMillis();
     BlobReadSession session = getBlobReadSession();
-    ranges.forEach(
-        range -> {
-          ApiFuture<DisposableByteString> futureBytes =
-              session.readAs(
-                  ReadProjectionConfigs.asFutureByteString()
-                      .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
-          ApiFutures.addCallback(
-              futureBytes,
-              new ApiFutureCallback<>() {
-                @Override
-                public void onFailure(Throwable t) {
-                  range.getData().completeExceptionally(t);
-                  logger.atFiner().log(
-                      "Vectored Read failed for range starting from %d with length %d",
-                      range.getOffset(), range.getLength());
-                }
 
-                @Override
-                public void onSuccess(DisposableByteString disposableByteString) {
-                  try {
-                    long bytesRead =
-                        processBytesAndCompleteRange(disposableByteString, range, allocate);
-                    logger.atFiner().log(
-                        "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
-                        range.getOffset(),
-                        range.getLength(),
-                        bytesRead,
-                        System.currentTimeMillis() - vectoredReadStartTime);
-                  } catch (Throwable t) {
-                    range.getData().completeExceptionally(t);
-                    logger.atFiner().log(
-                        "Vectored Read failed for range starting from %d with length %d",
-                        range.getOffset(), range.getLength());
-                  }
-                }
-              },
-              boundedThreadPool);
-        });
+    if (ranges.isEmpty()) {
+      return;
+    }
+
+    int partitionSize = (ranges.size() + 3) / 4;
+    List<List<VectoredIORange>> partitions = Lists.partition(ranges, partitionSize);
+
+    for (List<VectoredIORange> partition : partitions) {
+      boundedThreadPool.submit(
+          () -> {
+            for (VectoredIORange range : partition) {
+              try {
+                ApiFuture<DisposableByteString> futureBytes =
+                    session.readAs(
+                        ReadProjectionConfigs.asFutureByteString()
+                            .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
+                ApiFutures.addCallback(
+                    futureBytes,
+                    new ApiFutureCallback<>() {
+                      @Override
+                      public void onFailure(Throwable t) {
+                        range.getData().completeExceptionally(t);
+                        logger.atFiner().log(
+                            "Vectored Read failed for range starting from %d with length %d",
+                            range.getOffset(), range.getLength());
+                      }
+
+                      @Override
+                      public void onSuccess(DisposableByteString disposableByteString) {
+                        try {
+                          long bytesRead =
+                              processBytesAndCompleteRange(disposableByteString, range, allocate);
+                          logger.atFiner().log(
+                              "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
+                              range.getOffset(),
+                              range.getLength(),
+                              bytesRead,
+                              System.currentTimeMillis() - vectoredReadStartTime);
+                        } catch (Throwable t) {
+                          range.getData().completeExceptionally(t);
+                          logger.atFiner().log(
+                              "Vectored Read failed for range starting from %d with length %d",
+                              range.getOffset(), range.getLength());
+                        }
+                      }
+                    },
+                    boundedThreadPool);
+              } catch (Throwable t) {
+                range.getData().completeExceptionally(t);
+                logger.atFiner().withCause(t).log(
+                    "Vectored Read initiation failed for range starting from %d with length %d",
+                    range.getOffset(), range.getLength());
+              }
+            }
+          });
+    }
   }
 
   private long processBytesAndCompleteRange(
