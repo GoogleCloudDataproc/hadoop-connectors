@@ -23,6 +23,7 @@ import static java.util.Objects.requireNonNullElseGet;
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.util.SecurityUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -37,6 +38,7 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.time.Duration;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
@@ -45,6 +47,8 @@ import javax.net.ssl.SSLSocketFactory;
 /** Factory for creating HttpTransport types. */
 public class HttpTransportFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  private static final String KEYSTORE_FILE_NAME = "google.p12";
+  private static final String KEYSTORE_PASSWORD = "notasecret";
 
   /**
    * Create an {@link HttpTransport} with socketKeepAlive true
@@ -166,8 +170,18 @@ public class HttpTransportFactory {
   static NetHttpTransport.Builder createNetHttpTransportBuilder(
       @Nullable URI proxyUri, @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
-    NetHttpTransport.Builder builder =
-        new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
+
+    KeyStore keyStore = SecurityUtils.getPkcs12KeyStore();
+    try (InputStream fis =
+        HttpTransportFactory.class.getClassLoader().getResourceAsStream(KEYSTORE_FILE_NAME)) {
+      if (fis == null) {
+        logger.atWarning().log("Error reading " + KEYSTORE_FILE_NAME + " file from resources.");
+        keyStore = GoogleUtils.getCertificateTrustStore();
+      } else {
+        keyStore.load(fis, KEYSTORE_PASSWORD.toCharArray());
+      }
+    }
+    NetHttpTransport.Builder builder = new NetHttpTransport.Builder().trustCertificates(keyStore);
     SSLSocketFactory wrappedSslSocketFactory =
         requireNonNullElseGet(
             builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory);
