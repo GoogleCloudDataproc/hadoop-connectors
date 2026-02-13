@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.util.GcsJsonApiEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
+import com.google.cloud.hadoop.util.GrpcRequestCompletionEvent;
 import com.google.cloud.hadoop.util.IGcsJsonApiEvent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.eventbus.Subscribe;
@@ -59,7 +60,7 @@ public class GoogleCloudStorageEventSubscriber {
   public static synchronized GoogleCloudStorageEventSubscriber getInstance(
       @Nonnull GhfsGlobalStorageStatistics storageStatistics) {
     if (INSTANCE == null) {
-      logger.atFiner().log("Subscriber class invoked for first time");
+      logger.atInfo().log("Subscriber class invoked for first time");
       INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);
     }
     return INSTANCE;
@@ -113,6 +114,16 @@ public class GoogleCloudStorageEventSubscriber {
     } else if (eventType == EventType.EXCEPTION) {
       storageStatistics.incrementGcsExceptionCount();
     }
+  }
+
+  @Subscribe
+  private void subscriberOnGrpcCompletion(GrpcRequestCompletionEvent event) {
+    // 1. Update Latency Metric (Missing in original code)
+    storageStatistics.incrementCounter(
+        GoogleCloudStorageStatistics.GCS_API_TIME, event.getDurationMillis());
+
+    // 2. Update Status Code Metrics (reuses existing logic)
+    updateGcsIOSpecificStatistics(grpcToHttpStatusCodeMapping(event.getStatus()));
   }
 
   private void updateMetric(GhfsStatistic stat, long duration, Object eventContext) {

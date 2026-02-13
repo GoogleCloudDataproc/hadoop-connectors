@@ -78,6 +78,11 @@ public class GoogleCloudStorageEventBus {
     eventBus.post(gcsJsonApiEvent);
   }
 
+  /** Posting gRPC Completion Event (Status + Duration). */
+  public static void onGrpcCompletion(GrpcRequestCompletionEvent event) {
+    eventBus.post(event);
+  }
+
   public static void postWriteChecksumFailure() {
     eventBus.post(checksumFailureEvent);
   }

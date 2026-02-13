@@ -205,7 +205,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
               | ExecutionException
               | TimeoutException
               | java.util.concurrent.CancellationException e) {
-            logger.atFine().withCause(e).log(
+            logger.atInfo().withCause(e).log(
                 "Failed to get/close BlobReadSession during close() for '%s'", resourceId);
           }
         }
@@ -223,7 +223,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   @Override
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
+    logger.atInfo().log("readVectored() called for BlobId=%s", blobId.toString());
     long vectoredReadStartTime = System.currentTimeMillis();
     BlobReadSession session = getBlobReadSession();
     ranges.forEach(
@@ -238,7 +238,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                 @Override
                 public void onFailure(Throwable t) {
                   range.getData().completeExceptionally(t);
-                  logger.atFiner().log(
+                  logger.atInfo().log(
                       "Vectored Read failed for range starting from %d with length %d",
                       range.getOffset(), range.getLength());
                 }
@@ -248,7 +248,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                   try {
                     long bytesRead =
                         processBytesAndCompleteRange(disposableByteString, range, allocate);
-                    logger.atFiner().log(
+                    logger.atInfo().log(
                         "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
                         range.getOffset(),
                         range.getLength(),
@@ -256,7 +256,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                         System.currentTimeMillis() - vectoredReadStartTime);
                   } catch (Throwable t) {
                     range.getData().completeExceptionally(t);
-                    logger.atFiner().log(
+                    logger.atInfo().log(
                         "Vectored Read failed for range starting from %d with length %d",
                         range.getOffset(), range.getLength());
                   }
@@ -349,7 +349,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return;
     }
 
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Prefetching footer for '%s'. Position: %d, Size: %d",
         resourceId, footerStartPosition, footerSize);
     try (DisposableByteString dbs = readBytes(footerStartPosition, footerSize)) {
@@ -362,7 +362,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       }
       this.footerContent = byteString.toByteArray();
     }
-    logger.atFiner().log("Prefetched %d bytes footer for '%s'", footerContent.length, resourceId);
+    logger.atInfo().log("Prefetched %d bytes footer for '%s'", footerContent.length, resourceId);
   }
 
   /** Serve the data from the cached footer if the footer Cache is already populated */

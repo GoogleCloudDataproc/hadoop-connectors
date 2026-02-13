@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.LongSummaryStatistics;
 import java.util.Map;
@@ -63,7 +64,9 @@ import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -145,6 +148,21 @@ public class FsBenchmark extends Configured implements Tool {
     } finally {
       statsFuture.cancel(/* mayInterruptIfRunning= */ true);
       progressReporter.ifPresent(ExecutorService::shutdownNow);
+
+      System.out.println("\n=== GCS Connector Custom Metrics ===");
+      StorageStatistics gcsStats = GlobalStorageStatistics.INSTANCE.get("GhfsStorageStatistics");
+      if (gcsStats != null) {
+        Iterator<StorageStatistics.LongStatistic> it = gcsStats.getLongStatistics();
+        while (it.hasNext()) {
+          StorageStatistics.LongStatistic stat = it.next();
+          if (stat.getValue() > 0) {
+            System.out.printf("%s = %d%n", stat.getName(), stat.getValue());
+          }
+        }
+      } else {
+        System.out.println("No GhfsStorageStatistics found.");
+      }
+      System.out.println("====================================\n");
       System.out.printf("Final stats: %s%n", statistics);
     }
   }

@@ -162,7 +162,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     if (dst.remaining() == 0) {
       return 0;
     }
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Reading %d bytes at %d position from '%s'", dst.remaining(), currentPosition, resourceId);
     if (currentPosition == objectSize) {
       return -1;
@@ -201,7 +201,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     validatePosition(newPosition);
-    logger.atFiner().log(
+    logger.atInfo().log(
         "Seek from %s to %s position for '%s'", currentPosition, newPosition, resourceId);
     currentPosition = newPosition;
     return this;
@@ -231,7 +231,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   public void close() throws IOException {
     if (open) {
       try {
-        logger.atFiner().log("Closing channel for '%s'", resourceId);
+        logger.atInfo().log("Closing channel for '%s'", resourceId);
         contentReadChannel.closeContentChannel();
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
@@ -323,7 +323,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           we should not treat it as an error scenario anymore.
           */
           if (bytesRead == 0) {
-            logger.atFiner().log(
+            logger.atInfo().log(
                 "Read %d from storage-client's byte channel at position: %d with channel ending at: %d for resourceId: %s of size: %d",
                 bytesRead, currentPosition, contentChannelEnd, resourceId, objectSize);
           }
@@ -370,7 +370,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           totalBytesRead += partialBytes;
           currentPosition += partialBytes;
           contentChannelCurrentPosition += partialBytes;
-          logger.atFine().log(
+          logger.atInfo().log(
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
           throw convertError(e);
@@ -500,14 +500,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         footerContent = null;
         throw e;
       }
-      logger.atFiner().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
+      logger.atInfo().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
     }
 
     private ReadableByteChannel serveFooterContent() {
       contentChannelCurrentPosition = currentPosition;
       int offset = toIntExact(currentPosition - (objectSize - footerContent.length));
       int length = footerContent.length - offset;
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Opened channel (prefetched footer) from %d position for '%s'",
           currentPosition, resourceId);
       return Channels.newChannel(new ByteArrayInputStream(footerContent, offset, length));
@@ -557,12 +557,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     public void closeContentChannel() {
       if (byteChannel != null) {
-        logger.atFiner().log("Closing internal contentChannel for '%s'", resourceId);
+        logger.atInfo().log("Closing internal contentChannel for '%s'", resourceId);
         try {
           byteChannel.close();
         } catch (Exception e) {
           GoogleCloudStorageEventBus.postOnException();
-          logger.atFine().withCause(e).log(
+          logger.atInfo().withCause(e).log(
               "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
         } finally {
           byteChannel = null;
@@ -631,7 +631,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return;
       }
 
-      logger.atFiner().log(
+      logger.atInfo().log(
           "Performing lazySeek from %s to %s position '%s'",
           contentChannelCurrentPosition, currentPosition, resourceId);
 

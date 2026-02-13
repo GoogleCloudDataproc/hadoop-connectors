@@ -95,7 +95,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFiner().log("create(gcsPath: %s)", gcsPath);
+    logger.atInfo().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
@@ -128,7 +128,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFiner().log("create(fileInfo: %s)", fileInfo);
+    logger.atInfo().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
@@ -141,7 +141,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       FileInfo fileInfo,
       SeekableByteChannel channel,
       FileSystem.Statistics statistics) {
-    logger.atFiner().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
+    logger.atInfo().log("GoogleHadoopFSInputStream(gcsPath: %s)", gcsPath);
     this.gcsPath = gcsPath;
     this.channel = channel;
     this.fileInfo = fileInfo;
@@ -151,8 +151,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
 
-    this.streamStats =
-        new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
+    this.streamStats = new GhfsStreamStats(storageStatistics, STREAM_READ_OPERATIONS, gcsPath);
     this.seekStreamStats =
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
     this.vectoredReadStats =
@@ -178,24 +177,63 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
         () -> {
           if (channel instanceof ReadVectoredSeekableByteChannel) {
-            ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
+            storageStatistics.incrementCounter(
+                GhfsStatistic.STREAM_READ_VECTORED_READ_INCOMING_RANGES, ranges.size());
+            storageStatistics.incrementCounter(
+                GhfsStatistic.STREAM_READ_VECTORED_READ_COMBINED_RANGES, ranges.size());
+
+            ReadVectoredSeekableByteChannel readVectoredChannel =
                 (ReadVectoredSeekableByteChannel) channel;
-            ranges.forEach(
-                range -> {
-                  CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                  range.setData(result);
-                });
-            readVectoredSeekableByteChannelChannel.readVectored(
+
+            // Prepare Ranges with Duration Tracking
+            List<VectoredIORange> bidiRanges =
                 ranges.stream()
                     .map(
-                        range ->
-                            VectoredIORange.builder()
-                                .setLength(range.getLength())
-                                .setOffset(range.getOffset())
-                                .setData(range.getData())
-                                .build())
-                    .collect(Collectors.toList()),
-                allocate);
+                        range -> {
+                          long startTime = System.currentTimeMillis();
+                          CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+
+                          // Attach callback to record duration upon completion
+                          result.whenComplete(
+                              (buffer, exception) -> {
+                                long duration = System.currentTimeMillis() - startTime;
+                                storageStatistics.updateStats(
+                                    GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                                    duration,
+                                    gcsPath);
+                              });
+
+                          range.setData(result);
+
+                          return VectoredIORange.builder()
+                              .setLength(range.getLength())
+                              .setOffset(range.getOffset())
+                              .setData(result)
+                              .build();
+                        })
+                    .collect(Collectors.toList());
+
+            // Execute Native Read
+            readVectoredChannel.readVectored(bidiRanges, allocate);
+
+            // ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
+            //     (ReadVectoredSeekableByteChannel) channel;
+            // ranges.forEach(
+            //     range -> {
+            //       CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+            //       range.setData(result);
+            //     });
+            // readVectoredSeekableByteChannelChannel.readVectored(
+            //     ranges.stream()
+            //         .map(
+            //             range ->
+            //                 VectoredIORange.builder()
+            //                     .setLength(range.getLength())
+            //                     .setOffset(range.getOffset())
+            //                     .setData(range.getData())
+            //                     .build())
+            //         .collect(Collectors.toList()),
+            //     allocate);
           } else {
             long startTimeNs = System.nanoTime();
             vectoredIOSupplier
@@ -268,7 +306,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         () -> {
           long startTimeNs = System.nanoTime();
           checkNotClosed();
-          logger.atFiner().log("seek(%d)", pos);
+          logger.atInfo().log("seek(%d)", pos);
           long curPos = getPos();
           long diff = pos - curPos;
           if (diff > 0) {
@@ -303,10 +341,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           if (!closed) {
             closed = true;
             try {
-              logger.atFiner().log("close(): %s", gcsPath);
+              logger.atInfo().log("close(): %s", gcsPath);
               try {
                 if (channel != null) {
-                  logger.atFiner().log(
+                  logger.atInfo().log(
                       "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
                   channel.close();
                 }
@@ -356,7 +394,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   public synchronized long getPos() throws IOException {
     checkNotClosed();
     long pos = channel.position();
-    logger.atFiner().log("getPos(): %d", pos);
+    logger.atInfo().log("getPos(): %d", pos);
     return pos;
   }
 
@@ -367,7 +405,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   @Override
   public boolean seekToNewSource(long targetPos) {
-    logger.atFiner().log("seekToNewSource(%d): false", targetPos);
+    logger.atInfo().log("seekToNewSource(%d): false", targetPos);
     return false;
   }
 

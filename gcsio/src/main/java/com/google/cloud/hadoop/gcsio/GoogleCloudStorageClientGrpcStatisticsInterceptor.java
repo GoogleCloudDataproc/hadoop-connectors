@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.GrpcRequestCompletionEvent;
 import com.google.common.annotations.VisibleForTesting;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
@@ -28,6 +29,7 @@ import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
+import java.util.concurrent.TimeUnit;
 
 /** This is a gRPC interceptor to capture the statistics related to calls made to gcs backend. */
 @VisibleForTesting
@@ -39,6 +41,7 @@ public class GoogleCloudStorageClientGrpcStatisticsInterceptor implements Client
     return new SimpleForwardingClientCall<ReqT, RespT>(next.newCall(method, callOptions)) {
       @Override
       public void start(Listener<RespT> responseListener, Metadata headers) {
+        long startTimeNanos = System.nanoTime();
         try {
           GoogleCloudStorageEventBus.onGcsRequest(new GcsRequestExecutionEvent());
         } finally {
@@ -47,7 +50,11 @@ public class GoogleCloudStorageClientGrpcStatisticsInterceptor implements Client
                 @Override
                 public void onClose(Status status, Metadata trailers) {
                   try {
-                    GoogleCloudStorageEventBus.onGrpcStatus(status);
+                    long durationMillis =
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNanos);
+
+                    GoogleCloudStorageEventBus.onGrpcCompletion(
+                        new GrpcRequestCompletionEvent(status, durationMillis));
                   } finally {
                     super.onClose(status, trailers);
                   }
