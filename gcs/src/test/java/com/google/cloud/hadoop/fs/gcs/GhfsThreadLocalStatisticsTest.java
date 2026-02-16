@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.Map.entry;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import java.util.*;
@@ -39,7 +40,6 @@ public class GhfsThreadLocalStatisticsTest {
   private static final String HADOOP_API_COUNT = "hadoopApiCount";
   private static final String HADOOP_API_TIME = "hadoopApiTime";
   private static final String STREAM_READ_VECTORED_COUNT = "readVectoredCount";
-
   private static final String STREAM_READ_VECTORED_RANGE_COUNT = "readVectoredRangeCount";
 
   private static Map<GoogleCloudStorageStatistics, String> typeToNameMapping =
@@ -59,15 +59,15 @@ public class GhfsThreadLocalStatisticsTest {
   private Map<String, Long> getInitMetrics() {
     Map<String, Long> result =
         new HashMap<>(
-            Map.of(
-                BACKOFF_COUNT, 0L,
-                BACKOFF_TIME, 0L,
-                HADOOP_API_COUNT, 0L,
-                HADOOP_API_TIME, 0L,
-                GCS_API_COUNT, 0L,
-                GCS_API_TIME, 0L,
-                STREAM_READ_VECTORED_COUNT, 0L,
-                STREAM_READ_VECTORED_RANGE_COUNT, 0L));
+            Map.ofEntries(
+                entry(BACKOFF_COUNT, 0L),
+                entry(BACKOFF_TIME, 0L),
+                entry(HADOOP_API_COUNT, 0L),
+                entry(HADOOP_API_TIME, 0L),
+                entry(GCS_API_COUNT, 0L),
+                entry(GCS_API_TIME, 0L),
+                entry(STREAM_READ_VECTORED_COUNT, 0L),
+                entry(STREAM_READ_VECTORED_RANGE_COUNT, 0L)));
 
     return result;
   }
