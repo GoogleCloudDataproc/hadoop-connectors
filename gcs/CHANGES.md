@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.12 - 2026-02-19
 1. PR #1413 - [Bug] Fixing DeleteFolder stalling issue where high CPU usage can cause timeouts
 1. Add retry for ListObjects.
 
