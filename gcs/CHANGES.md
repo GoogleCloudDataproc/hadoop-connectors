@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add retry for ListObjects.
 
 ## 3.0.16 - 2025-12-10
 1. PR #1581 - [Bug] Add idempotency token header in JSON client for GCS
