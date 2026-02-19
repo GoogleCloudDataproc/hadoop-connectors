@@ -46,6 +46,8 @@ public class BidiBenchmark extends Configured implements Tool {
     boolean initFsPerIteration = conf.getBoolean("benchmark.fs.init.per.iteration", true);
     String label = conf.get("benchmark.label", "Unknown_Scenario");
     String csvPath = conf.get("benchmark.output.csv", "benchmark_results.csv");
+    // New config for raw data output
+    String rawCsvPath = conf.get("benchmark.output.raw.csv", "benchmark_raw.csv");
 
     Path path = new Path(fileUri);
 
@@ -53,6 +55,7 @@ public class BidiBenchmark extends Configured implements Tool {
     System.out.println("Scenario: " + label);
     System.out.println("Target: " + fileUri);
     System.out.println("Init FS per Iteration: " + initFsPerIteration);
+    System.out.println("Raw Data Output: " + rawCsvPath);
     System.out.println("==================================================");
 
     long fileSize;
@@ -69,71 +72,86 @@ public class BidiBenchmark extends Configured implements Tool {
       sharedFs = FileSystem.newInstance(path.toUri(), conf);
     }
 
-    try {
-      for (int i = 0; i < iterations; i++) {
-        List<FileRange> ranges = calculateRanges(fileSize);
-
-        FileSystem fs = null;
-        FSDataInputStream in = null;
-        double openDurationMs = 0;
-        double readDurationMs = 0;
-
-        try {
-          if (initFsPerIteration) {
-            fs = FileSystem.newInstance(path.toUri(), conf);
-          } else {
-            fs = sharedFs;
-          }
-
-          long openStart = System.nanoTime();
-          in = fs.open(path);
-          long openEnd = System.nanoTime();
-          openDurationMs = (openEnd - openStart) / 1_000_000.0;
-
-          long readStart = System.nanoTime();
-          in.readVectored(ranges, ByteBuffer::allocate);
-          for (FileRange range : ranges) {
-            range.getData().join();
-          }
-          long readEnd = System.nanoTime();
-          readDurationMs = (readEnd - readStart) / 1_000_000.0;
-
-        } catch (Exception e) {
-          System.err.printf("Iteration %d failed: %s%n", i, e.getMessage());
-          if (initFsPerIteration && fs != null)
-            try {
-              fs.close();
-            } catch (IOException ignored) {
-            }
-          continue;
-        } finally {
-          if (in != null)
-            try {
-              in.close();
-            } catch (IOException ignored) {
-            }
-          if (initFsPerIteration && fs != null)
-            try {
-              fs.close();
-            } catch (IOException ignored) {
-            }
-        }
-
-        double totalMs = openDurationMs + readDurationMs;
-        openLatencies.add(openDurationMs);
-        readLatencies.add(readDurationMs);
-        totalLatencies.add(totalMs);
-
-        if ((i + 1) % 100 == 0) {
-          System.out.printf("Progress: %d/%d%n", i + 1, iterations);
-        }
+    // Initialize Raw Data Writer
+    try (PrintWriter rawWriter = new PrintWriter(new FileWriter(rawCsvPath, true))) {
+      // Write Header if file is empty
+      if (new File(rawCsvPath).length() == 0) {
+        rawWriter.println("Timestamp,Iteration,Open_Ms,Read_Ms,Total_Ms");
       }
-    } finally {
-      if (sharedFs != null)
-        try {
-          sharedFs.close();
-        } catch (IOException ignored) {
+
+      try {
+        for (int i = 0; i < iterations; i++) {
+          List<FileRange> ranges = calculateRanges(fileSize);
+
+          FileSystem fs = null;
+          FSDataInputStream in = null;
+          double openDurationMs = 0;
+          double readDurationMs = 0;
+
+          try {
+            if (initFsPerIteration) {
+              fs = FileSystem.newInstance(path.toUri(), conf);
+            } else {
+              fs = sharedFs;
+            }
+
+            long openStart = System.nanoTime();
+            in = fs.open(path);
+            long openEnd = System.nanoTime();
+            openDurationMs = (openEnd - openStart) / 1_000_000.0;
+
+            long readStart = System.nanoTime();
+            in.readVectored(ranges, ByteBuffer::allocate);
+            for (FileRange range : ranges) {
+              range.getData().join();
+            }
+            long readEnd = System.nanoTime();
+            readDurationMs = (readEnd - readStart) / 1_000_000.0;
+
+          } catch (Exception e) {
+            System.err.printf("Iteration %d failed: %s%n", i, e.getMessage());
+            if (initFsPerIteration && fs != null)
+              try {
+                fs.close();
+              } catch (IOException ignored) {
+              }
+            continue;
+          } finally {
+            if (in != null)
+              try {
+                in.close();
+              } catch (IOException ignored) {
+              }
+            if (initFsPerIteration && fs != null)
+              try {
+                fs.close();
+              } catch (IOException ignored) {
+              }
+          }
+
+          double totalMs = openDurationMs + readDurationMs;
+          openLatencies.add(openDurationMs);
+          readLatencies.add(readDurationMs);
+          totalLatencies.add(totalMs);
+
+          // Dump Raw Data
+          rawWriter.printf(
+              "%s,%d,%.2f,%.2f,%.2f%n",
+              Instant.now().toString(), i, openDurationMs, readDurationMs, totalMs);
+          // Flush to ensure data is written immediately (useful if benchmark crashes)
+          rawWriter.flush();
+
+          if ((i + 1) % 100 == 0) {
+            System.out.printf("Progress: %d/%d%n", i + 1, iterations);
+          }
         }
+      } finally {
+        if (sharedFs != null)
+          try {
+            sharedFs.close();
+          } catch (IOException ignored) {
+          }
+      }
     }
 
     // Print to Console
@@ -142,7 +160,7 @@ public class BidiBenchmark extends Configured implements Tool {
     System.out.printf(
         "P50: %.2f | P99: %.2f | Max: %.2f%n", totalStats.p50, totalStats.p99, totalStats.max);
 
-    // Write to CSV
+    // Write to Summary CSV
     writeToCsv(
         csvPath,
         label,

@@ -26,25 +26,22 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 /**
- * A benchmark that performs parallel vectored reads using 16 concurrent threads on distinct files
- * (1.parquet to 16.parquet) using a SINGLE FileSystem object.
+ * A benchmark that performs parallel vectored reads using 16 concurrent threads. Dumps both summary
+ * statistics and raw per-iteration data.
  */
 public class BidiBenchmarkParallel extends Configured implements Tool {
 
-  private static final long ROW_GROUP_SIZE = 512L * 1024 * 1024; // 512 MB
+  private static final long ROW_GROUP_SIZE = 512L * 1024 * 1024;
   private static final int NUM_RANGES = 10;
   private static final int SMALL_READ_SIZE_MIN = 10 * 1024;
   private static final int SMALL_READ_SIZE_MAX = 90 * 1024;
   private static final int MEDIUM_READ_SIZE_MIN = 1 * 1024 * 1024;
   private static final int MEDIUM_READ_SIZE_MAX = 5 * 1024 * 1024;
-
-  // Number of concurrent files/threads to process
   private static final int PARALLEL_FILES = 16;
 
   private static final String DEFAULT_FILE_URI = "gs://hadoop-benchmark-regional/";
 
   public static void main(String[] args) throws Exception {
-    // Fix: Correctly invoking BidiBenchmarkParallel
     int exitCode = ToolRunner.run(new Configuration(), new BidiBenchmarkParallel(), args);
     System.exit(exitCode);
   }
@@ -55,11 +52,11 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
     String inputUri = (args.length > 0) ? args[0] : DEFAULT_FILE_URI;
 
     int iterations = conf.getInt("benchmark.iterations", 100);
-    boolean initFsPerIteration = conf.getBoolean("benchmark.fs.init.per.iteration", true);
+    boolean initFsPerIteration = conf.getBoolean("benchmark.fs.init.per.iteration", false);
     String label = conf.get("benchmark.label", "Parallel_Scenario");
-    String csvPath = conf.get("benchmark.output.csv", "benchmark_results.csv");
+    String summaryCsvPath = conf.get("benchmark.output.csv", "benchmark_summary.csv");
+    String rawCsvPath = conf.get("benchmark.output.raw.csv", "benchmark_raw.csv");
 
-    // Enforce the 128 thread limit for vectored reads
     conf.setInt("fs.gs.vectored.read.threads", 128);
 
     Path inputPath = new Path(inputUri);
@@ -67,11 +64,9 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
 
     System.out.println("==================================================");
     System.out.println("Scenario: " + label);
-    System.out.println("Base Directory: " + parentDir);
     System.out.println("Concurrency: " + PARALLEL_FILES + " threads");
     System.out.println("Init FS per Iteration: " + initFsPerIteration);
-    System.out.println("Vectored Read Threads: " + conf.get("fs.gs.vectored.read.threads"));
-    System.out.println("Iterations: " + iterations);
+    System.out.println("Raw Data Output: " + rawCsvPath);
     System.out.println("==================================================");
 
     long sampleFileSize;
@@ -94,7 +89,12 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
       sharedFs = FileSystem.newInstance(parentDir.toUri(), conf);
     }
 
-    try {
+    // Initialize Raw Data Writer
+    try (PrintWriter rawWriter = new PrintWriter(new FileWriter(rawCsvPath, true))) {
+      if (new File(rawCsvPath).length() == 0) {
+        rawWriter.println("Timestamp,Iteration,Thread_Idx,Open_Ms,Read_Ms,Total_Ms");
+      }
+
       for (int i = 0; i < iterations; i++) {
         FileSystem fs;
         if (initFsPerIteration) {
@@ -112,16 +112,34 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
 
         try {
           List<Future<SingleRunMetrics>> results = clientExecutor.invokeAll(tasks);
+
+          // Collect results and dump raw data
+          int threadIdx = 1;
           for (Future<SingleRunMetrics> future : results) {
             try {
               SingleRunMetrics metrics = future.get();
+
+              // Aggregates
               allOpenLatencies.add(metrics.openMs);
               allReadLatencies.add(metrics.readMs);
               allTotalLatencies.add(metrics.totalMs);
+
+              // Raw Dump
+              rawWriter.printf(
+                  "%s,%d,%d,%.2f,%.2f,%.2f%n",
+                  Instant.now().toString(),
+                  i,
+                  threadIdx++,
+                  metrics.openMs,
+                  metrics.readMs,
+                  metrics.totalMs);
+
             } catch (ExecutionException e) {
               System.err.println("Task failed: " + e.getCause().getMessage());
             }
           }
+          rawWriter.flush();
+
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           throw new IOException("Benchmark interrupted", e);
@@ -152,8 +170,8 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
         "\nSummary - P50: %.2f | P99: %.2f | Max: %.2f%n",
         totalStats.p50, totalStats.p99, totalStats.max);
 
-    writeToCsv(
-        csvPath,
+    writeSummaryCsv(
+        summaryCsvPath,
         label,
         initFsPerIteration,
         iterations,
@@ -224,7 +242,7 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
     return s;
   }
 
-  private void writeToCsv(
+  private void writeSummaryCsv(
       String path,
       String label,
       boolean initPerIter,
@@ -259,14 +277,13 @@ public class BidiBenchmarkParallel extends Configured implements Tool {
           total.p99,
           total.max);
 
-      System.out.println("Results appended to: " + path);
+      System.out.println("Summary appended to: " + path);
     } catch (IOException e) {
-      System.err.println("Failed to write to CSV: " + e.getMessage());
+      System.err.println("Failed to write to summary CSV: " + e.getMessage());
     }
   }
 
   private List<FileRange> calculateRanges(long fileSize) {
-    // Fix: Use ThreadLocalRandom for efficiency in multi-threaded environment
     ThreadLocalRandom random = ThreadLocalRandom.current();
     List<FileRange> ranges = new ArrayList<>();
     long maxStartIndex = Math.max(0, fileSize - ROW_GROUP_SIZE);
