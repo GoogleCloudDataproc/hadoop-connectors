@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade google-cloud-storage to 2.46.0
 
 ## 2.2.32 - 2026-02-12
 1. Add retry for ListObjects.
