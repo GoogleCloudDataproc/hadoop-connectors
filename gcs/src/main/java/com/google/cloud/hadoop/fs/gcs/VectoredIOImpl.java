@@ -104,10 +104,18 @@ public class VectoredIOImpl implements Closeable {
       FileInfo fileInfo,
       @Nonnull URI gcsPath,
       GhfsInputStreamStatistics streamStatistics,
-      final ConcurrentHashMap<String, Long> rangeReadThreadStats)
+      final ConcurrentHashMap<String, Long> rangeReadThreadStats,
+      GhfsGlobalStorageStatistics storageStatistics)
       throws IOException {
+
+    if (storageStatistics != null) {
+      storageStatistics.incrementCounter(
+          GhfsStatistic.STREAM_READ_VECTORED_READ_INCOMING_RANGES, ranges.size());
+    }
+
     VectoredReadChannel vectoredReadChannel =
-        new VectoredReadChannel(gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats);
+        new VectoredReadChannel(
+            gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats, storageStatistics);
     vectoredReadChannel.readVectored(ranges, allocate);
   }
 
@@ -117,16 +125,21 @@ public class VectoredIOImpl implements Closeable {
     private final ReadChannelProvider channelProvider;
     // aggregates the threadLocal stats for individual ranges.
     private final ConcurrentHashMap<String, Long> rangeStatsAccumulator;
+    private final GhfsGlobalStorageStatistics storageStatistics;
+    private final URI gcsPath;
 
     public VectoredReadChannel(
         GoogleCloudStorageFileSystem gcsFs,
         FileInfo fileInfo,
         URI gcsPath,
         GhfsInputStreamStatistics streamStatistics,
-        final ConcurrentHashMap<String, Long> rangeStatsAccumulator) {
+        final ConcurrentHashMap<String, Long> rangeStatsAccumulator,
+        GhfsGlobalStorageStatistics storageStatistics) {
       this.channelProvider = new ReadChannelProvider(gcsFs, fileInfo, gcsPath);
       this.streamStatistics = streamStatistics;
       this.rangeStatsAccumulator = rangeStatsAccumulator;
+      this.storageStatistics = storageStatistics; // <--- Store it
+      this.gcsPath = gcsPath; // <--- Store it
     }
 
     private void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
@@ -170,15 +183,35 @@ public class VectoredIOImpl implements Closeable {
                 logger.atFiner().log(
                     "Submitting combinedRange %s for execution.", combinedFileRange);
 
+                long startTime = System.currentTimeMillis();
+                try {
+                  // Existing reset logic from PR #1621
+                  resetThreadLocalStats();
+
+                  // Perform the actual read
+                  readCombinedRange(combinedFileRange, allocate, channelProvider);
+
+                } finally {
+                  // 4. Stop Timer & Record Duration
+                  long duration = System.currentTimeMillis() - startTime;
+
+                  if (storageStatistics != null) {
+                    storageStatistics.updateStats(
+                        GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION, duration, gcsPath);
+                  }
+
+                  // Existing cleanup logic from PR #1621
+                  captureAndResetThreadLocalStats();
+                }
                 // Reset thread stats as a new task is being submitted to this thread.
                 // all required stats must be collected before task is finished.
-                resetThreadLocalStats();
-                readCombinedRange(combinedFileRange, allocate, channelProvider);
-                long endTimer = System.currentTimeMillis();
-                storageStatistics.updateStats(
-                    GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                    endTimer - startTimer,
-                    channelProvider.gcsPath);
+                // resetThreadLocalStats();
+                // readCombinedRange(combinedFileRange, allocate, channelProvider);
+                // long endTimer = System.currentTimeMillis();
+                // storageStatistics.updateStats(
+                //     GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                //     endTimer - startTimer,
+                //     channelProvider.gcsPath);
               });
         }
       }

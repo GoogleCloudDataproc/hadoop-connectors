@@ -181,24 +181,60 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
         () -> {
           if (channel instanceof ReadVectoredSeekableByteChannel) {
-            ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
+            storageStatistics.incrementCounter(
+                GhfsStatistic.STREAM_READ_VECTORED_READ_INCOMING_RANGES, ranges.size());
+
+            ReadVectoredSeekableByteChannel readVectoredChannel =
                 (ReadVectoredSeekableByteChannel) channel;
-            ranges.forEach(
-                range -> {
-                  CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                  range.setData(result);
-                });
-            readVectoredSeekableByteChannelChannel.readVectored(
+
+            // 2. Wrap ranges to track duration
+            List<VectoredIORange> bidiRanges =
                 ranges.stream()
                     .map(
-                        range ->
-                            VectoredIORange.builder()
-                                .setLength(range.getLength())
-                                .setOffset(range.getOffset())
-                                .setData(range.getData())
-                                .build())
-                    .collect(Collectors.toList()),
-                allocate);
+                        range -> {
+                          long startTime = System.currentTimeMillis();
+                          CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+
+                          // Attach callback to record duration upon completion
+                          result.whenComplete(
+                              (buffer, exception) -> {
+                                long duration = System.currentTimeMillis() - startTime;
+                                // 3. Update Duration Metric
+                                storageStatistics.updateStats(
+                                    GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                                    duration,
+                                    gcsPath);
+                              });
+
+                          range.setData(result);
+
+                          return VectoredIORange.builder()
+                              .setLength(range.getLength())
+                              .setOffset(range.getOffset())
+                              .setData(result)
+                              .build();
+                        })
+                    .collect(Collectors.toList());
+
+            readVectoredChannel.readVectored(bidiRanges, allocate);
+            // ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
+            //     (ReadVectoredSeekableByteChannel) channel;
+            // ranges.forEach(
+            //     range -> {
+            //       CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+            //       range.setData(result);
+            //     });
+            // readVectoredSeekableByteChannelChannel.readVectored(
+            //     ranges.stream()
+            //         .map(
+            //             range ->
+            //                 VectoredIORange.builder()
+            //                     .setLength(range.getLength())
+            //                     .setOffset(range.getOffset())
+            //                     .setData(range.getData())
+            //                     .build())
+            //         .collect(Collectors.toList()),
+            //     allocate);
           } else {
             long startTimeNs = System.nanoTime();
             vectoredIOSupplier
@@ -210,7 +246,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                     fileInfo,
                     gcsPath,
                     streamStatistics,
-                    rangeReadThreadStats);
+                    rangeReadThreadStats,
+                    storageStatistics);
             statistics.incrementReadOps(1);
             vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
           }

@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.util.GcsJsonApiEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
+import com.google.cloud.hadoop.util.GrpcRequestCompletionEvent;
 import com.google.cloud.hadoop.util.IGcsJsonApiEvent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.eventbus.Subscribe;
@@ -140,6 +141,16 @@ public class GoogleCloudStorageEventSubscriber {
   @Subscribe
   private void subscriberOnException(IOException exception) {
     storageStatistics.incrementGcsExceptionCount();
+  }
+
+  @Subscribe
+  private void subscriberOnGrpcCompletion(GrpcRequestCompletionEvent event) {
+    // 1. Update Latency Metric
+    storageStatistics.incrementCounter(
+        GoogleCloudStorageStatistics.GCS_API_TIME, event.getDurationMillis());
+
+    // 2. Update Status Code Metrics (reuses existing logic if available, or just ignore)
+    updateGcsIOSpecificStatistics(grpcToHttpStatusCodeMapping(event.getStatus()));
   }
 
   @Subscribe

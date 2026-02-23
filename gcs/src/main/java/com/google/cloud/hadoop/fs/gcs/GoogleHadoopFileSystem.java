@@ -89,6 +89,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1849,6 +1850,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public void close() throws IOException {
     logger.atFiner().log("close()");
+
+    dumpStats();
+
     super.close();
 
     // NB: We must *first* have the superclass close() before we close the underlying gcsFsSupplier
@@ -1902,6 +1906,45 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     if (backgroundTasksThreadPool != null) {
       backgroundTasksThreadPool.shutdown();
       backgroundTasksThreadPool = null;
+    }
+  }
+
+  /** Helper to dump all GCS-specific metrics to the log. */
+  private void dumpStats() {
+    try {
+      StringBuilder sb = new StringBuilder();
+      sb.append("\n=== GCS Connector Metrics (Summary) ===\n");
+
+      // Fetch the global GCS statistics registry
+      StorageStatistics stats =
+          GlobalStorageStatistics.INSTANCE.get(GhfsGlobalStorageStatistics.NAME);
+
+      if (stats != null) {
+        Iterator<StorageStatistics.LongStatistic> it = stats.getLongStatistics();
+        boolean hasStats = false;
+        while (it.hasNext()) {
+          StorageStatistics.LongStatistic stat = it.next();
+          // Filter out zero-values to keep logs clean
+          if (stat.getValue() != 0) {
+            sb.append(String.format("%s = %d\n", stat.getName(), stat.getValue()));
+            hasStats = true;
+          }
+        }
+        if (!hasStats) {
+          sb.append("(No non-zero metrics recorded)\n");
+        }
+      } else {
+        sb.append("GhfsStorageStatistics not found in GlobalStorageStatistics registry.\n");
+      }
+      sb.append("=======================================\n");
+
+      // Log at INFO level so it appears in standard application logs
+      logger.atInfo().log("%s", sb.toString());
+      // Also print to Stderr to ensure it is seen in console output
+      System.err.println(sb.toString());
+
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log("Failed to dump GCS metrics during close.");
     }
   }
 
