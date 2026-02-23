@@ -50,6 +50,8 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
+  private String cachedFinalChecksum = null;
+
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
    *
@@ -128,8 +130,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   }
 
   private void verifyChecksums(String serverProvidedCrc32c) throws IOException {
-    String srcCrc =
-        BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
+    String srcCrc = getFinalChecksum();
     if (!srcCrc.equals(serverProvidedCrc32c)) {
       GoogleCloudStorageEventBus.postWriteChecksumFailure();
       throw new IOException(
@@ -141,6 +142,14 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
           "Data integrity check passed for resource '%s'. Client-calculated CRC32C (%s) matched the server-provided CRC32C (%s).",
           getResourceString(), srcCrc, serverProvidedCrc32c);
     }
+  }
+
+  private synchronized String getFinalChecksum() {
+    if (cachedFinalChecksum == null) {
+      cachedFinalChecksum =
+          BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
+    }
+    return cachedFinalChecksum;
   }
 
   /**
@@ -194,7 +203,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
-        ChecksumContext.CURRENT_HASHER.set(cumulativeCrc32cHasher);
+        ChecksumContext.setChecksumSupplier(GoogleCloudStorageWriteChannel.this::getFinalChecksum);
         return uploadObject.execute();
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();
@@ -207,7 +216,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
             resourceId, response);
         return response;
       } finally {
-        ChecksumContext.CURRENT_HASHER.remove();
+        ChecksumContext.clear();
       }
     }
   }

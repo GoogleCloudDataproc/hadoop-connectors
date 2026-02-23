@@ -42,6 +42,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryNotEmptyException;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Random;
 import java.util.concurrent.Executors;
@@ -433,7 +434,7 @@ public class GoogleHadoopFSIntegrationTest {
     assertThat(e.getCause().getMessage()).contains("CRC32C");
 
     try {
-      ghfs.getGcsFs().getGcs().deleteObjects(java.util.Collections.singletonList(resourceId));
+      ghfs.getGcsFs().getGcs().deleteObjects(Collections.singletonList(resourceId));
     } catch (Exception ignored) {
     }
   }

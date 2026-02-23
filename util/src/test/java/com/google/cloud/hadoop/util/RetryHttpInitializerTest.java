@@ -297,9 +297,10 @@ public class RetryHttpInitializerTest {
     byte[] testData = {1, 2, 3, 4};
     Hasher hasher = Hashing.crc32c().newHasher();
     hasher.putBytes(testData);
-    ChecksumContext.CURRENT_HASHER.set(hasher);
 
     String expectedChecksum = BaseEncoding.base64().encode(Ints.toByteArray(hasher.hash().asInt()));
+
+    ChecksumContext.setChecksumSupplier(() -> expectedChecksum);
 
     try {
       HttpRequest req = requestFactory.buildPutRequest(new GenericUrl(URL), null);
@@ -314,7 +315,7 @@ public class RetryHttpInitializerTest {
       assertThat(req.getHeaders().getFirstHeaderStringValue("x-goog-hash"))
           .isEqualTo("crc32c=" + expectedChecksum);
     } finally {
-      ChecksumContext.CURRENT_HASHER.remove();
+      ChecksumContext.clear();
     }
   }
 

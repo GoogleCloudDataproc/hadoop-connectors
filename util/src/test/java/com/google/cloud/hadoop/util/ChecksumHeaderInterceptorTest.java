@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +25,6 @@ import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.Hashing;
-import com.google.common.io.BaseEncoding;
-import com.google.common.primitives.Ints;
 import java.io.IOException;
 import org.junit.After;
 import org.junit.Before;
@@ -58,7 +54,7 @@ public class ChecksumHeaderInterceptorTest {
 
   @After
   public void tearDown() {
-    ChecksumContext.CURRENT_HASHER.remove();
+    ChecksumContext.clear();
   }
 
   @Test
@@ -68,18 +64,18 @@ public class ChecksumHeaderInterceptorTest {
   }
 
   @Test
-  public void intercept_noHasher_skipsHeader() throws IOException {
+  public void intercept_noSupplier_skipsHeader() throws IOException {
     headers.setContentRange("bytes 0-100/101");
 
     interceptor.intercept(request);
 
-    // header not set since no Hasher was set
+    // header not set since no Supplier was set in context
     assertThat(headers.get("x-goog-hash")).isNull();
   }
 
   @Test
   public void intercept_notPutMethod_skipsHeader() throws IOException {
-    setupHasher(new byte[] {1});
+    setupChecksumSupplier("fakeChecksum==");
     request.setRequestMethod("POST");
     headers.setContentRange("bytes 0-100/101");
 
@@ -90,7 +86,7 @@ public class ChecksumHeaderInterceptorTest {
 
   @Test
   public void intercept_intermediateChunk_skipsHeader() throws IOException {
-    setupHasher(new byte[] {1});
+    setupChecksumSupplier("fakeChecksum==");
     headers.setContentRange("bytes 0-100/*");
 
     interceptor.intercept(request);
@@ -100,9 +96,8 @@ public class ChecksumHeaderInterceptorTest {
 
   @Test
   public void intercept_finalChunk_addsHeader() throws IOException {
-    byte[] data = {1, 2, 3, 4};
-    Hasher hasher = setupHasher(data);
-    String expectedChecksum = BaseEncoding.base64().encode(Ints.toByteArray(hasher.hash().asInt()));
+    String expectedChecksum = "AAAAAA==";
+    setupChecksumSupplier(expectedChecksum);
     headers.setContentRange("bytes 0-3/4");
 
     interceptor.intercept(request);
@@ -111,12 +106,23 @@ public class ChecksumHeaderInterceptorTest {
         .isEqualTo("crc32c=" + expectedChecksum);
   }
 
-  private Hasher setupHasher(byte[] data) {
-    Hasher hasher = Hashing.crc32c().newHasher();
-    if (data != null) {
-      hasher.putBytes(data);
-    }
-    ChecksumContext.CURRENT_HASHER.set(hasher);
-    return hasher;
+  @Test
+  public void intercept_multipleCalls_simulatesRetry() throws IOException {
+    String expectedChecksum = "AAAAAA==";
+    setupChecksumSupplier(expectedChecksum);
+    headers.setContentRange("bytes 0-3/4");
+
+    // Simulate a network retry by calling the interceptor twice
+    interceptor.intercept(request);
+    interceptor.intercept(request);
+
+    // It should safely pull from the supplier both times without crashing
+    assertThat(headers.getFirstHeaderStringValue("x-goog-hash"))
+        .isEqualTo("crc32c=" + expectedChecksum);
+  }
+
+  /** Helper method to set a dummy supplier in the context. */
+  private void setupChecksumSupplier(String expectedChecksum) {
+    ChecksumContext.setChecksumSupplier(() -> expectedChecksum);
   }
 }
