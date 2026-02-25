@@ -52,8 +52,7 @@ public class ChecksumHeaderInterceptor implements HttpExecuteInterceptor {
         String contentRange = request.getHeaders().getContentRange();
 
         logger.atFiner().log(
-            "Analyzing PUT request for trailing checksum. Content-Range: %s",
-            contentRange);
+            "Analyzing PUT request for trailing checksum. Content-Range: %s", contentRange);
 
         // Detect if this is the FINAL chunk
         // Intermediate chunks end with "/*" (e.g., "bytes 0-100/*")
@@ -70,8 +69,7 @@ public class ChecksumHeaderInterceptor implements HttpExecuteInterceptor {
           request.getHeaders().set(CHECKSUM_HEADER, "crc32c=" + finalChecksum);
 
           logger.atFiner().log(
-              "Set trailing checksum header '%s' to 'crc32c=%s'",
-              CHECKSUM_HEADER, finalChecksum);
+              "Set trailing checksum header '%s' to 'crc32c=%s'", CHECKSUM_HEADER, finalChecksum);
         }
       }
     }
