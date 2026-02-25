@@ -20,17 +20,17 @@ import java.util.function.Supplier;
 
 public class ChecksumContext {
   // Stores a Supplier that provides the final checksum string for the current upload thread
-  private static final ThreadLocal<Supplier<String>> CHECKSUM_SUPPLIER = new ThreadLocal<>();
+  private static final ThreadLocal<Supplier<String>> checksumSupplier = new ThreadLocal<>();
 
   public static void setChecksumSupplier(Supplier<String> supplier) {
-    CHECKSUM_SUPPLIER.set(supplier);
+    checksumSupplier.set(supplier);
   }
 
   public static Supplier<String> getChecksumSupplier() {
-    return CHECKSUM_SUPPLIER.get();
+    return checksumSupplier.get();
   }
 
   public static void clear() {
-    CHECKSUM_SUPPLIER.remove();
+    checksumSupplier.remove();
   }
 }
