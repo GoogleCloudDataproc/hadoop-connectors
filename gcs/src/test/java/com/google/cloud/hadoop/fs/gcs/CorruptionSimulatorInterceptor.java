@@ -46,24 +46,19 @@ public class CorruptionSimulatorInterceptor implements HttpExecuteInterceptor {
   }
 
   private void corruptChecksum(HttpRequest request) {
-    // Only corrupt if the header exists
-    if (request.getHeaders().containsKey("x-goog-hash")) {
-      // Overwrite valid checksum with a bad one
-      request.getHeaders().set("x-goog-hash", "crc32c=AAAAAA==");
-    }
+    // Overwrite valid checksum with a bad one
+    request.getHeaders().set("x-goog-hash", "crc32c=AAAAAA==");
   }
 
   private void corruptData(HttpRequest request) {
-    String method = request.getRequestMethod();
     boolean hasHeader = request.getHeaders().containsKey("x-goog-hash");
-
-    // Only corrupt PUT requests that have a checksum header (final chunks/objects)
-    if (hasHeader && "PUT".equals(method)) {
-      HttpContent originalContent = request.getContent();
-      if (originalContent != null) {
-        request.setContent(new CorruptedHttpContent(originalContent));
-      }
+    if (!hasHeader || !request.getRequestMethod().equals("PUT")) {
+      return;
     }
+
+    // // Only corrupt PUT requests that have a checksum header (final chunks/objects)
+    HttpContent originalContent = request.getContent();
+    request.setContent(new CorruptedHttpContent(originalContent));
   }
 
   /** Wrapper for HttpContent that corrupts the first byte of the stream. */
@@ -116,16 +111,16 @@ public class CorruptionSimulatorInterceptor implements HttpExecuteInterceptor {
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
-      if (!corrupted && len > 0) {
-        byte[] corruptedCopy = new byte[len];
-        System.arraycopy(b, off, corruptedCopy, 0, len);
-        // Flip first byte
-        corruptedCopy[0] = (byte) (corruptedCopy[0] ^ 1);
-        corrupted = true;
-        out.write(corruptedCopy, 0, len);
-      } else {
+      if (corrupted || len <= 0) {
         out.write(b, off, len);
+        return;
       }
+      byte[] corruptedCopy = new byte[len];
+      System.arraycopy(b, off, corruptedCopy, 0, len);
+      // Flip first byte
+      corruptedCopy[0] = (byte) (corruptedCopy[0] ^ 1);
+      corrupted = true;
+      out.write(corruptedCopy, 0, len);
     }
   }
 }

@@ -268,17 +268,16 @@ public class GoogleHadoopFSIntegrationTest {
     ghfs.initialize(initUri, config);
 
     Path testPath = new Path(initUri.resolve("/testWriteWithTrailingChecksum_Enabled.bin"));
-
     int fileSize = (int) (2.5 * 1024 * 1024);
     byte[] expectedData = new byte[fileSize];
     new Random().nextBytes(expectedData);
+
     // write data
     try (FSDataOutputStream out = ghfs.create(testPath)) {
       out.write(expectedData);
     }
 
     byte[] actualData = new byte[fileSize];
-    // read the data
     try (FSDataInputStream in = ghfs.open(testPath)) {
       in.readFully(actualData);
     }
@@ -382,7 +381,6 @@ public class GoogleHadoopFSIntegrationTest {
     String bucket = initUri.getAuthority();
     String objectName = "testWithCorruption_" + System.currentTimeMillis() + ".bin";
     StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
-
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
 
     HttpRequestInitializer sabotageInitializer =
@@ -394,9 +392,7 @@ public class GoogleHadoopFSIntegrationTest {
                       .build())
               .initialize(request);
 
-          // Inject Sabotage Interceptor
           final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
-          // Inject Sabotage Interceptor
           request.setInterceptor(
               new CorruptionSimulatorInterceptor(existingInterceptor, CorruptionType.CHECKSUM));
         };
@@ -423,7 +419,6 @@ public class GoogleHadoopFSIntegrationTest {
             ObjectWriteConditions.NONE);
 
     channel.initialize();
-
     byte[] data = new byte[2 * 1024 * 1024];
     new Random().nextBytes(data);
     channel.write(ByteBuffer.wrap(data));
@@ -448,7 +443,6 @@ public class GoogleHadoopFSIntegrationTest {
     String bucket = initUri.getAuthority();
     String objectName = "corruption_test_" + System.currentTimeMillis() + ".bin";
     StorageResourceId resourceId = new StorageResourceId(bucket, objectName);
-
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
 
     HttpRequestInitializer sabotageInitializer =
@@ -461,7 +455,6 @@ public class GoogleHadoopFSIntegrationTest {
               .initialize(request);
 
           final HttpExecuteInterceptor existingInterceptor = request.getInterceptor();
-          // Inject Sabotage Interceptor
           request.setInterceptor(
               new CorruptionSimulatorInterceptor(existingInterceptor, CorruptionType.DATA));
         };
@@ -488,12 +481,12 @@ public class GoogleHadoopFSIntegrationTest {
             ObjectWriteConditions.NONE);
 
     channel.initialize();
-
     byte[] data = new byte[2 * 1024 * 1024];
     new Random().nextBytes(data);
     channel.write(ByteBuffer.wrap(data));
 
     IOException e = assertThrows(IOException.class, () -> channel.close());
+
     assertThat(e.getCause().getMessage()).contains("400");
     assertThat(e.getCause().getMessage()).contains("CRC32C");
 

@@ -45,33 +45,37 @@ public class ChecksumHeaderInterceptor implements HttpExecuteInterceptor {
       chainedInterceptor.intercept(request);
     }
 
-    if (HttpMethods.PUT.equals(request.getRequestMethod())) {
-      Supplier<String> checksumSupplier = ChecksumContext.getChecksumSupplier();
-
-      if (checksumSupplier != null) {
-        String contentRange = request.getHeaders().getContentRange();
-
-        logger.atFiner().log(
-            "Analyzing PUT request for trailing checksum. Content-Range: %s", contentRange);
-
-        // Detect if this is the FINAL chunk
-        // Intermediate chunks end with "/*" (e.g., "bytes 0-100/*")
-        // The final chunk includes the total size (e.g., "bytes 100-200/201")
-        if (contentRange != null && !contentRange.endsWith("/*")) {
-          logger.atFiner().log("Detected final upload chunk. Calculating checksum...");
-
-          // Finalize the checksum and encode it
-          // Since the WriteChannel is closed by now, the hasher contains the full object checksum
-          String finalChecksum = checksumSupplier.get();
-
-          // Set the trailing checksum header
-          // GCS will validate this checksum against the data received before finalizing the object
-          request.getHeaders().set(CHECKSUM_HEADER, "crc32c=" + finalChecksum);
-
-          logger.atFiner().log(
-              "Set trailing checksum header '%s' to 'crc32c=%s'", CHECKSUM_HEADER, finalChecksum);
-        }
-      }
+    if (!HttpMethods.PUT.equals(request.getRequestMethod())) {
+      return;
     }
+
+    Supplier<String> checksumSupplier = ChecksumContext.getChecksumSupplier();
+    if (checksumSupplier == null) {
+      return;
+    }
+
+    String contentRange = request.getHeaders().getContentRange();
+
+    logger.atFiner().log(
+        "Analyzing PUT request for trailing checksum. Content-Range: %s", contentRange);
+
+    // Detect if this is the FINAL chunk
+    // Intermediate chunks end with "/*", final chunks include the total size.
+    if (contentRange == null || contentRange.endsWith("/*")) {
+      return;
+    }
+
+    logger.atFiner().log("Detected final upload chunk. Calculating checksum...");
+
+    // Finalize the checksum and encode it
+    // Since the WriteChannel is closed by now, the hasher contains the full object checksum
+    String finalChecksum = checksumSupplier.get();
+
+    // Set the trailing checksum header
+    // GCS will validate this checksum against the data received before finalizing the object
+    request.getHeaders().set(CHECKSUM_HEADER, "crc32c=" + finalChecksum);
+
+    logger.atFiner().log(
+        "Set trailing checksum header '%s' to 'crc32c=%s'", CHECKSUM_HEADER, finalChecksum);
   }
 }
