@@ -42,7 +42,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
         .setStatusParallelEnabled(true)
-        .setCloudLoggingEnabled(false);
+        .setCloudLoggingEnabled(false)
+        .setAnalyticsCoreEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -65,6 +66,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract boolean isCloudLoggingEnabled();
 
   public abstract boolean isEnsureNoConflictingItems();
+
+  public abstract boolean isAnalyticsCoreEnabled();
 
   public void throwIfNotValid() {
     getCloudStorageOptions().throwIfNotValid();
@@ -101,6 +104,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setCloudLoggingEnabled(boolean cloudLoggingEnabled);
 
     public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
+
+    public abstract Builder setAnalyticsCoreEnabled(boolean analyticsCoreEnabled);
 
     public abstract GoogleCloudStorageFileSystemOptions build();
   }

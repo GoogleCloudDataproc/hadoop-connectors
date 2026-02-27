@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPLICATION_NAME_SUFFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -38,6 +39,9 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
@@ -47,6 +51,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -246,6 +251,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return this.traceFactory;
   }
 
+  // Underlying GCS FS to use for Analytics Core optimized path.
+  private GcsFileSystem analyticsGcsFs;
+
   /**
    * Constructs an instance of GoogleHadoopFileSystem; the internal GoogleCloudStorageFileSystem
    * will be set up with config settings when initialize() is called.
@@ -400,6 +408,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       } else {
         initializeGcsFs(createGcsFs(config));
       }
+      if (isAnalyticsCoreEnabled()) {
+        logger.atInfo().log("Initializing GcsFileSystem for Analytics Core...");
+        analyticsGcsFs = createAnalyticsGcsFs(config);
+      }
     }
   }
 
@@ -444,6 +456,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @VisibleForTesting
   LoggingInterceptor createLoggingInterceptor(GoogleCredentials credentials, String suffix) {
     return new LoggingInterceptor(credentials, suffix);
+  }
+
+  private GcsFileSystem createAnalyticsGcsFs(Configuration config) throws IOException {
+    Map<String, String> properties = config.getValByRegex("^" + GCS_CONFIG_PREFIX + "\\.");
+    GoogleCloudStorageOptions.Builder gcsOptionsBuilder =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
+    properties.put(GCS_CONFIG_PREFIX + ".user-agent", gcsOptionsBuilder.build().getAppName());
+    GcsFileSystemOptions options =
+        GcsFileSystemOptions.createFromOptions(properties, GCS_CONFIG_PREFIX + ".");
+    return new GcsFileSystemImpl(getCredentials(config), options);
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
@@ -1778,6 +1800,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return vectoredIOSupplier;
   }
 
+  /** Gets GCS FS instance for Analytics Core. */
+  public GcsFileSystem getAnalyticsGcsFs() {
+    return analyticsGcsFs;
+  }
+
+  public boolean isAnalyticsCoreEnabled() {
+    return GCS_ANALYTICS_CORE_ENABLE.get(getConf(), getConf()::getBoolean);
+  }
+
   /**
    * Loads an {@link AccessTokenProvider} implementation retrieved from the provided {@code
    * AbstractDelegationTokenBinding} if configured, otherwise it's null.
@@ -1859,6 +1890,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         getGcsFs().close();
       }
       gcsFsSupplier = null;
+    }
+
+    if (analyticsGcsFs != null) {
+      analyticsGcsFs.close();
+      analyticsGcsFs = null;
     }
 
     if (delegationTokens != null) {

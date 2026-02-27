@@ -132,6 +132,11 @@ public class FileInfo {
     return verificationAttributes == null ? null : verificationAttributes.getMd5hash();
   }
 
+  /** Returns the generation ID of the file. */
+  public long getGenerationId() {
+    return itemInfo.getResourceId().getGenerationId();
+  }
+
   /** Gets information about the underlying item. */
   GoogleCloudStorageItemInfo getItemInfo() {
     return itemInfo;

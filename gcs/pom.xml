@@ -140,6 +140,16 @@
       <artifactId>hadoop-client-runtime</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.google.cloud.gcs.analytics</groupId>
+      <artifactId>client</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.gcs.analytics</groupId>
+      <artifactId>gcs-analytics-core</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+    <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
     </dependency>
@@ -214,6 +224,7 @@
                   <include>com.google.auth</include>
                   <include>com.google.cloud</include>
                   <include>com.google.cloud.bigdataoss</include>
+                  <include>com.google.cloud.gcs.analytics</include>
                   <include>com.google.cloud.grpc</include>
                   <include>com.google.cloud.http</include>
                   <include>com.google.cloud.opentelemetry</include>
@@ -246,6 +257,7 @@
                     <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>
                     <include>com.google.cloud.*</include>
+                    <include>com.google.cloud.gcs.analyticscore.**</include>
                     <include>com.google.cloud.audit.**</include>
                     <include>com.google.cloud.grpc.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>

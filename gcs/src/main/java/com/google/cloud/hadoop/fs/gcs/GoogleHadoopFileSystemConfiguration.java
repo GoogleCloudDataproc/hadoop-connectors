@@ -604,6 +604,10 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.bidi.enable", GoogleCloudStorageOptions.DEFAULT.isBidiEnabled());
 
+  /** Flag to enable the GCS Analytics Core library. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
+
   /**
    * Number of threads used by ThreadPoolExecutor in bidi channel. This executor is used to read
    * individual range and populate the buffer.
@@ -636,7 +640,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean));
+        .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean))
+        .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean));
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {

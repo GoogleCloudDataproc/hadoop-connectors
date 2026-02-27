@@ -139,6 +139,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.client.timeout", 30);
           put("fs.gs.bidi.finalize.on.close", false);
           put("fs.gs.storage.client.cache.enable", false);
+          put("fs.gs.analytics.core.enable", false);
         }
       };
 
@@ -482,5 +483,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+  }
+
+  @Test
+  public void analyticsCoreProperties() {
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.isAnalyticsCoreEnabled()).isTrue();
   }
 }
