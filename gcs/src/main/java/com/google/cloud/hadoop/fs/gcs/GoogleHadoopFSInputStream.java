@@ -24,7 +24,9 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsItemInfo;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -112,14 +114,26 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         itemIdBuilder.setContentGeneration(resourceId.getGenerationId());
       }
       GcsItemId itemId = itemIdBuilder.build();
-      // Use GoogleCloudStorageInputStream from analytics-core library
-      // GoogleCloudStorageInputStream.create(fileSystem, itemId)
-      GoogleCloudStorageInputStream inputStream =
-          GoogleCloudStorageInputStream.create(ghfs.getAnalyticsGcsFs(), itemId);
-
       if (fileInfo == null) {
         fileInfo = ghfs.getGcsFs().getFileInfo(gcsPath);
       }
+      GcsItemInfo gcsItemInfo =
+          GcsItemInfo.builder()
+              .setItemId(itemId)
+              .setSize(fileInfo.getSize())
+              .setContentGeneration(fileInfo.getGenerationId())
+              .build();
+      GcsFileInfo gcsFileInfo =
+          GcsFileInfo.builder()
+              .setItemInfo(gcsItemInfo)
+              .setUri(gcsPath)
+              .setAttributes(fileInfo.getAttributes())
+              .build();
+      // Use GoogleCloudStorageInputStream from analytics-core library
+      // GoogleCloudStorageInputStream.create(fileSystem, gcsFileInfo)
+      GoogleCloudStorageInputStream inputStream =
+          GoogleCloudStorageInputStream.create(ghfs.getAnalyticsGcsFs(), gcsFileInfo);
+
       channel = new AnalyticsCoreChannelAdapter(inputStream, fileInfo.getSize());
     } else if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate
@@ -164,8 +178,21 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       }
       GcsItemId itemId = itemIdBuilder.build();
       // Use GoogleCloudStorageInputStream from analytics-core library
+      GcsItemInfo gcsItemInfo =
+          GcsItemInfo.builder()
+              .setItemId(itemId)
+              .setSize(fileInfo.getSize())
+              .setContentGeneration(fileInfo.getGenerationId())
+              .build();
+      GcsFileInfo gcsFileInfo =
+          GcsFileInfo.builder()
+              .setItemInfo(gcsItemInfo)
+              .setUri(fileInfo.getPath())
+              .setAttributes(fileInfo.getAttributes())
+              .build();
+
       GoogleCloudStorageInputStream inputStream =
-          GoogleCloudStorageInputStream.create(ghfs.getAnalyticsGcsFs(), itemId);
+          GoogleCloudStorageInputStream.create(ghfs.getAnalyticsGcsFs(), gcsFileInfo);
 
       channel = new AnalyticsCoreChannelAdapter(inputStream, fileInfo.getSize());
     } else {
