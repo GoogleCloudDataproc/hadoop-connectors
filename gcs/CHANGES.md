@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. PR #1647 - [Bug] fix thread local metrics
 
 ## 3.1.12 - 2026-02-19
 1. PR #1413 - [Bug] Fixing DeleteFolder stalling issue where high CPU usage can cause timeouts
