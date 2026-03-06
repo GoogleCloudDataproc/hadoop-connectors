@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Implement trailing checksums to enable server-side data validation.
 
 ## 4.0.2 - 2026-02-09
 1. Track Client Feature Usage using Custom Header
