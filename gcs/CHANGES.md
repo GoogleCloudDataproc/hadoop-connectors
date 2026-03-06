@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Implement trailing checksums to enable server-side data validation.
 
 ## 3.0.17 - 2026-02-19
 1. Add retry for ListObjects.
