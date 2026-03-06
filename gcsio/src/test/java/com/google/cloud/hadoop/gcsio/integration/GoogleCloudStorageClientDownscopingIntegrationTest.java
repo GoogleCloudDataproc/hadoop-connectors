@@ -170,17 +170,17 @@ public class GoogleCloudStorageClientDownscopingIntegrationTest {
     assertThat(headers).isNotNull();
 
     Iterable<String> authHeaders = headers.getAll(AUTH_KEY);
+    assertThat(authHeaders).isNotNull();
+
     AtomicInteger headerCount = new AtomicInteger(0);
     AtomicReference<String> capturedAuth = new AtomicReference<>();
 
-    if (authHeaders != null) {
-      authHeaders.forEach(
-          header -> {
-            System.err.println("DEBUG: Found Auth Header: " + header);
-            capturedAuth.set(header);
-            headerCount.incrementAndGet();
-          });
-    }
+    authHeaders.forEach(
+        header -> {
+          logger.atInfo().log("DEBUG: Found Auth Header: %s", header);
+          capturedAuth.set(header);
+          headerCount.incrementAndGet();
+        });
 
     // Expect exactly one header
     assertThat(headerCount.get()).isEqualTo(1);
