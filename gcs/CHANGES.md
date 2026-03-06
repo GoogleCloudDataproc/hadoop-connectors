@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.13 - 2026-03-06
 1. PR #1647 - [Bug] fix thread local metrics
 
 ## 3.1.12 - 2026-02-19
