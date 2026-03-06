@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Implement trailing checksums to enable server-side data validation.
 
 ## 3.1.13 - 2026-03-06
 1. PR #1647 - [Bug] fix thread local metrics
