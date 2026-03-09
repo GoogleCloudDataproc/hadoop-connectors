@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.1.14 - 2026-03-09
 1. Implement trailing checksums to enable server-side data validation.
 
