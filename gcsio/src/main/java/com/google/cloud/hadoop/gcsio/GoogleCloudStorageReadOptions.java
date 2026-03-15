@@ -60,7 +60,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setFadviseRequestTrackCount(3)
         .setReadExactRequestedBytesEnabled(false)
         .setBidiThreadCount(16)
-        .setBidiClientTimeout(30);
+        .setBidiClientTimeout(30)
+        .setMinReadPerThread(3);
   }
 
   public abstract Builder toBuilder();
@@ -119,6 +120,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setBidiClientTimeout(int)}. */
   public abstract int getBidiClientTimeout();
+
+  /** See {@link Builder#setMinReadPerThread(int)}. */
+  public abstract int getMinReadPerThread();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -233,6 +237,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the total amount of time, we would wait for bidi client initialization. */
     public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
+
+    /** Sets the minimum number of reads per thread. */
+    public abstract Builder setMinReadPerThread(int minReadPerThread);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
