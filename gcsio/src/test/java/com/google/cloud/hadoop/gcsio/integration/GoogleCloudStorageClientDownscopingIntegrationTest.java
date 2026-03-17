@@ -48,7 +48,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 /**
- * Integration test for {@link GoogleCloudStorageClientGrpcDownscopingInterceptor} ensuring that
+ * Integration test for {@code GoogleCloudStorageClientGrpcDownscopingInterceptor} ensuring that
  * chained interceptors do not duplicate Authorization headers.
  */
 @RunWith(JUnit4.class)
@@ -63,6 +63,17 @@ public class GoogleCloudStorageClientDownscopingIntegrationTest {
 
   @Test
   public void testChainedInterceptorsDoNotDuplicateHeaders() throws Exception {
+    verifyInterceptorsDoNotDuplicateHeaders(NoCredentials.getInstance(), "test-object");
+  }
+
+  @Test
+  public void testChainedInterceptorsDoNotDuplicateHeaders_withCredentials() throws Exception {
+    verifyInterceptorsDoNotDuplicateHeaders(
+        GoogleCloudStorageTestHelper.getCredentials(), "test-object-with-creds");
+  }
+
+  private void verifyInterceptorsDoNotDuplicateHeaders(
+      com.google.auth.Credentials credentials, String objectName) throws Exception {
     // Arrange
     GoogleCloudStorageOptions options =
         getStandardOptionBuilder().setGrpcEnabled(true).setGrpcWriteEnabled(true).build();
@@ -92,13 +103,13 @@ public class GoogleCloudStorageClientDownscopingIntegrationTest {
     GoogleCloudStorage gcs =
         GoogleCloudStorageClientImpl.builder()
             .setOptions(options)
-            .setCredentials(NoCredentials.getInstance())
+            .setCredentials(credentials)
             .setGRPCInterceptors(interceptors)
             .build();
 
     // Act
     try {
-      StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, "test-object");
+      StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, objectName);
       try (WritableByteChannel channel = gcs.create(resourceId)) {
         channel.write(ByteBuffer.wrap("test data".getBytes()));
       }
@@ -130,70 +141,12 @@ public class GoogleCloudStorageClientDownscopingIntegrationTest {
     assertThat(capturedAuth.get()).contains(token2);
   }
 
-  @Test
-  public void testChainedInterceptorsDoNotDuplicateHeaders_withCredentials() throws Exception {
-    // Arrange
-    GoogleCloudStorageOptions options =
-        getStandardOptionBuilder().setGrpcEnabled(true).setGrpcWriteEnabled(true).build();
-
-    String token1 = "token-from-interceptor-1";
-    String token2 = "token-from-interceptor-2";
-
-    ClientInterceptor interceptor1 = createInterceptor(boundaries -> token1);
-    ClientInterceptor interceptor2 = createInterceptor(boundaries -> token2);
-
-    HeaderCapturingInterceptor capturingInterceptor = new HeaderCapturingInterceptor();
-
-    // Chain them
-    ImmutableList<ClientInterceptor> interceptors =
-        ImmutableList.of(interceptor1, interceptor2, capturingInterceptor);
-
-    GoogleCloudStorage gcs =
-        GoogleCloudStorageClientImpl.builder()
-            .setOptions(options)
-            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
-            .setGRPCInterceptors(interceptors)
-            .build();
-
-    // Act
-    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, "test-object-with-creds");
-    try {
-      try (WritableByteChannel channel = gcs.create(resourceId)) {
-        channel.write(ByteBuffer.wrap("test data".getBytes()));
-      }
-    } catch (IOException | RuntimeException e) {
-      logger.atInfo().withCause(e).log("Operation failed with exception");
-    }
-
-    // Assert
-    Metadata headers = capturingInterceptor.capturedHeaders.get();
-    assertThat(headers).isNotNull();
-
-    Iterable<String> authHeaders = headers.getAll(AUTH_KEY);
-    assertThat(authHeaders).isNotNull();
-
-    AtomicInteger headerCount = new AtomicInteger(0);
-    AtomicReference<String> capturedAuth = new AtomicReference<>();
-
-    authHeaders.forEach(
-        header -> {
-          logger.atInfo().log("DEBUG: Found Auth Header: %s", header);
-          capturedAuth.set(header);
-          headerCount.incrementAndGet();
-        });
-
-    // Expect exactly one header
-    assertThat(headerCount.get()).isEqualTo(1);
-    // The inner interceptor (interceptor2) should set the header
-    assertThat(capturedAuth.get()).contains(token2);
-  }
-
   private ClientInterceptor createInterceptor(Function<List<AccessBoundary>, String> tokenFn)
       throws Exception {
-    Class<?> clazz =
+    Class<?> cls =
         Class.forName(
             "com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientGrpcDownscopingInterceptor");
-    Constructor<?> ctor = clazz.getDeclaredConstructor(Function.class);
+    Constructor<?> ctor = cls.getDeclaredConstructor(Function.class);
     ctor.setAccessible(true);
     return (ClientInterceptor) ctor.newInstance(tokenFn);
   }
