@@ -142,12 +142,12 @@
     <dependency>
       <groupId>com.google.cloud.gcs.analytics</groupId>
       <artifactId>client</artifactId>
-      <version>1.2.3</version>
+      <version>1.2.4-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.gcs.analytics</groupId>
       <artifactId>gcs-analytics-core</artifactId>
-      <version>1.2.3</version>
+      <version>1.2.4-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
