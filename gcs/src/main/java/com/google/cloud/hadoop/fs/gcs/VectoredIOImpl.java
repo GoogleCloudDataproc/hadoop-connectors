@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.VectoredReadUtils.validateRangeRequest;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
@@ -142,18 +143,24 @@ public class VectoredIOImpl implements Closeable {
         updateRangeSizeCounters(sortedRanges.size(), sortedRanges.size());
         // case when ranges are not merged
         for (FileRange sortedRange : sortedRanges) {
-          long startTimer = System.currentTimeMillis();
+          long submissionTime = System.currentTimeMillis();
           boundedThreadPool.submit(
               () -> {
+                long startTime = System.currentTimeMillis();
+                long queueWaitTime = startTime - submissionTime;
                 logger.atFiner().log("Submitting range %s for execution.", sortedRange);
                 // Reset thread stats as a new task is being submitted to this thread.
                 // all required stats must be collected before task is finished.
                 resetThreadLocalStats();
+                storageStatistics.updateStats(
+                    GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION,
+                    queueWaitTime,
+                    channelProvider.gcsPath);
                 readSingleRange(sortedRange, allocate, channelProvider);
                 long endTimer = System.currentTimeMillis();
                 storageStatistics.updateStats(
                     GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                    endTimer - startTimer,
+                    endTimer - submissionTime,
                     channelProvider.gcsPath);
               });
         }
@@ -164,20 +171,26 @@ public class VectoredIOImpl implements Closeable {
         for (CombinedFileRange combinedFileRange : combinedFileRanges) {
           CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
           combinedFileRange.setData(result);
-          long startTimer = System.currentTimeMillis();
+          long submissionTime = System.currentTimeMillis();
           boundedThreadPool.submit(
               () -> {
+                long startTime = System.currentTimeMillis();
+                long queueWaitTime = startTime - submissionTime;
                 logger.atFiner().log(
                     "Submitting combinedRange %s for execution.", combinedFileRange);
 
                 // Reset thread stats as a new task is being submitted to this thread.
                 // all required stats must be collected before task is finished.
                 resetThreadLocalStats();
+                storageStatistics.updateStats(
+                    GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION,
+                    queueWaitTime,
+                    channelProvider.gcsPath);
                 readCombinedRange(combinedFileRange, allocate, channelProvider);
                 long endTimer = System.currentTimeMillis();
                 storageStatistics.updateStats(
                     GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                    endTimer - startTimer,
+                    endTimer - submissionTime,
                     channelProvider.gcsPath);
               });
         }
@@ -246,6 +259,21 @@ public class VectoredIOImpl implements Closeable {
         channel.position(combinedFileRange.getOffset());
         ByteBuffer readContent = allocate.apply(combinedFileRange.getLength());
         int numRead = channel.read(readContent);
+        long connectionTime = 0;
+        long dataTransferTime = 0;
+        if (channel instanceof GoogleCloudStorageReadChannel) {
+          connectionTime = ((GoogleCloudStorageReadChannel) channel).getMediaRequestDurationMs();
+          dataTransferTime =
+              ((GoogleCloudStorageReadChannel) channel).getReadDataTransferDurationMs();
+        }
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_CONNECTION_DURATION,
+            connectionTime,
+            channelProvider.gcsPath);
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_DATA_TRANSFER_DURATION,
+            dataTransferTime,
+            channelProvider.gcsPath);
 
         // making it ready for reading
         readContent.flip();
@@ -334,6 +362,21 @@ public class VectoredIOImpl implements Closeable {
         channel.position(range.getOffset());
         ByteBuffer dst = allocate.apply(range.getLength());
         int numRead = channel.read(dst.duplicate());
+        long connectionTime = 0;
+        long dataTransferTime = 0;
+        if (channel instanceof GoogleCloudStorageReadChannel) {
+          connectionTime = ((GoogleCloudStorageReadChannel) channel).getMediaRequestDurationMs();
+          dataTransferTime =
+              ((GoogleCloudStorageReadChannel) channel).getReadDataTransferDurationMs();
+        }
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_CONNECTION_DURATION,
+            connectionTime,
+            channelProvider.gcsPath);
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_VECTORED_DATA_TRANSFER_DURATION,
+            dataTransferTime,
+            channelProvider.gcsPath);
         if (numRead < range.getLength()) {
           throw new EOFException(
               String.format(

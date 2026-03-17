@@ -113,6 +113,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // during "execute()" calls. The default in HttpRequest.java is also 10.
   private int maxRetries = 10;
 
+  // Duration of the GCS media request in milliseconds.
+  private long mediaRequestDurationMs = 0;
+
+  // Duration of data transfer (streaming) in milliseconds.
+  private long dataTransferDurationMs = 0;
+
   // Helper delegate for turning IOExceptions from API calls into higher-level semantics.
   private final ApiErrorExtractor errorExtractor;
 
@@ -292,6 +298,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     int totalBytesRead = 0;
     int retriesAttempted = 0;
 
+    long startTime = System.currentTimeMillis();
     // We read from a streaming source. We may not get all the bytes we asked for
     // in the first read. Therefore, loop till we either read the required number of
     // bytes or we reach end-of-stream.
@@ -426,6 +433,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         throw r;
       }
     } while (buffer.remaining() > 0 && currentPosition < size);
+    dataTransferDurationMs = System.currentTimeMillis() - startTime;
 
     // If this method was called when the stream was already at EOF
     // (indicated by totalBytesRead == 0) then return EOF else,
@@ -469,6 +477,22 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @Override
   public boolean isOpen() {
     return channelIsOpen;
+  }
+
+  /**
+   * Returns the duration of the GCS media request in milliseconds. Returns 0 if no request has been
+   * made yet.
+   */
+  public long getMediaRequestDurationMs() {
+    return mediaRequestDurationMs;
+  }
+
+  /**
+   * Returns the duration of data transfer (streaming) in milliseconds. Returns 0 if no read has
+   * been made yet.
+   */
+  public long getReadDataTransferDurationMs() {
+    return dataTransferDurationMs;
   }
 
   /**
@@ -943,7 +967,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     Storage.Objects.Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
+      long startTime = System.currentTimeMillis();
       response = getObject.executeMedia();
+      long endTime = System.currentTimeMillis();
+      mediaRequestDurationMs = endTime - startTime;
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
@@ -1022,7 +1049,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             throw footerException;
           }
           try {
+            long startTime = System.currentTimeMillis();
             response = getObject.executeMedia();
+            long endTime = System.currentTimeMillis();
+            mediaRequestDurationMs = endTime - startTime;
             // TODO(b/110832992): validate response range header against
             // expected/request range.
           } catch (IOException e) {

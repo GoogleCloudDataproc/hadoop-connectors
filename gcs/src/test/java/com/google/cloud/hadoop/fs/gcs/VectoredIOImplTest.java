@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import java.io.EOFException;
 import java.io.IOException;
@@ -554,5 +555,59 @@ public class VectoredIOImplTest {
 
   private void verifyGcsFsOpenCalls(int callCount) throws IOException {
     verify(gcsFs, times(callCount)).open((FileInfo) any(), any());
+  }
+
+  @Test
+  public void testVectoredIOMetrics() throws Exception {
+    List<FileRange> fileRanges = new ArrayList<>();
+    // valid range
+    fileRanges.add(FileRange.createFileRange(/* offset */ 0, /* length */ 10));
+
+    GoogleCloudStorageFileSystem mockedGcsFs = mock(GoogleCloudStorageFileSystem.class);
+    when(mockedGcsFs.getOptions()).thenReturn(GoogleCloudStorageFileSystemOptions.DEFAULT);
+
+    GoogleCloudStorageReadChannel mockedChannel = mock(GoogleCloudStorageReadChannel.class);
+
+    when(mockedChannel.read(any(ByteBuffer.class)))
+        .thenAnswer(
+            invocation -> {
+              ByteBuffer buffer = invocation.getArgument(0);
+              int length = buffer.remaining();
+              buffer.position(buffer.position() + length);
+              return length;
+            });
+    when(mockedChannel.isOpen()).thenReturn(true);
+    when(mockedChannel.position(org.mockito.ArgumentMatchers.anyLong())).thenReturn(mockedChannel);
+    when(mockedChannel.getMediaRequestDurationMs()).thenReturn(100L);
+    when(mockedChannel.getReadDataTransferDurationMs()).thenReturn(200L);
+
+    when(mockedGcsFs.open((FileInfo) any(), any())).thenReturn(mockedChannel);
+
+    vectoredIO.readVectored(
+        fileRanges,
+        allocate,
+        mockedGcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
+
+    // Wait for the asynchronous tasks to complete
+    for (FileRange range : fileRanges) {
+      range.getData().get(1, TimeUnit.MINUTES);
+    }
+
+    assertThat(
+            ghfsStorageStatistics.getMax(
+                GhfsStatistic.STREAM_READ_VECTORED_CONNECTION_DURATION.getSymbol()))
+        .isEqualTo(100L);
+    assertThat(
+            ghfsStorageStatistics.getMax(
+                GhfsStatistic.STREAM_READ_VECTORED_DATA_TRANSFER_DURATION.getSymbol()))
+        .isEqualTo(200L);
+    assertThat(
+            ghfsStorageStatistics.getMax(
+                GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION.getSymbol()))
+        .isAtLeast(0L);
   }
 }
