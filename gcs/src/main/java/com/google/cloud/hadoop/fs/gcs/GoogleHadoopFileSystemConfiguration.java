@@ -69,6 +69,9 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.root.url", GoogleCloudStorageOptions.DEFAULT.getStorageRootUrl());
 
+  public static final HadoopConfigurationProperty<Long> GCS_METRICS_EXPORT_INTERVAL_MS =
+      new HadoopConfigurationProperty<>("fs.gs.metrics.export.interval.ms", 60000L);
+
   /** Configuration key for the Cloud Storage API endpoint service path. */
   public static final HadoopConfigurationProperty<String> GCS_SERVICE_PATH =
       new HadoopConfigurationProperty<>(
@@ -674,6 +677,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMaxWaitTimeForEmptyObjectCreation(
             GCS_MAX_WAIT_TIME_EMPTY_OBJECT_CREATE.getTimeDuration(config))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
+        .setMetricsExportIntervalMs(GCS_METRICS_EXPORT_INTERVAL_MS.get(config, config::getLong))
         .setProjectId(projectId)
         .setProxyAddress(
             PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
