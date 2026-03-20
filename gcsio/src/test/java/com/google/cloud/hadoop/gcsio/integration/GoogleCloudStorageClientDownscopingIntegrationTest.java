@@ -114,7 +114,9 @@ public class GoogleCloudStorageClientDownscopingIntegrationTest {
         channel.write(ByteBuffer.wrap("test data".getBytes()));
       }
     } catch (IOException | RuntimeException e) {
-      // Expected failure due to fake config
+      // Catching RuntimeException is expected. We use NoCredentials to isolate the
+      // HeaderCapturingInterceptor logic, which intentionally causes the underlying library
+      // to crash during initialization. A generic catch ensures test robustness.
       logger.atInfo().withCause(e).log("Operation failed with exception");
     }
 
