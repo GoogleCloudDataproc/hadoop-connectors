@@ -1795,6 +1795,34 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   }
 
   @Test
+  public void listFileInfo_emptyNativeFolder_withoutTrailingSlash_returnsEmptyList()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setHnBucketRenameEnabled(true)
+                        .build())
+                .build());
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-list-test-no-slash");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    String testResource = getTestResource();
+    URI folderUriWithSlash = new URI(String.format("gs://%s/%s/", hnsBucketName, testResource));
+    URI folderUriWithoutSlash = new URI(String.format("gs://%s/%s", hnsBucketName, testResource));
+
+    gcsFs.mkdir(folderUriWithSlash);
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(folderUriWithoutSlash);
+
+    assertThat(fileInfos).isEmpty();
+  }
+
+  @Test
   public void concurrentCreation_newObjet_overwrite_oneSucceeds() throws Exception {
     concurrentCreate_oneSucceeds(/* overwriteExisting= */ false);
   }
