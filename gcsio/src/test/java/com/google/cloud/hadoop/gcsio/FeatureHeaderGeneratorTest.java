@@ -82,7 +82,7 @@ public class FeatureHeaderGeneratorTest {
     // Initially, the header should be based on default options
     FeatureHeaderGenerator header =
         new FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions.DEFAULT);
-    String initialHeader = "AQ==";
+    String initialHeader = "EQ==";
     assertThat(header.getValue()).isEqualTo(initialHeader);
 
     // A feature to track that is not part of the default set
@@ -95,7 +95,7 @@ public class FeatureHeaderGeneratorTest {
               // Inside track, the header should include the new feature
               String trackedHeader = header.getValue();
               assertThat(trackedHeader).isNotNull();
-              assertThat(trackedHeader).isEqualTo("EAE=");
+              assertThat(trackedHeader).isEqualTo("EBE=");
               return "success";
             });
 
@@ -154,10 +154,12 @@ public class FeatureHeaderGeneratorTest {
     public static Collection<Object[]> data() {
       return Arrays.asList(
           new Object[][] {
-            {"Default Options", GoogleCloudStorageFileSystemOptions.DEFAULT, createBitSet(0)},
-            {"Fadvise Random", buildOptionsWithFadvise(Fadvise.RANDOM), createBitSet(1)},
-            {"Fadvise Sequential", buildOptionsWithFadvise(Fadvise.SEQUENTIAL), createBitSet(2)},
-            {"Fadvise AutoRandom", buildOptionsWithFadvise(Fadvise.AUTO_RANDOM), createBitSet(3)},
+            {"Default Options", GoogleCloudStorageFileSystemOptions.DEFAULT, createBitSet(0, 4)},
+            {"Fadvise Random", buildOptionsWithFadvise(Fadvise.RANDOM), createBitSet(1, 4)},
+            {"Fadvise Sequential", buildOptionsWithFadvise(Fadvise.SEQUENTIAL), createBitSet(2, 4)},
+            {
+              "Fadvise AutoRandom", buildOptionsWithFadvise(Fadvise.AUTO_RANDOM), createBitSet(3, 4)
+            },
             {
               "Hierarchical Namespace",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
@@ -176,21 +178,21 @@ public class FeatureHeaderGeneratorTest {
                           .setHnOptimizationEnabled(true)
                           .build())
                   .build(),
-              createBitSet(0, 5)
+              createBitSet(0, 4, 5)
             },
             {
               "Performance Cache",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setPerformanceCacheEnabled(true)
                   .build(),
-              createBitSet(0, 6)
+              createBitSet(0, 4, 6)
             },
             {
               "Cloud Logging Enabled",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setCloudLoggingEnabled(true)
                   .build(),
-              createBitSet(0, 7)
+              createBitSet(0, 4, 7)
             },
             {
               "Trace Log Enabled",
@@ -200,7 +202,7 @@ public class FeatureHeaderGeneratorTest {
                           .setTraceLogEnabled(true)
                           .build())
                   .build(),
-              createBitSet(0, 8)
+              createBitSet(0, 4, 8)
             },
             {
               "Operation Trace Log Enabled",
@@ -210,7 +212,7 @@ public class FeatureHeaderGeneratorTest {
                           .setOperationTraceLogEnabled(true)
                           .build())
                   .build(),
-              createBitSet(0, 9)
+              createBitSet(0, 4, 9)
             },
             {
               "Direct Upload",
@@ -223,9 +225,9 @@ public class FeatureHeaderGeneratorTest {
                                   .build())
                           .build())
                   .build(),
-              createBitSet(0, 10)
+              createBitSet(0, 4, 10)
             },
-            {"Bidi Enabled", buildOptionsWithBidi(), createBitSet(0, 11)}
+            {"Bidi Enabled", buildOptionsWithBidi(), createBitSet(0, 4, 11)}
           });
     }
 
