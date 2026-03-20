@@ -640,10 +640,17 @@ public class GoogleHadoopFileSystemConfiguration {
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
+    int readThreads = GCS_VECTORED_READ_THREADS.get(config, config::getInt);
+    if (config.get(GCS_VECTORED_READ_THREADS.getKey()) == null) {
+      // These are IO threads. We use 2x CPUs to ensure full utilization even if some threads are
+      // waiting on IO.
+      readThreads = Math.max(16, 2 * Runtime.getRuntime().availableProcessors());
+    }
+    logger.atFiner().log("Using %d threads for vectored reads", readThreads);
     return VectoredReadOptions.builder()
         .setMinSeekVectoredReadSize(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getInt))
         .setMergeRangeMaxSize(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getInt))
-        .setReadThreads(GCS_VECTORED_READ_THREADS.get(config, config::getInt));
+        .setReadThreads(readThreads);
   }
 
   @VisibleForTesting
