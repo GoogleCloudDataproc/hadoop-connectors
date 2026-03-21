@@ -49,13 +49,17 @@ import java.util.List;
 import javax.annotation.concurrent.GuardedBy;
 
 /** Publishes open-census measurements to StackDriver */
-class CloudMonitoringMetricsRecorder implements MetricsRecorder {
+public class CloudMonitoringMetricsRecorder implements MetricsRecorder {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   @VisibleForTesting static final Object monitor = new Object();
 
-  private static final int EXPORT_INTERVAL = 5000;
+  private static final int EXPORT_INTERVAL = 60000;
+
+  public static final TagKey TYPE = TagKey.create("type");
+  public static final MeasureLong GCS_DURATION =
+      MeasureLong.create("spark/driver/connector/gcs/duration", "Duration of GCS operations", "ms");
 
   @GuardedBy("monitor")
   private static boolean initialized = false;
@@ -101,10 +105,11 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
   private static final Tagger tagger = Tags.getTagger();
   private static final StatsRecorder statsRecorder = Stats.getStatsRecorder();
 
-  public static MetricsRecorder create(String projectId, Credentials credentials) {
+  public static MetricsRecorder create(
+      String projectId, Credentials credentials, long exportIntervalMs) {
     try {
       registerAllViews();
-      setupCloudMonitoringExporter(projectId, credentials);
+      setupCloudMonitoringExporter(projectId, credentials, exportIntervalMs);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log("Exception while registering metrics publisher");
       return new NoOpMetricsRecorder();
@@ -112,15 +117,21 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
     return new CloudMonitoringMetricsRecorder();
   }
 
-  private static void setupCloudMonitoringExporter(String projectId, Credentials credentials)
-      throws IOException {
+  public static boolean isCloudMonitoringEnabled() {
+    synchronized (monitor) {
+      return initialized;
+    }
+  }
+
+  private static void setupCloudMonitoringExporter(
+      String projectId, Credentials credentials, long exportIntervalMs) throws IOException {
     synchronized (monitor) {
       if (!initialized) {
         StackdriverStatsExporter.createAndRegister(
             StackdriverStatsConfiguration.builder()
                 .setCredentials(credentials)
                 .setProjectId(projectId)
-                .setExportInterval(fromMillis(EXPORT_INTERVAL))
+                .setExportInterval(fromMillis(exportIntervalMs))
                 .build());
         Runtime.getRuntime().addShutdownHook(new Thread(StackdriverStatsExporter::unregister));
         initialized = true;
@@ -156,6 +167,12 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
               REQUESTS,
               COUNT,
               TAG_KEYS),
+          View.create(
+              Name.create("spark/driver/connector/gcs/duration"),
+              "The distribution of latencies for Hadoop operations",
+              GCS_DURATION,
+              Distribution.create(BucketBoundaries.create(RPC_MILLIS_BUCKET_BOUNDARIES)),
+              ImmutableList.of(TYPE))
         };
 
     ViewManager viewManager = Stats.getViewManager();

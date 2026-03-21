@@ -71,7 +71,8 @@ public abstract class GoogleCloudStorageOptions {
         .setStorageClientCachingEnabled(false)
         .setBidiEnabled(false)
         .setFinalizeBeforeClose(false)
-        .setHnOptimizationEnabled(false);
+        .setHnOptimizationEnabled(false)
+        .setMetricsExportIntervalMs(60000L);
   }
 
   public abstract Builder toBuilder();
@@ -87,6 +88,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isDirectPathPreferred();
 
   public abstract String getStorageRootUrl();
+
+  public abstract long getMetricsExportIntervalMs();
 
   public abstract String getStorageServicePath();
 
@@ -179,6 +182,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract static class Builder {
 
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
+
+    public abstract Builder setMetricsExportIntervalMs(long intervalMs);
 
     public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
