@@ -86,7 +86,7 @@
     <mockito.version>4.10.0</mockito.version>
     <system-lambda.version>1.2.1</system-lambda.version>
     <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
-    <assertj.version>3.14.0</assertj.version>
+    <assertj.version>3.27.7</assertj.version>
     <deploy.skip>true</deploy.skip>
     <central.publishing.skip>false</central.publishing.skip>
     <java.addopens.args>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</java.addopens.args>
