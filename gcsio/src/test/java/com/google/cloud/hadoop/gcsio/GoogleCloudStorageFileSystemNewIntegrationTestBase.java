@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketStorageLayoutRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithStartOffset;
@@ -1209,6 +1210,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     if (isTracingSupported) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
+              getBucketStorageLayoutRequestString(bucketName),
               getRequestString(bucketName, dirObject + "/"),
               getRequestString(bucketName, dirObject + "/f1"),
               listRequestWithTrailingDelimiter(
