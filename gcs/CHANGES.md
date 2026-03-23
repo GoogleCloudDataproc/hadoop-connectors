@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Enable move by default
 
 ## 3.0.18 - 2026-03-09
 1. Implement trailing checksums to enable server-side data validation.

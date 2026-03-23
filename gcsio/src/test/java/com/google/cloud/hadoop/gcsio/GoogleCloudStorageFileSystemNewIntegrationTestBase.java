@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.delet
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.moveRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.truth.Truth.assertThat;
@@ -1152,23 +1153,66 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "/f1"),
-            getRequestString(bucketName, dirObject + "/f2"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/"),
-            copyRequestString(
-                bucketName,
-                dirObject + "/f1",
-                bucketName,
-                dirObject + "/f2",
-                "copyTo",
-                /* generationId= */ 1),
-            deleteRequestString(bucketName, dirObject + "/f1", 2));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/"),
+              moveRequestString(
+                  bucketName,
+                  dirObject + "/f1",
+                  dirObject + "/f2",
+                  "moveTo",
+                  /* generationId= */ 1,
+                  /* sourceGenerationId= */ 1));
+    }
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
+  }
+
+  @Test
+  public void rename_file_withMoveDisabled_usesCopyAndDelete() throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setMoveOperationEnabled(false).build())
+                .setStatusParallelEnabled(false)
+                .build());
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+
+    gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
+
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/"),
+              copyRequestString(
+                  bucketName,
+                  dirObject + "/f1",
+                  bucketName,
+                  dirObject + "/f2",
+                  "copyTo",
+                  /* generationId= */ 1),
+              deleteRequestString(bucketName, dirObject + "/f1", 2));
+    }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
@@ -1186,27 +1230,28 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
 
-    // This test performs additional POST request to dirObject when run singly, as result
-    // generationId for delete operation need to be increased for DELETE request.
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "/f1"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/f2"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
-            copyRequestString(
-                bucketName,
-                dirObject + "/f1",
-                bucketName,
-                dirObject + "/f2",
-                "copyTo",
-                /* generationId= */ 1),
-            deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 2));
+    if (isTracingSupported) {
+      // This test performs additional POST request to dirObject when run singly, as result
+      // generationId for delete operation need to be increased for DELETE request.
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              getRequestString(bucketName, dirObject + "/f1"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/f2"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+              getRequestString(bucketName, dirObject + "/"),
+              listRequestWithTrailingDelimiter(
+                  bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
+              moveRequestString(
+                  bucketName,
+                  dirObject + "/f1",
+                  dirObject + "/f2",
+                  "moveTo",
+                  /* generationId= */ 1,
+                  /* sourceGenerationId= */ 1));
+    }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
@@ -1259,47 +1304,48 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
         bucketUri.resolve(dirObject + "/srcParent/srcDir"),
         bucketUri.resolve(dirObject + "/dstParent/dstDir"));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            // Get src info
-            getRequestString(bucketName, dirObject + "/srcParent/srcDir"),
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/srcParent/srcDir/",
-                /* maxResults= */ 1,
-                /* pageToken= */ null),
-            // Get dst info
-            getRequestString(bucketName, dirObject + "/dstParent/dstDir"),
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/dstParent/dstDir/",
-                /* maxResults= */ 1,
-                /* pageToken= */ null),
-            // Get dst dir parent info
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/dstParent/", /* maxResults= */ 1, /* pageToken= */ null),
-            // Check if src directory parent object exists
-            getRequestString(bucketName, dirObject + "/srcParent/"),
-            // List files that need to be renamed in src directory
-            listRequestString(
-                bucketName,
-                /* flatList= */ true,
-                /* includeTrailingDelimiter= */ null,
-                dirObject + "/srcParent/srcDir/",
-                "bucket,name,generation",
-
-                /* pageToken= */ null),
-            // Copy file
-            copyRequestString(
-                bucketName,
-                dirObject + "/srcParent/srcDir/f",
-                bucketName,
-                dirObject + "/dstParent/dstDir/f",
-                "copyTo"),
-            // Delete src directory and file
-            batchRequestString(),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 2));
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              // Get src info
+              getRequestString(bucketName, dirObject + "/srcParent/srcDir"),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/srcParent/srcDir/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              // Get dst info
+              getRequestString(bucketName, dirObject + "/dstParent/dstDir"),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/dstParent/dstDir/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              // Get dst dir parent info
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/dstParent/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              // Check if src directory parent object exists
+              getRequestString(bucketName, dirObject + "/srcParent/"),
+              // List files that need to be renamed in src directory
+              listRequestString(
+                  bucketName,
+                  /* flatList= */ true,
+                  /* includeTrailingDelimiter= */ null,
+                  dirObject + "/srcParent/srcDir/",
+                  "bucket,name,generation",
+                  /* pageToken= */ null),
+              // Move file
+              moveRequestString(
+                  bucketName,
+                  dirObject + "/srcParent/srcDir/f",
+                  dirObject + "/dstParent/dstDir/f",
+                  "moveTo"),
+              // Delete src directory
+              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 1));
+    }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir/f"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir"))).isFalse();
@@ -1500,47 +1546,48 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
         bucketUri.resolve(dirObject + "/srcParent/srcDir"),
         bucketUri.resolve(dirObject + "/dstParent/dstDir"));
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            // Get src info
-            getRequestString(bucketName, dirObject + "/srcParent/srcDir"),
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/srcParent/srcDir/",
-                /* maxResults= */ 1,
-                /* pageToken= */ null),
-            // Get dst info
-            getRequestString(bucketName, dirObject + "/dstParent/dstDir"),
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/dstParent/dstDir/",
-                /* maxResults= */ 1,
-                /* pageToken= */ null),
-            // Get dst dir parent info
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/dstParent/", /* maxResults= */ 1, /* pageToken= */ null),
-            // Check if src directory parent object exists
-            getRequestString(bucketName, dirObject + "/srcParent/"),
-            // List files that need to be renamed in src directory
-            listRequestString(
-                bucketName,
-                /* flatList= */ true,
-                /* includeTrailingDelimiter= */ null,
-                dirObject + "/srcParent/srcDir/",
-                "bucket,name,generation",
+    if (isTracingSupported) {
+      assertThat(gcsRequestsTracker.getAllRequestStrings())
+          .containsExactly(
+              // Get src info
+              getRequestString(bucketName, dirObject + "/srcParent/srcDir"),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/srcParent/srcDir/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              // Get dst info
+              getRequestString(bucketName, dirObject + "/dstParent/dstDir"),
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/dstParent/dstDir/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              // Get dst dir parent info
+              listRequestWithTrailingDelimiter(
+                  bucketName,
+                  dirObject + "/dstParent/",
+                  /* maxResults= */ 1,
+                  /* pageToken= */ null),
+              // Check if src directory parent object exists
+              getRequestString(bucketName, dirObject + "/srcParent/"),
+              // List files that need to be renamed in src directory
+              listRequestString(
+                  bucketName,
+                  /* flatList= */ true,
+                  /* includeTrailingDelimiter= */ null,
+                  dirObject + "/srcParent/srcDir/",
+                  "bucket,name,generation",
 
-                /* pageToken= */ null),
-            // Copy file
-            copyRequestString(
-                bucketName,
-                dirObject + "/srcParent/srcDir/f",
-                bucketName,
-                dirObject + "/dstParent/dstDir/f",
-                "copyTo"),
-            // Delete src directory and file
-            batchRequestString(),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 2));
+                  /* pageToken= */ null),
+              // Move file
+              moveRequestString(
+                  bucketName,
+                  dirObject + "/srcParent/srcDir/f",
+                  dirObject + "/dstParent/dstDir/f",
+                  "moveTo"),
+              deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 1));
+    }
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir/f"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir"))).isFalse();
