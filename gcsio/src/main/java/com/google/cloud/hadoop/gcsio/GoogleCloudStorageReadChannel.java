@@ -47,9 +47,12 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.Channels;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
@@ -363,6 +366,25 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         // each time we make progress we reset the retry counter.
         retriesAttempted = 0;
       } catch (IOException ioe) {
+        // Handle thread interruptions (e.g. from cancellation) separately from general
+        // IOExceptions.
+        // We catch InterruptedIOException but exclude its subclass SocketTimeoutException,
+        // which represents a network-level timeout that should still be retried.
+        if (ioe instanceof ClosedByInterruptException
+            || (ioe instanceof InterruptedIOException
+                && !(ioe instanceof SocketTimeoutException))) {
+          logger.atInfo().withCause(ioe).log(
+              "Thread interrupted while reading '%s' at position %d. Stopping further processing.",
+              resourceId, currentPosition);
+          closeContentChannel();
+          // Re-assert interrupt status and percolate as a non-retryable exception.
+          Thread.currentThread().interrupt();
+          throw new IOException(
+              String.format(
+                  "Thread interrupt received while reading '%s' at position %d.",
+                  resourceId, currentPosition),
+              ioe);
+        }
         logger.atFine().log(
             "Closing contentChannel after %s exception for '%s'.", ioe.getMessage(), resourceId);
         closeContentChannel();

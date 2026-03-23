@@ -37,9 +37,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -143,19 +145,31 @@ public class VectoredIOImpl implements Closeable {
         // case when ranges are not merged
         for (FileRange sortedRange : sortedRanges) {
           long startTimer = System.currentTimeMillis();
-          boundedThreadPool.submit(
-              () -> {
-                logger.atFiner().log("Submitting range %s for execution.", sortedRange);
-                // Reset thread stats as a new task is being submitted to this thread.
-                // all required stats must be collected before task is finished.
-                resetThreadLocalStats();
-                readSingleRange(sortedRange, allocate, channelProvider);
-                long endTimer = System.currentTimeMillis();
-                storageStatistics.updateStats(
-                    GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                    endTimer - startTimer,
-                    channelProvider.gcsPath);
-              });
+          Future<?> executionFuture =
+              boundedThreadPool.submit(
+                  () -> {
+                    logger.atFiner().log("Submitting range %s for execution.", sortedRange);
+                    // Reset thread stats as a new task is being submitted to this thread.
+                    // all required stats must be collected before task is finished.
+                    resetThreadLocalStats();
+                    readSingleRange(sortedRange, allocate, channelProvider);
+                    long endTimer = System.currentTimeMillis();
+                    storageStatistics.updateStats(
+                        GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                        endTimer - startTimer,
+                        channelProvider.gcsPath);
+                  });
+          sortedRange
+              .getData()
+              .whenComplete(
+                  (res, ex) -> {
+                    if (ex instanceof CancellationException) {
+                      logger.atFiner().log(
+                          "Cancelling execution future for range %s due to CancellationException",
+                          sortedRange);
+                      executionFuture.cancel(true);
+                    }
+                  });
         }
       } else {
         List<CombinedFileRange> combinedFileRanges = getCombinedFileRange(sortedRanges);
@@ -165,21 +179,33 @@ public class VectoredIOImpl implements Closeable {
           CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
           combinedFileRange.setData(result);
           long startTimer = System.currentTimeMillis();
-          boundedThreadPool.submit(
-              () -> {
-                logger.atFiner().log(
-                    "Submitting combinedRange %s for execution.", combinedFileRange);
+          Future<?> executionFuture =
+              boundedThreadPool.submit(
+                  () -> {
+                    logger.atFiner().log(
+                        "Submitting combinedRange %s for execution.", combinedFileRange);
 
-                // Reset thread stats as a new task is being submitted to this thread.
-                // all required stats must be collected before task is finished.
-                resetThreadLocalStats();
-                readCombinedRange(combinedFileRange, allocate, channelProvider);
-                long endTimer = System.currentTimeMillis();
-                storageStatistics.updateStats(
-                    GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                    endTimer - startTimer,
-                    channelProvider.gcsPath);
-              });
+                    // Reset thread stats as a new task is being submitted to this thread.
+                    // all required stats must be collected before task is finished.
+                    resetThreadLocalStats();
+                    readCombinedRange(combinedFileRange, allocate, channelProvider);
+                    long endTimer = System.currentTimeMillis();
+                    storageStatistics.updateStats(
+                        GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
+                        endTimer - startTimer,
+                        channelProvider.gcsPath);
+                  });
+          combinedFileRange
+              .getData()
+              .whenComplete(
+                  (res, ex) -> {
+                    if (ex instanceof CancellationException) {
+                      logger.atFiner().log(
+                          "Cancelling execution future for combined range %s due to CancellationException",
+                          combinedFileRange);
+                      executionFuture.cancel(true);
+                    }
+                  });
         }
       }
     }
