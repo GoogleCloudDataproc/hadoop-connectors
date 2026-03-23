@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add Integration test for chained Downscoping Interceptors
 
 ## 4.0.3 - 2026-03-09
 1. Implement trailing checksums to enable server-side data validation.
