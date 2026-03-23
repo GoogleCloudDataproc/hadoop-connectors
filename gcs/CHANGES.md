@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add Integration test for chained Downscoping Interceptors
 
 ## 2.2.32 - 2026-02-12
 1. Add retry for ListObjects.
