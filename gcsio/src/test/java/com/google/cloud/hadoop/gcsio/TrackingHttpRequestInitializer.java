@@ -177,7 +177,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
         .map(r -> replaceSourceGenerationMatchWithId(r, sourceGenerationMatchId))
         // Filter out this call, since its presence is non-deterministic as the call is cached.
-        .filter(r -> !r.contains("/storageLayout"))
+        // .filter(r -> !r.contains("/storageLayout"))
         .map(r -> replaceResumableUploadIdWithId(r, resumableUploadId))
         .collect(toImmutableList());
   }
