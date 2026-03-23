@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.delet
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.moveRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.truth.Truth.assertThat;
@@ -840,6 +841,48 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"),
+            moveRequestString(
+                bucketName,
+                dirObject + "/f1",
+                dirObject + "/f2",
+                "moveTo",
+                /* generationId= */ 1,
+                /* sourceGenerationId= */ 1));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
+  }
+
+  @Test
+  public void rename_file_withMoveDisabled_usesCopyAndDelete() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder().setMoveOperationEnabled(false).build())
+                .setStatusParallelEnabled(false)
+                .build(),
+            gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+
+    gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject + "/f1"),
+            getRequestString(bucketName, dirObject + "/f2"),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
+            getRequestString(bucketName, dirObject + "/"),
             copyRequestString(
                 bucketName,
                 dirObject + "/f1",
@@ -883,14 +926,13 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             getRequestString(bucketName, dirObject + "/"),
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
-            copyRequestString(
+            moveRequestString(
                 bucketName,
                 dirObject + "/f1",
-                bucketName,
                 dirObject + "/f2",
-                "copyTo",
-                /* generationId= */ 1),
-            deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 2));
+                "moveTo",
+                /* generationId= */ 1,
+                /* sourceGenerationId= */ 1));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
@@ -980,19 +1022,15 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 /* includeTrailingDelimiter= */ null,
                 dirObject + "/srcParent/srcDir/",
                 "bucket,name,generation",
-
                 /* pageToken= */ null),
-            // Copy file
-            copyRequestString(
+            // Move file
+            moveRequestString(
                 bucketName,
                 dirObject + "/srcParent/srcDir/f",
-                bucketName,
                 dirObject + "/dstParent/dstDir/f",
-                "copyTo"),
-            // Delete src directory and file
-            batchRequestString(),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 2));
+                "moveTo"),
+            // Delete src directory
+            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 1));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir/f"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir"))).isFalse();
@@ -1049,19 +1087,14 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
                 /* includeTrailingDelimiter= */ null,
                 dirObject + "/srcParent/srcDir/",
                 "bucket,name,generation",
-
                 /* pageToken= */ null),
-            // Copy file
-            copyRequestString(
+            // Move file
+            moveRequestString(
                 bucketName,
                 dirObject + "/srcParent/srcDir/f",
-                bucketName,
                 dirObject + "/dstParent/dstDir/f",
-                "copyTo"),
-            // Delete src directory and file
-            batchRequestString(),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/f", 1),
-            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 2));
+                "moveTo"),
+            deleteRequestString(bucketName, dirObject + "/srcParent/srcDir/", 1));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir/f"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent/srcDir"))).isFalse();
