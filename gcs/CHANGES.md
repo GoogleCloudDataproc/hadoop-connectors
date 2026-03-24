@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add Integration test for chained Downscoping Interceptors
 1. Enable move by default
 
 ## 3.1.14 - 2026-03-09
