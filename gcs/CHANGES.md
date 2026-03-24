@@ -6,6 +6,7 @@
 1. Upgrade grpc to 1.67.1
 1. [Bug Fix]: Prevent multiple auth headers with chained Downscoping Interceptors
 1. Implement fast fail flag in gRPC
+1. Add Integration test for chained Downscoping Interceptors
 
 ## 2.2.25 - 2024-08-01
 1. PR #1227 - Avoid registering subscriber class multiple times
