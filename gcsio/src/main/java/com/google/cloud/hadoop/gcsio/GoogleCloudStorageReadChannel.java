@@ -366,17 +366,22 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         // each time we make progress we reset the retry counter.
         retriesAttempted = 0;
       } catch (IOException ioe) {
+        logger.atFine().log(
+            "Closing contentChannel after %s exception for '%s'.", ioe.getMessage(), resourceId);
+        closeContentChannel();
+
         // Handle thread interruptions (e.g. from cancellation) separately from general
         // IOExceptions.
-        // We catch InterruptedIOException but exclude its subclass SocketTimeoutException,
-        // which represents a network-level timeout that should still be retried.
+        // Interruptions are treated as non-retryable events because they indicate the caller has
+        // abandoned the current request (e.g., due to a timeout) and may already be initiating
+        // a new attempt. We catch InterruptedIOException but exclude SocketTimeoutException,
+        // which is a network-level timeout that should still be retried.
         if (ioe instanceof ClosedByInterruptException
             || (ioe instanceof InterruptedIOException
                 && !(ioe instanceof SocketTimeoutException))) {
           logger.atInfo().withCause(ioe).log(
               "Thread interrupted while reading '%s' at position %d. Stopping further processing.",
               resourceId, currentPosition);
-          closeContentChannel();
           // Re-assert interrupt status and percolate as a non-retryable exception.
           Thread.currentThread().interrupt();
           throw new IOException(
@@ -385,9 +390,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                   resourceId, currentPosition),
               ioe);
         }
-        logger.atFine().log(
-            "Closing contentChannel after %s exception for '%s'.", ioe.getMessage(), resourceId);
-        closeContentChannel();
 
         if (buffer.remaining() != remainingBeforeRead) {
           int partialRead = remainingBeforeRead - buffer.remaining();

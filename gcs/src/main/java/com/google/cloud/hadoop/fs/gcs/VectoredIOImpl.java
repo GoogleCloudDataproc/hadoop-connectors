@@ -159,17 +159,7 @@ public class VectoredIOImpl implements Closeable {
                         endTimer - startTimer,
                         channelProvider.gcsPath);
                   });
-          sortedRange
-              .getData()
-              .whenComplete(
-                  (res, ex) -> {
-                    if (ex instanceof CancellationException) {
-                      logger.atFiner().log(
-                          "Cancelling execution future for range %s due to CancellationException",
-                          sortedRange);
-                      executionFuture.cancel(true);
-                    }
-                  });
+          addCancellationListener(sortedRange, executionFuture);
         }
       } else {
         List<CombinedFileRange> combinedFileRanges = getCombinedFileRange(sortedRanges);
@@ -195,19 +185,31 @@ public class VectoredIOImpl implements Closeable {
                         endTimer - startTimer,
                         channelProvider.gcsPath);
                   });
-          combinedFileRange
-              .getData()
-              .whenComplete(
-                  (res, ex) -> {
-                    if (ex instanceof CancellationException) {
-                      logger.atFiner().log(
-                          "Cancelling execution future for combined range %s due to CancellationException",
-                          combinedFileRange);
-                      executionFuture.cancel(true);
-                    }
-                  });
+          addCancellationListener(combinedFileRange, executionFuture);
         }
       }
+    }
+
+    /**
+     * Adds a listener to the range's data future that will interrupt the background execution
+     * thread if the future is cancelled. This prevents background "zombie" threads from continuing
+     * to read data after a timeout or explicit cancellation by the caller.
+     *
+     * @param range the file range being read.
+     * @param executionFuture the future representing the background thread execution.
+     */
+    private void addCancellationListener(FileRange range, Future<?> executionFuture) {
+      range
+          .getData()
+          .whenComplete(
+              (res, ex) -> {
+                if (ex instanceof CancellationException) {
+                  logger.atWarning().log(
+                      "Cancelling execution future for range %s due to CancellationException",
+                      range);
+                  executionFuture.cancel(true);
+                }
+              });
     }
 
     private void updateRangeSizeCounters(int incomingRangeSize, int combinedRangeSize) {
