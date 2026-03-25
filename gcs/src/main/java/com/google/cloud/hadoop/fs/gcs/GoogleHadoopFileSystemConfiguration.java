@@ -104,7 +104,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * be performed by calling the rename API.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_HIERARCHICAL_NAMESPACE_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", true);
 
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
