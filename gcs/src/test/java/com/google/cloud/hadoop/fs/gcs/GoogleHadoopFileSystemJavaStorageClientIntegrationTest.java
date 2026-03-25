@@ -64,10 +64,6 @@ public class GoogleHadoopFileSystemJavaStorageClientIntegrationTest
 
   @Ignore
   @Test
-  public void testRenameWithMoveOperation() {}
-
-  @Ignore
-  @Test
   public void testGcsJsonAPIMetrics() {
     // TODO: Update this will once gRPC API metrics are added
   }
