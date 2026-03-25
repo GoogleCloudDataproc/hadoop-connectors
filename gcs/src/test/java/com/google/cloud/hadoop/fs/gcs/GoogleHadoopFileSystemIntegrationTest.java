@@ -2545,6 +2545,9 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem();
     myghfs.initialize(subdirPath.toUri(), config);
 
+    // Warm the static HNS cache to prevent the check from occurring during measured operations
+    myghfs.getGcsFs().getGcs().isHnBucket(subdirPath.toUri());
+
     GhfsGlobalStorageStatistics stats = myghfs.getGlobalGcsStorageStatistics();
     stats.reset();
 
@@ -2730,6 +2733,9 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem();
     myghfs.initialize(subdirPath.toUri(), config);
 
+    // Warm the static HNS cache to prevent the check from occurring during measured operations
+    myghfs.getGcsFs().getGcs().isHnBucket(subdirPath.toUri());
+
     GhfsThreadLocalStatistics stats =
         (GhfsThreadLocalStatistics)
             GlobalStorageStatistics.INSTANCE.get(GhfsThreadLocalStatistics.NAME);
@@ -2751,6 +2757,12 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     config.setBoolean("fs.gs.create.items.conflict.check.enable", false);
 
     Path parentPath = ghfsHelper.castAsHadoopPath(getTempFilePath());
+
+    // Warm the static HNS cache to prevent the check from occurring during measured operations
+    try (GoogleHadoopFileSystem warmupFs = new GoogleHadoopFileSystem()) {
+      warmupFs.initialize(parentPath.toUri(), config);
+      warmupFs.getGcsFs().getGcs().isHnBucket(parentPath.toUri());
+    }
 
     GhfsThreadLocalStatistics stats =
         (GhfsThreadLocalStatistics)
