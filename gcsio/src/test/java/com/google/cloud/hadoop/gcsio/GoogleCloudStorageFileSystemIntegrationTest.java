@@ -1692,7 +1692,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // assert that marker files were copied last, e.g. marker files modification timestamp
     // should be less than regular files modification timestamp
-    // The test creates a Zonal Bucket(HNS Bucket) when bidi is enabled, hence skip this assertion
     for (FileInfo mf : markerFileInfos) {
       fileInfos.forEach(
           f -> assertThat(f.getModificationTime()).isLessThan(mf.getModificationTime()));
