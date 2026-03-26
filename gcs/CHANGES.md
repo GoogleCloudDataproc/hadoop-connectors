@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.19 - 2026-03-26
 1. Enable move by default
 1. Enable HNS flag by default
 
