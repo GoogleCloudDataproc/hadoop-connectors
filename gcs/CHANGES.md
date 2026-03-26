@@ -2,7 +2,7 @@
 
 ## Next
 1. Add Integration test for chained Downscoping Interceptors
-2. Enable HNS flag by default
+1. Enable HNS flag by default
 
 ## 4.0.3 - 2026-03-09
 1. Implement trailing checksums to enable server-side data validation.
