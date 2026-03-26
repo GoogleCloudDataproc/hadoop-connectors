@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketStorageLayoutRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithStartOffset;
@@ -1209,6 +1210,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     if (isTracingSupported) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
+              getBucketStorageLayoutRequestString(bucketName),
               getRequestString(bucketName, dirObject + "/"),
               getRequestString(bucketName, dirObject + "/f1"),
               listRequestWithTrailingDelimiter(
@@ -1792,6 +1794,34 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/srcParent"))).isTrue();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/dstParent/dstDir/f"))).isTrue();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/dstParent/dstDir"))).isTrue();
+  }
+
+  @Test
+  public void listFileInfo_emptyNativeFolder_withoutTrailingSlash_returnsEmptyList()
+      throws Exception {
+    gcsFs =
+        newGcsFs(
+            newGcsFsOptions()
+                .setCloudStorageOptions(
+                    gcsOptions.toBuilder()
+                        .setHnOptimizationEnabled(true)
+                        .setHnBucketRenameEnabled(true)
+                        .build())
+                .build());
+    String hnsBucketName = gcsfsIHelper.getUniqueBucketName("hns-list-test-no-slash");
+    gcsFs
+        .getGcs()
+        .createBucket(
+            hnsBucketName,
+            CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    String testResource = getTestResource();
+    URI folderUriWithSlash = new URI(String.format("gs://%s/%s/", hnsBucketName, testResource));
+    URI folderUriWithoutSlash = new URI(String.format("gs://%s/%s", hnsBucketName, testResource));
+
+    gcsFs.mkdir(folderUriWithSlash);
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(folderUriWithoutSlash);
+
+    assertThat(fileInfos).isEmpty();
   }
 
   @Test
