@@ -85,6 +85,17 @@
     <dependency>
       <groupId>com.google.api-client</groupId>
       <artifactId>google-api-client-jackson2</artifactId>
+      <exclusions>
+         <exclusion>
+             <groupId>com.fasterxml.jackson.core</groupId>
+             <artifactId>jackson-core</artifactId>
+         </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>2.15.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -248,7 +259,16 @@
                     <exclude>google/**</exclude>
                     <exclude>grpc/**</exclude>
                   </excludes>
-                </filter>
+                </filter>                
+                <filter>
+                  <artifact>com.fasterxml.jackson.core:jackson-core</artifact>
+                  <excludes>
+                    <exclude>META-INF/versions/17/com/fasterxml/jackson/core/io/doubleparser/FastDoubleSwar.class</exclude>
+                    <exclude>META-INF/versions/17/com/fasterxml/jackson/core/io/doubleparser/FastIntegerMath*.class</exclude>
+                    <exclude>META-INF/versions/19/com/fasterxml/jackson/core/io/doubleparser/FastDoubleSwar.class</exclude>
+                    <exclude>META-INF/versions/19/com/fasterxml/jackson/core/io/doubleparser/FastIntegerMath*.class</exclude>
+                  </excludes>
+                </filter>                
               </filters>
               <artifactSet>
                 <includes>
