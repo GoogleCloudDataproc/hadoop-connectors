@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 4.0.4 - 2026-03-26
 1. Add Integration test for chained Downscoping Interceptors
 1. Enable HNS flag by default
 
