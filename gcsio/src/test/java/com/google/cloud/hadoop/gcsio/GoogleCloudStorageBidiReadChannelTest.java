@@ -21,7 +21,11 @@ import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutures;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
@@ -78,6 +82,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().build(),
             Executors.newSingleThreadExecutor());
@@ -94,7 +99,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
   // TODO(dhritichopra): Remove test after support for Gzip is added
   @Test
-  public void constructor_whenItemIsGzipEncoded_throwsUnsupportedOperationException()
+  public void constructor_whenItemIsGzipEncoded_throwsIOException() // <-- renamed test
       throws IOException {
     Storage storage = mock(Storage.class);
     // Mock session creation to succeed (so the constructor gets to the metadata check)
@@ -114,17 +119,175 @@ public class GoogleCloudStorageBidiReadChannelTest {
             /* metaGeneration= */ 2L,
             /* verificationAttributes= */ null);
 
-    UnsupportedOperationException e =
+    IOException e =
         assertThrows(
-            UnsupportedOperationException.class,
+            IOException.class, // <-- Now expecting IOException
             () ->
                 new GoogleCloudStorageBidiReadChannel(
                     storage,
-                    gzipItemInfo, // Use the gzip item info
+                    RESOURCE_ID,
+                    gzipItemInfo,
                     GoogleCloudStorageReadOptions.builder().build(),
                     Executors.newSingleThreadExecutor()));
 
-    assertThat(e).hasMessageThat().isEqualTo("Gzip Encoded Files are not supported");
+    // <-- Match the actual message thrown by initMetadata
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
+  }
+
+  @Test
+  public void lazyMetadataFetch_whenFastFailFalse_usesSessionMetadata() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+    Storage mockStorage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+
+    // Mock the BlobInfo that the session should return natively
+    BlobInfo mockBlobInfo = mock(BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn(2048L);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(1L);
+    when(mockSession.getBlobInfo()).thenReturn(mockBlobInfo);
+
+    // Mock the future that resolves to our session
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+
+    // Initialize with itemInfo = null to simulate open(URI)
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    // ASSERT 1: Verify storage.get() was NOT called during construction
+    verify(mockStorage, times(0)).get(any(BlobId.class));
+    verify(mockStorage, times(0)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+
+    // Trigger the lazy initialization
+    long size = channel.size();
+
+    // ASSERT 2: The size should match our mocked session metadata
+    assertThat(size).isEqualTo(2048L);
+
+    // ASSERT 3: Verify it extracted the data from the session
+    verify(mockSession, times(1)).getBlobInfo();
+
+    // ASSERT 4: Verify storage.get() was STILL NOT called! (Zero network overhead)
+    verify(mockStorage, times(0)).get(any(BlobId.class));
+    verify(mockStorage, times(0)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+  }
+
+  @Test
+  public void lazyMetadataFetch_whenSessionFutureThrowsException_usesFallbackGet()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+    Storage mockStorage = mock(Storage.class);
+
+    // Simulate the Future throwing an ExecutionException (e.g., network failed during Bidi
+    // handshake)
+    ApiFuture<BlobReadSession> mockSessionFuture =
+        ApiFutures.immediateFailedFuture(
+            new java.util.concurrent.ExecutionException(
+                "Simulated Bidi Handshake Failure", new Exception()));
+    when(mockStorage.blobReadSession(any(BlobId.class))).thenReturn(mockSessionFuture);
+
+    // Mock the fallback storage.get() response
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn(8192L);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    // Explicitly returning the mock for the fallback call
+    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class))).thenReturn(mockBlob);
+
+    // Initialize with itemInfo = null
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    // Verify no immediate network calls during construction
+    verify(mockStorage, times(0)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+
+    // Trigger lazy initialization (this will catch the ExecutionException and trigger fallback)
+    long size = channel.size();
+
+    // Verify fallback worked
+    assertThat(size).isEqualTo(8192L);
+
+    // Verify storage.get() WAS called exactly once as the fallback mechanism
+    verify(mockStorage, times(1)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+  }
+
+  @Test
+  public void lazyMetadataFetch_whenSessionFails_usesFallbackGet() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+    Storage mockStorage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+
+    // Simulate the session FAILING to provide the metadata
+    when(mockSession.getBlobInfo()).thenReturn(null);
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+
+    // Mock the fallback storage.get() response
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn(4096L);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class))).thenReturn(mockBlob);
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    // ASSERT 1: Verify storage.get() was NOT called during construction
+    verify(mockStorage, times(0)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+
+    // Trigger the lazy initialization
+    long size = channel.size();
+
+    // ASSERT 2: Verify fallback worked and size is correct
+    assertThat(size).isEqualTo(4096L);
+
+    // ASSERT 3: Verify storage.get() WAS called exactly once as a fallback!
+    verify(mockStorage, times(1)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+  }
+
+  @Test
+  public void eagerMetadataFetch_whenFastFailTrue_callsGetImmediately() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
+
+    Storage mockStorage = mock(Storage.class);
+
+    // Mock the eager storage.get() response
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn(8192L);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class))).thenReturn(mockBlob);
+
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    // ASSERT 1: Verify storage.get() WAS called exactly once DURING construction
+    verify(mockStorage, times(1)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+
+    // Call size()
+    long size = channel.size();
+
+    // ASSERT 2: Verify size is correct and no additional network calls were made
+    assertThat(size).isEqualTo(8192L);
+    verify(mockStorage, times(1)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
   }
 
   @Test
@@ -192,6 +355,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel bidiReadChannel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().build(),
             Executors.newSingleThreadExecutor());
@@ -212,6 +376,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel bidiReadChannel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().build(),
             Executors.newSingleThreadExecutor());
@@ -236,6 +401,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel bidiReadChannel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder()
                 .setGrpcReadTimeout(java.time.Duration.ofNanos(1))
@@ -357,11 +523,24 @@ public class GoogleCloudStorageBidiReadChannelTest {
   }
 
   @Test
-  public void initMetadata_unsupportedOperationException() throws IOException {
-    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
+  public void initMetadata_whenGzipNotSupported_throwsIOException() throws Exception {
+    // 1. Create options where fast fail is FALSE so the constructor doesn't auto-initialize
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setGzipEncodingSupportEnabled(false) // GZIP disabled
+            .build();
 
-    assertThrows(
-        UnsupportedOperationException.class, () -> bidiReadChannel.initMetadata("gzip", 10));
+    // 2. Instantiate channel with null itemInfo so metadata remains uninitialized
+    GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel(null, readOptions);
+
+    // 3. Verify that calling initMetadata with "gzip" throws the correct IOException
+    IOException thrown =
+        assertThrows(IOException.class, () -> bidiReadChannel.initMetadata("gzip", 10L, 1L));
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .contains("Cannot read GZIP encoded files - content encoding support is disabled");
   }
 
   @Test
@@ -383,6 +562,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel bidiReadChannel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().build(),
             Executors.newSingleThreadExecutor());
@@ -421,7 +601,11 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
-            storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+            storage,
+            RESOURCE_ID,
+            DEFAULT_ITEM_INFO,
+            readOptions,
+            Executors.newSingleThreadExecutor());
 
     // Verify footer is not initially cached
     assertNull("Footer should be null initially", getPrivateField(channel, "footerContent"));
@@ -461,6 +645,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
             Executors.newSingleThreadExecutor());
@@ -482,6 +667,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
             Executors.newSingleThreadExecutor());
@@ -501,6 +687,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
             Executors.newSingleThreadExecutor());
@@ -810,6 +997,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
             storage,
+            RESOURCE_ID,
             DEFAULT_ITEM_INFO,
             GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(10).build(),
             Executors.newSingleThreadExecutor());
@@ -835,7 +1023,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     when(storage.blobReadSession(any(), ArgumentMatchers.any(BlobSourceOption.class)))
         .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
     return new GoogleCloudStorageBidiReadChannel(
-        storage, itemInfo, readOptions, Executors.newSingleThreadExecutor());
+        storage, RESOURCE_ID, itemInfo, readOptions, Executors.newSingleThreadExecutor());
   }
 
   private GoogleCloudStorageBidiReadChannel getMockedBidiReadChannel(
@@ -872,7 +1060,7 @@ public class GoogleCloudStorageBidiReadChannelTest {
     when(storage.blobReadSession(any()))
         .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
     return new GoogleCloudStorageBidiReadChannel(
-        storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+        storage, RESOURCE_ID, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
   }
 
   private Object getPrivateField(Object obj, String fieldName) throws Exception {

@@ -78,8 +78,10 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       throws IOException {
     this.storage = storage;
     this.resourceId = resourceId;
+    this.readOptions = readOptions;
+    this.boundedThreadPool = boundedThreadPool;
+    this.readTimeout = readOptions.getGrpcReadTimeout();
 
-    // validate(itemInfo);
     if (itemInfo != null) {
       validate(itemInfo);
       initMetadata(
@@ -89,19 +91,16 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         fetchMetadata();
       }
     }
-    // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
-    this.readTimeout = readOptions.getGrpcReadTimeout();
-    // this.resourceId =
-    //     new StorageResourceId(
-    //         itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-    this.blobId =
-        BlobId.of(
-            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-    this.readOptions = readOptions;
+
+    // 3. KICK OFF ASYNC SESSION
+    Long generationId =
+        resourceId.getGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID
+            ? null
+            : resourceId.getGenerationId();
+
+    this.blobId = BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), generationId);
     this.sessionFuture = storage.blobReadSession(blobId);
     this.blobReadSession = null;
-    this.boundedThreadPool = boundedThreadPool;
-    // initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
   }
 
   private synchronized BlobReadSession getBlobReadSession() throws IOException {

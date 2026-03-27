@@ -169,6 +169,45 @@ public class GoogleCloudStorageImplTest {
   }
 
   /**
+   * Verifies that Bidi channels with fast-fail disabled load metadata lazily from the session,
+   * avoiding an explicit 'GetObject' network call.
+   */
+  @Test
+  public void open_bidi_lazyInit_whenFastFailOnNotFound_isFalse() throws IOException {
+    // Bidi is only applicable to the Java Storage Client (gRPC)
+    if (!testStorageClientImpl) {
+      return;
+    }
+
+    int expectedSize = 5 * 1024 * 1024;
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
+    writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+
+    // Create options with Bidi Enabled
+    GoogleCloudStorageOptions bidiOptions = GCS_OPTIONS.toBuilder().setBidiEnabled(true).build();
+
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(bidiOptions);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
+      // Calling size() triggers ensureMetadataInitialized().
+      // In Bidi, it resolves the session future and gets the BlobInfo locally for free!
+      assertThat(readChannel.size()).isEqualTo(expectedSize);
+    }
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
+    // The critical assertion: Verify that an explicit GetObject network call was NEVER made!
+    assertThat(trackingGcs.getAllRequestStrings()).doesNotContain("rpcMethod:GetObject");
+
+    trackingGcs.delegate.close();
+  }
+
+  /**
    * Even when java-storage client in use, write path get short-circuited via {@link
    * GoogleCloudStorageOptions} to use the http implementation.
    */
