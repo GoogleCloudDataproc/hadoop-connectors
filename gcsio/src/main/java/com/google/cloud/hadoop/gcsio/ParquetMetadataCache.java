@@ -1,13 +1,29 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,7 +37,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,39 +55,48 @@ public class ParquetMetadataCache {
 
   public ParquetMetadataCache(String baseGcsPath, String localCacheDirPrefix) {
     this.baseGcsPath = baseGcsPath.endsWith("/") ? baseGcsPath : baseGcsPath + "/";
-    this.localCacheDir = Paths.get(System.getProperty("java.io.tmpdir"), localCacheDirPrefix, "parquet_cache");
+    this.localCacheDir =
+        Paths.get(System.getProperty("java.io.tmpdir"), localCacheDirPrefix, "parquet_cache");
     this.storage = StorageOptions.getDefaultInstance().getService();
 
     try {
+      System.out.println(this.localCacheDir);
       Files.createDirectories(this.localCacheDir);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to create local cache directory: " + this.localCacheDir, e);
+      throw new RuntimeException(
+          "Failed to create local cache directory: " + this.localCacheDir, e);
     }
 
     this.indexFiles = loadIndexFiles();
     LOG.info("Loaded index files: {}", indexFiles);
 
-    this.connectionCache = CacheBuilder.newBuilder()
+    this.connectionCache =
+        CacheBuilder.newBuilder()
             .maximumSize(100) // Maximum number of connections to cache
-            .build(new CacheLoader<String, Connection>() {
-              @Override
-              public Connection load(String localDbPath) throws SQLException {
-                return DriverManager.getConnection("jdbc:sqlite:" + localDbPath);
-              }
-            });
+            .build(
+                new CacheLoader<String, Connection>() {
+                  @Override
+                  public Connection load(String localDbPath) throws SQLException {
+                    return DriverManager.getConnection("jdbc:sqlite:" + localDbPath);
+                  }
+                });
   }
 
   private List<String> loadIndexFiles() {
     String bucketName = getBucketName(baseGcsPath);
-    String prefix = getPathWithoutBucket(baseGcsPath);
+    String prefix = getPathWithoutBucket(baseGcsPath + "**" + INDEX_DB_NAME);
 
     List<String> indices = new ArrayList<>();
     try {
-      storage.list(bucketName, Storage.BlobListOption.prefix(prefix)).iterateAll().forEach(blob -> {
-        if (blob.getName().endsWith(INDEX_DB_NAME)) {
-          indices.add("gs://" + bucketName + "/" + blob.getName());
-        }
-      });
+      storage
+          .list(bucketName, Storage.BlobListOption.matchGlob(prefix))
+          .iterateAll()
+          .forEach(
+              blob -> {
+                if (blob.getName().endsWith(INDEX_DB_NAME)) {
+                  indices.add("gs://" + bucketName + "/" + blob.getName());
+                }
+              });
     } catch (Exception e) {
       LOG.error("Error listing index files in {}: {}", baseGcsPath, e.getMessage(), e);
     }
@@ -142,9 +166,11 @@ public class ParquetMetadataCache {
       Connection conn = connectionCache.get(localIndexPatn.toString());
 
       String indexDir = indexGcsPath.substring(0, indexGcsPath.lastIndexOf('/'));
-      String objectName = objectGcsPath.substring(indexDir.length() + 1);
+      String objectName = BlobId.fromGsUtilUri(objectGcsPath).getName();
+      //      String objectName = objectGcsPath.substring(indexDir.length() + 1);
 
-      String query = "SELECT file_size, footer_length, raw_metadata FROM metadata_index WHERE object_name = ?";
+      String query =
+          "SELECT file_size, footer_length, raw_metadata FROM metadata_index WHERE object_name = ?";
       try (PreparedStatement pstmt = conn.prepareStatement(query)) {
         pstmt.setString(1, objectName);
         ResultSet rs = pstmt.executeQuery();
@@ -152,7 +178,8 @@ public class ParquetMetadataCache {
           long fileSize = rs.getLong("file_size");
           int footerLength = rs.getInt("footer_length");
           byte[] rawMetadata = rs.getBytes("raw_metadata");
-          return Optional.of(new ParquetObjectMetadata(objectName, fileSize, footerLength, rawMetadata));
+          return Optional.of(
+              new ParquetObjectMetadata(objectName, fileSize, footerLength, rawMetadata));
         } else {
           LOG.info("Metadata not found for {} in {}", objectName, indexGcsPath);
           return Optional.empty();
@@ -183,7 +210,8 @@ public class ParquetMetadataCache {
     private final int footerLength;
     private final byte[] rawMetadata;
 
-    public ParquetObjectMetadata(String objectName, long fileSize, int footerLength, byte[] rawMetadata) {
+    public ParquetObjectMetadata(
+        String objectName, long fileSize, int footerLength, byte[] rawMetadata) {
       this.objectName = objectName;
       this.fileSize = fileSize;
       this.footerLength = footerLength;
@@ -212,26 +240,27 @@ public class ParquetMetadataCache {
     String basePath = "gs://gcs-hyd-iceberg-benchmark-warehouse/partitioned_warehouse/tpcds_sf1000";
     ParquetMetadataCache cache = new ParquetMetadataCache(basePath, "gcsio");
 
-    String testObject = basePath + "/web_returns/wr_returned_date_sk=2451546/part-00000-some-uuid.c000.snappy.parquet";
+    String testObject =
+        basePath
+            + "/catalog_sales/data/cs_sold_date_sk=2450818/00000-37100-ac344383-7b67-478a-9b3f-da8e0ce699a4-0-00001.parquet";
     Optional<ParquetObjectMetadata> metadata = cache.getMetadata(testObject);
 
     if (metadata.isPresent()) {
       ParquetObjectMetadata meta = metadata.get();
-      System.out.println("
-              Metadata for " + testObject);
+      System.out.println("Metadata for " + testObject);
       System.out.println("  File Size: " + meta.getFileSize());
       System.out.println("  Footer Length: " + meta.getFooterLength());
-      System.out.println("  Raw Metadata Length: " + (meta.getRawMetadata() != null ? meta.getRawMetadata().length : 0));
+      System.out.println(
+          "  Raw Metadata Length: "
+              + (meta.getRawMetadata() != null ? meta.getRawMetadata().length : 0));
     } else {
-      System.out.println("
-              Could not retrieve metadata for " + testObject);
+      System.out.println("Could not retrieve metadata for " + testObject);
     }
 
     String testObjectNoIndex = basePath + "/non_existent_table/data.parquet";
     metadata = cache.getMetadata(testObjectNoIndex);
     if (!metadata.isPresent()) {
-      System.out.println("
-              As expected, could not retrieve metadata for " + testObjectNoIndex);
+      System.out.println("As expected, could not retrieve metadata for " + testObjectNoIndex);
     }
   }
 }
