@@ -1308,11 +1308,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    // GoogleCloudStorageItemInfo gcsItemInfo = itemInfo;
-    // if (gcsItemInfo == null
-    //     && (storageOptions.isBidiEnabled() || readOptions.isFastFailOnNotFoundEnabled())) {
-    //   gcsItemInfo = getItemInfo(resourceId);
-    // }
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo;
     // Respect the fastFailOnNotFoundEnabled flag for both Unary and Bidi channels.
     if (gcsItemInfo == null && readOptions.isFastFailOnNotFoundEnabled()) {

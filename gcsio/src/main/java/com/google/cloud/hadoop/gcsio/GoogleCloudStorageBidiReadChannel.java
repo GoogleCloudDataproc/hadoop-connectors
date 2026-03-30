@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.api.client.util.Preconditions.checkArgument;
 import static com.google.api.client.util.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.max;
 
 import com.google.api.core.ApiFuture;
@@ -28,7 +29,6 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -92,7 +92,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       }
     }
 
-    // 3. KICK OFF ASYNC SESSION
     Long generationId =
         resourceId.getGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID
             ? null
@@ -318,11 +317,11 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       throws IOException {
     checkState(!metadataInitialized, "Metadata already initialized");
 
-    gzipEncoded = Strings.nullToEmpty(encoding).contains("gzip");
-    if (gzipEncoded && !readOptions.isGzipEncodingSupportEnabled()) {
+    gzipEncoded = nullToEmpty(encoding).contains("gzip");
+    // TODO(dhritichopra) Add Support for GZIP Encoding
+    if (gzipEncoded) {
       GoogleCloudStorageEventBus.postOnException();
-      throw new IOException(
-          "Cannot read GZIP encoded files - content encoding support is disabled.");
+      throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
     }
 
     objectSize = gzipEncoded ? -1 : sizeFromMetadata;
@@ -341,17 +340,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
     metadataInitialized = true;
   }
-
-  // protected void initMetadata(@Nullable String encoding, long sizeFromMetadata)
-  //     throws UnsupportedOperationException {
-  //   gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
-  //   // TODO(dhritichopra) Add Support for GZIP Encoding
-  //   if (gzipEncoded) {
-  //     GoogleCloudStorageEventBus.postOnException();
-  //     throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
-  //   }
-  //   objectSize = sizeFromMetadata;
-  // }
 
   private void validatePosition(long position) throws IOException {
     if (position < 0) {
@@ -617,7 +605,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   private void fetchMetadata() throws IOException {
     try {
-      BlobId blobId =
+      BlobId metadataBlobId =
           BlobId.of(
               resourceId.getBucketName(),
               resourceId.getObjectName(),
@@ -625,7 +613,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
       Blob blob =
           storage.get(
-              blobId,
+              metadataBlobId,
               Storage.BlobGetOption.fields(
                   Storage.BlobField.CONTENT_ENCODING,
                   Storage.BlobField.SIZE,
