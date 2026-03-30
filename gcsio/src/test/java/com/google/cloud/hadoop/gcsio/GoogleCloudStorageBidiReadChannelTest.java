@@ -32,6 +32,7 @@ import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
@@ -218,6 +219,110 @@ public class GoogleCloudStorageBidiReadChannelTest {
 
     assertThat(size).isEqualTo(4096L);
     verify(mockStorage, times(1)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+  }
+
+  @Test
+  public void fetchMetadata_whenBlobIsNull_throwsFileNotFoundException() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+    when(mockSession.getBlobInfo()).thenReturn(null);
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class))).thenReturn(null);
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    FileNotFoundException e = assertThrows(FileNotFoundException.class, channel::size);
+    assertThat(e).hasMessageThat().contains("Item not found: " + RESOURCE_ID);
+  }
+
+  @Test
+  public void fetchMetadata_whenStorageException_throwsIOException() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+    when(mockSession.getBlobInfo()).thenReturn(null);
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class)))
+        .thenThrow(new StorageException(500, "Simulated Server Error"));
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    IOException e = assertThrows(IOException.class, channel::size);
+    assertThat(e).hasMessageThat().contains("Failed to fetch metadata for " + RESOURCE_ID);
+    assertThat(e).hasCauseThat().isInstanceOf(StorageException.class);
+  }
+
+  @Test
+  public void initMetadata_withoutGenerationId_updatesResourceId() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    StorageResourceId noGenId = new StorageResourceId("test-bucket", "test-object");
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, noGenId, null, readOptions, Executors.newSingleThreadExecutor());
+
+    channel.initMetadata("text/plain", 1024L, 999L);
+
+    assertThat(channel.size()).isEqualTo(1024L);
+  }
+
+  @Test
+  public void initMetadata_withMismatchedGenerationId_throwsIllegalStateException()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    StorageResourceId withGenId = new StorageResourceId("test-bucket", "test-object", 123L);
+
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, withGenId, null, readOptions, Executors.newSingleThreadExecutor());
+
+    IllegalStateException e =
+        assertThrows(
+            IllegalStateException.class,
+            () -> {
+              channel.initMetadata("text/plain", 1024L, 999L);
+            });
+
+    assertThat(e).hasMessageThat().contains("should be equal to fetched generation");
+  }
+
+  @Test
+  public void ensureMetadataInitialized_onInterruptedException_restoresInterruptFlag()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    // Mock the Future to throw an InterruptedException
+    ApiFuture<BlobReadSession> mockFuture = mock(ApiFuture.class);
+    when(mockFuture.get()).thenThrow(new InterruptedException("Simulated Interrupt"));
+    when(mockStorage.blobReadSession(any(BlobId.class))).thenReturn(mockFuture);
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn(1024L);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class))).thenReturn(mockBlob);
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    channel.size();
+
+    assertThat(Thread.currentThread().isInterrupted()).isTrue();
+
+    // Clear the interrupt flag so it doesn't affect other tests!
+    Thread.interrupted();
   }
 
   @Test
