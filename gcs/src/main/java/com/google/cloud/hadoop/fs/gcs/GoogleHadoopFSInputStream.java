@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
@@ -137,7 +138,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
   }
 
-  private GoogleHadoopFSInputStream(
+  @VisibleForTesting
+  GoogleHadoopFSInputStream(
       GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       FileInfo fileInfo,
@@ -246,13 +248,15 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             throw new IndexOutOfBoundsException();
           }
           int response = 0;
+          ByteBuffer buffer = ByteBuffer.wrap(buf, offset, length);
           try {
             // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for
             // the underlying channel.
-            int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
+            int numRead = channel.read(buffer);
             if (numRead > 0) {
               // -1 means we actually read 0 bytes, but requested at least one byte.
               totalBytesRead += numRead;
+              statistics.incrementBytesRead(numRead);
               statistics.incrementReadOps(1);
               streamStats.updateReadStreamStats(numRead, startTimeNs);
             }
@@ -261,6 +265,13 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             response = numRead;
           } catch (IOException e) {
             streamStatistics.readException();
+            int bytesReadBeforeException = buffer.position() - offset;
+            if (bytesReadBeforeException > 0) {
+              totalBytesRead += bytesReadBeforeException;
+              statistics.incrementBytesRead(bytesReadBeforeException);
+              streamStatistics.bytesRead(bytesReadBeforeException);
+              streamStats.updateReadStreamStats(bytesReadBeforeException, startTimeNs);
+            }
             throw e;
           }
           streamStatistics.bytesRead(max(response, 0));
