@@ -188,9 +188,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public long size() throws IOException {
-    throwIfNotOpen(); // Optional: Keep this if you have a closed channel check
+    throwIfNotOpen();
 
-    // NEW: Lazily fetch the size if it's not available yet
+    // Lazily fetch the size if it's not available yet
     ensureMetadataInitialized();
 
     return objectSize;
@@ -314,10 +314,10 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   protected void initMetadata(@Nullable String encoding, long sizeFromMetadata, long generation)
-      throws IOException {
+      throws UnsupportedOperationException {
     checkState(!metadataInitialized, "Metadata already initialized");
 
-    gzipEncoded = nullToEmpty(encoding).contains("gzip");
+    gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
     // TODO(dhritichopra) Add Support for GZIP Encoding
     if (gzipEncoded) {
       GoogleCloudStorageEventBus.postOnException();
@@ -573,7 +573,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return;
     }
 
-    // Fast Path: Try to grab it directly from the BlobReadSession
     try {
       if (this.sessionFuture != null) {
         // Resolve the ApiFuture to get the actual BlobReadSession object.
@@ -584,15 +583,14 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         BlobInfo blobInfo = session.getBlobInfo();
         if (blobInfo != null) {
           initMetadata(blobInfo.getContentEncoding(), blobInfo.getSize(), blobInfo.getGeneration());
-          return; // Success! Zero extra network calls.
+          return;
         }
       }
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt(); // Restore the interrupted status
+      Thread.currentThread().interrupt();
       logger.atWarning().withCause(e).log(
           "Interrupted while waiting for BlobReadSession initialization for '%s'", resourceId);
     } catch (Exception e) {
-      // ExecutionException or CancellationException from the future
       logger.atWarning().withCause(e).log(
           "Failed to get metadata from BlobReadSession future for '%s'", resourceId);
     }
