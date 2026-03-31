@@ -143,19 +143,21 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     checkNotNull(options, "options must not be null");
-
+    FeatureHeaderGenerator featureHeaderGenerator = new FeatureHeaderGenerator(options);
     switch (options.getClientType()) {
       case STORAGE_CLIENT:
         return GoogleCloudStorageClientImpl.builder()
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .setFeatureHeaderGenerator(featureHeaderGenerator)
             .build();
       default:
         return GoogleCloudStorageImpl.builder()
             .setOptions(options.getCloudStorageOptions())
             .setCredentials(credentials)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .setFeatureHeaderGenerator(featureHeaderGenerator)
             .build();
     }
   }
@@ -1038,7 +1040,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
       if (isHnsOptimized(path)
-          && gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true)).exists()) {
+          && gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true).toDirectoryId())
+              .exists()) {
         return FileInfo.fromItemInfos(dirItemInfos);
       }
       GoogleCloudStorageEventBus.postOnException();

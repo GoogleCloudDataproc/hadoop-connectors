@@ -58,6 +58,7 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
@@ -1342,10 +1343,69 @@ public class GoogleCloudStorageClientTest {
     }
   }
 
+  @Test
+  @SuppressWarnings("unchecked")
+  public void getUpdatedHeaders_includesFeatureUsageAndUserAgent() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
+        GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+            .setPerformanceCacheEnabled(true)
+            .build();
+    FeatureHeaderGenerator featureHeaderGenerator = new FeatureHeaderGenerator(gcsfsOptions);
+
+    // Prepare storage options
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageOptions.DEFAULT.toBuilder()
+            .setAppName("test-app")
+            .setHttpRequestHeaders(ImmutableMap.of())
+            .build();
+    // Use reflection to invoke the private static method under test.
+    Method getUpdatedHeadersMethod =
+        GoogleCloudStorageClientImpl.class.getDeclaredMethod(
+            "getUpdatedHeaders", GoogleCloudStorageOptions.class, FeatureHeaderGenerator.class);
+    getUpdatedHeadersMethod.setAccessible(true);
+    ImmutableMap<String, String> headers =
+        (ImmutableMap<String, String>)
+            getUpdatedHeadersMethod.invoke(null, storageOptions, featureHeaderGenerator);
+
+    String expectedHeaderValue = featureHeaderGenerator.getValue();
+    // Verify all expected headers are present.
+    assertThat(headers.get("user-agent")).contains("test-app");
+    assertThat(headers).containsEntry(FeatureHeaderGenerator.HEADER_NAME, expectedHeaderValue);
+  }
+
   private Bucket mockBucket(String storageClass) {
     return Bucket.newBuilder()
         .setName("projects/_/buckets/foo-bucket")
         .setStorageClass(storageClass)
         .build();
+  }
+
+  @Test
+  public void open_fastFailDisabled_doesNotInvokeGet() throws Exception {
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      GoogleCloudStorageReadOptions readOptions =
+          GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+      gcs.open(TEST_RESOURCE_ID, readOptions);
+    }
+    assertEquals(0, mockStorage.getRequests().size());
+  }
+
+  @Test
+  public void open_fastFailEnabled_invokesGet() throws Exception {
+    mockStorage.addResponse(TEST_OBJECT);
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      GoogleCloudStorageReadOptions readOptions =
+          GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
+
+      gcs.open(TEST_RESOURCE_ID, readOptions);
+    }
+    assertEquals(1, mockStorage.getRequests().size());
   }
 }

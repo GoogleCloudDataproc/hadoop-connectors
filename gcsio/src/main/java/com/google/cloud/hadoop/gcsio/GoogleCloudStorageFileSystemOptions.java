@@ -41,7 +41,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
-        .setStatusParallelEnabled(true);
+        .setStatusParallelEnabled(true)
+        .setCloudLoggingEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -60,6 +61,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract Pattern getMarkerFilePattern();
 
   public abstract boolean isStatusParallelEnabled();
+
+  public abstract boolean isCloudLoggingEnabled();
 
   public abstract boolean isEnsureNoConflictingItems();
 
@@ -94,6 +97,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
      * methods to reduce latency.
      */
     public abstract Builder setStatusParallelEnabled(boolean statusParallelEnabled);
+
+    public abstract Builder setCloudLoggingEnabled(boolean cloudLoggingEnabled);
 
     public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 

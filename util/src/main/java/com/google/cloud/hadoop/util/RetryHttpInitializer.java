@@ -101,8 +101,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
     headers.putAll(options.getHttpHeaders());
     request.setInterceptor(
-        new JsonIdempotencyTokenInterceptor(
-            new InvocationIdInterceptor(request.getInterceptor(), tracker)));
+        new ChecksumHeaderInterceptor(
+            new JsonIdempotencyTokenInterceptor(
+                new InvocationIdInterceptor(request.getInterceptor(), tracker))));
   }
 
   protected RequestTracker getRequestTracker(HttpRequest request) {

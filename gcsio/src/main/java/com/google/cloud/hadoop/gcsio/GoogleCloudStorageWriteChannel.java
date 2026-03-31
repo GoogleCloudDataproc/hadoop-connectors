@@ -23,6 +23,7 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.ChecksumContext;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
@@ -48,6 +49,8 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   private final ClientRequestHelper<StorageObject> clientRequestHelper;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
+
+  private String cachedFinalChecksum = null;
 
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
@@ -127,8 +130,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
   }
 
   private void verifyChecksums(String serverProvidedCrc32c) throws IOException {
-    String srcCrc =
-        BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
+    String srcCrc = getFinalChecksum();
     if (!srcCrc.equals(serverProvidedCrc32c)) {
       GoogleCloudStorageEventBus.postWriteChecksumFailure();
       throw new IOException(
@@ -140,6 +142,14 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
           "Data integrity check passed for resource '%s'. Client-calculated CRC32C (%s) matched the server-provided CRC32C (%s).",
           getResourceString(), srcCrc, serverProvidedCrc32c);
     }
+  }
+
+  private synchronized String getFinalChecksum() {
+    if (cachedFinalChecksum == null) {
+      cachedFinalChecksum =
+          BaseEncoding.base64().encode(Ints.toByteArray(cumulativeCrc32cHasher.hash().asInt()));
+    }
+    return cachedFinalChecksum;
   }
 
   /**
@@ -193,6 +203,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream ignore = pipeSource) {
+        ChecksumContext.setChecksumSupplier(GoogleCloudStorageWriteChannel.this::getFinalChecksum);
         return uploadObject.execute();
       } catch (IOException e) {
         GoogleCloudStorageEventBus.postOnException();
@@ -204,6 +215,8 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
             "Received IOException during '%s' upload, but successfully converted to response: '%s'.",
             resourceId, response);
         return response;
+      } finally {
+        ChecksumContext.clear();
       }
     }
   }
