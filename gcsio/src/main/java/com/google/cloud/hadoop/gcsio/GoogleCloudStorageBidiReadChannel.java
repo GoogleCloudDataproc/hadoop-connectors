@@ -469,7 +469,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       if (!byteString.isEmpty()) {
         this.bufferStartPosition = position;
 
-        // TODO(dhritichopra): This is a temporary fix for mmeory leak, better alterantives need to
+        // TODO(dhritichopra): This is a temporary fix for memory leak, better alternatives need to
         // be explored.
         byte[] copiedBytes = byteString.toByteArray();
         this.internalBuffer = ByteBuffer.wrap(copiedBytes);

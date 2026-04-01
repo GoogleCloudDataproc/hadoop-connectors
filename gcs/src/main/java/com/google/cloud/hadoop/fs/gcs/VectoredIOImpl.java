@@ -90,7 +90,7 @@ public class VectoredIOImpl implements Closeable {
    * @param ranges List of file ranges to read.
    * @param allocate Function to allocate ByteBuffer for reading.
    * @param gcsFs GCFS implementation to use while creating channel and reading content for ranges.
-   * @param fileInfo FileInfo of the gcs object agaisnt which range request are fired, this can be
+   * @param fileInfo FileInfo of the gcs object against which range request are fired, this can be
    *     null for some code path fall back to URI path provided.
    * @param gcsPath URI of the gcs object for which the range requests are fired.
    * @param rangeReadThreadStats concurrent map to capture all threadLocal stats collected during
@@ -379,7 +379,7 @@ public class VectoredIOImpl implements Closeable {
       }
 
       /**
-       * Returns Overriden GCS read options. These options will be used while creating channel per
+       * Returns Overridden GCS read options. These options will be used while creating channel per
        * FileRange. By default, channel is optimized to perform multiple read request from same
        * channel. Given in readVectored, only one read is performed per channel overriding some
        * configuration to optimize it.
