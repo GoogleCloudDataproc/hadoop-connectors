@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
@@ -47,12 +48,9 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InterruptedIOException;
-import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.Channels;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
@@ -370,15 +368,23 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             "Closing contentChannel after %s exception for '%s'.", ioe.getMessage(), resourceId);
         closeContentChannel();
 
+        if (buffer.remaining() != remainingBeforeRead) {
+          int partialRead = remainingBeforeRead - buffer.remaining();
+          logger.atInfo().log(
+              "Despite exception, had partial read of %d bytes from '%s'; resetting retry count.",
+              partialRead, resourceId);
+          retriesAttempted = 0;
+          totalBytesRead += partialRead;
+          currentPosition += partialRead;
+        }
+
         // Handle thread interruptions (e.g. from cancellation) separately from general
         // IOExceptions.
         // Interruptions are treated as non-retryable events because they indicate the caller has
         // abandoned the current request (e.g., due to a timeout) and may already be initiating
         // a new attempt. We catch InterruptedIOException but exclude SocketTimeoutException,
         // which is a network-level timeout that should still be retried.
-        if (ioe instanceof ClosedByInterruptException
-            || (ioe instanceof InterruptedIOException
-                && !(ioe instanceof SocketTimeoutException))) {
+        if (IoExceptionHelper.isInterrupted(ioe)) {
           logger.atInfo().withCause(ioe).log(
               "Thread interrupted while reading '%s' at position %d. Stopping further processing.",
               resourceId, currentPosition);
@@ -389,16 +395,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                   "Thread interrupt received while reading '%s' at position %d.",
                   resourceId, currentPosition),
               ioe);
-        }
-
-        if (buffer.remaining() != remainingBeforeRead) {
-          int partialRead = remainingBeforeRead - buffer.remaining();
-          logger.atInfo().log(
-              "Despite exception, had partial read of %d bytes from '%s'; resetting retry count.",
-              partialRead, resourceId);
-          retriesAttempted = 0;
-          totalBytesRead += partialRead;
-          currentPosition += partialRead;
         }
 
         // TODO(user): Refactor any reusable logic for retries into a separate RetryHelper
@@ -1035,6 +1031,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           break;
         } catch (IOException footerException) {
           GoogleCloudStorageEventBus.postOnException();
+          if (IoExceptionHelper.isInterrupted(footerException)) {
+            Thread.currentThread().interrupt();
+            throw footerException;
+          }
           logger.atInfo().withCause(footerException).log(
               "Failed to prefetch footer (retry #%d/%d) for '%s'",
               retriesCount + 1, maxRetries, resourceId);

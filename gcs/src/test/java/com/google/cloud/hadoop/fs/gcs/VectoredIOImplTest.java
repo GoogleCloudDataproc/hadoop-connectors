@@ -526,6 +526,51 @@ public class VectoredIOImplTest {
         interruptLatch.await(5, TimeUnit.SECONDS));
   }
 
+  @Test
+  public void testCombinedRangeZombieThreadPrevention() throws Exception {
+    List<FileRange> fileRanges = new ArrayList<>();
+    // These two ranges will be merged based on default options
+    fileRanges.add(FileRange.createFileRange(0, 10));
+    fileRanges.add(FileRange.createFileRange(15, 10));
+
+    CountDownLatch readStartedLatch = new CountDownLatch(1);
+    CountDownLatch interruptLatch = new CountDownLatch(1);
+
+    GoogleCloudStorageFileSystem mockedGcsFs = mock(GoogleCloudStorageFileSystem.class);
+    when(mockedGcsFs.getOptions()).thenReturn(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    when(mockedGcsFs.open((FileInfo) any(), any()))
+        .thenReturn(new BlockingReadChannel(readStartedLatch, interruptLatch));
+
+    vectoredIO.readVectored(
+        fileRanges,
+        allocate,
+        mockedGcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
+
+    // Wait for the background thread to actually start reading
+    assertTrue("Read should have started", readStartedLatch.await(5, TimeUnit.SECONDS));
+
+    // Cancel one of the child range's data future (simulating a Spark/Parquet timeout)
+    fileRanges.get(0).getData().cancel(true);
+
+    // Verify that the background thread was interrupted
+    assertTrue(
+        "Background thread should have been interrupted for combined range",
+        interruptLatch.await(5, TimeUnit.SECONDS));
+
+    // Verify both child ranges are failed/cancelled
+    assertTrue("First range should be cancelled", fileRanges.get(0).getData().isCancelled());
+    // The second range should also be completed exceptionally because the combined read was
+    // interrupted
+    ExecutionException ee =
+        assertThrows(
+            ExecutionException.class, () -> fileRanges.get(1).getData().get(1, TimeUnit.SECONDS));
+    assertThat(ee.getCause()).isInstanceOf(IOException.class);
+  }
+
   private void verifyRangeContent(List<FileRange> fileRanges) throws Exception {
     for (FileRange range : fileRanges) {
       ByteBuffer result = range.getData().get(1, TimeUnit.MINUTES);

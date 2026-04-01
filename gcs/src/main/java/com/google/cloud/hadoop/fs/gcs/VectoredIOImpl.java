@@ -24,6 +24,7 @@ import static org.apache.hadoop.fs.VectoredReadUtils.validateRangeRequest;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -199,6 +200,11 @@ public class VectoredIOImpl implements Closeable {
      * @param executionFuture the future representing the background thread execution.
      */
     private void addCancellationListener(FileRange range, Future<?> executionFuture) {
+      if (range instanceof CombinedFileRange) {
+        for (FileRange child : ((CombinedFileRange) range).getUnderlying()) {
+          addCancellationListener(child, executionFuture);
+        }
+      }
       range
           .getData()
           .whenComplete(
@@ -321,6 +327,9 @@ public class VectoredIOImpl implements Closeable {
         }
         combinedFileRange.getData().complete(readContent);
       } catch (Exception e) {
+        if (IoExceptionHelper.isInterrupted(e)) {
+          Thread.currentThread().interrupt();
+        }
         logger.atWarning().withCause(e).log(
             "Exception while reading combinedFileRange:%s for path: %s",
             combinedFileRange, channelProvider.gcsPath);
@@ -374,6 +383,9 @@ public class VectoredIOImpl implements Closeable {
             "Read single range completed from range: %s, path: %s", range, channelProvider.gcsPath);
         range.getData().complete(dst);
       } catch (Exception e) {
+        if (IoExceptionHelper.isInterrupted(e)) {
+          Thread.currentThread().interrupt();
+        }
         logger.atWarning().withCause(e).log(
             "Exception while reading range:%s for path: %s", range, channelProvider.gcsPath);
         captureAndResetThreadLocalStats();
