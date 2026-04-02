@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
@@ -375,6 +376,25 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           retriesAttempted = 0;
           totalBytesRead += partialRead;
           currentPosition += partialRead;
+        }
+
+        // Handle thread interruptions (e.g. from cancellation) separately from general
+        // IOExceptions.
+        // Interruptions are treated as non-retryable events because they indicate the caller has
+        // abandoned the current request (e.g., due to a timeout) and may already be initiating
+        // a new attempt. We catch InterruptedIOException but exclude SocketTimeoutException,
+        // which is a network-level timeout that should still be retried.
+        if (IoExceptionHelper.isInterrupted(ioe)) {
+          logger.atInfo().withCause(ioe).log(
+              "Thread interrupted while reading '%s' at position %d. Stopping further processing.",
+              resourceId, currentPosition);
+          // Re-assert interrupt status and percolate as a non-retryable exception.
+          Thread.currentThread().interrupt();
+          throw new IOException(
+              String.format(
+                  "Thread interrupt received while reading '%s' at position %d.",
+                  resourceId, currentPosition),
+              ioe);
         }
 
         // TODO(user): Refactor any reusable logic for retries into a separate RetryHelper
@@ -1011,6 +1031,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           break;
         } catch (IOException footerException) {
           GoogleCloudStorageEventBus.postOnException();
+          if (IoExceptionHelper.isInterrupted(footerException)) {
+            Thread.currentThread().interrupt();
+            throw footerException;
+          }
           logger.atInfo().withCause(footerException).log(
               "Failed to prefetch footer (retry #%d/%d) for '%s'",
               retriesCount + 1, maxRetries, resourceId);
