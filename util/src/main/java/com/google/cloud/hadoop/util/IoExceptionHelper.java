@@ -18,8 +18,10 @@ package com.google.cloud.hadoop.util;
 
 import java.io.IOError;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.channels.ClosedByInterruptException;
 import javax.net.ssl.SSLException;
 
 /**
@@ -77,5 +79,25 @@ public final class IoExceptionHelper {
    */
   public static boolean isReadTimedOut(IOException e) {
     return e instanceof SocketTimeoutException && e.getMessage().equalsIgnoreCase("Read timed out");
+  }
+
+  /**
+   * Determines if a given {@link Throwable} is caused by a thread interruption.
+   *
+   * <p>Recursively checks {@code getCause()} if outer exception isn't an instance of the correct
+   * class.
+   *
+   * @param throwable The {@link Throwable} to check.
+   * @return True if the {@link Throwable} is a result of a thread interruption.
+   */
+  public static boolean isInterrupted(Throwable throwable) {
+    if (throwable instanceof InterruptedException
+        || throwable instanceof ClosedByInterruptException
+        || (throwable instanceof InterruptedIOException
+            && !(throwable instanceof SocketTimeoutException))) {
+      return true;
+    }
+    Throwable cause = throwable.getCause();
+    return cause != null && isInterrupted(cause);
   }
 }
