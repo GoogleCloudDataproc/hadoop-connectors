@@ -76,7 +76,7 @@ public class BenchmarkParallel extends Configured implements Tool {
       if (!tempFs.exists(sampleFile)) {
         System.err.println("WARNING: Sample file " + sampleFile + " not found.");
       }
-      sampleFileSize = tempFs.getFileStatus(sampleFile).getLen();
+      sampleFileSize = 4_500_000_000L;
     }
 
     List<Double> allOpenLatencies = Collections.synchronizedList(new ArrayList<>());
@@ -234,6 +234,17 @@ public class BenchmarkParallel extends Configured implements Tool {
       in = fs.open(path);
       long endOpen = System.nanoTime();
       openMs = (endOpen - startOpen) / 1_000_000.0;
+
+      for (FileRange r : ranges) {
+        System.out.println(
+            "Processing path: "
+                + path
+                + " - Range: ["
+                + r.getOffset()
+                + ", "
+                + (r.getOffset() + r.getLength())
+                + ")");
+      }
 
       long startRead = System.nanoTime();
       in.readVectored(ranges, ByteBuffer::allocate);

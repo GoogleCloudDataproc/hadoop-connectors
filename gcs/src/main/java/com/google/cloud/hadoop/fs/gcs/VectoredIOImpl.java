@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -92,7 +93,7 @@ public class VectoredIOImpl implements Closeable {
    * @param gcsPath URI of the gcs object for which the range requests are fired.
    * @throws IOException If invalid range is requested, offset<0.
    */
-  public void readVectored(
+  public List<String> readVectored(
       List<? extends FileRange> ranges,
       IntFunction<ByteBuffer> allocate,
       GoogleCloudStorageFileSystem gcsFs,
@@ -102,7 +103,7 @@ public class VectoredIOImpl implements Closeable {
       throws IOException {
     VectoredReadChannel vectoredReadChannel =
         new VectoredReadChannel(gcsFs, fileInfo, gcsPath, streamStatistics);
-    vectoredReadChannel.readVectored(ranges, allocate);
+    return vectoredReadChannel.readVectored(ranges, allocate);
   }
 
   class VectoredReadChannel {
@@ -119,8 +120,8 @@ public class VectoredIOImpl implements Closeable {
       this.streamStatistics = streamStatistics;
     }
 
-    private void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
-        throws IOException {
+    private List<String> readVectored(
+        List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
       List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
       for (FileRange range : ranges) {
         // TODO(user): upgrade to use validateAndSortRanges
@@ -128,10 +129,16 @@ public class VectoredIOImpl implements Closeable {
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         range.setData(result);
       }
+      List<String> requestedRanges = new ArrayList<>();
       if (shouldMergeRanges(ranges)) {
         updateRangeSizeCounters(sortedRanges.size(), sortedRanges.size());
         // case when ranges are not merged
         for (FileRange sortedRange : sortedRanges) {
+          requestedRanges.add(
+              "["
+                  + sortedRange.getOffset()
+                  + ", "
+                  + (sortedRange.getOffset() + sortedRange.getLength() + ")"));
           long startTimer = System.currentTimeMillis();
           boundedThreadPool.submit(
               () -> {
@@ -149,6 +156,11 @@ public class VectoredIOImpl implements Closeable {
         updateRangeSizeCounters(sortedRanges.size(), combinedFileRanges.size());
         // case where ranges can be merged
         for (CombinedFileRange combinedFileRange : combinedFileRanges) {
+          requestedRanges.add(
+              "["
+                  + combinedFileRange.getOffset()
+                  + ", "
+                  + (combinedFileRange.getOffset() + combinedFileRange.getLength() + ")"));
           CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
           combinedFileRange.setData(result);
           long startTimer = System.currentTimeMillis();
@@ -165,6 +177,7 @@ public class VectoredIOImpl implements Closeable {
               });
         }
       }
+      return requestedRanges;
     }
 
     private void updateRangeSizeCounters(int incomingRangeSize, int combinedRangeSize) {

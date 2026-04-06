@@ -42,6 +42,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
@@ -105,18 +106,18 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
     if (ghfs.isAnalyticsCoreEnabled()) {
+      if (fileInfo == null) {
+        fileInfo = ghfs.getGcsFs().getFileInfoObject(gcsPath);
+      }
       StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
       GcsItemId.Builder itemIdBuilder =
           GcsItemId.builder()
               .setBucketName(resourceId.getBucketName())
               .setObjectName(resourceId.getObjectName());
-      if (resourceId.hasGenerationId()) {
-        itemIdBuilder.setContentGeneration(resourceId.getGenerationId());
+      if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+        itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
       }
       GcsItemId itemId = itemIdBuilder.build();
-      if (fileInfo == null) {
-        fileInfo = ghfs.getGcsFs().getFileInfo(gcsPath);
-      }
       GcsItemInfo gcsItemInfo =
           GcsItemInfo.builder()
               .setItemId(itemId)
@@ -278,15 +279,21 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             ((AnalyticsCoreChannelAdapter) channel).readVectored(ranges, allocate);
             long duration = System.nanoTime() - start;
             logger.atInfo().log("Analytics Core readVectored took %d ns", duration);
-            VectoredReadMetric.add("Analytics Core", duration);
+            List<String> requestedRanges = new ArrayList<>();
+            for (FileRange r : ranges) {
+              requestedRanges.add(
+                  "[" + r.getOffset() + ", " + (r.getOffset() + r.getLength()) + ")");
+            }
+            VectoredReadMetric.add("Analytics Core", duration, requestedRanges);
           } else {
             long startTimeNs = System.nanoTime();
-            vectoredIOSupplier
-                .get()
-                .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
+            List<String> mergedRanges =
+                vectoredIOSupplier
+                    .get()
+                    .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
             long duration = System.nanoTime() - startTimeNs;
             logger.atInfo().log("GCSIO readVectored took %d ns", duration);
-            VectoredReadMetric.add("GCSIO", duration);
+            VectoredReadMetric.add("GCSIO", duration, mergedRanges);
             statistics.incrementReadOps(1);
             vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
           }

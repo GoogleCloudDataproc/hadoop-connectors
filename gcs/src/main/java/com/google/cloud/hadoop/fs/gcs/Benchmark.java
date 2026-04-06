@@ -144,8 +144,12 @@ public class Benchmark extends Configured implements Tool {
           String readType = "Unknown";
           if (!metrics.isEmpty()) {
             readType = metrics.get(0).type;
+            System.out.println("\n--- Vectored Read Metrics (Iteration " + i + ") ---");
             for (VectoredReadMetric m : metrics) {
               totalVectoredReadDurationNs += m.durationNs;
+              System.out.printf(
+                  "  [%s] Duration: %.2f ms | Ranges: %s%n",
+                  m.type, m.durationNs / 1_000_000.0, m.requestedRanges);
             }
           }
           vectoredReadLatencies.add(totalVectoredReadDurationNs / 1_000_000.0);
