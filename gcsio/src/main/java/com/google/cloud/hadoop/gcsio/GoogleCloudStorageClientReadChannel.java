@@ -297,6 +297,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // in the first read. Therefore, loop till we either read the required number of
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
+        // Break the loop immediately if we are at or past EOF
+        if (objectSize != -1 && currentPosition >= objectSize) {
+          break;
+        }
+
         int remainingBeforeRead = dst.remaining();
         try {
           if (byteChannel == null) {
@@ -424,8 +429,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         logger.atInfo().log(
             "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
 
-        if (objectSize == 0) {
+        if (objectSize != -1 && currentPosition >= objectSize) {
           readableByteChannel.close();
+          contentChannelCurrentPosition = currentPosition;
+          contentChannelEnd = currentPosition;
           return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
         }
 
