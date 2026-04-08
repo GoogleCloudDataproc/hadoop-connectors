@@ -404,8 +404,51 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
       setChannelBoundaries(bytesToRead);
 
+      logger.atFiner().log(
+          "Opening lazy gRPC channel for '%s' from %d to %d",
+          resourceId, contentChannelCurrentPosition, contentChannelEnd);
+
       ReadableByteChannel readableByteChannel =
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
+
+      if (!metadataInitialized) {
+        logger.atInfo().log(
+            "Metadata not initialized. Forcing lazy channel connection with 0-byte read for '%s'",
+            resourceId);
+
+        // The 0-byte read triggers the actual ReadObjectRequest over the network
+        readableByteChannel.read(ByteBuffer.allocate(0));
+        // Extract the headers to populate objectSize
+        ensureMetadataInitialized(readableByteChannel);
+
+        logger.atInfo().log(
+            "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
+
+        if (objectSize == 0) {
+          readableByteChannel.close();
+          return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
+        }
+
+        // Check if file is GZIP Encoded
+        if (gzipEncoded) {
+          if (currentPosition == 0) {
+            contentChannelEnd = objectSize;
+          } else {
+            // We guessed the boundary wrong for a GZIP file. Reopen it properly.
+            readableByteChannel.close();
+            // Reset channel boundaries
+            contentChannelCurrentPosition = -1;
+            contentChannelEnd = -1;
+            return openByteChannel(bytesToRead);
+          }
+        }
+      }
+
+      if (contentChannelEnd == Long.MAX_VALUE && objectSize != -1) {
+        contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
+        logger.atInfo().log(
+            "Recalculated contentChannelEnd to %d for '%s'", contentChannelEnd, resourceId);
+      }
 
       if (contentChannelEnd == objectSize
           && (contentChannelEnd - contentChannelCurrentPosition)
@@ -461,7 +504,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private void setChannelBoundaries(long bytesToRead) {
-      contentChannelCurrentPosition = getRangeRequestStart();
+      contentChannelCurrentPosition = getRangeRequestStart(bytesToRead);
       contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
       checkState(
           contentChannelEnd >= contentChannelCurrentPosition,
@@ -513,10 +556,25 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       return Channels.newChannel(new ByteArrayInputStream(footerContent, offset, length));
     }
 
-    private long getRangeRequestStart() {
+    private long getRangeRequestStart(long bytesToRead) {
       if (gzipEncoded) {
         return 0;
       }
+
+      // Guess the start boundary if the size is unknown
+      if (objectSize == -1) {
+        if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
+            || bytesToRead >= readOptions.getMinRangeRequestSize()) {
+          return currentPosition;
+        }
+        // Prefetch footer (bytes before 'currentPosition') lazily.
+        // Max prefetch size is (minRangeRequestSize / 2) bytes.
+        if (bytesToRead <= readOptions.getMinRangeRequestSize() / 2) {
+          return Math.max(0, currentPosition - readOptions.getMinRangeRequestSize() / 2);
+        }
+        return Math.max(0, currentPosition - (readOptions.getMinRangeRequestSize() - bytesToRead));
+      }
+
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
           && isFooterRead()
           && !readOptions.isReadExactRequestedBytesEnabled()) {
