@@ -104,7 +104,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * be performed by calling the rename API.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_HIERARCHICAL_NAMESPACE_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.hierarchical.namespace.folders.enable", true);
 
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
@@ -640,10 +640,22 @@ public class GoogleHadoopFileSystemConfiguration {
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
+    int readThreads = GCS_VECTORED_READ_THREADS.get(config, config::getInt);
+    if (config.get(GCS_VECTORED_READ_THREADS.getKey()) == null) {
+      int availableCores = Runtime.getRuntime().availableProcessors();
+
+      // Multiplier of 2x for a safe balance of high throughput and stability
+      int calculatedThreads = availableCores * 2;
+
+      // Floor of 16: Hides network latency on small containers
+      // Ceiling of 128: Prevents connection/memory thrashing on massive VMs.
+      readThreads = Math.max(16, Math.min(128, calculatedThreads));
+    }
+    logger.atInfo().log("Using %d threads for vectored reads", readThreads);
     return VectoredReadOptions.builder()
         .setMinSeekVectoredReadSize(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getInt))
         .setMergeRangeMaxSize(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getInt))
-        .setReadThreads(GCS_VECTORED_READ_THREADS.get(config, config::getInt));
+        .setReadThreads(readThreads);
   }
 
   @VisibleForTesting

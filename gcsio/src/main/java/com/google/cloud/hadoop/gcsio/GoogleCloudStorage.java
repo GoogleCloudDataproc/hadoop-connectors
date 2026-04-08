@@ -393,7 +393,7 @@ public interface GoogleCloudStorage {
    *       <p>This is an experimental API and can change without notice.
    *
    * @param bucketName bucket name
-   * @param startOffset offset sting, all object with name greater and equal will be listed.
+   * @param startOffset offset string, all object with name greater and equal will be listed.
    * @return list of objects
    * @throws IOException on IO error
    */
@@ -448,7 +448,7 @@ public interface GoogleCloudStorage {
    *       <p>This is an experimental API and can change without notice.
    *
    * @param bucketName bucket name
-   * @param startOffset offset sting, all object with name greater and equal will be listed.
+   * @param startOffset offset string, all object with name greater and equal will be listed.
    * @param listOptions options to use when listing objects
    * @return list of objects
    * @throws IOException on IO error

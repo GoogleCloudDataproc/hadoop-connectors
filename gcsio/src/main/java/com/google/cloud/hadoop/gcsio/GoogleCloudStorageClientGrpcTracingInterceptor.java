@@ -130,7 +130,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
    * ClientStreamTracer support added in grpc helps in tracing the flow of messages over socket and
    * have less control over the actual message. Via this customised Tracer of every stream type we
    * added support to trace the messages sent over stream and also extract and log the meaningful
-   * information from it i.e. invocationId header, request parameters. reponse values etc.
+   * information from it i.e. invocationId header, request parameters. response values etc.
    *
    * <p>Via {@link #logRequestMessage(MessageLite)} and {@link #logRequestMessage(MessageLite)}
    * hooks we associate request and response messages to a stream.

@@ -135,7 +135,7 @@
 
 1.  Upgrade java-storage to 2.29.0
 
-1.  Add support for `WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE` authentication type that retrieves a refresh token using workload identity federation configuraiton defined in: `fs.gs.auth.workload.identity.federation.credential.config.file`
+1.  Add support for `WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE` authentication type that retrieves a refresh token using workload identity federation configuration defined in: `fs.gs.auth.workload.identity.federation.credential.config.file`
 
 ### 2.2.2 - 2021-06-25
 
@@ -307,7 +307,7 @@
 
 1.  Add a property that allows to disable HCFS semantic enforcement. If set to
     `false` GSC connector will not check if directory with same name already
-    exists when creating a new file and vise versa.
+    exists when creating a new file and vice versa.
 
     ```
     fs.gs.create.items.conflict.check.enable (default: true)
@@ -332,7 +332,7 @@
     configured via property and disabled by default (zero or negative value):
 
     ```
-    fs.gs.outputstream.upload.cache.size (deafult: 0)
+    fs.gs.outputstream.upload.cache.size (default: 0)
     ```
 
 ### 2.1.0 - 2020-03-09
@@ -1241,7 +1241,7 @@
     ```
 
     This allows working around some clients like Hive-related daemons and tools
-    which pre-emptively check for certain assumptions about permissions.
+    which preemptively check for certain assumptions about permissions.
 
 ### 1.4.1 - 2015-07-09
 
