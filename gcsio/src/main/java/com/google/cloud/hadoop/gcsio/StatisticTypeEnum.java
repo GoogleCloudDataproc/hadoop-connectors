@@ -22,14 +22,14 @@ public enum StatisticTypeEnum {
   /** Counter. Counts the number of occurrences of each operation */
   TYPE_COUNTER,
 
-  /** Duration. Duration for the execution of opertaion */
+  /** Duration. Duration for the execution of operation */
   TYPE_DURATION,
 
   /** Gauge. */
   TYPE_GAUGE,
 
   /* Duration. Stores everything stored by TYPE_DURATION and total time taken.
-   * This is to avoid storing and computing total duration of an operation repeatedly. Instread this can be done at the time of querying metric by multipying mean and count
+   * This is to avoid storing and computing total duration of an operation repeatedly. Instead this can be done at the time of querying metric by multiplying mean and count
    * */
   TYPE_DURATION_TOTAL
 }
