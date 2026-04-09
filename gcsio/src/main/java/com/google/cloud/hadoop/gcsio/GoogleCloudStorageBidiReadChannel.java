@@ -324,7 +324,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
     }
 
-    objectSize = gzipEncoded ? -1 : sizeFromMetadata;
+    objectSize = sizeFromMetadata;
 
     if (!resourceId.hasGenerationId()) {
       resourceId =
@@ -576,9 +576,10 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     try {
       if (this.sessionFuture != null) {
         // Resolve the ApiFuture to get the actual BlobReadSession object.
-        // This will block until the session is successfully established,
-        // effectively deferring the connection latency to the first read().
-        BlobReadSession session = this.sessionFuture.get();
+        // We use the configured BidiClientTimeout to prevent the reading thread
+        // from blocking indefinitely if the future hangs.
+        BlobReadSession session =
+            this.sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
 
         BlobInfo blobInfo = session.getBlobInfo();
         if (blobInfo != null) {
@@ -587,9 +588,11 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         }
       }
     } catch (InterruptedException e) {
+      GoogleCloudStorageEventBus.postOnException();
       Thread.currentThread().interrupt();
       logger.atWarning().withCause(e).log(
           "Interrupted while waiting for BlobReadSession initialization for '%s'", resourceId);
+      throw new IOException("Thread interrupt received.", e);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log(
           "Failed to get metadata from BlobReadSession future for '%s'", resourceId);

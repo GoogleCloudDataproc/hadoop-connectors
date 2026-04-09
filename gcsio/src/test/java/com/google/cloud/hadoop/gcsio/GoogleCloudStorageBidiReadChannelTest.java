@@ -304,21 +304,17 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     Storage mockStorage = mock(Storage.class);
-    // Mock the Future to throw an InterruptedException
     ApiFuture<BlobReadSession> mockFuture = mock(ApiFuture.class);
-    when(mockFuture.get()).thenThrow(new InterruptedException("Simulated Interrupt"));
+    when(mockFuture.get(anyLong(), any(java.util.concurrent.TimeUnit.class)))
+        .thenThrow(new InterruptedException("Simulated Interrupt"));
     when(mockStorage.blobReadSession(any(BlobId.class))).thenReturn(mockFuture);
-    Blob mockBlob = mock(Blob.class);
-    when(mockBlob.getSize()).thenReturn(1024L);
-    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
-    when(mockBlob.getGeneration()).thenReturn(1L);
-    when(mockStorage.get(any(BlobId.class), any(Storage.BlobGetOption.class))).thenReturn(mockBlob);
     GoogleCloudStorageBidiReadChannel channel =
         new GoogleCloudStorageBidiReadChannel(
             mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
 
-    channel.size();
-
+    IOException thrown = assertThrows(IOException.class, channel::size);
+    assertThat(thrown).hasMessageThat().contains("Thread interrupt received.");
+    assertThat(thrown).hasCauseThat().isInstanceOf(InterruptedException.class);
     assertThat(Thread.currentThread().isInterrupted()).isTrue();
 
     // Clear the interrupt flag so it doesn't affect other tests!
@@ -583,7 +579,8 @@ public class GoogleCloudStorageBidiReadChannelTest {
   }
 
   @Test
-  public void initMetadata_whenGzipNotSupported_throwsIOException() throws Exception {
+  public void initMetadata_whenGzipNotSupported_throwsUnsupportedOperationException()
+      throws Exception {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
             .setFastFailOnNotFoundEnabled(false)
