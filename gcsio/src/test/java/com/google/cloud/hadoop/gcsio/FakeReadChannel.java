@@ -35,7 +35,9 @@ public class FakeReadChannel implements ReadChannel {
     READ_EXCEPTION,
     PARTIAL_READ,
     NEGATIVE_READ,
-    ZERO_READ
+    ZERO_READ,
+    MORE_THAN_CHANNEL_LENGTH,
+    MORE_THAN_OBJECT_SIZE
   }
 
   private final List<REQUEST_TYPE> orderRequestsList;
@@ -118,6 +120,12 @@ public class FakeReadChannel implements ReadChannel {
         break;
       case NEGATIVE_READ:
         bytesRead = -1;
+        break;
+      case MORE_THAN_CHANNEL_LENGTH:
+        bytesRead = toIntExact(limit + 1);
+        break;
+      case MORE_THAN_OBJECT_SIZE:
+        bytesRead = content.size() + 1;
         break;
       case READ_EXCEPTION:
         throw new IOException("Exception occurred in read");
