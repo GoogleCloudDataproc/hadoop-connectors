@@ -48,6 +48,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
+import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -933,6 +934,71 @@ public class GoogleCloudStorageReadChannelTest {
         .isEqualTo(
             "Unexpected end of stream trying to skip 10 bytes to seek to position 10,"
                 + " size: 9223372036854775807 for 'gs://foo-bucket/bar-object'");
+  }
+
+  @Test
+  public void readBeyondObjectSize() throws IOException {
+    long objectSize = 10L;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(objectSize))
+                    .setGeneration(1L)),
+            inputStreamResponse(CONTENT_LENGTH, objectSize, new ByteArrayInputStream(testData)));
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build());
+
+    readChannel.setMaxRetries(0);
+
+    IOException e =
+        assertThrows(
+            IOException.class, () -> readChannel.read(ByteBuffer.allocate(testData.length)));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Received end of stream result beyond the object size;");
+  }
+
+  @Test
+  public void readBeyondChannelLength() throws IOException {
+    long objectSize = 20L;
+    long contentChannelEnd = 10L;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(objectSize))
+                    .setGeneration(1L)),
+            inputStreamResponse(
+                CONTENT_LENGTH, contentChannelEnd, new ByteArrayInputStream(testData)));
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder()
+                    .setMinRangeRequestSize((int) contentChannelEnd)
+                    .setFadvise(Fadvise.RANDOM)
+                    .build());
+
+    readChannel.setMaxRetries(0);
+
+    assertThrows(Exception.class, () -> readChannel.read(ByteBuffer.allocate(testData.length)));
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
