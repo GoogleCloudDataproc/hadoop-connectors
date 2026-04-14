@@ -815,6 +815,7 @@ public class GoogleCloudStorageClientReadChannelTest {
         assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(CHUNK_SIZE)));
 
     assertThat(e)
+        .hasCauseThat()
         .hasMessageThat()
         .contains("Received end of stream result beyond the object size;");
   }
