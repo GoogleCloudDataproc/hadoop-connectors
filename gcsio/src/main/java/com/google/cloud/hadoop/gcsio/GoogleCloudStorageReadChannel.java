@@ -297,7 +297,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     // in the first read. Therefore, loop till we either read the required number of
     // bytes or we reach end-of-stream.
     do {
-      final int remainingBeforeRead = buffer.remaining();
+      int remainingBeforeRead = buffer.remaining();
       performLazySeek(remainingBeforeRead);
       checkState(
           contentChannelPosition == currentPosition,
@@ -329,17 +329,22 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             GoogleCloudStorageEventBus.postOnException();
             throw new IOException(
                 String.format(
-                    "Received end of stream result before all requestedBytes were received; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                    "Received end of stream result before all requestedBytes were received; "
+                        + "at offset: %d where as stream was suppose to end at: %d for resource: "
+                        + "%s of size: %d",
                     currentPosition, contentChannelEnd, resourceId, size));
+
           } else if (currentPosition > size) {
             GoogleCloudStorageEventBus.postOnException();
             throw new IOException(
                 String.format(
-                    "Received end of stream result beyond the object size; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                    "Received end of stream result beyond the object size; at offset: %d "
+                        + "where as stream was suppose to end at: %d for resource: %s of size: %d",
                     currentPosition, contentChannelEnd, resourceId, size));
           } else if (currentPosition > contentChannelEnd) {
             logger.atWarning().log(
-                "Received end of stream result after the channel end; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                "Received end of stream result after the channel end; at offset: %d "
+                    + "where as stream was suppose to end at: %d for resource: %s of size: %d",
                 currentPosition, contentChannelEnd, resourceId, size);
             closeContentChannel();
             continue;
@@ -747,8 +752,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
     contentChannel = Channels.newChannel(objectContentStream);
 
-    // Logging at warning so that we don't need to change log level.
-    logger.atWarning().log(
+    logger.atFiner().log(
         "Storage ReadChannel opened at, contentChannelPosition: %d, contentChannelEnd: %d",
         contentChannelPosition, contentChannelEnd);
 

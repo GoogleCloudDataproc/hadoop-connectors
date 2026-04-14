@@ -1007,12 +1007,7 @@ public class GoogleCloudStorageReadChannelTest {
                     .build());
 
     readChannel.setMaxRetries(0);
-
-    readChannel.read(ByteBuffer.allocate((int) contentChannelEnd));
-
-    readChannel.read(ByteBuffer.allocate(2));
-
-    assertThrows(Exception.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(100)));
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {

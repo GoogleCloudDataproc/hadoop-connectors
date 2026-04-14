@@ -342,17 +342,22 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
-                      "Received end of stream result before all requestedBytes were received; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                      "Received end of stream result before all requestedBytes were received; "
+                          + "at offset: %d where as stream was suppose to end at: %d for resource: "
+                          + "%s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
+
             } else if (currentPosition > objectSize) {
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
-                      "Received end of stream result beyond the object size; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                      "Received end of stream result beyond the object size; at offset: %d "
+                          + "whereas stream was suppose to end at: %d for resource: %s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
             } else if (currentPosition > contentChannelEnd) {
               logger.atWarning().log(
-                  "Received end of stream result after the channel end; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                  "Received end of stream result after the channel end; at offset: %d "
+                      + "whereas stream was suppose to end at: %d for resource: %s of size: %d",
                   currentPosition, contentChannelEnd, resourceId, objectSize);
               closeContentChannel();
               continue;
@@ -418,8 +423,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       ReadableByteChannel readableByteChannel =
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
 
-      // Logging at warning so that we don't need to change log level.
-      logger.atWarning().log(
+      logger.atFiner().log(
           "Storage ReadChannel opened at, contentChannelCurrentPosition: %d, contentChannelEnd: %d",
           contentChannelCurrentPosition, contentChannelEnd);
 
