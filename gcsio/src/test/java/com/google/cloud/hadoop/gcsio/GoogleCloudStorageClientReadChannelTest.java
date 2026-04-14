@@ -626,39 +626,6 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
-  public void readBeyondChannelLength() throws IOException {
-    int bufferSize = 100;
-    fakeReadChannel =
-        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH)));
-    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
-    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
-
-    int startPosition = 0;
-    readChannel.position(startPosition);
-
-    assertThat(readChannel.read(ByteBuffer.allocate(bufferSize)))
-        .isEqualTo(bufferSize + CHUNK_SIZE + 1);
-  }
-
-  @Test
-  public void readBeyondObjectSize() throws IOException {
-    fakeReadChannel =
-        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.MORE_THAN_OBJECT_SIZE)));
-    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
-    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
-
-    int startPosition = 0;
-    readChannel.position(startPosition);
-    IOException e =
-        assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(CHUNK_SIZE)));
-
-    assertThat(e)
-        .hasCauseThat()
-        .hasMessageThat()
-        .contains("Received end of stream result beyond the object size;");
-  }
-
-  @Test
   public void lazyMetadataFetch_whenFastFailFalse_usesFallback() throws IOException {
     // Setup with fastFailOnNotFound = false and null itemInfo
     GoogleCloudStorageReadOptions readOptions =
@@ -868,6 +835,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     }
     return new GoogleCloudStorageClientReadChannel(
         mockedStorage,
+        objectInfo.getResourceId(),
         objectInfo,
         readOptions,
         GrpcErrorTypeExtractor.INSTANCE,

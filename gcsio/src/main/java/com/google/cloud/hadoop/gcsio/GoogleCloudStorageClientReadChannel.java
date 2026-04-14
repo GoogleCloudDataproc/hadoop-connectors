@@ -338,13 +338,24 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               contentChannelEnd = currentPosition;
             }
 
-            if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
+            if (currentPosition < contentChannelEnd && currentPosition < objectSize) {
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
-                      "Received end of stream result before all requestedBytes were received;"
-                          + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                      "Received end of stream result before all requestedBytes were received; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
+            } else if (currentPosition > objectSize) {
+              GoogleCloudStorageEventBus.postOnException();
+              throw new IOException(
+                  String.format(
+                      "Received end of stream result beyond the object size; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                      currentPosition, contentChannelEnd, resourceId, objectSize));
+            } else if (currentPosition > contentChannelEnd) {
+              logger.atWarning().log(
+                  "Received end of stream result after the channel end; at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                  currentPosition, contentChannelEnd, resourceId, objectSize);
+              closeContentChannel();
+              continue;
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
@@ -406,6 +417,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
       ReadableByteChannel readableByteChannel =
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
+
+      // Logging at warning so that we don't need to change log level.
+      logger.atWarning().log(
+          "Storage ReadChannel opened at, contentChannelCurrentPosition: %d, contentChannelEnd: %d",
+          contentChannelCurrentPosition, contentChannelEnd);
 
       if (contentChannelEnd == objectSize
           && (contentChannelEnd - contentChannelCurrentPosition)
