@@ -949,7 +949,9 @@ public class GoogleCloudStorageReadChannelTest {
                     .setName(OBJECT_NAME)
                     .setSize(BigInteger.valueOf(objectSize))
                     .setGeneration(1L)),
-            inputStreamResponse(CONTENT_LENGTH, objectSize, new ByteArrayInputStream(testData)));
+            // Ensure content-length accommodates the over-read
+            inputStreamResponse(
+                CONTENT_LENGTH, (long) testData.length, new ByteArrayInputStream(testData)));
     GoogleCloudStorage gcs = mockedGcsImpl(transport);
 
     GoogleCloudStorageReadChannel readChannel =
@@ -962,7 +964,15 @@ public class GoogleCloudStorageReadChannelTest {
 
     IOException e =
         assertThrows(
-            IOException.class, () -> readChannel.read(ByteBuffer.allocate(testData.length)));
+            IOException.class,
+            () -> {
+              ByteBuffer buffer = ByteBuffer.allocate(testData.length + 1);
+              while (buffer.hasRemaining()) {
+                if (readChannel.read(buffer) < 0) {
+                  break;
+                }
+              }
+            });
 
     assertThat(e)
         .hasMessageThat()
@@ -970,7 +980,7 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
-  public void readBeyondChannelLength() throws IOException {
+  public void readBeyondChannelLength() throws Exception {
     long objectSize = 20L;
     long contentChannelEnd = 10L;
     byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
@@ -984,7 +994,7 @@ public class GoogleCloudStorageReadChannelTest {
                     .setSize(BigInteger.valueOf(objectSize))
                     .setGeneration(1L)),
             inputStreamResponse(
-                CONTENT_LENGTH, contentChannelEnd, new ByteArrayInputStream(testData)));
+                CONTENT_LENGTH, (long) testData.length, new ByteArrayInputStream(testData)));
     GoogleCloudStorage gcs = mockedGcsImpl(transport);
 
     GoogleCloudStorageReadChannel readChannel =
@@ -998,7 +1008,11 @@ public class GoogleCloudStorageReadChannelTest {
 
     readChannel.setMaxRetries(0);
 
-    assertThrows(Exception.class, () -> readChannel.read(ByteBuffer.allocate(testData.length)));
+    readChannel.read(ByteBuffer.allocate((int) contentChannelEnd));
+
+    readChannel.read(ByteBuffer.allocate(2));
+
+    assertThrows(Exception.class, () -> readChannel.read(ByteBuffer.allocate(1)));
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
