@@ -798,8 +798,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     int startPosition = 0;
     readChannel.position(startPosition);
 
-    assertThat(readChannel.read(ByteBuffer.allocate(bufferSize)))
-        .isEqualTo(bufferSize + CHUNK_SIZE + 1);
+    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(100)));
   }
 
   @Test

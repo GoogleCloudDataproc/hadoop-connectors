@@ -346,6 +346,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                 "Received end of stream result after the channel end; at offset: %d "
                     + "where as stream was suppose to end at: %d for resource: %s of size: %d",
                 currentPosition, contentChannelEnd, resourceId, size);
+
+            // Dropping additional bytes.
+            int overshoot = (int) (currentPosition - contentChannelEnd);
+            buffer.position(buffer.position() - overshoot);
+            currentPosition = contentChannelEnd;
+
             closeContentChannel();
             continue;
           }
