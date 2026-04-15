@@ -70,6 +70,10 @@
 
     <bigdataoss.version>4.0.6-SNAPSHOT</bigdataoss.version>
 
+    <google.api-client-libraries.version>2.9.0</google.api-client-libraries.version>
+    <google.api-client-libraries-fallback.version>2.0.0</google.api-client-libraries-fallback.version>
+    <google.api-iamcredentials.version>v1-rev20211203-${google.api-client-libraries-fallback.version}</google.api-iamcredentials.version>
+    <google.api-storage.version>v1-rev20250312-${google.api-client-libraries-fallback.version}</google.api-storage.version>
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud.library.bom.version>26.73.0</google.cloud.library.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
@@ -267,6 +271,16 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.google.api-client</groupId>
+        <artifactId>google-api-client</artifactId>
+        <version>${google.api-client-libraries.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api-client</groupId>
+        <artifactId>google-api-client-gson</artifactId>
+        <version>${google.api-client-libraries.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
