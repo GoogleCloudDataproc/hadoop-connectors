@@ -51,7 +51,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final int EOF = -1;
   private StorageResourceId resourceId;
-  private final BlobId blobId;
+  private BlobId blobId;
   private final ApiFuture<BlobReadSession> sessionFuture;
   private volatile BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
@@ -329,6 +329,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     if (!resourceId.hasGenerationId()) {
       resourceId =
           new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName(), generation);
+      blobId = BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), generation);
     } else {
       checkState(
           resourceId.getGenerationId() == generation,

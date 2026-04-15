@@ -30,7 +30,9 @@ import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ByteString;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -296,6 +298,62 @@ public class GoogleCloudStorageBidiReadChannelTest {
             });
 
     assertThat(e).hasMessageThat().contains("should be equal to fetched generation");
+  }
+
+  @Test
+  public void lazyMetadataFetch_triggeredByRead_usesSessionMetadata() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+    BlobInfo mockBlobInfo = mock(BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn(5L);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(1L);
+    when(mockSession.getBlobInfo()).thenReturn(mockBlobInfo);
+    DisposableByteString mockDisposable = mock(DisposableByteString.class);
+    ByteString mockByteString = ByteString.copyFromUtf8("hello");
+    when(mockDisposable.byteString()).thenReturn(mockByteString);
+    ApiFuture<DisposableByteString> mockReadFuture = ApiFutures.immediateFuture(mockDisposable);
+    when(mockSession.readAs(any())).thenReturn(mockReadFuture);
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    ByteBuffer buffer = ByteBuffer.allocate(5);
+    int bytesRead = channel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(5);
+    verify(mockSession, times(1)).getBlobInfo();
+    verify(mockSession, times(1)).readAs(any());
+    verify(mockStorage, times(0)).get(any(BlobId.class));
+    verify(mockStorage, times(0)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
+  }
+
+  @Test
+  public void lazyMetadataFetch_triggeredByReadVectored_usesSessionMetadata() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+    BlobInfo mockBlobInfo = mock(BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn(2048L);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(1L);
+    when(mockSession.getBlobInfo()).thenReturn(mockBlobInfo);
+    when(mockStorage.blobReadSession(any(BlobId.class)))
+        .thenReturn(ApiFutures.immediateFuture(mockSession));
+    GoogleCloudStorageBidiReadChannel channel =
+        new GoogleCloudStorageBidiReadChannel(
+            mockStorage, RESOURCE_ID, null, readOptions, Executors.newSingleThreadExecutor());
+
+    channel.readVectored(ImmutableList.of(), ByteBuffer::allocate);
+
+    verify(mockSession, times(1)).getBlobInfo();
+    verify(mockStorage, times(0)).get(any(BlobId.class));
+    verify(mockStorage, times(0)).get(any(BlobId.class), any(Storage.BlobGetOption.class));
   }
 
   @Test
