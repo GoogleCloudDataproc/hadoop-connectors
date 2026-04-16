@@ -789,18 +789,31 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void readBeyondChannelLength() throws IOException {
-    int bufferSize = 100;
+    // Queue MORE_THAN_CHANNEL_LENGTH for the first read, then NORMAL for the continuation read
     fakeReadChannel =
-        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH)));
+        spy(
+            new FakeReadChannel(
+                CONTENT,
+                ImmutableList.of(REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH, REQUEST_TYPE.READ_CHUNK)));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
-    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+
+    // Enforce a chunk size so that contentChannelEnd is smaller than the full object size
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setMinRangeRequestSize(10).build();
+
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
 
     int startPosition = 0;
     readChannel.position(startPosition);
 
-    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(100)));
+    // We expect it to drop the overshoot, fetch the remaining chunks, and succeed
+    ByteBuffer buffer = ByteBuffer.allocate(100);
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isGreaterThan(0);
   }
 
+  // @Ignore
   @Test
   public void readBeyondObjectSize() throws IOException {
     fakeReadChannel =

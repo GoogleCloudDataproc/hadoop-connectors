@@ -122,7 +122,8 @@ public class FakeReadChannel implements ReadChannel {
         bytesRead = -1;
         break;
       case MORE_THAN_CHANNEL_LENGTH:
-        bytesRead = toIntExact(limit + 1);
+        bytesRead = readInternal(dst, currentPosition, toIntExact(limit - currentPosition + 1));
+        currentPosition = limit + 1;
         break;
       case MORE_THAN_OBJECT_SIZE:
         bytesRead = content.size() + 1;
