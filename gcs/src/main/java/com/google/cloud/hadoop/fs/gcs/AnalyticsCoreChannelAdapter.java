@@ -17,12 +17,12 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.List;
@@ -34,11 +34,8 @@ import java.util.function.IntFunction;
  */
 class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
 
-  private static final String CHANNEL_CLOSED_MESSAGE = "Channel is closed";
-
   private final long size;
-
-  private GoogleCloudStorageInputStream inputStream;
+  private final GoogleCloudStorageInputStream inputStream;
   private boolean open;
 
   AnalyticsCoreChannelAdapter(GoogleCloudStorageInputStream inputStream, long size) {
@@ -49,7 +46,7 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
-    checkState(open, CHANNEL_CLOSED_MESSAGE);
+    checkOpen();
     // If the buffer has no remaining space, return 0.
     if (!dst.hasRemaining()) {
       return 0;
@@ -66,13 +63,13 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
 
   @Override
   public long position() throws IOException {
-    checkState(open, CHANNEL_CLOSED_MESSAGE);
+    checkOpen();
     return inputStream.getPos();
   }
 
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
-    checkState(open, CHANNEL_CLOSED_MESSAGE);
+    checkOpen();
     checkArgument(newPosition >= 0 && newPosition <= size, "Invalid position: %s", newPosition);
 
     inputStream.seek(newPosition);
@@ -81,7 +78,7 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
 
   @Override
   public long size() throws IOException {
-    checkState(open, CHANNEL_CLOSED_MESSAGE);
+    checkOpen();
     return size;
   }
 
@@ -105,12 +102,18 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
 
   public void readVectored(List<GcsObjectRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    checkState(open, CHANNEL_CLOSED_MESSAGE);
+    checkOpen();
     inputStream.readVectored(ranges, allocate);
   }
 
   public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
-    checkState(open, CHANNEL_CLOSED_MESSAGE);
+    checkOpen();
     inputStream.readFully(position, buffer, offset, length);
+  }
+
+  private void checkOpen() throws ClosedChannelException {
+    if (!open) {
+      throw new ClosedChannelException();
+    }
   }
 }
