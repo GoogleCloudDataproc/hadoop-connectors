@@ -477,18 +477,23 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return readableByteChannel;
 
       } catch (Exception e) {
-        // Safely close the orphaned channel BEFORE re-throwing the error
+        logger.atWarning().withCause(e).log(
+            "Exception occurred during metadata initialization for '%s'. Attempting to safely close orphaned channel.",
+            resourceId);
         try {
           if (readableByteChannel != null && readableByteChannel.isOpen()) {
             readableByteChannel.close();
+            logger.atInfo().log("Successfully closed orphaned channel for '%s'", resourceId);
           }
         } catch (IOException closeException) {
+          logger.atWarning().withCause(closeException).log(
+              "Failed to close orphaned channel for '%s' during cleanup", resourceId);
           e.addSuppressed(closeException);
         }
         if (e instanceof IOException) {
           throw (IOException) e;
         }
-        throw new RuntimeException(e);
+        throw new IOException("Unexpected error during channel initialization", e);
       }
     }
 
