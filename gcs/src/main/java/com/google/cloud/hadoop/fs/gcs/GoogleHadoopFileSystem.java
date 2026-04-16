@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPLICATION_NAME_SUFFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -38,6 +39,9 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
@@ -241,6 +245,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private LoggingInterceptor loggingInterceptor;
 
+  private GcsFileSystem analyticsGcsFs;
+
   /** Instrumentation to track Statistics */
   ITraceFactory getTraceFactory() {
     return this.traceFactory;
@@ -400,6 +406,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       } else {
         initializeGcsFs(createGcsFs(config));
       }
+      if (isAnalyticsCoreEnabled()) {
+        analyticsGcsFs = createAnalyticsGcsFs(config);
+      }
     }
   }
 
@@ -444,6 +453,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @VisibleForTesting
   LoggingInterceptor createLoggingInterceptor(GoogleCredentials credentials, String suffix) {
     return new LoggingInterceptor(credentials, suffix);
+  }
+
+  private GcsFileSystem createAnalyticsGcsFs(Configuration config) throws IOException {
+    // TODO(singhaniash): Create a config mapping
+    // TODO(singhaniash): Pass correct user agent to AnalyticsCore
+    Map<String, String> properties = config.getValByRegex("^" + GCS_CONFIG_PREFIX + "\\.");
+    GcsFileSystemOptions options =
+        GcsFileSystemOptions.createFromOptions(properties, GCS_CONFIG_PREFIX + ".");
+    return new GcsFileSystemImpl(getCredentials(config), options);
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
@@ -1774,6 +1792,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return gcsFsSupplier.get();
   }
 
+  /** Gets GCS FS instance for Analytics Core. */
+  public GcsFileSystem getAnalyticsGcsFs() {
+    return analyticsGcsFs;
+  }
+
+  /** Checks if Analytics Core is enabled. */
+  public boolean isAnalyticsCoreEnabled() {
+    return GCS_ANALYTICS_CORE_ENABLE.get(getConf(), getConf()::getBoolean);
+  }
+
   public Supplier<VectoredIOImpl> getVectoredIOSupplier() {
     return vectoredIOSupplier;
   }
@@ -1859,6 +1887,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         getGcsFs().close();
       }
       gcsFsSupplier = null;
+    }
+
+    if (analyticsGcsFs != null) {
+      try {
+        analyticsGcsFs.close();
+      } catch (Exception e) {
+        logger.atWarning().withCause(e).log("Error while closing analyticsGcsFs");
+      }
+      analyticsGcsFs = null;
     }
 
     if (delegationTokens != null) {

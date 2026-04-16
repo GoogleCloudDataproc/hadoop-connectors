@@ -24,10 +24,16 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsItemInfo;
+import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
@@ -102,8 +108,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
-    // Extract out the fileInfo call here and use it in readChannel as well as in vectoredRead API
-    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+    if (ghfs.isAnalyticsCoreEnabled()) {
+      fileInfo = ghfs.getGcsFs().getFileInfoObject(gcsPath);
+      channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
+    } else if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
       fileInfo = gcsFs.getFileInfoObject(gcsPath);
       channel =
@@ -133,9 +141,44 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel =
-        gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    SeekableByteChannel channel;
+    if (ghfs.isAnalyticsCoreEnabled()) {
+      channel = createAnalyticsCoreChannel(ghfs, fileInfo, fileInfo.getPath());
+    } else {
+      channel =
+          gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+    }
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
+  }
+
+  private static SeekableByteChannel createAnalyticsCoreChannel(
+      GoogleHadoopFileSystem ghfs, FileInfo fileInfo, URI gcsPath) throws IOException {
+    checkNotNull(fileInfo, "fileInfo must not be null");
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
+    GcsItemId itemId =
+        GcsItemId.builder()
+            .setBucketName(resourceId.getBucketName())
+            .setObjectName(resourceId.getObjectName())
+            .setContentGeneration(
+                fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID
+                    ? fileInfo.getGenerationId()
+                    : null)
+            .build();
+    GcsItemInfo gcsItemInfo =
+        GcsItemInfo.builder()
+            .setItemId(itemId)
+            .setSize(fileInfo.getSize())
+            .setContentGeneration(fileInfo.getGenerationId())
+            .build();
+    GcsFileInfo gcsFileInfo =
+        GcsFileInfo.builder()
+            .setItemInfo(gcsItemInfo)
+            .setUri(gcsPath)
+            .setAttributes(fileInfo.getAttributes())
+            .build();
+    GoogleCloudStorageInputStream inputStream =
+        GoogleCloudStorageInputStream.create(ghfs.getAnalyticsGcsFs(), gcsFileInfo);
+    return new AnalyticsCoreChannelAdapter(inputStream, fileInfo.getSize());
   }
 
   private GoogleHadoopFSInputStream(
@@ -198,6 +241,25 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                                   .setLength(range.getLength())
                                   .setOffset(range.getOffset())
                                   .setData(range.getData())
+                                  .build())
+                      .collect(Collectors.toList()),
+                  allocate);
+            } else if (channel instanceof AnalyticsCoreChannelAdapter) {
+              AnalyticsCoreChannelAdapter analyticsCoreChannelAdapterChannel =
+                  (AnalyticsCoreChannelAdapter) channel;
+              ranges.forEach(
+                  range -> {
+                    CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+                    range.setData(result);
+                  });
+              analyticsCoreChannelAdapterChannel.readVectored(
+                  ranges.stream()
+                      .map(
+                          range ->
+                              GcsObjectRange.builder()
+                                  .setLength(range.getLength())
+                                  .setOffset(range.getOffset())
+                                  .setByteBufferFuture(range.getData())
                                   .build())
                       .collect(Collectors.toList()),
                   allocate);
@@ -278,6 +340,32 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           streamStatistics.readOperationCompleted(length, max(response, 0));
           return response;
         });
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    if (length == 0) {
+      return;
+    }
+    if (channel instanceof AnalyticsCoreChannelAdapter) {
+      trackDuration(
+          streamStatistics,
+          STREAM_READ_OPERATIONS.getSymbol(),
+          () -> {
+            long startTimeNs = System.nanoTime();
+            checkNotClosed();
+            ((AnalyticsCoreChannelAdapter) channel).readFully(position, buffer, offset, length);
+            totalBytesRead += length;
+            statistics.incrementReadOps(1);
+            streamStats.updateReadStreamStats(length, startTimeNs);
+            storageStatistics.streamReadOperationInComplete(length, length);
+            streamStatistics.bytesRead(length);
+            streamStatistics.readOperationCompleted(length, length);
+            return null;
+          });
+    } else {
+      super.readFully(position, buffer, offset, length);
+    }
   }
 
   @Override
