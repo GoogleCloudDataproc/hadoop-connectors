@@ -109,7 +109,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
     if (ghfs.isAnalyticsCoreEnabled()) {
-      fileInfo = ghfs.getGcsFs().getFileInfoObject(gcsPath);
+      fileInfo = gcsFs.getFileInfoObject(gcsPath);
       channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
     } else if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.

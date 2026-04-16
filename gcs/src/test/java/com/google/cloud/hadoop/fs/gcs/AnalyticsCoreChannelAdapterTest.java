@@ -9,6 +9,7 @@ import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.util.Arrays;
 import java.util.List;
@@ -54,11 +55,11 @@ public class AnalyticsCoreChannelAdapterTest {
   }
 
   @Test
-  public void read_whenClosed_throwsIllegalStateException() throws IOException {
+  public void read_whenClosed_throwsClosedChannelException() throws IOException {
     adapter.close();
     ByteBuffer dst = ByteBuffer.allocate(100);
 
-    assertThrows(IllegalStateException.class, () -> adapter.read(dst));
+    assertThrows(ClosedChannelException.class, () -> adapter.read(dst));
   }
 
   @Test
