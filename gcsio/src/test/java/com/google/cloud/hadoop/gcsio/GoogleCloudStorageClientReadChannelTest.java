@@ -806,6 +806,33 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
+  public void read_whenLazyInitFails_closesOrphanedChannel() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    ReadChannel mockReadChannel = mock(ReadChannel.class);
+    when(mockStorage.reader(any(), any())).thenReturn(mockReadChannel);
+    when(mockReadChannel.isOpen()).thenReturn(true);
+    when(mockReadChannel.read(any(ByteBuffer.class)))
+        .thenThrow(new IOException("Simulated Connection Error"));
+    GoogleCloudStorageClientReadChannel channel =
+        new GoogleCloudStorageClientReadChannel(
+            mockStorage,
+            RESOURCE_ID,
+            null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    IOException thrown =
+        assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(10)));
+
+    assertThat(thrown).hasMessageThat().contains("Error reading");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Simulated Connection Error");
+    verify(mockReadChannel, times(1)).close();
+  }
+
+  @Test
   public void testLazyMetadataFetch_normalForwardRead_fetchesMetadataMidFlight() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
         DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
