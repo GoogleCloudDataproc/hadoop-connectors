@@ -155,29 +155,27 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, URI gcsPath) throws IOException {
     checkNotNull(fileInfo, "fileInfo must not be null");
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
-    GcsItemId itemId =
+    GcsItemId.Builder itemIdBuilder =
         GcsItemId.builder()
             .setBucketName(resourceId.getBucketName())
-            .setObjectName(resourceId.getObjectName())
-            .setContentGeneration(
-                fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID
-                    ? fileInfo.getGenerationId()
-                    : null)
-            .build();
-    GcsItemInfo gcsItemInfo =
-        GcsItemInfo.builder()
-            .setItemId(itemId)
-            .setSize(fileInfo.getSize())
-            .setContentGeneration(fileInfo.getGenerationId())
-            .build();
+            .setObjectName(resourceId.getObjectName());
+    if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
+    }
+    GcsItemId itemId = itemIdBuilder.build();
+    GcsItemInfo.Builder itemInfoBuilder =
+        GcsItemInfo.builder().setItemId(itemId).setSize(fileInfo.getSize());
+    if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemInfoBuilder.setContentGeneration(fileInfo.getGenerationId());
+    }
+    GcsItemInfo gcsItemInfo = itemInfoBuilder.build();
     GcsFileInfo gcsFileInfo =
         GcsFileInfo.builder()
             .setItemInfo(gcsItemInfo)
             .setUri(gcsPath)
             .setAttributes(fileInfo.getAttributes())
             .build();
-    GoogleCloudStorageInputStream inputStream =
-        GoogleCloudStorageInputStream.create(ghfs.getAnalyticsGcsFs(), gcsFileInfo);
+    GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(gcsFileInfo);
     return new AnalyticsCoreChannelAdapter(inputStream, fileInfo.getSize());
   }
 
@@ -343,7 +341,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   @Override
-  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+  public synchronized void readFully(long position, byte[] buffer, int offset, int length)
+      throws IOException {
     if (length == 0) {
       return;
     }

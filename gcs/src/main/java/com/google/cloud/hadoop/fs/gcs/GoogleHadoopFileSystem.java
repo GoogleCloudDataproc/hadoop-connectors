@@ -39,9 +39,11 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
@@ -1795,6 +1797,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   /** Gets GCS FS instance for Analytics Core. */
   public GcsFileSystem getAnalyticsGcsFs() {
     return analyticsGcsFs;
+  }
+
+  @VisibleForTesting
+  protected GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsFileInfo gcsFileInfo)
+      throws IOException {
+    return GoogleCloudStorageInputStream.create(analyticsGcsFs, gcsFileInfo);
   }
 
   /** Checks if Analytics Core is enabled. */
