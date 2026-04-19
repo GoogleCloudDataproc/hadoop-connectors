@@ -1025,7 +1025,7 @@ public class GoogleCloudStorageReadChannelTest {
 
     // total read should be 7 (remaining in overshootData) + 8 (from second mock to fill buffer
     // limit 20) = 15
-    assertThat(bytesRead).isEqualTo(17);
+    assertThat(bytesRead).isEqualTo(15);
     assertThat(readChannel.position()).isEqualTo(20);
   }
 

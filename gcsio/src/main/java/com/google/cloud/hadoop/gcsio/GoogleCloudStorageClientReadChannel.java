@@ -363,6 +363,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               int overshoot = (int) (currentPosition - contentChannelEnd);
               dst.position(dst.position() - overshoot);
               currentPosition = contentChannelEnd;
+              totalBytesRead -= overshoot;
+              contentChannelCurrentPosition -= overshoot;
 
               closeContentChannel();
               continue;

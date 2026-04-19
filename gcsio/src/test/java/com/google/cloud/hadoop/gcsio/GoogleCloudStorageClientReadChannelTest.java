@@ -817,8 +817,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     ByteBuffer buffer2 = ByteBuffer.allocate(10);
     int bytesRead2 = readChannel.read(buffer2);
 
-    // TODO(animgupt): Check if we should change returned bytes as well.
-    assertThat(bytesRead2).isEqualTo(11);
+    assertThat(bytesRead2).isEqualTo(10);
     assertThat(readChannel.position()).isEqualTo(15);
   }
 
