@@ -789,12 +789,13 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void readBeyondChannelLength() throws IOException {
-    // Queue MORE_THAN_CHANNEL_LENGTH for the first read, then NORMAL for the continuation read
+    // Queue READ_CHUNK for the first read, then MORE_THAN_CHANNEL_LENGTH for the second read
+    // so it overshoots the channel limit.
     fakeReadChannel =
         spy(
             new FakeReadChannel(
                 CONTENT,
-                ImmutableList.of(REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH, REQUEST_TYPE.READ_CHUNK)));
+                ImmutableList.of(REQUEST_TYPE.READ_CHUNK, REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH)));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
 
     // Enforce a chunk size so that contentChannelEnd is smaller than the full object size
@@ -803,14 +804,22 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
 
-    int startPosition = 0;
-    readChannel.position(startPosition);
+    readChannel.position(0);
 
-    // We expect it to drop the overshoot, fetch the remaining chunks, and succeed
-    ByteBuffer buffer = ByteBuffer.allocate(100);
-    int bytesRead = readChannel.read(buffer);
+    // 1. First read of 5 bytes. This will open the channel with limit = max(5, 10) = 10.
+    ByteBuffer buffer1 = ByteBuffer.allocate(5);
+    int bytesRead1 = readChannel.read(buffer1);
+    assertThat(bytesRead1).isEqualTo(5);
 
-    assertThat(bytesRead).isGreaterThan(0);
+    // 2. Second read of 10 bytes. The channel limit is still 10.
+    // The FakeReadChannel will return 10 - 5 + 1 = 6 bytes, so currentPosition becomes 11.
+    // Since 11 > 10, it will hit the overshoot block in GoogleCloudStorageClientReadChannel.
+    ByteBuffer buffer2 = ByteBuffer.allocate(10);
+    int bytesRead2 = readChannel.read(buffer2);
+
+    // TODO(animgupt): Check if we should change returned bytes as well.
+    assertThat(bytesRead2).isEqualTo(11);
+    assertThat(readChannel.position()).isEqualTo(15);
   }
 
   // @Ignore
