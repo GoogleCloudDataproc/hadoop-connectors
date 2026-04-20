@@ -1799,8 +1799,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return analyticsGcsFs;
   }
 
-  @VisibleForTesting
-  protected GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsFileInfo gcsFileInfo)
+  GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsFileInfo gcsFileInfo)
       throws IOException {
     return GoogleCloudStorageInputStream.create(analyticsGcsFs, gcsFileInfo);
   }
