@@ -821,7 +821,6 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(readChannel.position()).isEqualTo(15);
   }
 
-  // @Ignore
   @Test
   public void readBeyondObjectSize() throws IOException {
     fakeReadChannel =

@@ -343,7 +343,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               throw new IOException(
                   String.format(
                       "Received end of stream result before all requestedBytes were received; "
-                          + "at offset: %d where as stream was suppose to end at: %d for resource: "
+                          + "at offset: %d where as stream was supposed to end at: %d for resource: "
                           + "%s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
 
@@ -352,12 +352,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               throw new IOException(
                   String.format(
                       "Received end of stream result beyond the object size; at offset: %d "
-                          + "whereas stream was suppose to end at: %d for resource: %s of size: %d",
+                          + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
             } else if (currentPosition > contentChannelEnd) {
               logger.atWarning().log(
                   "Received end of stream result after the channel end; at offset: %d "
-                      + "whereas stream was suppose to end at: %d for resource: %s of size: %d",
+                      + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
                   currentPosition, contentChannelEnd, resourceId, objectSize);
               // Dropping additional bytes.
               int overshoot = (int) (currentPosition - contentChannelEnd);
