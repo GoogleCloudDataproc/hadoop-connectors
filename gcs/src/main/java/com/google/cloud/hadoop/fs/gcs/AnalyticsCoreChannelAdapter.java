@@ -16,10 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -70,7 +69,19 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
     checkOpen();
-    checkArgument(newPosition >= 0 && newPosition <= size, "Invalid position: %s", newPosition);
+    if (newPosition < 0) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new java.io.EOFException(
+          "Invalid seek offset: position value (" + newPosition + ") must be >= 0");
+    }
+    if (size >= 0 && newPosition >= size) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new java.io.EOFException(
+          "Invalid seek offset: position value ("
+              + newPosition
+              + ") must be between 0 and "
+              + size);
+    }
 
     inputStream.seek(newPosition);
     return this;
