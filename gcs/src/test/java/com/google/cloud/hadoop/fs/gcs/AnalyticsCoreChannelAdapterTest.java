@@ -101,9 +101,10 @@ public class AnalyticsCoreChannelAdapterTest {
   }
 
   @Test
-  public void position_withInvalidPosition_throwsIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class, () -> adapter.position(-1L));
-    assertThrows(IllegalArgumentException.class, () -> adapter.position(size + 1));
+  public void position_withInvalidPosition_throwsEOFException() {
+    assertThrows(java.io.EOFException.class, () -> adapter.position(-1L));
+    assertThrows(java.io.EOFException.class, () -> adapter.position(size));
+    assertThrows(java.io.EOFException.class, () -> adapter.position(size + 1));
   }
 
   @Test
