@@ -85,6 +85,10 @@
       <version>${bigdataoss.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.google.cloud.gcs.analytics</groupId>
+      <artifactId>gcs-analytics-core</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
     </dependency>
@@ -213,6 +217,7 @@
                   <include>com.google.apis</include>
                   <include>com.google.auth</include>
                   <include>com.google.cloud</include>
+                  <include>com.google.cloud.gcs.analytics</include>
                   <include>com.google.cloud.bigdataoss</include>
                   <include>com.google.cloud.grpc</include>
                   <include>com.google.cloud.http</include>
@@ -246,6 +251,7 @@
                     <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>
                     <include>com.google.cloud.*</include>
+                    <include>com.google.cloud.gcs.analyticscore.**</include>
                     <include>com.google.cloud.audit.**</include>
                     <include>com.google.cloud.grpc.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>

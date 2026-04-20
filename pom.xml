@@ -69,6 +69,7 @@
     <gpg.skip>true</gpg.skip>
 
     <bigdataoss.version>4.0.0-SNAPSHOT</bigdataoss.version>
+    <google.analyticscore.version>1.2.3</google.analyticscore.version>
 
     <google.auto-value.version>1.10.4</google.auto-value.version>
     <google.cloud.library.bom.version>26.73.0</google.cloud.library.bom.version>
@@ -273,6 +274,11 @@
         <version>${google.cloud.library.bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud.gcs.analytics</groupId>
+        <artifactId>gcs-analytics-core</artifactId>
+        <version>${google.analyticscore.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.auto.value</groupId>
