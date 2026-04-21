@@ -85,6 +85,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.blobReadSession = null;
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+    logger.atWarning().log(
+        "shru - Created new GoogleCloudStorageBidiReadChannel %s using Storage %s for %s",
+        System.identityHashCode(this), System.identityHashCode(storage), blobId);
   }
 
   private synchronized BlobReadSession getBlobReadSession() throws IOException {
@@ -97,6 +100,13 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         throw new IOException("Failed to get BlobReadSession", e);
       }
       this.blobReadSession = readSession;
+      logger.atWarning().log(
+          "shru - Created new BlobReadSession %s for %s",
+          System.identityHashCode(blobReadSession), blobId);
+    } else {
+      logger.atWarning().log(
+          "shru - Reusing BlobReadSession %s for %s",
+          System.identityHashCode(blobReadSession), blobId);
     }
     return blobReadSession;
   }
@@ -194,8 +204,13 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   public void close() throws IOException {
     if (open) {
       logger.atFinest().log("Closing channel for '%s'", resourceId);
+      logger.atWarning().log(
+          "shru - Closing channel %s for %s", System.identityHashCode(this), blobId);
       try {
         if (blobReadSession != null) {
+          logger.atWarning().log(
+              "shru - Closing BlobReadSession %s for %s",
+              System.identityHashCode(blobReadSession), blobId);
           blobReadSession.close();
         } else if (sessionFuture != null) {
           try (BlobReadSession readSession =
@@ -226,6 +241,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
     long vectoredReadStartTime = System.currentTimeMillis();
     BlobReadSession session = getBlobReadSession();
+    logger.atWarning().log(
+        "shru - readVectored using channel %s and session %s for %s",
+        System.identityHashCode(this), System.identityHashCode(session), blobId);
     ranges.forEach(
         range -> {
           ApiFuture<DisposableByteString> futureBytes =
