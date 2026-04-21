@@ -35,10 +35,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -354,6 +356,77 @@ public class GoogleCloudStorageBidiReadChannelTest {
     GoogleCloudStorageBidiReadChannel bidiReadChannel = getMockedBidiReadChannel();
 
     assertThrows(UnsupportedOperationException.class, () -> bidiReadChannel.truncate(0));
+  }
+
+  @Test
+  public void testChannelPooling() throws IOException {
+    GoogleCloudStorageBidiReadChannel.clearPool();
+    Storage storage = mock(Storage.class);
+    when(storage.blobReadSession(any()))
+        .thenReturn(ApiFutures.immediateFuture(new FakeBlobReadSession()));
+
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();
+
+    // 1. Get a channel
+    GoogleCloudStorageBidiReadChannel channel1 =
+        GoogleCloudStorageBidiReadChannel.getOrCreate(
+            storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+
+    // 2. Close it (should be pooled)
+    channel1.close();
+
+    // 3. Get it again (should be the same instance)
+    GoogleCloudStorageBidiReadChannel channel2 =
+        GoogleCloudStorageBidiReadChannel.getOrCreate(
+            storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+
+    assertSame("Should reuse the same channel instance", channel1, channel2);
+    assertTrue("Reused channel should be open", channel2.isOpen());
+    assertEquals("Reused channel position should be reset", 0, channel2.position());
+
+    // 4. Disable pooling and verify a new instance is created
+    GoogleCloudStorageBidiReadChannel.CHANNEL_POOL_ENABLED = false;
+    try {
+      channel2.close();
+      GoogleCloudStorageBidiReadChannel channel3 =
+          GoogleCloudStorageBidiReadChannel.getOrCreate(
+              storage, DEFAULT_ITEM_INFO, readOptions, Executors.newSingleThreadExecutor());
+      assertNotSame("Should NOT reuse the channel when pooling is disabled", channel2, channel3);
+    } finally {
+      GoogleCloudStorageBidiReadChannel.CHANNEL_POOL_ENABLED = true;
+    }
+  }
+
+  @Test
+  public void testMaxPoolSize() throws IOException {
+    GoogleCloudStorageBidiReadChannel.clearPool();
+    Storage storage = mock(Storage.class);
+    BlobReadSession mockSession = mock(BlobReadSession.class);
+    when(storage.blobReadSession(any())).thenReturn(ApiFutures.immediateFuture(mockSession));
+
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    // 1. Create 1000 channels
+    List<GoogleCloudStorageBidiReadChannel> channels = new ArrayList<>();
+    for (int i = 0; i < 1000; i++) {
+      channels.add(
+          new GoogleCloudStorageBidiReadChannel(storage, DEFAULT_ITEM_INFO, readOptions, executor));
+    }
+
+    // 2. Close all 1000 (they should be pooled, session.close() should NOT be called)
+    for (GoogleCloudStorageBidiReadChannel channel : channels) {
+      channel.close();
+    }
+    verify(mockSession, never()).close();
+
+    // 3. Create one more
+    GoogleCloudStorageBidiReadChannel overflowChannel =
+        new GoogleCloudStorageBidiReadChannel(storage, DEFAULT_ITEM_INFO, readOptions, executor);
+
+    // 4. Close the 1001st one. It should be actually closed because pool is full.
+    overflowChannel.close();
+    verify(mockSession, times(1)).close();
   }
 
   @Test

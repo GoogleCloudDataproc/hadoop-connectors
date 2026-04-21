@@ -38,16 +38,26 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  public static boolean CHANNEL_POOL_ENABLED = true;
+  private static final int MAX_POOL_SIZE = 1000;
+  private static final AtomicInteger TOTAL_POOLED_CHANNELS = new AtomicInteger(0);
+  private static final Map<BlobId, Queue<GoogleCloudStorageBidiReadChannel>> CHANNEL_POOL =
+      new ConcurrentHashMap<>();
   private static final int EOF = -1;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
@@ -85,6 +95,41 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.blobReadSession = null;
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
+  }
+
+  public static GoogleCloudStorageBidiReadChannel getOrCreate(
+      Storage storage,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions,
+      ExecutorService boundedThreadPool)
+      throws IOException {
+    if (CHANNEL_POOL_ENABLED) {
+      BlobId blobId =
+          BlobId.of(
+              itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
+      Queue<GoogleCloudStorageBidiReadChannel> queue =
+          CHANNEL_POOL.computeIfAbsent(blobId, k -> new ConcurrentLinkedQueue<>());
+      GoogleCloudStorageBidiReadChannel channel = queue.poll();
+      if (channel != null) {
+        TOTAL_POOLED_CHANNELS.decrementAndGet();
+        System.out.println("Reusing GoogleCloudStorageBidiReadChannel from pool for: " + blobId);
+        channel.resetForReuse();
+        return channel;
+      }
+    }
+    return new GoogleCloudStorageBidiReadChannel(storage, itemInfo, readOptions, boundedThreadPool);
+  }
+
+  private void resetForReuse() {
+    this.position = 0;
+    this.open = true;
+    invalidateBuffer();
+  }
+
+  @VisibleForTesting
+  static void clearPool() {
+    CHANNEL_POOL.clear();
+    TOTAL_POOLED_CHANNELS.set(0);
   }
 
   private synchronized BlobReadSession getBlobReadSession() throws IOException {
@@ -192,6 +237,22 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public void close() throws IOException {
+    if (open) {
+      if (CHANNEL_POOL_ENABLED) {
+        if (TOTAL_POOLED_CHANNELS.incrementAndGet() <= MAX_POOL_SIZE) {
+          this.open = false;
+          invalidateBuffer();
+          CHANNEL_POOL.computeIfAbsent(this.blobId, k -> new ConcurrentLinkedQueue<>()).offer(this);
+          return;
+        } else {
+          TOTAL_POOLED_CHANNELS.decrementAndGet();
+        }
+      }
+      actualClose();
+    }
+  }
+
+  public void actualClose() throws IOException {
     if (open) {
       logger.atFinest().log("Closing channel for '%s'", resourceId);
       try {
