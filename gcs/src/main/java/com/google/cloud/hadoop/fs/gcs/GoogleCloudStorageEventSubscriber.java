@@ -25,6 +25,7 @@ import com.google.cloud.hadoop.util.GCSChecksumFailureEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
+import com.google.cloud.hadoop.util.GcsReadMetricEvent;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.IGcsJsonApiEvent;
 import com.google.common.annotations.VisibleForTesting;
@@ -62,6 +63,7 @@ public class GoogleCloudStorageEventSubscriber {
       logger.atFiner().log("Subscriber class invoked for first time");
       INSTANCE = new GoogleCloudStorageEventSubscriber(storageStatistics);
     }
+    GoogleCloudStorageEventSubscriber.storageStatistics = storageStatistics;
     return INSTANCE;
   }
 
@@ -96,6 +98,10 @@ public class GoogleCloudStorageEventSubscriber {
       storageStatistics.incrementCounter(GoogleCloudStorageStatistics.GCS_API_TIME, duration);
 
       RequestType requestType = (RequestType) event.getProperty(GcsJsonApiEvent.REQUEST_TYPE);
+      if (requestType == RequestType.GET_MEDIA) {
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_CONNECTION_DURATION, duration, eventContext);
+      }
       if (requestToGcsStatMap.containsKey(requestType)) {
         updateMetric(requestToGcsStatMap.get(requestType), duration, eventContext);
       } else if (requestToGhfsStatMap.containsKey(requestType)) {
@@ -112,6 +118,26 @@ public class GoogleCloudStorageEventSubscriber {
           GoogleCloudStorageStatistics.GCS_BACKOFF_TIME, backOffTime);
     } else if (eventType == EventType.EXCEPTION) {
       storageStatistics.incrementGcsExceptionCount();
+    }
+  }
+
+  @Subscribe
+  private void subscriberOnGcsReadMetricEvent(@Nonnull GcsReadMetricEvent event) {
+    if (event.getConnectionDurationMs() > 0) {
+      storageStatistics.updateStats(
+          GhfsStatistic.STREAM_READ_CONNECTION_DURATION,
+          event.getConnectionDurationMs(),
+          event.getStreamPath());
+    }
+    if (event.getDataTransferDurationMs() > 0) {
+      storageStatistics.updateStats(
+          GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION,
+          event.getDataTransferDurationMs(),
+          event.getStreamPath());
+      if (event.isLatencyThresholdBreached()) {
+        storageStatistics.incrementCounter(
+            GoogleCloudStorageStatistics.GCS_READ_DATA_TRANSFER_LATENCY_BREACHED_COUNT, 1);
+      }
     }
   }
 
