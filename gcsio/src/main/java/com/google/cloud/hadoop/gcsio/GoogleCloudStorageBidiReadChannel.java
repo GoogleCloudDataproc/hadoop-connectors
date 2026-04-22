@@ -28,6 +28,8 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
@@ -40,9 +42,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -56,7 +56,10 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   public static boolean CHANNEL_POOL_ENABLED = true;
   private static final int MAX_POOL_SIZE = 1000;
   private static final AtomicInteger TOTAL_POOLED_CHANNELS = new AtomicInteger(0);
-  private static final Map<BlobId, Queue<GoogleCloudStorageBidiReadChannel>> CHANNEL_POOL = new ConcurrentHashMap<>();
+  private static final Cache<BlobId, GoogleCloudStorageBidiReadChannel> SHARED_CHANNELS =
+      CacheBuilder.newBuilder().maximumSize(MAX_POOL_SIZE).build();
+  private static final Map<BlobId, ApiFuture<BlobReadSession>> SHARED_SESSIONS =
+      new ConcurrentHashMap<>();
   private static final int EOF = -1;
   private final StorageResourceId resourceId;
   private final BlobId blobId;
@@ -90,7 +93,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
-    this.sessionFuture = storage.blobReadSession(blobId);
+    // Experimental: Share session across instances
+    this.sessionFuture =
+        SHARED_SESSIONS.computeIfAbsent(blobId, k -> storage.blobReadSession(blobId));
     this.blobReadSession = null;
     this.boundedThreadPool = boundedThreadPool;
     initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
@@ -105,21 +110,32 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-    if (CHANNEL_POOL_ENABLED) {
-      BlobId blobId = BlobId.of(
-          itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-      Queue<GoogleCloudStorageBidiReadChannel> queue = CHANNEL_POOL.computeIfAbsent(blobId,
-          k -> new ConcurrentLinkedQueue<>());
-      GoogleCloudStorageBidiReadChannel channel = queue.poll();
-      if (channel != null) {
-        TOTAL_POOLED_CHANNELS.decrementAndGet();
-        logger.atWarning().log(
-            "shru - Reusing GoogleCloudStorageBidiReadChannel from pool for: %s", blobId);
-        channel.resetForReuse();
-        return channel;
-      }
+    BlobId blobId =
+        BlobId.of(
+            itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
+
+    GoogleCloudStorageBidiReadChannel channel = SHARED_CHANNELS.getIfPresent(blobId);
+    if (channel != null) {
+      logger.atWarning().log(
+          "shru - Reusing shared GoogleCloudStorageBidiReadChannel %s for %s. Cache size: %d",
+          System.identityHashCode(channel), blobId, SHARED_CHANNELS.size());
+      return channel;
     }
-    return new GoogleCloudStorageBidiReadChannel(storage, itemInfo, readOptions, boundedThreadPool);
+
+    channel =
+        new GoogleCloudStorageBidiReadChannel(storage, itemInfo, readOptions, boundedThreadPool);
+    GoogleCloudStorageBidiReadChannel existing =
+        SHARED_CHANNELS.asMap().putIfAbsent(blobId, channel);
+    if (existing != null) {
+      logger.atWarning().log(
+          "shru - Reusing shared GoogleCloudStorageBidiReadChannel %s (race won) for %s. Cache size: %d",
+          System.identityHashCode(existing), blobId, SHARED_CHANNELS.size());
+      return existing;
+    }
+    logger.atWarning().log(
+        "shru - Created new shared GoogleCloudStorageBidiReadChannel %s for %s. Cache size: %d",
+        System.identityHashCode(channel), blobId, SHARED_CHANNELS.size());
+    return channel;
   }
 
   private void resetForReuse() {
@@ -129,16 +145,15 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   @VisibleForTesting
-  static void clearPool() {
-    CHANNEL_POOL.clear();
-    TOTAL_POOLED_CHANNELS.set(0);
+  public static void clearSharedSessions() {
+    SHARED_SESSIONS.clear();
   }
 
   private synchronized BlobReadSession getBlobReadSession() throws IOException {
     if (blobReadSession == null) {
       BlobReadSession readSession = null;
       try {
-        readSession = sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
+        readSession = sessionFuture.get(300, TimeUnit.SECONDS);
       } catch (InterruptedException | ExecutionException | TimeoutException e) {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Failed to get BlobReadSession", e);
@@ -156,7 +171,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   @Override
-  public int read(ByteBuffer dst) throws IOException {
+  public synchronized int read(ByteBuffer dst) throws IOException {
     throwIfNotOpen();
     if (!dst.hasRemaining()) {
       return 0;
@@ -197,7 +212,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   @Override
-  public SeekableByteChannel position(long newPosition) throws IOException {
+  public synchronized SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
     validatePosition(newPosition);
     if (newPosition == this.position) {
@@ -246,43 +261,25 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public void close() throws IOException {
-    if (open) {
-      if (CHANNEL_POOL_ENABLED) {
-        if (TOTAL_POOLED_CHANNELS.incrementAndGet() <= MAX_POOL_SIZE) {
-          this.open = false;
-          invalidateBuffer();
-          CHANNEL_POOL.computeIfAbsent(this.blobId, k -> new ConcurrentLinkedQueue<>()).offer(this);
-          return;
-        } else {
-          TOTAL_POOLED_CHANNELS.decrementAndGet();
-        }
-      }
-      actualClose();
-    }
+    // Skipping close for shared channels to keep them available.
+    logger.atWarning().log(
+        "shru - Skipping Close of Shared GoogleCloudStorageBidiReadChannel %s for %s",
+        System.identityHashCode(this), blobId);
   }
 
   public void actualClose() throws IOException {
     if (open) {
       logger.atFinest().log("Closing channel for '%s'", resourceId);
-      logger.atWarning().log(
-          "shru - Closing channel %s for %s", System.identityHashCode(this), blobId);
       try {
         if (blobReadSession != null) {
           logger.atWarning().log(
-              "shru - Closing BlobReadSession %s for %s",
+              "shru - Skipping Close of Shared BlobReadSession %s for %s (Experimental)",
               System.identityHashCode(blobReadSession), blobId);
-          blobReadSession.close();
+          // blobReadSession.close(); // Skipped for experiment
         } else if (sessionFuture != null) {
-          try (BlobReadSession readSession =
-              sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS)) {
-            // The try-with-resources statement ensures the readSession is automatically closed.
-          } catch (InterruptedException
-              | ExecutionException
-              | TimeoutException
-              | java.util.concurrent.CancellationException e) {
-            logger.atFine().withCause(e).log(
-                "Failed to get/close BlobReadSession during close() for '%s'", resourceId);
-          }
+          logger.atWarning().log(
+              "shru - Skipping Close of Shared sessionFuture for %s (Experimental)", blobId);
+          // Skipping resolution and close to avoid breaking shared session
         }
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
@@ -427,9 +424,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return;
     }
 
-    logger.atWarning().log(
-        "shru - Prefetching footer using channel %s for '%s'. Position: %d, Size: %d",
-        System.identityHashCode(this), blobId, footerStartPosition, footerSize);
     try (DisposableByteString dbs = readBytes(footerStartPosition, footerSize)) {
       ByteString byteString = dbs.byteString();
       if (byteString.size() != footerSize) {
