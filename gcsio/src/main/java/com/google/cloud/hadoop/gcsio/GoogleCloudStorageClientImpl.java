@@ -1317,7 +1317,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of
     // flag
     if (storageOptions.isBidiEnabled()) {
-      return new GoogleCloudStorageBidiReadChannel(
+      return GoogleCloudStorageBidiReadChannel.getOrCreate(
           storageWrapper.getStorage(),
           gcsItemInfo,
           readOptions,
