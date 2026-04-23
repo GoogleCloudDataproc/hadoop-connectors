@@ -1316,21 +1316,28 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     // TODO(dhritichorpa) Microbenchmark the latency of using
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of
     // flag
+    long startTime = System.currentTimeMillis();
+    SeekableByteChannel channel;
     if (storageOptions.isBidiEnabled()) {
-      return GoogleCloudStorageBidiReadChannel.getOrCreate(
-          storageWrapper.getStorage(),
-          gcsItemInfo,
-          readOptions,
-          getBoundedThreadPool(readOptions.getBidiThreadCount()));
+      channel =
+          GoogleCloudStorageBidiReadChannel.getOrCreate(
+              storageWrapper.getStorage(),
+              gcsItemInfo,
+              readOptions,
+              getBoundedThreadPool(readOptions.getBidiThreadCount()));
     } else {
-      return new GoogleCloudStorageClientReadChannel(
-          storageWrapper.getStorage(),
-          resourceId,
-          gcsItemInfo,
-          readOptions,
-          errorExtractor,
-          storageOptions);
+      channel =
+          new GoogleCloudStorageClientReadChannel(
+              storageWrapper.getStorage(),
+              resourceId,
+              gcsItemInfo,
+              readOptions,
+              errorExtractor,
+              storageOptions);
     }
+    long duration = System.currentTimeMillis() - startTime;
+    logger.atWarning().log("shruTime GCSIO initialization took %d ms for %s", duration, resourceId);
+    return channel;
   }
 
   private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
