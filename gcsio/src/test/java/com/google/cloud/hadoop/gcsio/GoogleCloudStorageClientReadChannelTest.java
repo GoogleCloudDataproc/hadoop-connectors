@@ -806,7 +806,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
-  public void read_whenLazyInitFails_closesOrphanedChannel() throws Exception {
+  public void testRead_whenLazyInitFails_closesOrphanedChannel() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     Storage mockStorage = mock(Storage.class);

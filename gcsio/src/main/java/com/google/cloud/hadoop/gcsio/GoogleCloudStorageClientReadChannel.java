@@ -414,9 +414,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           resourceId, contentChannelCurrentPosition, contentChannelEnd);
 
       ReadableByteChannel readableByteChannel =
-          getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
-
-      readableByteChannel = initializeMetadataAndValidateChannel(readableByteChannel, bytesToRead);
+          initializeMetadataAndValidateChannel(
+              getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd), bytesToRead);
 
       if (contentChannelEnd == objectSize
           && (contentChannelEnd - contentChannelCurrentPosition)
@@ -476,7 +475,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
         return readableByteChannel;
 
-      } catch (Exception e) {
+      } catch (IOException | RuntimeException e) {
         logger.atWarning().withCause(e).log(
             "Exception occurred during metadata initialization for '%s'. Attempting to safely close orphaned channel.",
             resourceId);
@@ -490,10 +489,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Failed to close orphaned channel for '%s' during cleanup", resourceId);
           e.addSuppressed(closeException);
         }
-        if (e instanceof IOException) {
-          throw (IOException) e;
-        }
-        throw new IOException("Unexpected error during channel initialization", e);
+        // Directly re-throw the exception exactly as it was caught.
+        // This prevents RuntimeExceptions (like NPEs) from being masked as IOExceptions!
+        throw e;
       }
     }
 

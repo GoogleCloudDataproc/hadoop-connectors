@@ -223,7 +223,6 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
-    // Clear all logs from the writeObject setup before we start testing the read!
     assertingHandler.flush();
 
     // Execute Parquet-style suffix read
@@ -232,38 +231,39 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
       channel.position(partition.length - 8);
       ByteBuffer magicBuffer = ByteBuffer.allocate(8);
       channel.read(magicBuffer);
-
       // Seek backward by 64KB and read (should be satisfied entirely from RAM)
       channel.position(partition.length - 65536);
       ByteBuffer footerBuffer = ByteBuffer.allocate(65536);
       channel.read(footerBuffer);
     }
 
-    int getObjectCount = 0;
-    int readObjectCount = 0;
-    int i = 0;
-    while (true) {
-      try {
-        Map<String, Object> log = assertingHandler.getLogRecordAtIndex(i);
-        String method = String.valueOf(log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name));
-
-        // Extract the stream operation type (request, response, or onClose)
-        String streamOp = String.valueOf(log.get("streamOperation"));
-
-        if ("GetObject".equals(method)) {
-          getObjectCount++;
-        }
-
-        // ONLY count when the stream is initially opened ("request"),
-        // and ignore "response" and "onClose".
-        if (method != null && method.contains("ReadObject") && "request".equals(streamOp)) {
-          readObjectCount++;
-        }
-        i++;
-      } catch (AssertionError | IndexOutOfBoundsException e) {
-        break;
-      }
-    }
+    // A single gRPC network stream generates exactly 3 logs (request, response, onClose)
+    // We expect exactly 1 stream to be opened, therefore we expect 3 logs!
+    assertingHandler.assertLogCount(3);
+    List<Map<String, Object>> allLogs = assertingHandler.getAllLogRecords();
+    long getObjectCount =
+        allLogs.stream()
+            .filter(
+                log ->
+                    "GetObject"
+                        .equals(
+                            String.valueOf(
+                                log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name))))
+            .count();
+    long readObjectCount =
+        allLogs.stream()
+            .filter(
+                log -> {
+                  String method =
+                      String.valueOf(log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name));
+                  String streamOp = String.valueOf(log.get("streamOperation"));
+                  // ONLY count when the stream is initially opened ("request"),
+                  // and ignore "response" and "onClose".
+                  return method != null
+                      && method.contains("ReadObject")
+                      && "request".equals(streamOp);
+                })
+            .count();
     assertThat(getObjectCount).isEqualTo(0);
     assertThat(readObjectCount).isEqualTo(1);
   }
