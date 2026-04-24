@@ -595,7 +595,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       throw new IOException("Thread interrupt received.", e);
     } catch (ExecutionException e) {
       GoogleCloudStorageEventBus.postOnException();
-      // If the future failed, the network call failed (e.g. 404 Not Found or 403 Forbidden).
+      // If the future failed, the network call failed (e.g. 404 Not Found).
       // We extract the underlying cause and immediately throw to prevent a redundant fallback call.
       Throwable cause = e.getCause();
       if (cause instanceof StorageException && ((StorageException) cause).getCode() == 404) {
