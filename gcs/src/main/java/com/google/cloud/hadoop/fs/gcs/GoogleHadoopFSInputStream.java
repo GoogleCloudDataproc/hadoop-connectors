@@ -99,7 +99,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
-    long startTime = System.currentTimeMillis();
+    // long startTime = System.currentTimeMillis();
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
@@ -114,8 +114,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       channel =
           gcsFs.open(gcsPath, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     }
-    long duration = System.currentTimeMillis() - startTime;
-    logger.atWarning().log("shruTime GHFS initialization took %d ms for %s", duration, gcsPath);
+    // long duration = System.currentTimeMillis() - startTime;
+    // logger.atWarning().log("shruTime GHFS initialization took %d ms for %s", duration, gcsPath);
     return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
   }
 
@@ -139,9 +139,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     long startTime = System.currentTimeMillis();
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
-    long duration = System.currentTimeMillis() - startTime;
-    logger.atWarning().log(
-        "shruTime GHFS create(fileInfo) took %d ms for %s", duration, fileInfo.getPath());
+    // long duration = System.currentTimeMillis() - startTime;
+    // logger.atWarning().log(
+    //     "shruTime GHFS create(fileInfo) took %d ms for %s", duration, fileInfo.getPath());
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
   }
 
@@ -232,10 +232,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           .whenComplete(
               (v, e) -> {
                 long durationMs = System.currentTimeMillis() - startTime;
-                long totalBytes = ranges.stream().mapToLong(FileRange::getLength).sum();
-                logger.atWarning().log(
-                    "shruTime GHFS readVectored took %d ms for %d bytes for %s",
-                    durationMs, totalBytes, gcsPath);
+                // long totalBytes = ranges.stream().mapToLong(FileRange::getLength).sum();
+                // logger.atWarning().log(
+                //     "shruTime GHFS readVectored took %d ms for %d bytes for %s",
+                //     durationMs, totalBytes, gcsPath);
               });
     } catch (IOException e) {
       if (IoExceptionHelper.isInterrupted(e)) {
@@ -278,8 +278,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for
             // the underlying channel.
             int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
-            long durationMs = System.currentTimeMillis() - startTimeMs;
-            logger.atWarning().log("shruTime GHFS read took %d ms for %s", durationMs, gcsPath);
+            // long durationMs = System.currentTimeMillis() - startTimeMs;
+            // logger.atWarning().log("shruTime GHFS read took %d ms for %s", durationMs, gcsPath);
             if (numRead > 0) {
               // -1 means we actually read 0 bytes, but requested at least one byte.
               totalBytesRead += numRead;
