@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.api.client.util.Preconditions.checkArgument;
 import static com.google.api.client.util.Preconditions.checkNotNull;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.max;
@@ -86,10 +87,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       validate(itemInfo);
       initMetadata(
           itemInfo.getContentEncoding(), itemInfo.getSize(), itemInfo.getContentGeneration());
-    } else {
-      if (readOptions.isFastFailOnNotFoundEnabled()) {
-        fetchMetadata();
-      }
+    } else if (readOptions.isFastFailOnNotFoundEnabled()) {
+      fetchMetadata();
     }
 
     Long generationId =
@@ -594,9 +593,24 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       logger.atWarning().withCause(e).log(
           "Interrupted while waiting for BlobReadSession initialization for '%s'", resourceId);
       throw new IOException("Thread interrupt received.", e);
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      // If the future failed, the network call failed (e.g. 404 Not Found or 403 Forbidden).
+      // We extract the underlying cause and immediately throw to prevent a redundant fallback call.
+      Throwable cause = e.getCause();
+      if (cause instanceof StorageException && ((StorageException) cause).getCode() == 404) {
+        throw createFileNotFoundException(
+            resourceId.getBucketName(), resourceId.getObjectName(), new IOException(e));
+      }
       logger.atWarning().withCause(e).log(
           "Failed to get metadata from BlobReadSession future for '%s'", resourceId);
+    } catch (TimeoutException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      logger.atWarning().withCause(e).log(
+          "Timeout waiting for BlobReadSession initialization for '%s'", resourceId);
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log(
+          "Unexpected error from BlobReadSession future for '%s'", resourceId);
     }
 
     // Fallback: If the session didn't have it, or the future failed to resolve, do the explicit

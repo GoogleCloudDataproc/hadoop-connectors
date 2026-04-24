@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -165,27 +166,16 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     boolean hasGetObject = false;
     boolean hasBidiRead = false;
 
-    // Use a try-catch loop to read all logs since getLogCount() is not available
-    int i = 0;
-    while (true) {
-      try {
-        Map<String, Object> log = assertingHandler.getLogRecordAtIndex(i);
-        String method = String.valueOf(log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name));
+    // Verify number of calls
+    assertingHandler.assertLogCount(1);
 
-        if ("GetObject".equals(method)) {
-          hasGetObject = true;
-        }
-        if (method != null && method.contains("ReadObject")) {
-          hasBidiRead = true;
-        }
-        i++;
-      } catch (AssertionError | IndexOutOfBoundsException e) {
-        break;
-      }
-    }
-
-    assertThat(hasGetObject).isFalse();
-    assertThat(hasBidiRead).isTrue();
+    // Verify that no GetObject call was made
+    List<String> rpcMethods =
+        assertingHandler.getAllLogRecords().stream()
+            .map(log -> String.valueOf(log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name)))
+            .collect(Collectors.toList());
+    assertThat(rpcMethods).doesNotContain("GetObject");
+    assertThat(rpcMethods.stream().anyMatch(method -> method.contains("ReadObject"))).isTrue();
   }
 
   @Test

@@ -57,6 +57,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
@@ -194,6 +195,33 @@ public class GoogleCloudStorageImplTest {
     }
     assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
         .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+    assertThat(trackingGcs.getAllRequestStrings()).doesNotContain("rpcMethod:GetObject");
+
+    trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void open_bidi_lazyInit_whenFileNotFound_throwsExceptionWithoutFallback()
+      throws Exception {
+    if (!testStorageClientImpl) {
+      return;
+    }
+    StorageResourceId resourceId = new StorageResourceId(testBucket, "non-existent-file-123.txt");
+    GoogleCloudStorageOptions bidiOptions = GCS_OPTIONS.toBuilder().setBidiEnabled(true).build();
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(bidiOptions);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
+      // Trigger lazy initialization.
+      // The sessionFuture.get() will throw an ExecutionException(StorageException: 404).
+      // catch block intercepts and throws a FileNotFoundException.
+      FileNotFoundException thrown =
+          assertThrows(FileNotFoundException.class, () -> readChannel.size());
+      assertThat(thrown).hasMessageThat().contains("Item not found");
+    }
+    // Verify that the fallback fetchMetadata() was bypassed.
+    // If the code fell through to the fallback, we would see a "GetObject" RPC in the logs.
     assertThat(trackingGcs.getAllRequestStrings()).doesNotContain("rpcMethod:GetObject");
 
     trackingGcs.delegate.close();
