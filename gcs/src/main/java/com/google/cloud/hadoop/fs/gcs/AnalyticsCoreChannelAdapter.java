@@ -118,7 +118,7 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
     checkOpen();
     List<GcsObjectRange> validRanges = new ArrayList<>();
     for (GcsObjectRange range : ranges) {
-      if (range.getOffset() + range.getLength() > size) {
+      if (size >= 0 && range.getOffset() + range.getLength() > size) {
         range
             .getByteBufferFuture()
             .completeExceptionally(new IOException("Range extends beyond file size: " + range));
