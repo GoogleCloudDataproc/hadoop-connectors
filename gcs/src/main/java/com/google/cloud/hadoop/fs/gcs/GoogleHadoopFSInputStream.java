@@ -32,6 +32,7 @@ import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
@@ -223,6 +224,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           streamStatistics,
           STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
           () -> {
+            long startTimeNs = System.nanoTime();
             if (channel instanceof ReadVectoredSeekableByteChannel) {
               ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
                   (ReadVectoredSeekableByteChannel) channel;
@@ -242,15 +244,24 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                                   .build())
                       .collect(Collectors.toList()),
                   allocate);
+              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
             } else if (channel instanceof AnalyticsCoreChannelAdapter) {
-              AnalyticsCoreChannelAdapter analyticsCoreChannelAdapterChannel =
-                  (AnalyticsCoreChannelAdapter) channel;
+              AnalyticsCoreChannelAdapter adapterChannel = (AnalyticsCoreChannelAdapter) channel;
               ranges.forEach(
                   range -> {
                     CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
                     range.setData(result);
+                    result.whenComplete(
+                        (buf, ex) -> {
+                          if (ex == null) {
+                            int length = range.getLength();
+                            streamStatistics.bytesRead(length);
+                            storageStatistics.streamReadBytes(length);
+                          }
+                        });
                   });
-              analyticsCoreChannelAdapterChannel.readVectored(
+
+              List<GcsObjectRange> gcsRanges =
                   ranges.stream()
                       .map(
                           range ->
@@ -259,10 +270,15 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                                   .setOffset(range.getOffset())
                                   .setByteBufferFuture(range.getData())
                                   .build())
-                      .collect(Collectors.toList()),
-                  allocate);
+                      .collect(Collectors.toList());
+
+              adapterChannel.readVectored(gcsRanges, allocate);
+
+              storageStatistics.incrementGcsTotalRequestCount();
+              storageStatistics.incrementCounter(
+                  GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
+              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
             } else {
-              long startTimeNs = System.nanoTime();
               vectoredIOSupplier
                   .get()
                   .readVectored(
@@ -319,6 +335,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             // the underlying channel.
             int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
             if (numRead > 0) {
+              if (channel instanceof AnalyticsCoreChannelAdapter) {
+                storageStatistics.incrementGcsTotalRequestCount();
+                storageStatistics.incrementCounter(
+                    GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
+              }
               // -1 means we actually read 0 bytes, but requested at least one byte.
               totalBytesRead += numRead;
               statistics.incrementReadOps(1);
@@ -354,6 +375,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             long startTimeNs = System.nanoTime();
             checkNotClosed();
             ((AnalyticsCoreChannelAdapter) channel).readFully(position, buffer, offset, length);
+            storageStatistics.incrementGcsTotalRequestCount();
+            storageStatistics.incrementCounter(
+                GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
             totalBytesRead += length;
             statistics.incrementReadOps(1);
             streamStats.updateReadStreamStats(length, startTimeNs);
