@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.1.16 - 2026-04-27
 1. Upgrade google.api-client-libraries.version to 2.9.0.
 1. Update base image to trusted openjdk 11 in Dockerfile.
