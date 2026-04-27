@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+1. Upgrade google.api-client-libraries.version to 2.9.0.
+1. Update base image to trusted openjdk 11 in Dockerfile.
 
 ## 3.1.15 - 2026-03-26
 1. Add Integration test for chained Downscoping Interceptors
