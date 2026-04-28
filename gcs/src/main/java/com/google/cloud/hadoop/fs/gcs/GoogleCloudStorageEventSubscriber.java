@@ -123,21 +123,23 @@ public class GoogleCloudStorageEventSubscriber {
 
   @Subscribe
   private void subscriberOnGcsReadMetricEvent(@Nonnull GcsReadMetricEvent event) {
-    if (event.getConnectionDurationMs() > 0) {
-      storageStatistics.updateStats(
-          GhfsStatistic.STREAM_READ_CONNECTION_DURATION,
-          event.getConnectionDurationMs(),
-          event.getStreamPath());
-    }
-    if (event.getDataTransferDurationMs() > 0) {
-      storageStatistics.updateStats(
-          GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION,
-          event.getDataTransferDurationMs(),
-          event.getStreamPath());
-      if (event.isLatencyThresholdBreached()) {
-        storageStatistics.incrementCounter(
-            GoogleCloudStorageStatistics.GCS_READ_DATA_TRANSFER_LATENCY_BREACHED_COUNT, 1);
-      }
+    switch (event.getType()) {
+      case CONNECTION:
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_CONNECTION_DURATION,
+            event.getDurationMs(),
+            event.getStreamPath());
+        break;
+      case DATA_TRANSFER:
+        storageStatistics.updateStats(
+            GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION,
+            event.getDurationMs(),
+            event.getStreamPath());
+        if (event.isLatencyThresholdBreached()) {
+          storageStatistics.incrementCounter(
+              GoogleCloudStorageStatistics.GCS_READ_DATA_TRANSFER_LATENCY_BREACHED_COUNT, 1);
+        }
+        break;
     }
   }
 

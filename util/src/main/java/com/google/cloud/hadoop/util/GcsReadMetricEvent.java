@@ -20,41 +20,42 @@ import java.net.URI;
 
 /** Event for providing GCS read metrics. */
 public class GcsReadMetricEvent {
-  private final long connectionDurationMs;
-  private final long dataTransferDurationMs;
+
+  /** Types of read metric events. */
+  public enum Type {
+    CONNECTION,
+    DATA_TRANSFER
+  }
+
+  private final Type type;
+  private final long durationMs;
   private final URI streamPath;
   private final boolean latencyThresholdBreached;
 
   public static GcsReadMetricEvent ofConnection(long durationMs, URI streamPath) {
-    return new GcsReadMetricEvent(durationMs, 0, streamPath, false);
-  }
-
-  public static GcsReadMetricEvent ofDataTransfer(long durationMs, URI streamPath) {
-    return ofDataTransfer(durationMs, streamPath, false);
+    return new GcsReadMetricEvent(Type.CONNECTION, durationMs, streamPath, false);
   }
 
   public static GcsReadMetricEvent ofDataTransfer(
       long durationMs, URI streamPath, boolean latencyThresholdBreached) {
-    return new GcsReadMetricEvent(0, durationMs, streamPath, latencyThresholdBreached);
+    return new GcsReadMetricEvent(
+        Type.DATA_TRANSFER, durationMs, streamPath, latencyThresholdBreached);
   }
 
-  public GcsReadMetricEvent(
-      long connectionDurationMs,
-      long dataTransferDurationMs,
-      URI streamPath,
-      boolean latencyThresholdBreached) {
-    this.connectionDurationMs = connectionDurationMs;
-    this.dataTransferDurationMs = dataTransferDurationMs;
+  private GcsReadMetricEvent(
+      Type type, long durationMs, URI streamPath, boolean latencyThresholdBreached) {
+    this.type = type;
+    this.durationMs = durationMs;
     this.streamPath = streamPath;
     this.latencyThresholdBreached = latencyThresholdBreached;
   }
 
-  public long getConnectionDurationMs() {
-    return connectionDurationMs;
+  public Type getType() {
+    return type;
   }
 
-  public long getDataTransferDurationMs() {
-    return dataTransferDurationMs;
+  public long getDurationMs() {
+    return durationMs;
   }
 
   public URI getStreamPath() {

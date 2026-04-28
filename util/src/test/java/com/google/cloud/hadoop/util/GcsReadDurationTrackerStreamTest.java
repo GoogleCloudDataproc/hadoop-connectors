@@ -43,7 +43,9 @@ public class GcsReadDurationTrackerStreamTest {
         new Object() {
           @Subscribe
           public void onGcsReadMetricEvent(GcsReadMetricEvent event) {
-            events.add(event);
+            if (event.getType() == GcsReadMetricEvent.Type.DATA_TRANSFER) {
+              events.add(event);
+            }
           }
         });
   }
@@ -70,7 +72,7 @@ public class GcsReadDurationTrackerStreamTest {
 
     assertThat(events).hasSize(1);
     GcsReadMetricEvent event = events.get(0);
-    assertThat(event.getDataTransferDurationMs()).isAtLeast(100L);
+    assertThat(event.getDurationMs()).isAtLeast(100L);
     assertThat(event.getStreamPath()).isEqualTo(path);
   }
 

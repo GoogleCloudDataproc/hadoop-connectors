@@ -696,7 +696,9 @@ public class VectoredIOImplTest {
     doAnswer(
             invocation -> {
               GoogleCloudStorageEventBus.postReadMetricEvent(
-                  new GcsReadMetricEvent(100L, 200L, fileInfo.getPath(), false));
+                  GcsReadMetricEvent.ofConnection(100L, fileInfo.getPath()));
+              GoogleCloudStorageEventBus.postReadMetricEvent(
+                  GcsReadMetricEvent.ofDataTransfer(200L, fileInfo.getPath(), false));
               return null;
             })
         .when(mockedChannel)
