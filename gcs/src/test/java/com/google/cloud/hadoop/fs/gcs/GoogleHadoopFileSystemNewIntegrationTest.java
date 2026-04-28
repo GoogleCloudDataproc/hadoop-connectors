@@ -49,7 +49,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -63,7 +62,10 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   private static HadoopFileSystemIntegrationHelper ghfsIHelper;
   private static String testBucketName;
 
-  @Rule public TestName name = new TestName();
+  @Rule
+  public GoogleHadoopFileSystemTestBase.SanitizedTestName name =
+      new GoogleHadoopFileSystemTestBase.SanitizedTestName();
+
   private TrackingHttpRequestInitializer gcsRequestsTracker;
 
   @Parameterized.Parameter public ClientType storageClientType;
