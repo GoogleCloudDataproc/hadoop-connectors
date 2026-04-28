@@ -145,19 +145,25 @@ public class VectoredIOImpl implements Closeable {
         updateRangeSizeCounters(sortedRanges.size(), sortedRanges.size());
         // case when ranges are not merged
         for (FileRange sortedRange : sortedRanges) {
-          long startTimer = System.currentTimeMillis();
+          long submissionTime = System.currentTimeMillis();
           Future<?> executionFuture =
               boundedThreadPool.submit(
                   () -> {
+                    long startTime = System.currentTimeMillis();
+                    long queueWaitTime = startTime - submissionTime;
                     logger.atFiner().log("Submitting range %s for execution.", sortedRange);
                     // Reset thread stats as a new task is being submitted to this thread.
                     // all required stats must be collected before task is finished.
                     resetThreadLocalStats();
+                    storageStatistics.updateStats(
+                        GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION,
+                        queueWaitTime,
+                        channelProvider.gcsPath);
                     readSingleRange(sortedRange, allocate, channelProvider);
                     long endTimer = System.currentTimeMillis();
                     storageStatistics.updateStats(
                         GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                        endTimer - startTimer,
+                        endTimer - submissionTime,
                         channelProvider.gcsPath);
                   });
           addCancellationListener(sortedRange, executionFuture);
@@ -169,21 +175,27 @@ public class VectoredIOImpl implements Closeable {
         for (CombinedFileRange combinedFileRange : combinedFileRanges) {
           CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
           combinedFileRange.setData(result);
-          long startTimer = System.currentTimeMillis();
+          long submissionTime = System.currentTimeMillis();
           Future<?> executionFuture =
               boundedThreadPool.submit(
                   () -> {
+                    long startTime = System.currentTimeMillis();
+                    long queueWaitTime = startTime - submissionTime;
                     logger.atFiner().log(
                         "Submitting combinedRange %s for execution.", combinedFileRange);
 
                     // Reset thread stats as a new task is being submitted to this thread.
                     // all required stats must be collected before task is finished.
                     resetThreadLocalStats();
+                    storageStatistics.updateStats(
+                        GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION,
+                        queueWaitTime,
+                        channelProvider.gcsPath);
                     readCombinedRange(combinedFileRange, allocate, channelProvider);
                     long endTimer = System.currentTimeMillis();
                     storageStatistics.updateStats(
                         GhfsStatistic.STREAM_READ_VECTORED_READ_RANGE_DURATION,
-                        endTimer - startTimer,
+                        endTimer - submissionTime,
                         channelProvider.gcsPath);
                   });
           addCancellationListener(combinedFileRange, executionFuture);

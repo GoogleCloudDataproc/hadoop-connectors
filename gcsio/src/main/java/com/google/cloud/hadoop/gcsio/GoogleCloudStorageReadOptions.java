@@ -58,7 +58,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setMinRangeRequestSize(2 * 1024 * 1024)
         .setBlockSize(64 * 1024 * 1024)
         .setFadviseRequestTrackCount(3)
-        .setReadExactRequestedBytesEnabled(false);
+        .setReadExactRequestedBytesEnabled(false)
+        .setLatencyLoggingThreshold(1000L);
   }
 
   public abstract Builder toBuilder();
@@ -111,6 +112,9 @@ public abstract class GoogleCloudStorageReadOptions {
   public abstract long getBlockSize();
 
   public abstract int getFadviseRequestTrackCount();
+
+  /** See {@link Builder#setLatencyLoggingThreshold(long)}. */
+  public abstract long getLatencyLoggingThreshold();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -219,6 +223,12 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setBlockSize(long blockSize);
 
     public abstract Builder setFadviseRequestTrackCount(int requestTrackCount);
+
+    /**
+     * Sets the threshold for data transfer latency, if the transfer takes longer than this
+     * threshold, then a high latency warning will be logged.
+     */
+    public abstract Builder setLatencyLoggingThreshold(long latencyLoggingThresholdMillis);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

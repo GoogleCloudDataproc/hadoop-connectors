@@ -83,15 +83,16 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     return newConfig;
   }
 
-  @Rule
-  public TestName name =
-      new TestName() {
-        // With parametrization method name will get [index] appended in their name.
-        @Override
-        public String getMethodName() {
-          return super.getMethodName().replaceAll("[\\[,\\]]", "");
-        }
-      };
+  /** TestName rule that sanitizes method names for use in GCS paths. */
+  public static class SanitizedTestName extends TestName {
+    @Override
+    public String getMethodName() {
+      // With parametrization method name will get [index] appended in their name.
+      return super.getMethodName().replaceAll("[\\[,\\],\\s+]", "");
+    }
+  }
+
+  @Rule public SanitizedTestName name = new SanitizedTestName();
 
   // -----------------------------------------------------------------------------------------
   // Tests that vary according to the GHFS variant, but which we want to make sure get tested.

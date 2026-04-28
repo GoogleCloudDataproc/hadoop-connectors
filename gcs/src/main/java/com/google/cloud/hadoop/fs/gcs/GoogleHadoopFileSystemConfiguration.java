@@ -380,6 +380,16 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.inputstream.min.range.request.size",
           GoogleCloudStorageReadOptions.DEFAULT.getMinRangeRequestSize());
 
+  /**
+   * Threshold for data transfer latency, if the transfer takes longer than this threshold, then a
+   * high latency warning will be logged.
+   */
+  public static final HadoopConfigurationProperty<Long>
+      GCS_INPUT_STREAM_LATENCY_LOGGING_THRESHOLD_MS =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.inputstream.latency.logging.threshold.ms",
+              GoogleCloudStorageReadOptions.DEFAULT.getLatencyLoggingThreshold());
+
   /** Minimum distance that will be seeked without merging the ranges together. */
   public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_RANGE_MIN_SEEK =
       new HadoopConfigurationProperty<>(
@@ -710,6 +720,8 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
         .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
         .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
+        .setLatencyLoggingThreshold(
+            GCS_INPUT_STREAM_LATENCY_LOGGING_THRESHOLD_MS.get(config, config::getLong))
         .build();
   }
 
