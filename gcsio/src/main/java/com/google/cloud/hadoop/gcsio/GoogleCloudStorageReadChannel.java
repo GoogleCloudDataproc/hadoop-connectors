@@ -35,6 +35,8 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.GcsReadDurationTrackerStream;
+import com.google.cloud.hadoop.util.GcsReadMetricEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -48,6 +50,7 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.Channels;
@@ -893,7 +896,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /**
-   * Opens the underlying stream, sets its position to the {@link #currentPosition}.
+   * Opens an {@link InputStream} to the GCS object at the current position, wrapped with
+   * performance tracking.
    *
    * <p>If the file encoding in GCS is gzip (and therefore the HTTP client will decompress it), the
    * entire file is always requested, and we seek to the position requested. If the file encoding is
@@ -901,6 +905,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    *
    * @param bytesToRead number of bytes to read from new stream. Ignored if {@link
    *     GoogleCloudStorageReadOptions#getFadvise()} is equal to {@link Fadvise#SEQUENTIAL}.
+   * @return an {@link InputStream} to the object content, typically a {@link
+   *     GcsReadDurationTrackerStream}.
    * @throws IOException on IO error
    */
   protected InputStream openStream(long bytesToRead) throws IOException {
@@ -987,8 +993,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     Storage.Objects.Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
+    long startTime = System.currentTimeMillis();
     try {
       response = getObject.executeMedia();
+      GoogleCloudStorageEventBus.postReadMetricEvent(
+          GcsReadMetricEvent.ofConnection(
+              System.currentTimeMillis() - startTime, URI.create(resourceId.toString())));
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
@@ -1108,7 +1118,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           currentPosition,
           resourceId);
 
-      return contentStream;
+      return new GcsReadDurationTrackerStream(
+          contentStream,
+          URI.create(resourceId.toString()),
+          response.getHeaders(),
+          readOptions.getLatencyLoggingThreshold());
     } catch (IOException e) {
       GoogleCloudStorageEventBus.postOnException();
       try {
