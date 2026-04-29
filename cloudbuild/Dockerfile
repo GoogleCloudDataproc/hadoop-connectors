@@ -1,5 +1,6 @@
 # This Dockerfile creates an image for running presubmit tests.
-FROM eclipse-temurin:8-jdk
+# The image below is for OpenJDK 8.
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk:8@sha256:3af2ac94130765b73fc8f1b42ffc04f77996ed8210c297fcfa28ca880ff0a217
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
