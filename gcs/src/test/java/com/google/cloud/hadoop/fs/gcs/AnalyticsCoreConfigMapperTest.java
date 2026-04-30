@@ -38,12 +38,15 @@ public class AnalyticsCoreConfigMapperTest {
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped.get("fs.gs.project-id")).isEqualTo("my-project");
-    assertThat(mapped.get("fs.gs.user-project")).isEqualTo("user-project");
-    assertThat(mapped.get("fs.gs.analytics-core.read.thread.count")).isEqualTo("10");
-    assertThat(mapped.get("fs.gs.analytics-core.read.vectored.range.merge-gap.max-bytes"))
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PROJECT_ID_KEY))
+        .isEqualTo("my-project");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isEqualTo("user-project");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.READ_THREAD_COUNT_KEY))
+        .isEqualTo("10");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_GAP_KEY))
         .isEqualTo("1024");
-    assertThat(mapped.get("fs.gs.analytics-core.read.vectored.range.merged-size.max-bytes"))
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_SIZE_KEY))
         .isEqualTo("2048");
   }
 
@@ -77,21 +80,19 @@ public class AnalyticsCoreConfigMapperTest {
 
   @Test
   public void mapConfigs_returnsEmptyWhenNoMatchingPrefix() {
-    Configuration config = new Configuration();
+    Configuration config = new Configuration(false);
     config.set("other.prefix.prop", "val");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
-    mapped.remove("fs.gs.impl");
 
     assertThat(mapped).isEmpty();
   }
 
   @Test
   public void mapConfigs_returnsEmptyWhenConfigIsEmpty() {
-    Configuration config = new Configuration();
+    Configuration config = new Configuration(false);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
-    mapped.remove("fs.gs.impl");
 
     assertThat(mapped).isEmpty();
   }

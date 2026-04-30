@@ -22,6 +22,13 @@ import org.apache.hadoop.conf.Configuration;
 /** Maps GCS Hadoop Connector configurations to GCS Analytics Core configurations. */
 final class AnalyticsCoreConfigMapper {
 
+  static final String PROJECT_ID_KEY = "project-id";
+  static final String USER_PROJECT_KEY = "user-project";
+  static final String READ_THREAD_COUNT_KEY = "analytics-core.read.thread.count";
+  static final String MAX_MERGE_GAP_KEY = "analytics-core.read.vectored.range.merge-gap.max-bytes";
+  static final String MAX_MERGE_SIZE_KEY =
+      "analytics-core.read.vectored.range.merged-size.max-bytes";
+
   private AnalyticsCoreConfigMapper() {
     // Utility class
   }
@@ -42,27 +49,27 @@ final class AnalyticsCoreConfigMapper {
         config,
         GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(),
         mappedProperties,
-        prefix + "project-id");
+        prefix + PROJECT_ID_KEY);
     mapAndRemoveSource(
         config,
         GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
         mappedProperties,
-        prefix + "user-project");
+        prefix + USER_PROJECT_KEY);
     mapAndRemoveSource(
         config,
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(),
         mappedProperties,
-        prefix + "analytics-core.read.thread.count");
+        prefix + READ_THREAD_COUNT_KEY);
     mapAndRemoveSource(
         config,
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(),
         mappedProperties,
-        prefix + "analytics-core.read.vectored.range.merge-gap.max-bytes");
+        prefix + MAX_MERGE_GAP_KEY);
     mapAndRemoveSource(
         config,
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
         mappedProperties,
-        prefix + "analytics-core.read.vectored.range.merged-size.max-bytes");
+        prefix + MAX_MERGE_SIZE_KEY);
 
     return mappedProperties;
   }
