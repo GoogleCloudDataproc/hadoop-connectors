@@ -15,7 +15,6 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 
@@ -41,32 +40,26 @@ final class AnalyticsCoreConfigMapper {
    * @return A map containing the mapped properties.
    */
   static Map<String, String> mapConfigs(Configuration config, String prefix) {
-    Map<String, String> properties = config.getValByRegex("^" + prefix.replace(".", "\\."));
-    Map<String, String> mappedProperties = new HashMap<>(properties);
+    Map<String, String> mappedProperties = config.getValByRegex("^" + prefix.replace(".", "\\."));
 
     // Direct 1:1 mappings from Connector to Analytics Core
     mapAndRemoveSource(
-        config,
         GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(),
         mappedProperties,
         prefix + PROJECT_ID_KEY);
     mapAndRemoveSource(
-        config,
         GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
         mappedProperties,
         prefix + USER_PROJECT_KEY);
     mapAndRemoveSource(
-        config,
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(),
         mappedProperties,
         prefix + READ_THREAD_COUNT_KEY);
     mapAndRemoveSource(
-        config,
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(),
         mappedProperties,
         prefix + MAX_MERGE_GAP_KEY);
     mapAndRemoveSource(
-        config,
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
         mappedProperties,
         prefix + MAX_MERGE_SIZE_KEY);
@@ -75,11 +68,10 @@ final class AnalyticsCoreConfigMapper {
   }
 
   private static void mapAndRemoveSource(
-      Configuration config, String hadoopKey, Map<String, String> map, String analyticsCoreKey) {
-    String value = config.get(hadoopKey);
+      String hadoopKey, Map<String, String> map, String analyticsCoreKey) {
+    String value = map.remove(hadoopKey);
     if (value != null) {
       map.put(analyticsCoreKey, value);
-      map.remove(hadoopKey);
     }
   }
 }
