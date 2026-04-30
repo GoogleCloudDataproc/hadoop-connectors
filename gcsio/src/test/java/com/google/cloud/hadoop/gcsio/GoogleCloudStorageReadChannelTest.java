@@ -604,6 +604,55 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
+  public void read_withPositiveGeneration_usesGenerationMatchPrecondition() throws IOException {
+    long generation = 12345L;
+    byte[] testData = {0x01, 0x02, 0x03};
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(generation)),
+            dataResponse(testData));
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+    GoogleCloudStorageReadChannel readChannel =
+        createReadChannel(storage, GoogleCloudStorageReadOptions.builder().build(), generation);
+
+    readChannel.read(ByteBuffer.allocate(testData.length));
+
+    // The first request is for metadata, the second is for data.
+    // Verify the data request URL contains the generation parameter.
+    String mediaRequestUrl = getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation);
+    assertThat("GET:" + requests.get(1).getUrl().toString()).isEqualTo(mediaRequestUrl);
+  }
+
+  @Test
+  public void read_withZeroGeneration_doesNotUseGenerationMatchPrecondition() throws IOException {
+    long requestedGeneration = 0L;
+    // The actual object has a real, positive generation ID.
+    long actualGeneration = 54321L;
+    byte[] testData = {0x04, 0x05, 0x06};
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(actualGeneration)),
+            dataResponse(testData));
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+    GoogleCloudStorageReadChannel readChannel =
+        createReadChannel(
+            storage,
+            GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build(),
+            requestedGeneration);
+
+    readChannel.read(ByteBuffer.allocate(testData.length));
+
+    // The data request URL should not contain a generation parameter,
+    // because the requested generation was 0. The generation parameter in getMediaRequestString
+    // will be null when the check for generation > 0 fails.
+    String mediaRequestUrl = getMediaRequestString(BUCKET_NAME, OBJECT_NAME);
+    assertThat("GET:" + requests.get(0).getUrl().toString()).isEqualTo(mediaRequestUrl);
+  }
+
+  @Test
   public void open_gzipContentEncoding_succeeds_whenContentEncodingSupported() throws Exception {
     MockHttpTransport transport =
         mockTransport(
