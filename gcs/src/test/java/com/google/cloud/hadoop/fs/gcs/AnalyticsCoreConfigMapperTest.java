@@ -43,8 +43,6 @@ public class AnalyticsCoreConfigMapperTest {
         .isEqualTo("1024");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_SIZE_KEY))
         .isEqualTo("2048");
-    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY))
-        .isEqualTo(GoogleHadoopFileSystem.GHFS_ID);
   }
 
   @Test
@@ -75,17 +73,6 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
-  public void mapConfigs_mapsUserAgentWithSuffix() {
-    Configuration config = new Configuration();
-    config.set("fs.gs.application.name.suffix", "-my-suffix");
-
-    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
-
-    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY))
-        .isEqualTo(GoogleHadoopFileSystem.GHFS_ID + "-my-suffix");
-  }
-
-  @Test
   public void mapConfigs_preservesUnmappedPropertiesWithPrefix() {
     Configuration config = new Configuration();
     config.set("fs.gs.some.other.prop", "val");
@@ -96,26 +83,22 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
-  public void mapConfigs_returnsOnlyUserAgentWhenNoMatchingPrefix() {
+  public void mapConfigs_returnsEmptyWhenNoMatchingPrefix() {
     Configuration config = new Configuration(false);
     config.set("other.prefix.prop", "val");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped)
-        .containsExactly(
-            "fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
+    assertThat(mapped).isEmpty();
   }
 
   @Test
-  public void mapConfigs_returnsOnlyUserAgentWhenConfigIsEmpty() {
+  public void mapConfigs_returnsEmptyWhenConfigIsEmpty() {
     Configuration config = new Configuration(false);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped)
-        .containsExactly(
-            "fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
+    assertThat(mapped).isEmpty();
   }
 
   private Configuration createTestConfiguration() {

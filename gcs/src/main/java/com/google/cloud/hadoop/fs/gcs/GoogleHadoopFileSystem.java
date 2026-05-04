@@ -458,6 +458,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   private GcsFileSystem createAnalyticsGcsFs(Configuration config) throws IOException {
+    // TODO(singhaniash): Pass correct user agent to AnalyticsCore
     Map<String, String> mappedProperties =
         AnalyticsCoreConfigMapper.mapConfigs(config, GCS_CONFIG_PREFIX + ".");
     GcsFileSystemOptions options =

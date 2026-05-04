@@ -28,7 +28,6 @@ final class AnalyticsCoreConfigMapper {
   static final String MAX_MERGE_GAP_KEY = "analytics-core.read.vectored.range.merge-gap.max-bytes";
   static final String MAX_MERGE_SIZE_KEY =
       "analytics-core.read.vectored.range.merged-size.max-bytes";
-  static final String USER_AGENT_KEY = "user-agent";
 
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
@@ -66,9 +65,6 @@ final class AnalyticsCoreConfigMapper {
     HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS.forEach(
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
-
-    mappedProperties.put(
-        prefix + USER_AGENT_KEY, GoogleHadoopFileSystemConfiguration.getApplicationName(config));
 
     return mappedProperties;
   }
