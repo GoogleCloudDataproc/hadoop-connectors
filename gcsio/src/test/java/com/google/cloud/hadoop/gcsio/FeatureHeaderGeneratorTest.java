@@ -39,6 +39,12 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(JUnit4.class)
 public class FeatureHeaderGeneratorTest {
 
+  private static final GoogleCloudStorageFileSystemOptions TEST_DEFAULT_OPTIONS =
+      GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+          .setCloudStorageOptions(
+              GoogleCloudStorageOptions.DEFAULT.toBuilder().setHnBucketRenameEnabled(false).build())
+          .build();
+
   @Before
   public void setUp() {
     // Clear any request-specific features.
@@ -80,13 +86,12 @@ public class FeatureHeaderGeneratorTest {
   @Test
   public void track_withCallable_setsAndClearsFeature() throws IOException {
     // Initially, the header should be based on default options
-    FeatureHeaderGenerator header =
-        new FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    FeatureHeaderGenerator header = new FeatureHeaderGenerator(TEST_DEFAULT_OPTIONS);
     String initialHeader = "AQ==";
     assertThat(header.getValue()).isEqualTo(initialHeader);
 
     // A feature to track that is not part of the default set
-    TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // This is likely bit 12, not 11
+    TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // This is bit 12
 
     String result =
         FeatureHeaderGenerator.track( // track is still static for request-level features
@@ -108,8 +113,7 @@ public class FeatureHeaderGeneratorTest {
 
   @Test
   public void track_clearsFeatureOnException() {
-    FeatureHeaderGenerator header =
-        new FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions.DEFAULT);
+    FeatureHeaderGenerator header = new FeatureHeaderGenerator(TEST_DEFAULT_OPTIONS);
     String initialHeader = header.getValue();
     TrackedFeatures testFeature = TrackedFeatures.RENAME_API; // bit 12
 
@@ -154,15 +158,15 @@ public class FeatureHeaderGeneratorTest {
     public static Collection<Object[]> data() {
       return Arrays.asList(
           new Object[][] {
-            {"Default Options", GoogleCloudStorageFileSystemOptions.DEFAULT, createBitSet(0)},
+            {"Default Options", TEST_DEFAULT_OPTIONS, createBitSet(0)},
             {"Fadvise Random", buildOptionsWithFadvise(Fadvise.RANDOM), createBitSet(1)},
             {"Fadvise Sequential", buildOptionsWithFadvise(Fadvise.SEQUENTIAL), createBitSet(2)},
             {"Fadvise AutoRandom", buildOptionsWithFadvise(Fadvise.AUTO_RANDOM), createBitSet(3)},
             {
               "Hierarchical Namespace",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+              TEST_DEFAULT_OPTIONS.toBuilder()
                   .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                      TEST_DEFAULT_OPTIONS.getCloudStorageOptions().toBuilder()
                           .setHnBucketRenameEnabled(true)
                           .build())
                   .build(),
@@ -170,9 +174,9 @@ public class FeatureHeaderGeneratorTest {
             },
             {
               "HNS Optimizations Enabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+              TEST_DEFAULT_OPTIONS.toBuilder()
                   .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                      TEST_DEFAULT_OPTIONS.getCloudStorageOptions().toBuilder()
                           .setHnOptimizationEnabled(true)
                           .build())
                   .build(),
@@ -180,23 +184,19 @@ public class FeatureHeaderGeneratorTest {
             },
             {
               "Performance Cache",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setPerformanceCacheEnabled(true)
-                  .build(),
+              TEST_DEFAULT_OPTIONS.toBuilder().setPerformanceCacheEnabled(true).build(),
               createBitSet(0, 6)
             },
             {
               "Cloud Logging Enabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-                  .setCloudLoggingEnabled(true)
-                  .build(),
+              TEST_DEFAULT_OPTIONS.toBuilder().setCloudLoggingEnabled(true).build(),
               createBitSet(0, 7)
             },
             {
               "Trace Log Enabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+              TEST_DEFAULT_OPTIONS.toBuilder()
                   .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                      TEST_DEFAULT_OPTIONS.getCloudStorageOptions().toBuilder()
                           .setTraceLogEnabled(true)
                           .build())
                   .build(),
@@ -204,9 +204,9 @@ public class FeatureHeaderGeneratorTest {
             },
             {
               "Operation Trace Log Enabled",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+              TEST_DEFAULT_OPTIONS.toBuilder()
                   .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                      TEST_DEFAULT_OPTIONS.getCloudStorageOptions().toBuilder()
                           .setOperationTraceLogEnabled(true)
                           .build())
                   .build(),
@@ -214,18 +214,20 @@ public class FeatureHeaderGeneratorTest {
             },
             {
               "Direct Upload",
-              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+              TEST_DEFAULT_OPTIONS.toBuilder()
                   .setCloudStorageOptions(
-                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                      TEST_DEFAULT_OPTIONS.getCloudStorageOptions().toBuilder()
                           .setWriteChannelOptions(
-                              GoogleCloudStorageOptions.DEFAULT.getWriteChannelOptions().toBuilder()
+                              TEST_DEFAULT_OPTIONS
+                                  .getCloudStorageOptions()
+                                  .getWriteChannelOptions()
+                                  .toBuilder()
                                   .setDirectUploadEnabled(true)
                                   .build())
                           .build())
                   .build(),
               createBitSet(0, 10)
-            },
-            {"Bidi Enabled", buildOptionsWithBidi(), createBitSet(0, 11)}
+            }
           });
     }
 
@@ -243,17 +245,9 @@ public class FeatureHeaderGeneratorTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.DEFAULT.toBuilder().setFadvise(fadvise).build();
     GoogleCloudStorageOptions storageOptions =
-        GoogleCloudStorageOptions.DEFAULT.toBuilder().setReadChannelOptions(readOptions).build();
-    return GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-        .setCloudStorageOptions(storageOptions)
-        .build();
-  }
-
-  private static GoogleCloudStorageFileSystemOptions buildOptionsWithBidi() {
-    GoogleCloudStorageOptions storageOptions =
-        GoogleCloudStorageOptions.DEFAULT.toBuilder().setBidiEnabled(true).build();
-    return GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
-        .setCloudStorageOptions(storageOptions)
-        .build();
+        TEST_DEFAULT_OPTIONS.getCloudStorageOptions().toBuilder()
+            .setReadChannelOptions(readOptions)
+            .build();
+    return TEST_DEFAULT_OPTIONS.toBuilder().setCloudStorageOptions(storageOptions).build();
   }
 }

@@ -124,11 +124,6 @@ public class FeatureHeaderGenerator {
       features.set(TrackedFeatures.DIRECT_UPLOAD_ENABLED.getBitPosition());
     }
 
-    // Bidirectional Support
-    if (storageOptions.isBidiEnabled()) {
-      features.set(TrackedFeatures.BIDI_ENABLED.getBitPosition());
-    }
-
     // Performance Cache
     if (fsOptions.isPerformanceCacheEnabled()) {
       features.set(TrackedFeatures.PERFORMANCE_CACHE_ENABLED.getBitPosition());

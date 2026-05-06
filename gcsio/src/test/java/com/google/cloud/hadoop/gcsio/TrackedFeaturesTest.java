@@ -38,7 +38,6 @@ public class TrackedFeaturesTest {
             .put(TrackedFeatures.TRACE_LOG_ENABLED, 8)
             .put(TrackedFeatures.OPERATION_TRACE_LOG_ENABLED, 9)
             .put(TrackedFeatures.DIRECT_UPLOAD_ENABLED, 10)
-            .put(TrackedFeatures.BIDI_ENABLED, 11)
             .put(TrackedFeatures.RENAME_API, 12)
             .build();
 
