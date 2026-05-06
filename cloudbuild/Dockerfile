@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # This Dockerfile creates an image for running presubmit tests.
-FROM eclipse-temurin:11-jdk
+# The image below is for OpenJDK 11.
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk@sha256:e81b7f317654b0f26d3993e014b04bcb29250339b11b9de41e130feecd4cd43c
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
