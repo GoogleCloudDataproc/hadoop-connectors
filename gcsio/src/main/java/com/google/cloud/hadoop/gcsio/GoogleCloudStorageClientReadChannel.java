@@ -433,7 +433,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
       try {
         if (!metadataInitialized) {
-          logger.atInfo().log(
+          logger.atFine().log(
               "Metadata not initialized. Forcing lazy channel connection with 0-byte read for '%s'",
               resourceId);
 
@@ -442,7 +442,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           // Extract the headers to populate objectSize
           ensureMetadataInitialized(readableByteChannel);
 
-          logger.atInfo().log(
+          logger.atFiner().log(
               "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
 
           if (objectSize != -1 && currentPosition >= objectSize) {
@@ -469,7 +469,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
         if (contentChannelEnd == Long.MAX_VALUE && objectSize != -1) {
           contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
-          logger.atInfo().log(
+          logger.atFiner().log(
               "Recalculated contentChannelEnd to %d for '%s'", contentChannelEnd, resourceId);
         }
 
@@ -482,7 +482,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         try {
           if (readableByteChannel != null && readableByteChannel.isOpen()) {
             readableByteChannel.close();
-            logger.atInfo().log("Successfully closed orphaned channel for '%s'", resourceId);
+            logger.atFine().log("Successfully closed orphaned channel for '%s'", resourceId);
           }
         } catch (IOException closeException) {
           logger.atWarning().withCause(closeException).log(
