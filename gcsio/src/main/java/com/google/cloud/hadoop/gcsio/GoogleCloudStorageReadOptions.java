@@ -60,7 +60,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setFadviseRequestTrackCount(3)
         .setReadExactRequestedBytesEnabled(false)
         .setBidiThreadCount(16)
-        .setBidiClientTimeout(30);
+        .setBidiClientTimeout(30)
+        .setLatencyLoggingThreshold(1000L);
   }
 
   public abstract Builder toBuilder();
@@ -119,6 +120,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setBidiClientTimeout(int)}. */
   public abstract int getBidiClientTimeout();
+
+  /** See {@link Builder#setLatencyLoggingThreshold(long)}. */
+  public abstract long getLatencyLoggingThreshold();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -233,6 +237,12 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the total amount of time, we would wait for bidi client initialization. */
     public abstract Builder setBidiClientTimeout(int bidiClientTimeout);
+
+    /**
+     * Sets the threshold for data transfer latency, if the transfer takes longer than this
+     * threshold, then a high latency warning will be logged.
+     */
+    public abstract Builder setLatencyLoggingThreshold(long latencyLoggingThresholdMillis);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
