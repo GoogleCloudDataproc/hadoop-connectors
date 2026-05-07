@@ -27,6 +27,8 @@ import org.junit.runners.JUnit4;
 public class StorageClientProviderTest {
 
   private static final Credentials TEST_CREDENTIALS = null;
+  private static final FeatureHeaderGenerator TEST_FEATURE_HEADER_GENERATOR =
+      new FeatureHeaderGenerator(GoogleCloudStorageFileSystemOptions.DEFAULT);
 
   private static final GoogleCloudStorageOptions TEST_STORAGE_OPTIONS =
       GoogleCloudStorageOptions.builder()
@@ -78,7 +80,12 @@ public class StorageClientProviderTest {
   public void getStorage_returnsAndCachesNewStorageObject() throws IOException {
     StorageClientWrapper storage =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
 
     assertNotNull(storage);
     assertEquals(storageClientProvider.cache.size(), 1);
@@ -97,7 +104,12 @@ public class StorageClientProviderTest {
         TEST_STORAGE_OPTIONS.toBuilder().setStorageClientCachingEnabled(false).build();
     StorageClientWrapper storage =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, disableCacheOptions, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            disableCacheOptions,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
 
     assertNotNull(storage);
     assertEquals(storageClientProvider.cache.size(), 0);
@@ -107,10 +119,20 @@ public class StorageClientProviderTest {
   public void getStorage_returnsCachedStorageObject() throws IOException {
     StorageClientWrapper storage1 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
     StorageClientWrapper storage2 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
 
     assertEquals(storageClientProvider.cache.size(), 1);
     // A single storage object should be shared across both the references.
@@ -128,10 +150,20 @@ public class StorageClientProviderTest {
 
     StorageClientWrapper storage1 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
     StorageClientWrapper storage2 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, testOptions, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            testOptions,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
 
     assertNotEquals(storage1, storage2);
     assertEquals(getReferences(storage1), 1);
@@ -142,10 +174,20 @@ public class StorageClientProviderTest {
   public void close_nonZeroReference_doesNotCloseObject() throws Exception {
     StorageClientWrapper storage1 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
     StorageClientWrapper storage2 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
 
     assertEquals(storageClientProvider.cache.size(), 1);
     // A single storage object should be shared across both the references.
@@ -162,7 +204,12 @@ public class StorageClientProviderTest {
   public void close_zeroReference_closesStorageObject() throws Exception {
     StorageClientWrapper storage1 =
         storageClientProvider.getStorage(
-            TEST_CREDENTIALS, TEST_STORAGE_OPTIONS, null, null, TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+            TEST_CREDENTIALS,
+            TEST_STORAGE_OPTIONS,
+            null,
+            null,
+            TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+            TEST_FEATURE_HEADER_GENERATOR);
 
     assertEquals(storageClientProvider.cache.size(), 1);
     // A single storage object should be shared across both the references.
@@ -191,7 +238,8 @@ public class StorageClientProviderTest {
                   TEST_STORAGE_OPTIONS,
                   null,
                   null,
-                  TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC);
+                  TEST_DOWNSCOPED_ACCESS_TOKEN_FUNC,
+                  TEST_FEATURE_HEADER_GENERATOR);
             } catch (IOException e) {
               failures.getAndIncrement();
             } finally {

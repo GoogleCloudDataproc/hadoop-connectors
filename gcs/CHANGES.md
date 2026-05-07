@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Track Client Feature Usage using Custom Header
 
 ## 3.1.16 - 2026-04-27
 1. Upgrade google.api-client-libraries.version to 2.9.0.

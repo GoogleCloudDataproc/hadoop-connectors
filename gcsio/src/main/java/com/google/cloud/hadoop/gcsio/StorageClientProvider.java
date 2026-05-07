@@ -51,7 +51,8 @@ public class StorageClientProvider {
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      FeatureHeaderGenerator featureHeaderGenerator)
       throws IOException {
     if (!canCache(storageOptions, interceptors, pCUExecutorService)) {
       logger.atInfo().log("Ignoring storage object cache.");
@@ -61,7 +62,8 @@ public class StorageClientProvider {
               storageOptions,
               interceptors,
               pCUExecutorService,
-              downscopedAccessTokenFn),
+              downscopedAccessTokenFn,
+              featureHeaderGenerator),
           this);
     }
     StorageClientProviderCacheKey key =
@@ -70,7 +72,13 @@ public class StorageClientProvider {
     if (storage == null) {
       storage =
           new StorageClientWrapper(
-              createStorage(credentials, storageOptions, null, null, downscopedAccessTokenFn),
+              createStorage(
+                  credentials,
+                  storageOptions,
+                  null,
+                  null,
+                  downscopedAccessTokenFn,
+                  featureHeaderGenerator),
               this);
       cache.put(key, storage);
       storageToCacheKeyMap.put(storage, key);
@@ -145,9 +153,11 @@ public class StorageClientProvider {
       GoogleCloudStorageOptions storageOptions,
       List<ClientInterceptor> interceptors,
       ExecutorService pCUExecutorService,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      FeatureHeaderGenerator featureHeaderGenerator)
       throws IOException {
-    final ImmutableMap<String, String> headers = getUpdatedHeadersWithUserAgent(storageOptions);
+    final ImmutableMap<String, String> headers =
+        getUpdatedHeaders(storageOptions, featureHeaderGenerator);
 
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
