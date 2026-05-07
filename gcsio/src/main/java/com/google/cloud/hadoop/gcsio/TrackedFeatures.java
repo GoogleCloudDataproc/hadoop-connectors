@@ -54,6 +54,8 @@ public enum TrackedFeatures {
 
   DIRECT_UPLOAD_ENABLED(10),
 
+  // Bit 11 is reserved to avoid misuse in future.
+
   RENAME_API(12);
 
   private final int bitPosition;
