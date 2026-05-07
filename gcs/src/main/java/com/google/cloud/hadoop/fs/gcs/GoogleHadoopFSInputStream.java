@@ -106,12 +106,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
+    if (ghfs.isAnalyticsCoreEnabled()) {
+      FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      SeekableByteChannel channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
+      return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
+    }
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
-    if (ghfs.isAnalyticsCoreEnabled()) {
-      fileInfo = gcsFs.getFileInfoObject(gcsPath);
-      channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
-    } else if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
       fileInfo = gcsFs.getFileInfoObject(gcsPath);
       channel =
@@ -141,13 +143,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel;
     if (ghfs.isAnalyticsCoreEnabled()) {
-      channel = createAnalyticsCoreChannel(ghfs, fileInfo, fileInfo.getPath());
-    } else {
-      channel =
-          gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+      SeekableByteChannel channel = createAnalyticsCoreChannel(ghfs, fileInfo, fileInfo.getPath());
+      return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
     }
+    SeekableByteChannel channel =
+        gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
   }
 
@@ -176,7 +177,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             .setAttributes(fileInfo.getAttributes())
             .build();
     GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(gcsFileInfo);
-    return new AnalyticsCoreChannelAdapter(inputStream, fileInfo.getSize());
+    return new GcsAnalyticsCoreInputStreamWrapper(inputStream, fileInfo.getSize());
   }
 
   private GoogleHadoopFSInputStream(
@@ -242,15 +243,17 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                                   .build())
                       .collect(Collectors.toList()),
                   allocate);
-            } else if (channel instanceof AnalyticsCoreChannelAdapter) {
-              AnalyticsCoreChannelAdapter analyticsCoreChannelAdapterChannel =
-                  (AnalyticsCoreChannelAdapter) channel;
+              return null;
+            }
+            if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+              GcsAnalyticsCoreInputStreamWrapper gcsAnalyticsCoreInputStreamWrapperChannel =
+                  (GcsAnalyticsCoreInputStreamWrapper) channel;
               ranges.forEach(
                   range -> {
                     CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
                     range.setData(result);
                   });
-              analyticsCoreChannelAdapterChannel.readVectored(
+              gcsAnalyticsCoreInputStreamWrapperChannel.readVectored(
                   ranges.stream()
                       .map(
                           range ->
@@ -261,21 +264,21 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
                                   .build())
                       .collect(Collectors.toList()),
                   allocate);
-            } else {
-              long startTimeNs = System.nanoTime();
-              vectoredIOSupplier
-                  .get()
-                  .readVectored(
-                      ranges,
-                      allocate,
-                      gcsFs,
-                      fileInfo,
-                      gcsPath,
-                      streamStatistics,
-                      rangeReadThreadStats);
-              statistics.incrementReadOps(1);
-              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
+              return null;
             }
+            long startTimeNs = System.nanoTime();
+            vectoredIOSupplier
+                .get()
+                .readVectored(
+                    ranges,
+                    allocate,
+                    gcsFs,
+                    fileInfo,
+                    gcsPath,
+                    streamStatistics,
+                    rangeReadThreadStats);
+            statistics.incrementReadOps(1);
+            vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
             return null;
           });
     } catch (IOException e) {
@@ -346,14 +349,15 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (length == 0) {
       return;
     }
-    if (channel instanceof AnalyticsCoreChannelAdapter) {
+    if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
       trackDuration(
           streamStatistics,
           STREAM_READ_OPERATIONS.getSymbol(),
           () -> {
             long startTimeNs = System.nanoTime();
             checkNotClosed();
-            ((AnalyticsCoreChannelAdapter) channel).readFully(position, buffer, offset, length);
+            ((GcsAnalyticsCoreInputStreamWrapper) channel)
+                .readFully(position, buffer, offset, length);
             totalBytesRead += length;
             statistics.incrementReadOps(1);
             streamStats.updateReadStreamStats(length, startTimeNs);
@@ -362,9 +366,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             streamStatistics.readOperationCompleted(length, length);
             return null;
           });
-    } else {
-      super.readFully(position, buffer, offset, length);
+      return;
     }
+    super.readFully(position, buffer, offset, length);
   }
 
   @Override

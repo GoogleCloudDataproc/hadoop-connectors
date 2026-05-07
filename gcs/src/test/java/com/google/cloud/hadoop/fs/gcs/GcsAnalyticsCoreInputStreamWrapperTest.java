@@ -38,16 +38,16 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class AnalyticsCoreChannelAdapterTest {
+public class GcsAnalyticsCoreInputStreamWrapperTest {
 
   @Mock private GoogleCloudStorageInputStream mockInputStream;
 
-  private AnalyticsCoreChannelAdapter adapter;
+  private GcsAnalyticsCoreInputStreamWrapper adapter;
   private long size = 1000L;
 
   @Before
   public void setUp() {
-    adapter = new AnalyticsCoreChannelAdapter(mockInputStream, size);
+    adapter = new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, size);
   }
 
   @Test

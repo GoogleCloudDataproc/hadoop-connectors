@@ -32,13 +32,13 @@ import java.util.function.IntFunction;
  * Adapter to expose {@link GoogleCloudStorageInputStream} from Analytics Core library as {@link
  * SeekableByteChannel} for use in {@link GoogleHadoopFSInputStream}.
  */
-class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
+class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
 
   private final long size;
   private final GoogleCloudStorageInputStream inputStream;
   private boolean open;
 
-  AnalyticsCoreChannelAdapter(GoogleCloudStorageInputStream inputStream, long size) {
+  GcsAnalyticsCoreInputStreamWrapper(GoogleCloudStorageInputStream inputStream, long size) {
     this.inputStream = inputStream;
     this.size = size;
     this.open = true;

@@ -1795,7 +1795,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /** Gets GCS FS instance for Analytics Core. */
-  public GcsFileSystem getAnalyticsGcsFs() {
+  GcsFileSystem getAnalyticsGcsFs() {
     return analyticsGcsFs;
   }
 
@@ -1805,7 +1805,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /** Checks if Analytics Core is enabled. */
-  public boolean isAnalyticsCoreEnabled() {
+  boolean isAnalyticsCoreEnabled() {
     return GCS_ANALYTICS_CORE_ENABLE.get(getConf(), getConf()::getBoolean);
   }
 
