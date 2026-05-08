@@ -445,25 +445,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           logger.atFiner().log(
               "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
 
-          if (objectSize != -1 && currentPosition >= objectSize) {
-            readableByteChannel.close();
-            contentChannelCurrentPosition = currentPosition;
-            contentChannelEnd = currentPosition;
-            return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
+          ReadableByteChannel eofChannel = validateEndOfFile(readableByteChannel);
+          if (eofChannel != null) {
+            return eofChannel;
           }
 
-          // Check if file is GZIP Encoded
-          if (gzipEncoded) {
-            if (currentPosition == 0) {
-              contentChannelEnd = objectSize;
-            } else {
-              // We guessed the boundary wrong for a GZIP file. Reopen it properly.
-              readableByteChannel.close();
-              // Reset channel boundaries
-              contentChannelCurrentPosition = -1;
-              contentChannelEnd = -1;
-              return openByteChannel(bytesToRead);
-            }
+          ReadableByteChannel gzipChannel = handleGzipDiscovery(readableByteChannel, bytesToRead);
+          if (gzipChannel != null) {
+            return gzipChannel;
           }
         }
 
@@ -493,6 +482,33 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         // This prevents RuntimeExceptions (like NPEs) from being masked as IOExceptions!
         throw e;
       }
+    }
+
+    private ReadableByteChannel validateEndOfFile(ReadableByteChannel readableByteChannel)
+        throws IOException {
+      if (objectSize != -1 && currentPosition >= objectSize) {
+        readableByteChannel.close();
+        contentChannelCurrentPosition = currentPosition;
+        contentChannelEnd = currentPosition;
+        return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
+      }
+      return null;
+    }
+
+    private ReadableByteChannel handleGzipDiscovery(
+        ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
+      if (gzipEncoded) {
+        if (currentPosition != 0) {
+          // We guessed the boundary wrong for a GZIP file. Reopen it properly.
+          readableByteChannel.close();
+          // Reset channel boundaries
+          contentChannelCurrentPosition = -1;
+          contentChannelEnd = -1;
+          return openByteChannel(bytesToRead);
+        }
+        contentChannelEnd = objectSize;
+      }
+      return null;
     }
 
     private void ensureMetadataInitialized(ReadableByteChannel readableByteChannel)
