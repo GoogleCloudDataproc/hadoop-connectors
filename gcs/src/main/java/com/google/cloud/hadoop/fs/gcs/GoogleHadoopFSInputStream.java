@@ -224,70 +224,75 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       trackDuration(
           streamStatistics,
           STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
-          () -> {
-            if (channel instanceof ReadVectoredSeekableByteChannel) {
-              ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
-                  (ReadVectoredSeekableByteChannel) channel;
-              ranges.forEach(
-                  range -> {
-                    CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                    range.setData(result);
-                  });
-              readVectoredSeekableByteChannelChannel.readVectored(
-                  ranges.stream()
-                      .map(
-                          range ->
-                              VectoredIORange.builder()
-                                  .setLength(range.getLength())
-                                  .setOffset(range.getOffset())
-                                  .setData(range.getData())
-                                  .build())
-                      .collect(Collectors.toList()),
-                  allocate);
-              return null;
-            }
-            if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
-              GcsAnalyticsCoreInputStreamWrapper gcsAnalyticsCoreInputStreamWrapperChannel =
-                  (GcsAnalyticsCoreInputStreamWrapper) channel;
-              ranges.forEach(
-                  range -> {
-                    CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                    range.setData(result);
-                  });
-              gcsAnalyticsCoreInputStreamWrapperChannel.readVectored(
-                  ranges.stream()
-                      .map(
-                          range ->
-                              GcsObjectRange.builder()
-                                  .setLength(range.getLength())
-                                  .setOffset(range.getOffset())
-                                  .setByteBufferFuture(range.getData())
-                                  .build())
-                      .collect(Collectors.toList()),
-                  allocate);
-              return null;
-            }
-            long startTimeNs = System.nanoTime();
-            vectoredIOSupplier
-                .get()
-                .readVectored(
-                    ranges,
-                    allocate,
-                    gcsFs,
-                    fileInfo,
-                    gcsPath,
-                    streamStatistics,
-                    rangeReadThreadStats);
-            statistics.incrementReadOps(1);
-            vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
-            return null;
-          });
+          () -> readVectoredRouted(ranges, allocate));
     } catch (IOException e) {
       if (IoExceptionHelper.isInterrupted(e)) {
         Thread.currentThread().interrupt();
       }
       throw e;
     }
+  }
+
+  private Void readVectoredRouted(
+      List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
+    if (channel instanceof ReadVectoredSeekableByteChannel) {
+      readVectoredViaSeekableByteChannel(
+          (ReadVectoredSeekableByteChannel) channel, ranges, allocate);
+    } else if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+      readVectoredViaAnalyticsCore((GcsAnalyticsCoreInputStreamWrapper) channel, ranges, allocate);
+    } else {
+      readVectoredDefault(ranges, allocate);
+    }
+    return null;
+  }
+
+  private void readVectoredViaSeekableByteChannel(
+      ReadVectoredSeekableByteChannel vectoredChannel,
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    ranges.forEach(range -> range.setData(new CompletableFuture<>()));
+    List<VectoredIORange> vectoredIORanges =
+        ranges.stream()
+            .map(
+                range ->
+                    VectoredIORange.builder()
+                        .setLength(range.getLength())
+                        .setOffset(range.getOffset())
+                        .setData(range.getData())
+                        .build())
+            .collect(Collectors.toList());
+    vectoredChannel.readVectored(vectoredIORanges, allocate);
+  }
+
+  private void readVectoredViaAnalyticsCore(
+      GcsAnalyticsCoreInputStreamWrapper analyticsChannel,
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    ranges.forEach(range -> range.setData(new CompletableFuture<>()));
+    List<GcsObjectRange> gcsObjectRanges =
+        ranges.stream()
+            .map(
+                range ->
+                    GcsObjectRange.builder()
+                        .setLength(range.getLength())
+                        .setOffset(range.getOffset())
+                        .setByteBufferFuture(range.getData())
+                        .build())
+            .collect(Collectors.toList());
+    analyticsChannel.readVectored(gcsObjectRanges, allocate);
+  }
+
+  private void readVectoredDefault(
+      List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
+    long startTimeNs = System.nanoTime();
+    vectoredIOSupplier
+        .get()
+        .readVectored(
+            ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats);
+    statistics.incrementReadOps(1);
+    vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
   }
 
   @Override
