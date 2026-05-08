@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -74,12 +75,12 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
     checkOpen();
     if (newPosition < 0) {
       GoogleCloudStorageEventBus.postOnException();
-      throw new java.io.EOFException(
+      throw new EOFException(
           "Invalid seek offset: position value (" + newPosition + ") must be >= 0");
     }
     if (size >= 0 && newPosition >= size) {
       GoogleCloudStorageEventBus.postOnException();
-      throw new java.io.EOFException(
+      throw new EOFException(
           "Invalid seek offset: position value ("
               + newPosition
               + ") must be between 0 and "

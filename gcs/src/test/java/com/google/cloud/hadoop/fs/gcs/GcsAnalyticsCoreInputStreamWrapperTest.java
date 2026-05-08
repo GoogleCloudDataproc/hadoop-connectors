@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -104,9 +105,9 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
 
   @Test
   public void position_withInvalidPosition_throwsEOFException() {
-    assertThrows(java.io.EOFException.class, () -> adapter.position(-1L));
-    assertThrows(java.io.EOFException.class, () -> adapter.position(size));
-    assertThrows(java.io.EOFException.class, () -> adapter.position(size + 1));
+    assertThrows(EOFException.class, () -> adapter.position(-1L));
+    assertThrows(EOFException.class, () -> adapter.position(size));
+    assertThrows(EOFException.class, () -> adapter.position(size + 1));
   }
 
   @Test
