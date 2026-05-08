@@ -55,6 +55,8 @@ import org.mockito.MockitoAnnotations;
 
 public class GoogleHadoopFSInputStreamTest {
 
+  // TODO(user): Add test cases for when isAnalyticsCoreEnabled is false in a follow-up PR.
+
   private AutoCloseable mocks;
 
   @Mock private GoogleHadoopFileSystem mockGhfs;
@@ -154,10 +156,8 @@ public class GoogleHadoopFSInputStreamTest {
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
-
     GoogleHadoopFSInputStream inputStream =
         GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
-
     FileRange range = mock(FileRange.class);
     when(range.getOffset()).thenReturn(0L);
     when(range.getLength()).thenReturn(100);
@@ -178,10 +178,8 @@ public class GoogleHadoopFSInputStreamTest {
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
-
     GoogleHadoopFSInputStream inputStream =
         GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
-
     byte[] buffer = new byte[100];
 
     inputStream.readFully(100L, buffer, 0, 100);
@@ -196,10 +194,8 @@ public class GoogleHadoopFSInputStreamTest {
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
-
     GoogleHadoopFSInputStream inputStream =
         GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
-
     when(mockAnalyticsInputStream.read(any(ByteBuffer.class)))
         .thenAnswer(
             invocation -> {
@@ -221,10 +217,8 @@ public class GoogleHadoopFSInputStreamTest {
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
-
     GoogleHadoopFSInputStream inputStream =
         GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
-
     byte[] buf = new byte[10];
     when(mockAnalyticsInputStream.read(any(ByteBuffer.class)))
         .thenAnswer(
@@ -252,7 +246,6 @@ public class GoogleHadoopFSInputStreamTest {
         .thenReturn(mockAnalyticsInputStream);
     when(mockInputStreamStatistics.trackDuration(any(String.class), anyLong()))
         .thenReturn(mockDurationTracker);
-
     GoogleHadoopFSInputStream inputStream =
         GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
 

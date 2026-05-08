@@ -160,13 +160,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         GcsItemId.builder()
             .setBucketName(resourceId.getBucketName())
             .setObjectName(resourceId.getObjectName());
-    if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    boolean hasGenerationId = fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID;
+    if (hasGenerationId) {
       itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
     }
     GcsItemId itemId = itemIdBuilder.build();
     GcsItemInfo.Builder itemInfoBuilder =
         GcsItemInfo.builder().setItemId(itemId).setSize(fileInfo.getSize());
-    if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    if (hasGenerationId) {
       itemInfoBuilder.setContentGeneration(fileInfo.getGenerationId());
     }
     GcsItemInfo gcsItemInfo = itemInfoBuilder.build();
@@ -350,6 +351,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       return;
     }
     if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+      // TODO(user): Differentiate between STREAM_READ_OPERATIONS and STREAM_READ_FULLY_OPERATIONS
+      // as a follow-up task.
       trackDuration(
           streamStatistics,
           STREAM_READ_OPERATIONS.getSymbol(),

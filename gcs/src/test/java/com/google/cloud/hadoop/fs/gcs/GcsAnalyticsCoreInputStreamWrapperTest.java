@@ -81,6 +81,7 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
   @Test
   public void write_throwsNonWritableChannelException() {
     ByteBuffer src = ByteBuffer.allocate(100);
+
     assertThrows(NonWritableChannelException.class, () -> adapter.write(src));
   }
 
@@ -97,6 +98,7 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
   @Test
   public void position_setsInputStreamPosition() throws IOException {
     adapter.position(500L);
+
     verify(mockInputStream).seek(500L);
   }
 
@@ -119,13 +121,16 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
   @Test
   public void isOpen_reflectsClosedState() throws IOException {
     assertThat(adapter.isOpen()).isTrue();
+
     adapter.close();
+
     assertThat(adapter.isOpen()).isFalse();
   }
 
   @Test
   public void close_delegatesToInputStream() throws IOException {
     adapter.close();
+
     verify(mockInputStream).close();
   }
 
@@ -145,7 +150,9 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
   @Test
   public void readFully_delegatesToInputStream() throws IOException {
     byte[] buffer = new byte[100];
+
     adapter.readFully(100L, buffer, 0, 100);
+
     verify(mockInputStream).readFully(100L, buffer, 0, 100);
   }
 }
