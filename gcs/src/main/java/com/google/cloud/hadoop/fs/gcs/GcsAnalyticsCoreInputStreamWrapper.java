@@ -30,6 +30,9 @@ import java.util.function.IntFunction;
 /**
  * Adapter to expose {@link GoogleCloudStorageInputStream} from Analytics Core library as {@link
  * SeekableByteChannel} for use in {@link GoogleHadoopFSInputStream}.
+ *
+ * <p>TODO(user): Wrap exception-throwing calls to post exceptions to GoogleCloudStorageEventBus on
+ * failure when adding comprehensive logging.
  */
 class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
 

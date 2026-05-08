@@ -75,5 +75,17 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     return config;
   }
 
+  public static class TestFixture {
+    public final GoogleHadoopFileSystem ghfs;
+    public final URI path;
+    public final String content;
+
+    public TestFixture(GoogleHadoopFileSystem ghfs, URI path, String content) {
+      this.ghfs = ghfs;
+      this.path = path;
+      this.content = content;
+    }
+  }
+
   private GoogleHadoopFileSystemIntegrationHelper() {}
 }

@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.as
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemIntegrationHelper.TestFixture;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.EOFException;
 import java.io.IOException;
@@ -56,18 +57,6 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
     gcsFsIHelper.afterAllTests();
   }
 
-  private static class TestFixture {
-    final GoogleHadoopFileSystem ghfs;
-    final URI path;
-    final String content;
-
-    TestFixture(GoogleHadoopFileSystem ghfs, URI path, String content) {
-      this.ghfs = ghfs;
-      this.path = path;
-      this.content = content;
-    }
-  }
-
   private TestFixture setupFixture(String tag, String content) throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), tag);
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
@@ -82,50 +71,89 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
   public void read_singleBytes_returnsData() throws Exception {
     String testContent = "test content";
     TestFixture fixture = setupFixture("read_singleBytes", testContent);
-
     byte[] value = new byte[2];
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics)) {
-      assertThat(in.read(value, 0, 1)).isEqualTo(1);
-      assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+    int firstRead;
+    int secondRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      firstRead = in.read(value, 0, 1);
+      secondRead = in.read(1, value, 1, 1);
     }
 
+    assertThat(firstRead).isEqualTo(1);
+    assertThat(secondRead).isEqualTo(1);
     assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
+  public void read_buffer_returnsData() throws Exception {
+    String testContent = "test content that is a bit longer";
+    TestFixture fixture = setupFixture("read_buffer", testContent);
+    byte[] value = new byte[10];
+    byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 10);
+
+    int bytesRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      bytesRead = in.read(value, 0, 10);
+    }
+
+    assertThat(bytesRead).isEqualTo(10);
+    assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
+  public void read_bufferAlreadyFull_throwsIndexOutOfBoundsException() throws Exception {
+    TestFixture fixture = setupFixture("read_buffer_full", "test content");
+    byte[] value = new byte[10];
+
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      assertThrows(IndexOutOfBoundsException.class, () -> in.read(value, 10, 1));
+    }
+  }
+
+  @Test
+  public void read_bufferAlreadyFullZeroLength_returnsZero() throws Exception {
+    TestFixture fixture = setupFixture("read_buffer_full_zero", "test content");
+    byte[] value = new byte[10];
+
+    int bytesRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      bytesRead = in.read(value, 10, 0);
+    }
+
+    assertThat(bytesRead).isEqualTo(0);
   }
 
   @Test
   public void readVectored_returnsExpectedRanges() throws Exception {
     String testContent = "verify vectored read ranges are getting"; // length = 40
     TestFixture fixture = setupFixture("readVectored", testContent);
-
     List<FileRange> fileRanges = new ArrayList<>();
     fileRanges.add(FileRange.createFileRange(0, 5));
     fileRanges.add(FileRange.createFileRange(10, 5));
 
     try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
-      validateVectoredReadResult(fileRanges, fixture.path);
     }
+
+    validateVectoredReadResult(fileRanges, fixture.path);
   }
 
   @Test
   public void seek_movesPointerToCorrectPosition() throws Exception {
     String testContent = "test content";
     TestFixture fixture = setupFixture("seek", testContent);
-
     byte[] value = new byte[2];
     byte[] expected = new byte[] {'c', 'o'}; // "content" starts at index 5
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics)) {
+    int bytesRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
       in.seek(5);
-      assertThat(in.read(value, 0, 2)).isEqualTo(2);
+      bytesRead = in.read(value, 0, 2);
     }
 
+    assertThat(bytesRead).isEqualTo(2);
     assertThat(value).isEqualTo(expected);
   }
 
@@ -133,13 +161,10 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
   public void readFully_readsDataIntoBuffer() throws Exception {
     String testContent = "test content";
     TestFixture fixture = setupFixture("readFully", testContent);
-
     byte[] value = new byte[4];
     byte[] expected = new byte[] {'c', 'o', 'n', 't'}; // "content" starts at index 5
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics)) {
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
       in.readFully(5, value);
     }
 
@@ -149,25 +174,23 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
   @Test
   public void read_whenClosed_throwsIOException() throws Exception {
     TestFixture fixture = setupFixture("read_after_closed", "test content");
-
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics);
+    GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path);
     in.close();
+
     assertThrows(IOException.class, in::read);
   }
 
   @Test
   public void read_zeroBytes_returnsZero() throws Exception {
     TestFixture fixture = setupFixture("read_zeroBytes", "test content");
-
     byte[] value = new byte[2];
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics)) {
-      assertThat(in.read(value, 0, 0)).isEqualTo(0);
+    int bytesRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      bytesRead = in.read(value, 0, 0);
     }
+
+    assertThat(bytesRead).isEqualTo(0);
   }
 
   @Test
@@ -175,9 +198,7 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
     String testContent = "test content";
     TestFixture fixture = setupFixture("seek_beyond_file", testContent);
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics)) {
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
       assertThrows(EOFException.class, () -> in.seek(testContent.length() + 1));
     }
   }
@@ -186,14 +207,14 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
   public void read_positional_beyondFileSize_returnsMinusOne() throws Exception {
     String testContent = "test content";
     TestFixture fixture = setupFixture("read_pos_beyond_file", testContent);
-
     byte[] value = new byte[2];
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(fixture.ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        GoogleHadoopFSInputStream.create(fixture.ghfs, fixture.path, statistics)) {
-      assertThat(in.read(testContent.length(), value, 0, 1)).isEqualTo(-1);
+    int bytesRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      bytesRead = in.read(testContent.length(), value, 0, 1);
     }
+
+    assertThat(bytesRead).isEqualTo(-1);
   }
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(
