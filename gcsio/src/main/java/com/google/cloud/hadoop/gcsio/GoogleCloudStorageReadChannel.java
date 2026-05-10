@@ -328,7 +328,19 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           // actual size of the data stream when stream compression is used, so we can
           // only ignore
           // this case here.
-          if (currentPosition < contentChannelEnd && currentPosition < size) {
+          if (currentPosition > contentChannelEnd && currentPosition < size) {
+            logger.atWarning().log(
+                "Received end of stream result after the channel end; at offset: %d "
+                    + "where as stream was suppose to end at: %d for resource: %s of size: %d",
+                currentPosition, contentChannelEnd, resourceId, size);
+
+            // Dropping additional bytes.
+            int overshoot = (int) (currentPosition - contentChannelEnd);
+            buffer.position(buffer.position() - overshoot);
+            currentPosition = contentChannelEnd;
+            totalBytesRead -= overshoot;
+            contentChannelPosition -= overshoot;
+          } else if (currentPosition < contentChannelEnd && currentPosition < size) {
             GoogleCloudStorageEventBus.postOnException();
             throw new IOException(
                 String.format(
@@ -344,21 +356,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                     "Received end of stream result beyond the object size; at offset: %d "
                         + "where as stream was suppose to end at: %d for resource: %s of size: %d",
                     currentPosition, contentChannelEnd, resourceId, size));
-          } else if (currentPosition > contentChannelEnd) {
-            logger.atWarning().log(
-                "Received end of stream result after the channel end; at offset: %d "
-                    + "where as stream was suppose to end at: %d for resource: %s of size: %d",
-                currentPosition, contentChannelEnd, resourceId, size);
-
-            // Dropping additional bytes.
-            int overshoot = (int) (currentPosition - contentChannelEnd);
-            buffer.position(buffer.position() - overshoot);
-            currentPosition = contentChannelEnd;
-            totalBytesRead -= overshoot;
-            contentChannelPosition -= overshoot;
-
-            closeContentChannel();
-            continue;
           }
 
           // If we have reached an end of a contentChannel but not an end of an object
