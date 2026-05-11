@@ -264,6 +264,13 @@ public class FeatureHeaderGeneratorTest {
               "Bidi Enabled",
               buildOptionsWithBidi(),
               createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.BIDI_ENABLED)
+            },
+            {
+              "Analytics Core Enabled",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setAnalyticsCoreEnabled(true)
+                  .build(),
+              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.ANALYTICS_CORE_ENABLED)
             }
           });
     }

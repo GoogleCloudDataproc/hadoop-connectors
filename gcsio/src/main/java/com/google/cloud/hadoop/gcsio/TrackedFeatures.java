@@ -56,7 +56,9 @@ public enum TrackedFeatures {
 
   BIDI_ENABLED(11),
 
-  RENAME_API(12);
+  RENAME_API(12),
+
+  ANALYTICS_CORE_ENABLED(13);
 
   private final int bitPosition;
 
