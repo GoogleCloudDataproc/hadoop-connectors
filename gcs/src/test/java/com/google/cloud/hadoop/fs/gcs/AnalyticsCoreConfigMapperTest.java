@@ -29,12 +29,7 @@ public class AnalyticsCoreConfigMapperTest {
 
   @Test
   public void mapConfigs_mapsConnectorPropertiesToAnalyticsCore() {
-    Configuration config = new Configuration();
-    config.set("fs.gs.project.id", "my-project");
-    config.set("fs.gs.requester.pays.project.id", "user-project");
-    config.set("fs.gs.vectored.read.threads", "10");
-    config.set("fs.gs.vectored.read.min.range.seek.size", "1024");
-    config.set("fs.gs.vectored.read.merged.range.max.size", "2048");
+    Configuration config = createTestConfiguration();
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -52,20 +47,29 @@ public class AnalyticsCoreConfigMapperTest {
 
   @Test
   public void mapConfigs_removesMappedConnectorPropertiesFromResult() {
-    Configuration config = new Configuration();
-    config.set("fs.gs.project.id", "my-project");
-    config.set("fs.gs.requester.pays.project.id", "user-project");
-    config.set("fs.gs.vectored.read.threads", "10");
-    config.set("fs.gs.vectored.read.min.range.seek.size", "1024");
-    config.set("fs.gs.vectored.read.merged.range.max.size", "2048");
+    Configuration config = createTestConfiguration();
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped.containsKey("fs.gs.project.id")).isFalse();
-    assertThat(mapped.containsKey("fs.gs.requester.pays.project.id")).isFalse();
-    assertThat(mapped.containsKey("fs.gs.vectored.read.threads")).isFalse();
-    assertThat(mapped.containsKey("fs.gs.vectored.read.min.range.seek.size")).isFalse();
-    assertThat(mapped.containsKey("fs.gs.vectored.read.merged.range.max.size")).isFalse();
+    assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE
+                    .getKey()))
+        .isFalse();
   }
 
   @Test
@@ -95,5 +99,19 @@ public class AnalyticsCoreConfigMapperTest {
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
     assertThat(mapped).isEmpty();
+  }
+
+  private Configuration createTestConfiguration() {
+    Configuration config = new Configuration();
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "my-project");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(), "user-project");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(), "10");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(), "1024");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
+        "2048");
+    return config;
   }
 }

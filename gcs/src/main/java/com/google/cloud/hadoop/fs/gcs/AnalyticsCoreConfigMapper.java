@@ -15,6 +15,7 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 
@@ -27,6 +28,23 @@ final class AnalyticsCoreConfigMapper {
   static final String MAX_MERGE_GAP_KEY = "analytics-core.read.vectored.range.merge-gap.max-bytes";
   static final String MAX_MERGE_SIZE_KEY =
       "analytics-core.read.vectored.range.merged-size.max-bytes";
+
+  private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
+      ImmutableMap.<String, String>builder()
+          .put(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), PROJECT_ID_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
+              USER_PROJECT_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(),
+              READ_THREAD_COUNT_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(),
+              MAX_MERGE_GAP_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
+              MAX_MERGE_SIZE_KEY)
+          .build();
 
   private AnalyticsCoreConfigMapper() {
     // Utility class
@@ -43,26 +61,9 @@ final class AnalyticsCoreConfigMapper {
     Map<String, String> mappedProperties = config.getValByRegex("^" + prefix.replace(".", "\\."));
 
     // Direct 1:1 mappings from Connector to Analytics Core
-    mapAndRemoveSource(
-        GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(),
-        mappedProperties,
-        prefix + PROJECT_ID_KEY);
-    mapAndRemoveSource(
-        GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
-        mappedProperties,
-        prefix + USER_PROJECT_KEY);
-    mapAndRemoveSource(
-        GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(),
-        mappedProperties,
-        prefix + READ_THREAD_COUNT_KEY);
-    mapAndRemoveSource(
-        GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(),
-        mappedProperties,
-        prefix + MAX_MERGE_GAP_KEY);
-    mapAndRemoveSource(
-        GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
-        mappedProperties,
-        prefix + MAX_MERGE_SIZE_KEY);
+    HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS.forEach(
+        (hadoopKey, analyticsKey) ->
+            mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
 
     return mappedProperties;
   }
