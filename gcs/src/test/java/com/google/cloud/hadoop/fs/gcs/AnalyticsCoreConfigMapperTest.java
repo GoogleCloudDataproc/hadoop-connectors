@@ -27,6 +27,9 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AnalyticsCoreConfigMapperTest {
 
+  private static final Map<String, String> EXPECTED_MANDATORY_MAPPINGS =
+      Map.of("fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
+
   @Test
   public void mapConfigs_mapsConnectorPropertiesToAnalyticsCore() {
     Configuration config = createTestConfiguration();
@@ -43,8 +46,7 @@ public class AnalyticsCoreConfigMapperTest {
         .isEqualTo("1024");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_SIZE_KEY))
         .isEqualTo("2048");
-    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY))
-        .isEqualTo(GoogleHadoopFileSystem.GHFS_ID);
+    assertThat(mapped).containsAtLeastEntriesIn(EXPECTED_MANDATORY_MAPPINGS);
   }
 
   @Test
@@ -96,26 +98,22 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
-  public void mapConfigs_returnsOnlyUserAgentWhenNoMatchingPrefix() {
+  public void mapConfigs_returnsOnlyMandatoryMappingsWhenNoMatchingPrefix() {
     Configuration config = new Configuration(false);
     config.set("other.prefix.prop", "val");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped)
-        .containsExactly(
-            "fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
+    assertThat(mapped).containsExactlyEntriesIn(EXPECTED_MANDATORY_MAPPINGS);
   }
 
   @Test
-  public void mapConfigs_returnsOnlyUserAgentWhenConfigIsEmpty() {
+  public void mapConfigs_returnsOnlyMandatoryMappingsWhenConfigIsEmpty() {
     Configuration config = new Configuration(false);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped)
-        .containsExactly(
-            "fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
+    assertThat(mapped).containsExactlyEntriesIn(EXPECTED_MANDATORY_MAPPINGS);
   }
 
   private Configuration createTestConfiguration() {

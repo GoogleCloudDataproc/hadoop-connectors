@@ -67,6 +67,7 @@ final class AnalyticsCoreConfigMapper {
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
 
+    // User agent is computed from GHFS_ID and an optional suffix, not a simple 1:1 mapping.
     mappedProperties.put(
         prefix + USER_AGENT_KEY, GoogleHadoopFileSystemConfiguration.getApplicationName(config));
 
