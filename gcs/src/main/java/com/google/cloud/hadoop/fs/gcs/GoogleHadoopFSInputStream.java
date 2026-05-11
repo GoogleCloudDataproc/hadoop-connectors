@@ -107,12 +107,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
+    if (ghfs.isAnalyticsCoreEnabled()) {
+      FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      SeekableByteChannel channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
+      return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
+    }
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
-    if (ghfs.isAnalyticsCoreEnabled()) {
-      fileInfo = gcsFs.getFileInfoObject(gcsPath);
-      channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
-    } else if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
       fileInfo = gcsFs.getFileInfoObject(gcsPath);
       channel =
@@ -142,13 +144,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    SeekableByteChannel channel;
     if (ghfs.isAnalyticsCoreEnabled()) {
-      channel = createAnalyticsCoreChannel(ghfs, fileInfo, fileInfo.getPath());
-    } else {
-      channel =
-          gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
+      SeekableByteChannel channel = createAnalyticsCoreChannel(ghfs, fileInfo, fileInfo.getPath());
+      return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
     }
+    SeekableByteChannel channel =
+        gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
   }
 
@@ -160,13 +161,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         GcsItemId.builder()
             .setBucketName(resourceId.getBucketName())
             .setObjectName(resourceId.getObjectName());
-    if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    boolean hasGenerationId = fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID;
+    if (hasGenerationId) {
       itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
     }
     GcsItemId itemId = itemIdBuilder.build();
     GcsItemInfo.Builder itemInfoBuilder =
         GcsItemInfo.builder().setItemId(itemId).setSize(fileInfo.getSize());
-    if (fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    if (hasGenerationId) {
       itemInfoBuilder.setContentGeneration(fileInfo.getGenerationId());
     }
     GcsItemInfo gcsItemInfo = itemInfoBuilder.build();
@@ -177,7 +179,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             .setAttributes(fileInfo.getAttributes())
             .build();
     GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(gcsFileInfo);
-    return new AnalyticsCoreChannelAdapter(inputStream, fileInfo.getSize());
+    return new GcsAnalyticsCoreInputStreamWrapper(inputStream, fileInfo.getSize());
   }
 
   private GoogleHadoopFSInputStream(
@@ -223,83 +225,93 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       trackDuration(
           streamStatistics,
           STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
-          () -> {
-            long startTimeNs = System.nanoTime();
-            if (channel instanceof ReadVectoredSeekableByteChannel) {
-              ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
-                  (ReadVectoredSeekableByteChannel) channel;
-              ranges.forEach(
-                  range -> {
-                    CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                    range.setData(result);
-                  });
-              readVectoredSeekableByteChannelChannel.readVectored(
-                  ranges.stream()
-                      .map(
-                          range ->
-                              VectoredIORange.builder()
-                                  .setLength(range.getLength())
-                                  .setOffset(range.getOffset())
-                                  .setData(range.getData())
-                                  .build())
-                      .collect(Collectors.toList()),
-                  allocate);
-              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
-            } else if (channel instanceof AnalyticsCoreChannelAdapter) {
-              AnalyticsCoreChannelAdapter adapterChannel = (AnalyticsCoreChannelAdapter) channel;
-              ranges.forEach(
-                  range -> {
-                    CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                    range.setData(result);
-                    result.whenComplete(
-                        (buf, ex) -> {
-                          if (ex == null) {
-                            int length = range.getLength();
-                            streamStatistics.bytesRead(length);
-                            storageStatistics.streamReadBytes(length);
-                          }
-                        });
-                  });
-
-              List<GcsObjectRange> gcsRanges =
-                  ranges.stream()
-                      .map(
-                          range ->
-                              GcsObjectRange.builder()
-                                  .setLength(range.getLength())
-                                  .setOffset(range.getOffset())
-                                  .setByteBufferFuture(range.getData())
-                                  .build())
-                      .collect(Collectors.toList());
-
-              adapterChannel.readVectored(gcsRanges, allocate);
-
-              storageStatistics.incrementGcsTotalRequestCount();
-              storageStatistics.incrementCounter(
-                  GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
-              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
-            } else {
-              vectoredIOSupplier
-                  .get()
-                  .readVectored(
-                      ranges,
-                      allocate,
-                      gcsFs,
-                      fileInfo,
-                      gcsPath,
-                      streamStatistics,
-                      rangeReadThreadStats);
-              statistics.incrementReadOps(1);
-              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
-            }
-            return null;
-          });
+          () -> readVectoredRouted(ranges, allocate));
     } catch (IOException e) {
       if (IoExceptionHelper.isInterrupted(e)) {
         Thread.currentThread().interrupt();
       }
       throw e;
     }
+  }
+
+  private Void readVectoredRouted(
+      List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
+    if (channel instanceof ReadVectoredSeekableByteChannel) {
+      readVectoredViaSeekableByteChannel(
+          (ReadVectoredSeekableByteChannel) channel, ranges, allocate);
+    } else if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+      readVectoredViaAnalyticsCore((GcsAnalyticsCoreInputStreamWrapper) channel, ranges, allocate);
+    } else {
+      readVectoredDefault(ranges, allocate);
+    }
+    return null;
+  }
+
+  private void readVectoredViaSeekableByteChannel(
+      ReadVectoredSeekableByteChannel vectoredChannel,
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    long startTimeNs = System.nanoTime();
+    ranges.forEach(range -> range.setData(new CompletableFuture<>()));
+    List<VectoredIORange> vectoredIORanges =
+        ranges.stream()
+            .map(
+                range ->
+                    VectoredIORange.builder()
+                        .setLength(range.getLength())
+                        .setOffset(range.getOffset())
+                        .setData(range.getData())
+                        .build())
+            .collect(Collectors.toList());
+    vectoredChannel.readVectored(vectoredIORanges, allocate);
+    vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
+  }
+
+  private void readVectoredViaAnalyticsCore(
+      GcsAnalyticsCoreInputStreamWrapper analyticsChannel,
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    long startTimeNs = System.nanoTime();
+    ranges.forEach(
+        range -> {
+          CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+          range.setData(result);
+          result.whenComplete(
+              (buf, ex) -> {
+                if (ex == null) {
+                  int length = range.getLength();
+                  streamStatistics.bytesRead(length);
+                  storageStatistics.streamReadBytes(length);
+                }
+              });
+        });
+    List<GcsObjectRange> gcsObjectRanges =
+        ranges.stream()
+            .map(
+                range ->
+                    GcsObjectRange.builder()
+                        .setLength(range.getLength())
+                        .setOffset(range.getOffset())
+                        .setByteBufferFuture(range.getData())
+                        .build())
+            .collect(Collectors.toList());
+    analyticsChannel.readVectored(gcsObjectRanges, allocate);
+    storageStatistics.incrementGcsTotalRequestCount();
+    storageStatistics.incrementCounter(GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
+    vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
+  }
+
+  private void readVectoredDefault(
+      List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
+    long startTimeNs = System.nanoTime();
+    vectoredIOSupplier
+        .get()
+        .readVectored(
+            ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats);
+    statistics.incrementReadOps(1);
+    vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
   }
 
   @Override
@@ -335,7 +347,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             // the underlying channel.
             int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
             if (numRead > 0) {
-              if (channel instanceof AnalyticsCoreChannelAdapter) {
+              if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
                 storageStatistics.incrementGcsTotalRequestCount();
                 storageStatistics.incrementCounter(
                     GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
@@ -367,14 +379,17 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (length == 0) {
       return;
     }
-    if (channel instanceof AnalyticsCoreChannelAdapter) {
+    if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+      // TODO(user): Differentiate between STREAM_READ_OPERATIONS and STREAM_READ_FULLY_OPERATIONS
+      // as a follow-up task.
       trackDuration(
           streamStatistics,
           STREAM_READ_OPERATIONS.getSymbol(),
           () -> {
             long startTimeNs = System.nanoTime();
             checkNotClosed();
-            ((AnalyticsCoreChannelAdapter) channel).readFully(position, buffer, offset, length);
+            ((GcsAnalyticsCoreInputStreamWrapper) channel)
+                .readFully(position, buffer, offset, length);
             storageStatistics.incrementGcsTotalRequestCount();
             storageStatistics.incrementCounter(
                 GoogleCloudStorageStatistics.GCS_GET_MEDIA_REQUEST, 1);
@@ -386,9 +401,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             streamStatistics.readOperationCompleted(length, length);
             return null;
           });
-    } else {
-      super.readFully(position, buffer, offset, length);
+      return;
     }
+    super.readFully(position, buffer, offset, length);
   }
 
   @Override

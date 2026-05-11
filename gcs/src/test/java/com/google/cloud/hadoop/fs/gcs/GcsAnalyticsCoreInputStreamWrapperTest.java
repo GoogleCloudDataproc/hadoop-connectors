@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -38,16 +39,16 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class AnalyticsCoreChannelAdapterTest {
+public class GcsAnalyticsCoreInputStreamWrapperTest {
 
   @Mock private GoogleCloudStorageInputStream mockInputStream;
 
-  private AnalyticsCoreChannelAdapter adapter;
+  private GcsAnalyticsCoreInputStreamWrapper adapter;
   private long size = 1000L;
 
   @Before
   public void setUp() {
-    adapter = new AnalyticsCoreChannelAdapter(mockInputStream, size);
+    adapter = new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, size);
   }
 
   @Test
@@ -81,6 +82,7 @@ public class AnalyticsCoreChannelAdapterTest {
   @Test
   public void write_throwsNonWritableChannelException() {
     ByteBuffer src = ByteBuffer.allocate(100);
+
     assertThrows(NonWritableChannelException.class, () -> adapter.write(src));
   }
 
@@ -97,14 +99,15 @@ public class AnalyticsCoreChannelAdapterTest {
   @Test
   public void position_setsInputStreamPosition() throws IOException {
     adapter.position(500L);
+
     verify(mockInputStream).seek(500L);
   }
 
   @Test
   public void position_withInvalidPosition_throwsEOFException() {
-    assertThrows(java.io.EOFException.class, () -> adapter.position(-1L));
-    assertThrows(java.io.EOFException.class, () -> adapter.position(size));
-    assertThrows(java.io.EOFException.class, () -> adapter.position(size + 1));
+    assertThrows(EOFException.class, () -> adapter.position(-1L));
+    assertThrows(EOFException.class, () -> adapter.position(size));
+    assertThrows(EOFException.class, () -> adapter.position(size + 1));
   }
 
   @Test
@@ -120,13 +123,16 @@ public class AnalyticsCoreChannelAdapterTest {
   @Test
   public void isOpen_reflectsClosedState() throws IOException {
     assertThat(adapter.isOpen()).isTrue();
+
     adapter.close();
+
     assertThat(adapter.isOpen()).isFalse();
   }
 
   @Test
   public void close_delegatesToInputStream() throws IOException {
     adapter.close();
+
     verify(mockInputStream).close();
   }
 
@@ -146,7 +152,9 @@ public class AnalyticsCoreChannelAdapterTest {
   @Test
   public void readFully_delegatesToInputStream() throws IOException {
     byte[] buffer = new byte[100];
+
     adapter.readFully(100L, buffer, 0, 100);
+
     verify(mockInputStream).readFully(100L, buffer, 0, 100);
   }
 }

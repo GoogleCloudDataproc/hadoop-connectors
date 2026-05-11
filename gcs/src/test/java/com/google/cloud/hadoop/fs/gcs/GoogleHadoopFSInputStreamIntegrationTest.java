@@ -212,29 +212,24 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   @Test
   public void rangeRequestBeyondFileSize() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_rangeRequestBeyondFile");
-
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getParameterizedConfig());
 
     String testContent = "verify vectored read ranges are getting"; // length = 40
     gcsFsIHelper.writeTextFile(path, testContent);
-    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
-
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
     List<FileRange> fileRanges = new ArrayList<>();
-    // range inside file size
     FileRange fileRange1 = FileRange.createFileRange(33, 2);
     fileRanges.add(fileRange1);
-    // range going beyond filesize
     FileRange fileRange2 = FileRange.createFileRange(35, 15);
     fileRanges.add(fileRange2);
 
     try (GoogleHadoopFSInputStream ignore = in) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
     }
+
     byte[] readBytes = gcsFsIHelper.readFile(path, fileRange1.getOffset(), fileRange1.getLength());
     assertByteBuffers(fileRange1.getData().get(), ByteBuffer.wrap(readBytes));
-
     Throwable e = assertThrows(ExecutionException.class, () -> fileRange2.getData().get());
     assertThat(e.getCause()).isInstanceOf(IOException.class);
   }
@@ -267,16 +262,15 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   @Test
   public void testReadAfterClosed() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_after_closed");
-
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getParameterizedConfig());
 
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
 
-    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
     in.close();
+
     assertThrows(IOException.class, in::read);
   }
 
@@ -426,23 +420,17 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   @Test
   public void readVectoredMetricsTest() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_mergedRange");
-
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getParameterizedConfig());
     GhfsGlobalStorageStatistics stats = TestUtils.getStorageStatistics();
-
-    // overriding the default values with lower limit to test out on smaller content size.
     VectoredReadOptions vectoredReadOptions =
         VectoredReadOptions.DEFAULT.toBuilder()
             .setMinSeekVectoredReadSize(2)
             .setMergeRangeMaxSize(10)
             .build();
-
     String testContent = "verify vectored read ranges are getting"; // length = 40
     gcsFsIHelper.writeTextFile(path, testContent);
-    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
-
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
     List<FileRange> fileRanges = new ArrayList<>();
     fileRanges.add(FileRange.createFileRange(0, 5));
 
@@ -450,6 +438,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       in.readVectored(fileRanges, ByteBuffer::allocate);
       validateVectoredReadResult(fileRanges, path);
     }
+
     TestUtils.verifyCounter(stats, STREAM_READ_VECTORED_OPERATIONS, 1);
     TestUtils.verifyDurationMetric(stats, STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
   }

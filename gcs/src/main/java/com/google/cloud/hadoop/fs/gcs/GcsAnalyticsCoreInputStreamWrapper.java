@@ -32,17 +32,20 @@ import java.util.function.IntFunction;
 /**
  * Adapter to expose {@link GoogleCloudStorageInputStream} from Analytics Core library as {@link
  * SeekableByteChannel} for use in {@link GoogleHadoopFSInputStream}.
+ *
+ * <p>TODO(user): Wrap exception-throwing calls to post exceptions to GoogleCloudStorageEventBus on
+ * failure when adding comprehensive logging.
  */
-class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
+class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
 
   private final long size;
   private final GoogleCloudStorageInputStream inputStream;
-  private boolean open;
+  private boolean channelIsOpen;
 
-  AnalyticsCoreChannelAdapter(GoogleCloudStorageInputStream inputStream, long size) {
+  GcsAnalyticsCoreInputStreamWrapper(GoogleCloudStorageInputStream inputStream, long size) {
     this.inputStream = inputStream;
     this.size = size;
-    this.open = true;
+    this.channelIsOpen = true;
   }
 
   @Override
@@ -102,14 +105,14 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
 
   @Override
   public boolean isOpen() {
-    return open;
+    return channelIsOpen;
   }
 
   @Override
   public void close() throws IOException {
-    if (open) {
+    if (channelIsOpen) {
       inputStream.close();
-      open = false;
+      channelIsOpen = false;
     }
   }
 
@@ -137,7 +140,7 @@ class AnalyticsCoreChannelAdapter implements SeekableByteChannel {
   }
 
   private void checkOpen() throws ClosedChannelException {
-    if (!open) {
+    if (!channelIsOpen) {
       throw new ClosedChannelException();
     }
   }
