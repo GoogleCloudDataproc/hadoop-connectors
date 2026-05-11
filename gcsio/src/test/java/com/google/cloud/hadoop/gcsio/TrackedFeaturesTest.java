@@ -40,6 +40,7 @@ public class TrackedFeaturesTest {
             .put(TrackedFeatures.DIRECT_UPLOAD_ENABLED, 10)
             .put(TrackedFeatures.BIDI_ENABLED, 11)
             .put(TrackedFeatures.RENAME_API, 12)
+            .put(TrackedFeatures.ANALYTICS_CORE_ENABLED, 13)
             .build();
 
     // Verifies that no new features have been added without updating this test.
