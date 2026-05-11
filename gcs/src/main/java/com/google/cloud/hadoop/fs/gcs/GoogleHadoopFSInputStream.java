@@ -108,7 +108,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     if (ghfs.isAnalyticsCoreEnabled()) {
       FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
-      SeekableByteChannel channel = createAnalyticsCoreChannel(ghfs, fileInfo, gcsPath);
+      SeekableByteChannel channel = createAnalyticsCoreReadChannel(ghfs, fileInfo, gcsPath);
       return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
     }
     FileInfo fileInfo = null;
@@ -144,7 +144,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     if (ghfs.isAnalyticsCoreEnabled()) {
-      SeekableByteChannel channel = createAnalyticsCoreChannel(ghfs, fileInfo, fileInfo.getPath());
+      SeekableByteChannel channel =
+          createAnalyticsCoreReadChannel(ghfs, fileInfo, fileInfo.getPath());
       return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
     }
     SeekableByteChannel channel =
@@ -152,7 +153,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
   }
 
-  private static SeekableByteChannel createAnalyticsCoreChannel(
+  private static SeekableByteChannel createAnalyticsCoreReadChannel(
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, URI gcsPath) throws IOException {
     checkNotNull(fileInfo, "fileInfo must not be null");
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);

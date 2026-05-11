@@ -135,7 +135,7 @@ public class GoogleHadoopFSInputStreamTest {
   public void create_withAnalyticsCoreEnabled_returnsInputStreamWithAnalyticsChannel()
       throws IOException {
     when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
-    when(mockGhfs.getAnalyticsGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
 
     // Instance mocking instead of static mocking
@@ -152,7 +152,7 @@ public class GoogleHadoopFSInputStreamTest {
   public void readVectored_withAnalyticsCoreEnabled_delegatesToAnalyticsChannel()
       throws IOException {
     when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
-    when(mockGhfs.getAnalyticsGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
@@ -174,7 +174,7 @@ public class GoogleHadoopFSInputStreamTest {
   @Test
   public void readFully_withAnalyticsCoreEnabled_delegatesToAnalyticsChannel() throws IOException {
     when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
-    when(mockGhfs.getAnalyticsGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
@@ -190,7 +190,7 @@ public class GoogleHadoopFSInputStreamTest {
   @Test
   public void read_withAnalyticsCoreEnabled_delegatesToAnalyticsChannel() throws IOException {
     when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
-    when(mockGhfs.getAnalyticsGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
@@ -213,7 +213,7 @@ public class GoogleHadoopFSInputStreamTest {
   @Test
   public void readBuffer_withAnalyticsCoreEnabled_delegatesToAnalyticsChannel() throws IOException {
     when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
-    when(mockGhfs.getAnalyticsGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
@@ -240,7 +240,7 @@ public class GoogleHadoopFSInputStreamTest {
   @Test
   public void close_withAnalyticsCoreEnabled_closesAnalyticsChannel() throws IOException {
     when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
-    when(mockGhfs.getAnalyticsGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
     when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(fileInfo);
     when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
         .thenReturn(mockAnalyticsInputStream);
