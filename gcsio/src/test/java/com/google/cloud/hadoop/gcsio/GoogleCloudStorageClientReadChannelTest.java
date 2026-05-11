@@ -944,6 +944,58 @@ public class GoogleCloudStorageClientReadChannelTest {
     }
   }
 
+  @Test
+  public void readBeyondChannelLength() throws IOException {
+    // Queue READ_CHUNK for the first read, then MORE_THAN_CHANNEL_LENGTH for the second read
+    // so it overshoots the channel limit.
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(
+                CONTENT,
+                ImmutableList.of(REQUEST_TYPE.READ_CHUNK, REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH)));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+
+    // Enforce a chunk size so that contentChannelEnd is smaller than the full object size
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setMinRangeRequestSize(10).build();
+
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
+
+    readChannel.position(0);
+
+    // 1. First read of 5 bytes. This will open the channel with limit = max(5, 10) = 10.
+    ByteBuffer buffer1 = ByteBuffer.allocate(5);
+    int bytesRead1 = readChannel.read(buffer1);
+    assertThat(bytesRead1).isEqualTo(5);
+
+    // 2. Second read of 10 bytes. The channel limit is still 10.
+    // The FakeReadChannel will return 10 - 5 + 1 = 6 bytes, so currentPosition becomes 11.
+    // Since 11 > 10, it will hit the overshoot block in GoogleCloudStorageClientReadChannel.
+    ByteBuffer buffer2 = ByteBuffer.allocate(10);
+    int bytesRead2 = readChannel.read(buffer2);
+
+    assertThat(bytesRead2).isEqualTo(10);
+    assertThat(readChannel.position()).isEqualTo(15);
+  }
+
+  @Test
+  public void readBeyondObjectSize() throws IOException {
+    fakeReadChannel =
+        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.MORE_THAN_OBJECT_SIZE)));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+
+    int startPosition = 0;
+    readChannel.position(startPosition);
+    IOException e =
+        assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(CHUNK_SIZE)));
+
+    assertThat(e)
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Received end of stream result beyond the object size;");
+  }
+
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
     assertThat(buffer.position()).isEqualTo(length);
     assertByteArrayEquals(
@@ -959,10 +1011,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     }
     return new GoogleCloudStorageClientReadChannel(
         mockedStorage,
-        new StorageResourceId(
-            objectInfo.getBucketName(),
-            objectInfo.getObjectName(),
-            objectInfo.getContentGeneration()),
+        objectInfo.getResourceId(),
         objectInfo,
         readOptions,
         GrpcErrorTypeExtractor.INSTANCE,
