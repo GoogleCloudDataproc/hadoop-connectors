@@ -347,6 +347,13 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     in.readVectored(fileRanges, ByteBuffer::allocate);
     assertThat(expected).isEqualTo(rangeReq1.getData().get(10, TimeUnit.SECONDS).array());
+
+    long startWait = System.currentTimeMillis();
+    while (globalStorageStatistics.getLong(STREAM_READ_VECTORED_OPERATIONS.getSymbol()) < 1
+        && System.currentTimeMillis() - startWait < 5000) {
+      Thread.sleep(100);
+    }
+
     in.close();
 
     IOStatistics ioStats = in.getIOStatistics();
@@ -437,6 +444,12 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     try (GoogleHadoopFSInputStream ignore = in) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
       validateVectoredReadResult(fileRanges, path);
+    }
+
+    long startWait = System.currentTimeMillis();
+    while (stats.getLong(STREAM_READ_VECTORED_OPERATIONS.getSymbol()) < 1
+        && System.currentTimeMillis() - startWait < 5000) {
+      Thread.sleep(100);
     }
 
     TestUtils.verifyCounter(stats, STREAM_READ_VECTORED_OPERATIONS, 1);
