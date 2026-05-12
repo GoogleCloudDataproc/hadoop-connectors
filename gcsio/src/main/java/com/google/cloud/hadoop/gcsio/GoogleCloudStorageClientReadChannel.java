@@ -349,19 +349,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       currentPosition, contentChannelEnd, resourceId, objectSize));
 
             } else if (currentPosition > objectSize) {
-              // If totalBytesRead is 0, the client intentionally seeked past EOF before reading.
-              // Only throw the overshoot exception if we actually read extra bytes.
-              if (totalBytesRead > 0) {
-                GoogleCloudStorageEventBus.postOnException();
-                throw new IOException(
-                    String.format(
-                        "Received end of stream result beyond the object size; at offset: %d "
-                            + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
-                        currentPosition, contentChannelEnd, resourceId, objectSize));
-              } else {
-                // Cleanly exit for seek past EOF
-                break;
-              }
+              GoogleCloudStorageEventBus.postOnException();
+              throw new IOException(
+                  String.format(
+                      "Received end of stream result beyond the object size; at offset: %d "
+                          + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                      currentPosition, contentChannelEnd, resourceId, objectSize));
             } else if (currentPosition > contentChannelEnd) {
               logger.atWarning().log(
                   "Received end of stream result after the channel end; at offset: %d "
