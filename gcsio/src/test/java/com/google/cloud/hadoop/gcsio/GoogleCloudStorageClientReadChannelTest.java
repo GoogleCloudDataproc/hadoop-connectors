@@ -898,7 +898,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
-  public void testLazyMetadataFetch_seekPastEof_returnsEofCleanly() throws Exception {
+  public void testLazyMetadataFetch_seekPastEof_throwsEofException() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
         DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
     Blob mockBlob = mock(Blob.class);
@@ -923,9 +923,18 @@ public class GoogleCloudStorageClientReadChannelTest {
     // Because fast fail is disabled, the connector doesn't know this is out of bounds yet.
     readChannel.position(15);
     ByteBuffer buffer = ByteBuffer.allocate(10);
-    int bytesRead = readChannel.read(buffer);
 
-    assertThat(bytesRead).isEqualTo(0);
+    // Once read() is called, the lazy fetch retrieves the actual size (10L).
+    // validateEndOfFile will realize position (15) > objectSize (10) and throw an EOFException.
+    IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
+
+    assertThat(thrown).hasCauseThat().isInstanceOf(EOFException.class);
+
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Invalid seek offset: position value (15) must be between 0 and 10");
+
     assertThat(readChannel.size()).isEqualTo(10L);
   }
 

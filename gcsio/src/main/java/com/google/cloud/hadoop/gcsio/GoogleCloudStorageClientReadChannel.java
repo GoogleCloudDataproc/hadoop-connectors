@@ -297,16 +297,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // in the first read. Therefore, loop till we either read the required number of
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
-        // Break the loop immediately if we are at or past EOF
-        if (objectSize != -1 && currentPosition >= objectSize) {
-          // Only break if we haven't read any bytes yet (a clean seek past EOF)
-          // OR if we are exactly at the object boundary.
-          if (totalBytesRead == 0 || currentPosition == objectSize) {
-            break;
-          }
-          // If totalBytesRead > 0 AND currentPosition > objectSize, do NOT break.
-          // We overshot mid-read. Let the channel read '-1' so the overshoot handler can run.
-        }
 
         int remainingBeforeRead = dst.remaining();
         try {
@@ -526,11 +516,23 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private ReadableByteChannel validateEndOfFile(ReadableByteChannel readableByteChannel)
         throws IOException {
-      if (objectSize != -1 && currentPosition >= objectSize) {
-        readableByteChannel.close();
-        contentChannelCurrentPosition = currentPosition;
-        contentChannelEnd = currentPosition;
-        return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
+      if (objectSize != -1) {
+        if (currentPosition > objectSize) {
+          // We just fetched the metadata and realized the user's initial seek was invalid
+          // Intercept it and throw the standard Invalid Seek error.
+          readableByteChannel.close();
+          GoogleCloudStorageEventBus.postOnException();
+          throw new EOFException(
+              String.format(
+                  "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
+                  currentPosition, objectSize, resourceId));
+        } else if (currentPosition == objectSize) {
+          // User seeked exactly to the end of the file. Return a clean EOF.
+          readableByteChannel.close();
+          contentChannelCurrentPosition = currentPosition;
+          contentChannelEnd = currentPosition;
+          return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
+        }
       }
       return null;
     }
