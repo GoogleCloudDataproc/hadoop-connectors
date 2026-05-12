@@ -247,7 +247,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private LoggingInterceptor loggingInterceptor;
 
-  private GcsFileSystem analyticsGcsFs;
+  private GcsFileSystem analyticsCoreGcsFs;
 
   /** Instrumentation to track Statistics */
   ITraceFactory getTraceFactory() {
@@ -409,7 +409,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         initializeGcsFs(createGcsFs(config));
       }
       if (isAnalyticsCoreEnabled()) {
-        analyticsGcsFs = createAnalyticsGcsFs(config);
+        analyticsCoreGcsFs = createAnalyticsGcsFs(config);
       }
     }
   }
@@ -1795,13 +1795,13 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /** Gets GCS FS instance for Analytics Core. */
-  GcsFileSystem getAnalyticsGcsFs() {
-    return analyticsGcsFs;
+  GcsFileSystem getAnalyticsCoreGcsFs() {
+    return analyticsCoreGcsFs;
   }
 
   GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsFileInfo gcsFileInfo)
       throws IOException {
-    return GoogleCloudStorageInputStream.create(analyticsGcsFs, gcsFileInfo);
+    return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsFileInfo);
   }
 
   /** Checks if Analytics Core is enabled. */
@@ -1896,13 +1896,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       gcsFsSupplier = null;
     }
 
-    if (analyticsGcsFs != null) {
+    if (analyticsCoreGcsFs != null) {
       try {
-        analyticsGcsFs.close();
+        analyticsCoreGcsFs.close();
       } catch (Exception e) {
-        logger.atWarning().withCause(e).log("Error while closing analyticsGcsFs");
+        GoogleCloudStorageEventBus.postOnException();
+        logger.atWarning().withCause(e).log("Error while closing analyticsCoreGcsFs");
+      } finally {
+        analyticsCoreGcsFs = null;
       }
-      analyticsGcsFs = null;
     }
 
     if (delegationTokens != null) {
