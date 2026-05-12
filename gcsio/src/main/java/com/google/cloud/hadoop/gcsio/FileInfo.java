@@ -137,6 +137,11 @@ public class FileInfo {
     return itemInfo;
   }
 
+  /** Returns the generation ID of the file. */
+  public long getGenerationId() {
+    return itemInfo.getResourceId().getGenerationId();
+  }
+
   /** Gets string representation of this instance. */
   @Override
   public String toString() {
