@@ -299,7 +299,13 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       while (dst.hasRemaining()) {
         // Break the loop immediately if we are at or past EOF
         if (objectSize != -1 && currentPosition >= objectSize) {
-          break;
+          // Only break if we haven't read any bytes yet (a clean seek past EOF)
+          // OR if we are exactly at the object boundary.
+          if (totalBytesRead == 0 || currentPosition == objectSize) {
+            break;
+          }
+          // If totalBytesRead > 0 AND currentPosition > objectSize, do NOT break.
+          // We overshot mid-read. Let the channel read '-1' so the overshoot handler can run.
         }
 
         int remainingBeforeRead = dst.remaining();
@@ -353,12 +359,19 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                       currentPosition, contentChannelEnd, resourceId, objectSize));
 
             } else if (currentPosition > objectSize) {
-              GoogleCloudStorageEventBus.postOnException();
-              throw new IOException(
-                  String.format(
-                      "Received end of stream result beyond the object size; at offset: %d "
-                          + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
-                      currentPosition, contentChannelEnd, resourceId, objectSize));
+              // If totalBytesRead is 0, the client intentionally seeked past EOF before reading.
+              // Only throw the overshoot exception if we actually read extra bytes.
+              if (totalBytesRead > 0) {
+                GoogleCloudStorageEventBus.postOnException();
+                throw new IOException(
+                    String.format(
+                        "Received end of stream result beyond the object size; at offset: %d "
+                            + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                        currentPosition, contentChannelEnd, resourceId, objectSize));
+              } else {
+                // Cleanly exit for seek past EOF
+                break;
+              }
             } else if (currentPosition > contentChannelEnd) {
               logger.atWarning().log(
                   "Received end of stream result after the channel end; at offset: %d "
