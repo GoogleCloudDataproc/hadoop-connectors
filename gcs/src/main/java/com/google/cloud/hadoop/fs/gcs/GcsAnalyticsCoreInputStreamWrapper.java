@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntFunction;
 
@@ -118,7 +119,19 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
   public void readVectored(List<GcsObjectRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
     checkOpen();
-    inputStream.readVectored(ranges, allocate);
+    List<GcsObjectRange> validRanges = new ArrayList<>();
+    for (GcsObjectRange range : ranges) {
+      if (size >= 0 && range.getOffset() + range.getLength() > size) {
+        range
+            .getByteBufferFuture()
+            .completeExceptionally(new IOException("Range extends beyond file size: " + range));
+      } else {
+        validRanges.add(range);
+      }
+    }
+    if (!validRanges.isEmpty()) {
+      inputStream.readVectored(validRanges, allocate);
+    }
   }
 
   public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
