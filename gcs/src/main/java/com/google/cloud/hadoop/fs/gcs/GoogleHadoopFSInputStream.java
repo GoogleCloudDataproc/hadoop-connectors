@@ -47,6 +47,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -55,6 +56,7 @@ import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.statistics.DurationTracker;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -93,7 +95,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   private final GhfsStreamStats streamStats;
   private final GhfsStreamStats seekStreamStats;
-  private final GhfsStreamStats vectoredReadStats;
   private final ConcurrentHashMap<String, Long> rangeReadThreadStats;
 
   // Statistic tracker of the Input stream
@@ -202,9 +203,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
     this.seekStreamStats =
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
-    this.vectoredReadStats =
-        new GhfsStreamStats(
-            storageStatistics, GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS, gcsPath);
     this.rangeReadThreadStats = new ConcurrentHashMap<>();
 
     this.traceFactory = ghfs.getTraceFactory();
@@ -221,17 +219,41 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
+    if (ranges.isEmpty()) {
+      return;
+    }
+    long startTimeNs = System.nanoTime();
+    DurationTracker tracker =
+        streamStatistics.trackDuration(STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
     try {
-      trackDuration(
-          streamStatistics,
-          STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
-          () -> readVectoredRouted(ranges, allocate));
+      readVectoredRouted(ranges, allocate);
     } catch (IOException e) {
+      tracker.failed();
+      tracker.close();
       if (IoExceptionHelper.isInterrupted(e)) {
         Thread.currentThread().interrupt();
       }
       throw e;
     }
+
+    CompletableFuture<?>[] futures =
+        ranges.stream().map(FileRange::getData).toArray(CompletableFuture[]::new);
+    CompletableFuture.allOf(futures)
+        .whenComplete(
+            (v, ex) -> {
+              if (ex != null) {
+                tracker.failed();
+              }
+              tracker.close();
+              long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNs);
+              storageStatistics.updateStats(
+                  GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS,
+                  elapsedMs,
+                  elapsedMs,
+                  elapsedMs,
+                  1,
+                  gcsPath);
+            });
   }
 
   private Void readVectoredRouted(
@@ -271,7 +293,19 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       List<? extends FileRange> ranges,
       IntFunction<ByteBuffer> allocate)
       throws IOException {
-    ranges.forEach(range -> range.setData(new CompletableFuture<>()));
+    ranges.forEach(
+        range -> {
+          CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+          range.setData(result);
+          result.whenComplete(
+              (buf, ex) -> {
+                if (ex == null) {
+                  int length = range.getLength();
+                  streamStatistics.bytesRead(length);
+                  storageStatistics.streamReadBytes(length);
+                }
+              });
+        });
     List<GcsObjectRange> gcsObjectRanges =
         ranges.stream()
             .map(
@@ -293,7 +327,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         .readVectored(
             ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats);
     statistics.incrementReadOps(1);
-    vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
   }
 
   @Override
@@ -446,7 +479,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
               rangeReadThreadStats.clear();
               streamStats.close();
               seekStreamStats.close();
-              vectoredReadStats.close();
             }
           }
           return null;

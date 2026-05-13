@@ -18,11 +18,15 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -103,9 +107,10 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
   }
 
   @Test
-  public void position_withInvalidPosition_throwsIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class, () -> adapter.position(-1L));
-    assertThrows(IllegalArgumentException.class, () -> adapter.position(size + 1));
+  public void position_withInvalidPosition_throwsEOFException() {
+    assertThrows(EOFException.class, () -> adapter.position(-1L));
+    assertThrows(EOFException.class, () -> adapter.position(size));
+    assertThrows(EOFException.class, () -> adapter.position(size + 1));
   }
 
   @Test
@@ -145,6 +150,75 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
     adapter.readVectored(ranges, allocate);
 
     verify(mockInputStream).readVectored(ranges, allocate);
+  }
+
+  @Test
+  public void readVectored_withSomeInvalidRanges_completesInvalidExceptionallyAndDelegatesValid()
+      throws IOException {
+    CompletableFuture<ByteBuffer> validFuture = new CompletableFuture<>();
+    GcsObjectRange validRange =
+        GcsObjectRange.builder()
+            .setOffset(0)
+            .setLength(100)
+            .setByteBufferFuture(validFuture)
+            .build();
+
+    CompletableFuture<ByteBuffer> invalidFuture = new CompletableFuture<>();
+    GcsObjectRange invalidRange =
+        GcsObjectRange.builder()
+            .setOffset(950)
+            .setLength(100)
+            .setByteBufferFuture(invalidFuture)
+            .build(); // 950 + 100 = 1050 > size (1000)
+
+    List<GcsObjectRange> ranges = Arrays.asList(validRange, invalidRange);
+    IntFunction<ByteBuffer> allocate = ByteBuffer::allocate;
+
+    adapter.readVectored(ranges, allocate);
+
+    // Verify valid range is delegated
+    verify(mockInputStream).readVectored(Arrays.asList(validRange), allocate);
+
+    // Verify invalid range is completed exceptionally
+    assertThat(invalidFuture.isCompletedExceptionally()).isTrue();
+    java.util.concurrent.ExecutionException exception =
+        assertThrows(java.util.concurrent.ExecutionException.class, invalidFuture::get);
+    assertThat(exception.getCause()).isInstanceOf(IOException.class);
+    assertThat(exception.getCause().getMessage()).contains("Range extends beyond file size");
+
+    // Verify valid range is NOT completed exceptionally
+    assertThat(validFuture.isCompletedExceptionally()).isFalse();
+  }
+
+  @Test
+  public void readVectored_withAllInvalidRanges_doesNotDelegateToInputStream() throws IOException {
+    CompletableFuture<ByteBuffer> invalidFuture1 = new CompletableFuture<>();
+    GcsObjectRange invalidRange1 =
+        GcsObjectRange.builder()
+            .setOffset(1001)
+            .setLength(10)
+            .setByteBufferFuture(invalidFuture1)
+            .build();
+
+    CompletableFuture<ByteBuffer> invalidFuture2 = new CompletableFuture<>();
+    GcsObjectRange invalidRange2 =
+        GcsObjectRange.builder()
+            .setOffset(950)
+            .setLength(100)
+            .setByteBufferFuture(invalidFuture2)
+            .build();
+
+    List<GcsObjectRange> ranges = Arrays.asList(invalidRange1, invalidRange2);
+    IntFunction<ByteBuffer> allocate = ByteBuffer::allocate;
+
+    adapter.readVectored(ranges, allocate);
+
+    // Verify mockInputStream.readVectored was never called
+    verify(mockInputStream, never()).readVectored(anyList(), any());
+
+    // Verify both are completed exceptionally
+    assertThat(invalidFuture1.isCompletedExceptionally()).isTrue();
+    assertThat(invalidFuture2.isCompletedExceptionally()).isTrue();
   }
 
   @Test
