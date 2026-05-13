@@ -36,6 +36,8 @@ import com.google.gson.Gson;
 import com.google.storage.v2.BucketName;
 import io.grpc.Status;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -234,6 +236,63 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
     Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(3);
     verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
+  }
+
+  @Test
+  public void testGrpcReadLogs_fastFailDisabled_perfectFooterCache() throws Exception {
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    int partitionsCount = 1;
+    // Write a 2MB file to simulate a Parquet block
+    byte[] partition =
+        writeObject(helperGcs, resourceId, /* partitionSize= */ 2 * 1024 * 1024, partitionsCount);
+    GoogleCloudStorageOptions storageOption =
+        GCS_TRACE_OPTIONS.toBuilder().setBidiEnabled(false).build();
+    GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    assertingHandler.flush();
+
+    // Execute Parquet-style suffix read
+    try (SeekableByteChannel channel = gcsImpl.open(resourceId, readOptions)) {
+      // Read last 8 bytes (triggers the 1MB backward guess + 0-byte metadata fetch)
+      channel.position(partition.length - 8);
+      ByteBuffer magicBuffer = ByteBuffer.allocate(8);
+      channel.read(magicBuffer);
+      // Seek backward by 64KB and read (should be satisfied entirely from RAM)
+      channel.position(partition.length - 65536);
+      ByteBuffer footerBuffer = ByteBuffer.allocate(65536);
+      channel.read(footerBuffer);
+    }
+
+    // A single gRPC network stream generates exactly 3 logs (request, response, onClose)
+    // We expect exactly 1 stream to be opened, therefore we expect 3 logs!
+    assertingHandler.assertLogCount(3);
+    List<Map<String, Object>> allLogs = assertingHandler.getAllLogRecords();
+    long getObjectCount =
+        allLogs.stream()
+            .filter(
+                log ->
+                    "GetObject"
+                        .equals(
+                            String.valueOf(
+                                log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name))))
+            .count();
+    long readObjectCount =
+        allLogs.stream()
+            .filter(
+                log -> {
+                  String method =
+                      String.valueOf(log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name));
+                  String streamOp = String.valueOf(log.get("streamOperation"));
+                  // ONLY count when the stream is initially opened ("request"),
+                  // and ignore "response" and "onClose".
+                  return method != null
+                      && method.contains("ReadObject")
+                      && "request".equals(streamOp);
+                })
+            .count();
+    assertThat(getObjectCount).isEqualTo(0);
+    assertThat(readObjectCount).isEqualTo(1);
   }
 
   @Test
