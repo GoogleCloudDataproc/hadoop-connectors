@@ -44,11 +44,8 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
-<<<<<<< HEAD
-=======
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
->>>>>>> f834c65b (Log and drop while receiving the additional bytes from server (#1694))
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
