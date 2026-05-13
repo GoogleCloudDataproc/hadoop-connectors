@@ -57,9 +57,9 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private volatile BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
-  private long objectSize = -1;
+  private volatile long objectSize = -1;
   private boolean open = true;
-  private boolean metadataInitialized = false;
+  private volatile boolean metadataInitialized = false;
 
   private final Storage storage;
   private final GoogleCloudStorageReadOptions readOptions;
@@ -569,54 +569,64 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   private void ensureMetadataInitialized() throws IOException {
+    // First check (lock-free fast path)
     if (metadataInitialized) {
       return;
     }
 
-    try {
-      if (this.sessionFuture != null) {
-        // Resolve the ApiFuture to get the actual BlobReadSession object.
-        // We use the configured BidiClientTimeout to prevent the reading thread
-        // from blocking indefinitely if the future hangs.
-        BlobReadSession session =
-            this.sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
+    synchronized (this) {
+      // Second check (thread-safe, protects against race conditions)
+      if (metadataInitialized) {
+        return;
+      }
 
-        BlobInfo blobInfo = session.getBlobInfo();
-        if (blobInfo != null) {
-          initMetadata(blobInfo.getContentEncoding(), blobInfo.getSize(), blobInfo.getGeneration());
-          return;
+      try {
+        if (this.sessionFuture != null) {
+          // Resolve the ApiFuture to get the actual BlobReadSession object.
+          // We use the configured BidiClientTimeout to prevent the reading thread
+          // from blocking indefinitely if the future hangs.
+          BlobReadSession session =
+              this.sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
+
+          BlobInfo blobInfo = session.getBlobInfo();
+          if (blobInfo != null) {
+            initMetadata(
+                blobInfo.getContentEncoding(), blobInfo.getSize(), blobInfo.getGeneration());
+            return;
+          }
         }
+      } catch (InterruptedException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        Thread.currentThread().interrupt();
+        logger.atWarning().withCause(e).log(
+            "Interrupted while waiting for BlobReadSession initialization for '%s'", resourceId);
+        throw new IOException("Thread interrupt received.", e);
+      } catch (ExecutionException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        // If the future failed, the network call failed (e.g. 404 Not Found).
+        // We extract the underlying cause and immediately throw to prevent a redundant fallback
+        // call.
+        Throwable cause = e.getCause();
+        if (cause instanceof StorageException && ((StorageException) cause).getCode() == 404) {
+          throw createFileNotFoundException(
+              resourceId.getBucketName(), resourceId.getObjectName(), new IOException(e));
+        }
+        logger.atWarning().withCause(e).log(
+            "Failed to get metadata from BlobReadSession future for '%s'", resourceId);
+      } catch (TimeoutException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        logger.atWarning().withCause(e).log(
+            "Timeout waiting for BlobReadSession initialization for '%s'", resourceId);
+      } catch (Exception e) {
+        logger.atWarning().withCause(e).log(
+            "Unexpected error from BlobReadSession future for '%s'", resourceId);
       }
-    } catch (InterruptedException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      Thread.currentThread().interrupt();
-      logger.atWarning().withCause(e).log(
-          "Interrupted while waiting for BlobReadSession initialization for '%s'", resourceId);
-      throw new IOException("Thread interrupt received.", e);
-    } catch (ExecutionException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      // If the future failed, the network call failed (e.g. 404 Not Found).
-      // We extract the underlying cause and immediately throw to prevent a redundant fallback call.
-      Throwable cause = e.getCause();
-      if (cause instanceof StorageException && ((StorageException) cause).getCode() == 404) {
-        throw createFileNotFoundException(
-            resourceId.getBucketName(), resourceId.getObjectName(), new IOException(e));
-      }
-      logger.atWarning().withCause(e).log(
-          "Failed to get metadata from BlobReadSession future for '%s'", resourceId);
-    } catch (TimeoutException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      logger.atWarning().withCause(e).log(
-          "Timeout waiting for BlobReadSession initialization for '%s'", resourceId);
-    } catch (Exception e) {
-      logger.atWarning().withCause(e).log(
-          "Unexpected error from BlobReadSession future for '%s'", resourceId);
-    }
 
-    // Fallback: If the session didn't have it, or the future failed to resolve, do the explicit
-    // network call
-    logger.atInfo().log("Fallback to explicit metadata fetch for '%s'", resourceId);
-    fetchMetadata();
+      // Fallback: If the session didn't have it, or the future failed to resolve, do the explicit
+      // network call
+      logger.atInfo().log("Fallback to explicit metadata fetch for '%s'", resourceId);
+      fetchMetadata();
+    }
   }
 
   private void fetchMetadata() throws IOException {
