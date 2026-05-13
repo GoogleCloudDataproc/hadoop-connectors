@@ -617,9 +617,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         GoogleCloudStorageEventBus.postOnException();
         logger.atWarning().withCause(e).log(
             "Timeout waiting for BlobReadSession initialization for '%s'", resourceId);
-      } catch (Exception e) {
-        logger.atWarning().withCause(e).log(
-            "Unexpected error from BlobReadSession future for '%s'", resourceId);
       }
 
       // Fallback: If the session didn't have it, or the future failed to resolve, do the explicit
