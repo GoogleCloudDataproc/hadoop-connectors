@@ -1309,8 +1309,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     GoogleCloudStorageItemInfo gcsItemInfo = itemInfo;
-    if (gcsItemInfo == null
-        && (storageOptions.isBidiEnabled() || readOptions.isFastFailOnNotFoundEnabled())) {
+    // Respect the fastFailOnNotFoundEnabled flag for both Unary and Bidi channels.
+    if (gcsItemInfo == null && readOptions.isFastFailOnNotFoundEnabled()) {
       gcsItemInfo = getItemInfo(resourceId);
     }
     // TODO(dhritichorpa) Microbenchmark the latency of using
@@ -1319,6 +1319,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     if (storageOptions.isBidiEnabled()) {
       return new GoogleCloudStorageBidiReadChannel(
           storageWrapper.getStorage(),
+          resourceId,
           gcsItemInfo,
           readOptions,
           getBoundedThreadPool(readOptions.getBidiThreadCount()));
