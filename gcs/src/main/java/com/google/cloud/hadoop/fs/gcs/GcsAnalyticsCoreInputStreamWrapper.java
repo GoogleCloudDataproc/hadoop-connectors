@@ -79,6 +79,9 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
       throw new EOFException(
           "Invalid seek offset: position value (" + newPosition + ") must be >= 0");
     }
+    // Throwing EOFException aligns with the Hadoop spec for seek >= len(data).
+    // See:
+    // https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/filesystem/fsdatainputstream.html#Seekable.seek.28s.29
     if (size >= 0 && newPosition >= size) {
       GoogleCloudStorageEventBus.postOnException();
       throw new EOFException(

@@ -321,6 +321,10 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   @Test
   public void fs_operation_threadLocalMetric_tests() throws Exception {
+    // Skip for Analytics Core as it buffers/merges requests, making per-read counting inaccurate.
+    if (analyticsCoreEnabled) {
+      return;
+    }
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
 
     GoogleHadoopFileSystem ghfs =
