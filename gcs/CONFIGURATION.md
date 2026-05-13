@@ -302,7 +302,6 @@ default service account impersonation.
     call. If the client code can handle late failures on not-found errors, or
     has independently already ensured that a file exists before calling open(),
     then set this property to false for more efficient reads.
-    Not supported by `STORAGE_CLIENT` (gRPC) when `fs.gs.bidi.enable` is `true`.
 
 *   `fs.gs.inputstream.support.gzip.encoding.enable` (default: `false`)
 
