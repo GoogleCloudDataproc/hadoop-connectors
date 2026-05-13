@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -149,6 +150,32 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
     Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(6);
     verifyCloseStatus(writeObjectCloseStatusRecord, "WriteObject", Status.OK);
+  }
+
+  @Test
+  public void testBidiReadLogs_fastFailDisabled_noGetObject() throws Exception {
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    int partitionsCount = 1;
+    byte[] partition =
+        writeObject(helperGcs, resourceId, /* partitionSize= */ 2 * 1024 * 1024, partitionsCount);
+    assertingHandler.flush();
+    GoogleCloudStorageOptions storageOption =
+        GCS_TRACE_OPTIONS.toBuilder().setBidiEnabled(true).build();
+    GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
+
+    // Verify number of calls
+    assertingHandler.assertLogCount(1);
+
+    // Verify that no GetObject call was made
+    List<String> rpcMethods =
+        assertingHandler.getAllLogRecords().stream()
+            .map(log -> String.valueOf(log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name)))
+            .collect(Collectors.toList());
+    assertThat(rpcMethods).doesNotContain("GetObject");
+    assertThat(rpcMethods.stream().anyMatch(method -> method.contains("ReadObject"))).isTrue();
   }
 
   @Test
