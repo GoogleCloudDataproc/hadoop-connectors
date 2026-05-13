@@ -32,7 +32,7 @@ class TestUtils {
 
     Long minValue = ioStatistics.minimums().get(minKey);
     Long maxValue = ioStatistics.maximums().get(maxKey);
-    long meanValue = Double.valueOf(ioStatistics.meanStatistics().get(meanKey).mean()).longValue();
+    long meanValue = Math.round(ioStatistics.meanStatistics().get(meanKey).mean());
 
     assertThat(minValue).isLessThan(maxValue + 1);
     assertThat(minValue).isLessThan(meanValue + 1);
@@ -44,7 +44,7 @@ class TestUtils {
     String symbol = statistic;
     long minValue = stats.getMin(symbol);
     long maxValue = stats.getMax(symbol);
-    long meanValue = Double.valueOf(stats.getMean(symbol)).longValue();
+    long meanValue = Math.round(stats.getMean(symbol));
 
     assertThat(stats.getLong(symbol)).isEqualTo(expected);
     assertThat(minValue).isLessThan(maxValue + 1);

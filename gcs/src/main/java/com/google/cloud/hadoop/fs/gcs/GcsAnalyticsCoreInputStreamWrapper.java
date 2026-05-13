@@ -16,21 +16,25 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntFunction;
 
 /**
  * Adapter to expose {@link GoogleCloudStorageInputStream} from Analytics Core library as {@link
  * SeekableByteChannel} for use in {@link GoogleHadoopFSInputStream}.
+ *
+ * <p>TODO(user): Wrap exception-throwing calls to post exceptions to GoogleCloudStorageEventBus on
+ * failure when adding comprehensive logging.
  */
 class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
 
@@ -70,7 +74,22 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
     checkOpen();
-    checkArgument(newPosition >= 0 && newPosition <= size, "Invalid position: %s", newPosition);
+    if (newPosition < 0) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new EOFException(
+          "Invalid seek offset: position value (" + newPosition + ") must be >= 0");
+    }
+    // Throwing EOFException aligns with the Hadoop spec for seek >= len(data).
+    // See:
+    // https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/filesystem/fsdatainputstream.html#Seekable.seek.28s.29
+    if (size >= 0 && newPosition >= size) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new EOFException(
+          "Invalid seek offset: position value ("
+              + newPosition
+              + ") must be between 0 and "
+              + size);
+    }
 
     inputStream.seek(newPosition);
     return this;
@@ -103,7 +122,19 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
   public void readVectored(List<GcsObjectRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
     checkOpen();
-    inputStream.readVectored(ranges, allocate);
+    List<GcsObjectRange> validRanges = new ArrayList<>();
+    for (GcsObjectRange range : ranges) {
+      if (size >= 0 && range.getOffset() + range.getLength() > size) {
+        range
+            .getByteBufferFuture()
+            .completeExceptionally(new IOException("Range extends beyond file size: " + range));
+      } else {
+        validRanges.add(range);
+      }
+    }
+    if (!validRanges.isEmpty()) {
+      inputStream.readVectored(validRanges, allocate);
+    }
   }
 
   public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
