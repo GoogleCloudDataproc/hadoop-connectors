@@ -2,6 +2,10 @@
 
 ## Next
 
+1. Implement fast fail for Bidi Read.
+1. Fast Fail Bug Fix during gRPC Reads.
+1. Log and drop while receiving the additional bytes from server.
+
 ## 4.0.4 - 2026-03-26
 1. Add Integration test for chained Downscoping Interceptors
 1. Enable HNS flag by default
