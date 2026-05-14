@@ -1803,12 +1803,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsFileInfo);
   }
 
-  @VisibleForTesting
-  protected GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsFileInfo gcsFileInfo)
-      throws IOException {
-    return GoogleCloudStorageInputStream.create(analyticsGcsFs, gcsFileInfo);
-  }
-
   /** Checks if Analytics Core is enabled. */
   boolean isAnalyticsCoreEnabled() {
     return GCS_ANALYTICS_CORE_ENABLE.get(getConf(), getConf()::getBoolean);
