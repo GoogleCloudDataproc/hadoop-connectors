@@ -604,3 +604,18 @@ better latency and increased bandwidth. Currently supported only for read/write 
     Comma-separated list of Google Cloud Storage Buckets for which Google Cloud
     Storage Requester Pays feature should be activated if
     `fs.gs.requester.pays.mode` property value is set to `CUSTOM`.
+
+### GCS Analytics Core Configuration
+
+The GCS Analytics Core is a Java library that optimizes and accelerates analytics workloads on Google Cloud Storage (GCS) by centralizing key optimizations and simplifying configuration.
+
+The GCS Hadoop Connector can integrate with the `gcs-analytics-core` library to optimize its read path.
+
+*   `fs.gs.analytics.core.enable` (default: `false`)
+
+    Enables the integration with `gcs-analytics-core` for optimized reads.
+
+To use Analytics Core configurations, use the `fs.gs.` prefix. For a full list of configuration properties supported by the `gcs-analytics-core` library, see its [CONFIGURATION.md](https://github.com/GoogleCloudPlatform/gcs-analytics-core/blob/main/CONFIGURATION.md).
+
+**Unused Flags/Features:**
+The integration currently only utilizes the **HTTP read path** of the `gcs-analytics-core` library for optimized reads. Features related to writes or other non-read operations in the library are not used by the connector. Additionally, other optimizations like `fadvise`, `gzip`, and `fast fail` are currently not supported.
