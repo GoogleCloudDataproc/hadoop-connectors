@@ -24,10 +24,16 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsItemInfo;
+import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
@@ -41,6 +47,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -49,6 +56,7 @@ import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.statistics.DurationTracker;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -87,7 +95,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   private final GhfsStreamStats streamStats;
   private final GhfsStreamStats seekStreamStats;
-  private final GhfsStreamStats vectoredReadStats;
   private final ConcurrentHashMap<String, Long> rangeReadThreadStats;
 
   // Statistic tracker of the Input stream
@@ -100,9 +107,13 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
+    if (ghfs.isAnalyticsCoreEnabled()) {
+      FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      SeekableByteChannel channel = createAnalyticsCoreReadChannel(ghfs, fileInfo, gcsPath);
+      return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
+    }
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
-    // Extract out the fileInfo call here and use it in readChannel as well as in vectoredRead API
     if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
       fileInfo = gcsFs.getFileInfoObject(gcsPath);
@@ -133,9 +144,43 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(fileInfo: %s)", fileInfo);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
+    if (ghfs.isAnalyticsCoreEnabled()) {
+      SeekableByteChannel channel =
+          createAnalyticsCoreReadChannel(ghfs, fileInfo, fileInfo.getPath());
+      return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
+    }
     SeekableByteChannel channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
     return new GoogleHadoopFSInputStream(ghfs, fileInfo.getPath(), fileInfo, channel, statistics);
+  }
+
+  private static SeekableByteChannel createAnalyticsCoreReadChannel(
+      GoogleHadoopFileSystem ghfs, FileInfo fileInfo, URI gcsPath) throws IOException {
+    checkNotNull(fileInfo, "fileInfo must not be null");
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
+    GcsItemId.Builder itemIdBuilder =
+        GcsItemId.builder()
+            .setBucketName(resourceId.getBucketName())
+            .setObjectName(resourceId.getObjectName());
+    boolean hasGenerationId = fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID;
+    if (hasGenerationId) {
+      itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
+    }
+    GcsItemId itemId = itemIdBuilder.build();
+    GcsItemInfo.Builder itemInfoBuilder =
+        GcsItemInfo.builder().setItemId(itemId).setSize(fileInfo.getSize());
+    if (hasGenerationId) {
+      itemInfoBuilder.setContentGeneration(fileInfo.getGenerationId());
+    }
+    GcsItemInfo gcsItemInfo = itemInfoBuilder.build();
+    GcsFileInfo gcsFileInfo =
+        GcsFileInfo.builder()
+            .setItemInfo(gcsItemInfo)
+            .setUri(gcsPath)
+            .setAttributes(fileInfo.getAttributes())
+            .build();
+    GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(gcsFileInfo);
+    return new GcsAnalyticsCoreInputStreamWrapper(inputStream, fileInfo.getSize());
   }
 
   private GoogleHadoopFSInputStream(
@@ -158,9 +203,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_OPERATIONS, gcsPath);
     this.seekStreamStats =
         new GhfsStreamStats(storageStatistics, GhfsStatistic.STREAM_READ_SEEK_OPERATIONS, gcsPath);
-    this.vectoredReadStats =
-        new GhfsStreamStats(
-            storageStatistics, GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS, gcsPath);
     this.rangeReadThreadStats = new ConcurrentHashMap<>();
 
     this.traceFactory = ghfs.getTraceFactory();
@@ -177,53 +219,114 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
+    if (ranges.isEmpty()) {
+      return;
+    }
+    long startTimeNs = System.nanoTime();
+    DurationTracker tracker =
+        streamStatistics.trackDuration(STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
     try {
-      trackDuration(
-          streamStatistics,
-          STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
-          () -> {
-            if (channel instanceof ReadVectoredSeekableByteChannel) {
-              ReadVectoredSeekableByteChannel readVectoredSeekableByteChannelChannel =
-                  (ReadVectoredSeekableByteChannel) channel;
-              ranges.forEach(
-                  range -> {
-                    CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
-                    range.setData(result);
-                  });
-              readVectoredSeekableByteChannelChannel.readVectored(
-                  ranges.stream()
-                      .map(
-                          range ->
-                              VectoredIORange.builder()
-                                  .setLength(range.getLength())
-                                  .setOffset(range.getOffset())
-                                  .setData(range.getData())
-                                  .build())
-                      .collect(Collectors.toList()),
-                  allocate);
-            } else {
-              long startTimeNs = System.nanoTime();
-              vectoredIOSupplier
-                  .get()
-                  .readVectored(
-                      ranges,
-                      allocate,
-                      gcsFs,
-                      fileInfo,
-                      gcsPath,
-                      streamStatistics,
-                      rangeReadThreadStats);
-              statistics.incrementReadOps(1);
-              vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
-            }
-            return null;
-          });
+      readVectoredRouted(ranges, allocate);
     } catch (IOException e) {
+      tracker.failed();
+      tracker.close();
       if (IoExceptionHelper.isInterrupted(e)) {
         Thread.currentThread().interrupt();
       }
       throw e;
     }
+
+    CompletableFuture<?>[] futures =
+        ranges.stream().map(FileRange::getData).toArray(CompletableFuture[]::new);
+    CompletableFuture.allOf(futures)
+        .whenComplete(
+            (v, ex) -> {
+              if (ex != null) {
+                tracker.failed();
+              }
+              tracker.close();
+              long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNs);
+              storageStatistics.updateStats(
+                  GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS,
+                  elapsedMs,
+                  elapsedMs,
+                  elapsedMs,
+                  1,
+                  gcsPath);
+            });
+  }
+
+  private Void readVectoredRouted(
+      List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
+    if (channel instanceof ReadVectoredSeekableByteChannel) {
+      readVectoredViaSeekableByteChannel(
+          (ReadVectoredSeekableByteChannel) channel, ranges, allocate);
+    } else if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+      readVectoredViaAnalyticsCore((GcsAnalyticsCoreInputStreamWrapper) channel, ranges, allocate);
+    } else {
+      readVectoredDefault(ranges, allocate);
+    }
+    return null;
+  }
+
+  private void readVectoredViaSeekableByteChannel(
+      ReadVectoredSeekableByteChannel vectoredChannel,
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    ranges.forEach(range -> range.setData(new CompletableFuture<>()));
+    List<VectoredIORange> vectoredIORanges =
+        ranges.stream()
+            .map(
+                range ->
+                    VectoredIORange.builder()
+                        .setLength(range.getLength())
+                        .setOffset(range.getOffset())
+                        .setData(range.getData())
+                        .build())
+            .collect(Collectors.toList());
+    vectoredChannel.readVectored(vectoredIORanges, allocate);
+  }
+
+  private void readVectoredViaAnalyticsCore(
+      GcsAnalyticsCoreInputStreamWrapper analyticsChannel,
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate)
+      throws IOException {
+    ranges.forEach(
+        range -> {
+          CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+          range.setData(result);
+          result.whenComplete(
+              (buf, ex) -> {
+                if (ex == null) {
+                  int length = range.getLength();
+                  streamStatistics.bytesRead(length);
+                  storageStatistics.streamReadBytes(length);
+                }
+              });
+        });
+    List<GcsObjectRange> gcsObjectRanges =
+        ranges.stream()
+            .map(
+                range ->
+                    GcsObjectRange.builder()
+                        .setLength(range.getLength())
+                        .setOffset(range.getOffset())
+                        .setByteBufferFuture(range.getData())
+                        .build())
+            .collect(Collectors.toList());
+    analyticsChannel.readVectored(gcsObjectRanges, allocate);
+  }
+
+  private void readVectoredDefault(
+      List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate) throws IOException {
+    long startTimeNs = System.nanoTime();
+    vectoredIOSupplier
+        .get()
+        .readVectored(
+            ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats);
+    statistics.incrementReadOps(1);
   }
 
   @Override
@@ -278,6 +381,36 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           streamStatistics.readOperationCompleted(length, max(response, 0));
           return response;
         });
+  }
+
+  @Override
+  public synchronized void readFully(long position, byte[] buffer, int offset, int length)
+      throws IOException {
+    if (length == 0) {
+      return;
+    }
+    if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+      // TODO(user): Differentiate between STREAM_READ_OPERATIONS and STREAM_READ_FULLY_OPERATIONS
+      // as a follow-up task.
+      trackDuration(
+          streamStatistics,
+          STREAM_READ_OPERATIONS.getSymbol(),
+          () -> {
+            long startTimeNs = System.nanoTime();
+            checkNotClosed();
+            ((GcsAnalyticsCoreInputStreamWrapper) channel)
+                .readFully(position, buffer, offset, length);
+            totalBytesRead += length;
+            statistics.incrementReadOps(1);
+            streamStats.updateReadStreamStats(length, startTimeNs);
+            storageStatistics.streamReadOperationInComplete(length, length);
+            streamStatistics.bytesRead(length);
+            streamStatistics.readOperationCompleted(length, length);
+            return null;
+          });
+      return;
+    }
+    super.readFully(position, buffer, offset, length);
   }
 
   @Override
@@ -346,7 +479,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
               rangeReadThreadStats.clear();
               streamStats.close();
               seekStreamStats.close();
-              vectoredReadStats.close();
             }
           }
           return null;

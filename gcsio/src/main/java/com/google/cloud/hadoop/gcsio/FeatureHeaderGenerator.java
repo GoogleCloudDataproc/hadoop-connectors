@@ -138,6 +138,11 @@ public class FeatureHeaderGenerator {
     if (fsOptions.isCloudLoggingEnabled()) {
       features.set(TrackedFeatures.CLOUD_LOGGING_ENABLED.getBitPosition());
     }
+
+    // Analytics Core
+    if (fsOptions.isAnalyticsCoreEnabled()) {
+      features.set(TrackedFeatures.ANALYTICS_CORE_ENABLED.getBitPosition());
+    }
   }
 
   /**

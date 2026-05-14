@@ -635,6 +635,10 @@ public class GoogleHadoopFileSystemConfiguration {
               "fs.gs.bidi.finalize.on.close",
               GoogleCloudStorageOptions.DEFAULT.isFinalizeBeforeClose());
 
+  /** Configuration key for enabling GCS Analytics Core. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -646,7 +650,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean));
+        .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean))
+        .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean));
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
@@ -727,7 +732,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .build();
   }
 
-  private static String getApplicationName(Configuration config) {
+  static String getApplicationName(Configuration config) {
     String appNameSuffix = nullToEmpty(GCS_APPLICATION_NAME_SUFFIX.get(config, config::get));
     String applicationName = GoogleHadoopFileSystem.GHFS_ID + appNameSuffix;
     logger.atFiner().log("getApplicationName(config: %s): %s", config, applicationName);

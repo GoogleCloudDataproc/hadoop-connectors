@@ -56,6 +56,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   private static final Map<String, Object> expectedDefaultConfiguration =
       new HashMap<>() {
         {
+          put("fs.gs.analytics.core.enable", false);
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
@@ -384,6 +385,17 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
     assertThat(options.getBidiThreadCount()).isEqualTo(5);
     assertThat(options.getBidiClientTimeout()).isEqualTo(6);
+  }
+
+  @Test
+  public void analyticsCoreOptions() {
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.isAnalyticsCoreEnabled()).isTrue();
   }
 
   @Test
