@@ -302,7 +302,6 @@ default service account impersonation.
     call. If the client code can handle late failures on not-found errors, or
     has independently already ensured that a file exists before calling open(),
     then set this property to false for more efficient reads.
-    Not supported by `STORAGE_CLIENT` (gRPC) when `fs.gs.bidi.enable` is `true`.
 
 *   `fs.gs.inputstream.support.gzip.encoding.enable` (default: `false`)
 
@@ -559,9 +558,9 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
 ### Hierarchical Namespace (HNS) Configuration
 
-* `fs.gs.hierarchical.namespace.folders.enable` (default: `false`)
+* `fs.gs.hierarchical.namespace.folders.enable` (default: `true`)
 
-    If true, the connector will use native HNS APIs for `rename` and `delete` operations
+    By default, the connector will use native HNS APIs for `rename` and `delete` operations
     on Hierarchical Namespace (HNS) enabled buckets. This includes using the `renameFolder` API for directory renames
     and deleting native folders during `delete` operations.
 
