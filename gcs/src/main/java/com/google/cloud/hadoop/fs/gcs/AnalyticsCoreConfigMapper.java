@@ -52,8 +52,8 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
-   * Maps configurations from Hadoop Configuration to a map suitable for Analytics Core.
-   * If a configuration flag is not set by the user, Analytics Core defaults will be used.
+   * Maps configurations from Hadoop Configuration to a map suitable for Analytics Core. If a
+   * configuration flag is not set by the user, Analytics Core defaults will be used.
    *
    * @param config The Hadoop configuration.
    * @param prefix The prefix used for Analytics Core properties (e.g., "fs.gs.").
