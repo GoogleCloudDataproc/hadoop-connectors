@@ -48,11 +48,6 @@ public class GoogleCloudStorageEventBus {
     eventBus.unregister(obj);
   }
 
-  /** Resets the event bus by creating a new instance. */
-  public static void reset() {
-    eventBus = new EventBus();
-  }
-
   /**
    * Posting Gcs request execution event i.e. request to gcs is being initiated.
    *
@@ -81,10 +76,6 @@ public class GoogleCloudStorageEventBus {
 
   public static void postGcsJsonApiEvent(IGcsJsonApiEvent gcsJsonApiEvent) {
     eventBus.post(gcsJsonApiEvent);
-  }
-
-  public static void postReadMetricEvent(GcsReadMetricEvent gcsReadMetricEvent) {
-    eventBus.post(gcsReadMetricEvent);
   }
 
   public static void postWriteChecksumFailure() {

@@ -48,7 +48,6 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
-import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -934,99 +933,6 @@ public class GoogleCloudStorageReadChannelTest {
         .isEqualTo(
             "Unexpected end of stream trying to skip 10 bytes to seek to position 10,"
                 + " size: 9223372036854775807 for 'gs://foo-bucket/bar-object'");
-  }
-
-  @Test
-  public void readBeyondObjectSize() throws IOException {
-    long objectSize = 10L;
-    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
-
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(
-                new StorageObject()
-                    .setBucket(BUCKET_NAME)
-                    .setName(OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(objectSize))
-                    .setGeneration(1L)),
-            // Ensure content-length accommodates the over-read
-            inputStreamResponse(
-                CONTENT_LENGTH, (long) testData.length, new ByteArrayInputStream(testData)));
-    GoogleCloudStorage gcs = mockedGcsImpl(transport);
-
-    GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel)
-            gcs.open(
-                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-                GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build());
-
-    readChannel.setMaxRetries(0);
-
-    IOException e =
-        assertThrows(
-            IOException.class,
-            () -> {
-              ByteBuffer buffer = ByteBuffer.allocate(testData.length + 1);
-              while (buffer.hasRemaining()) {
-                if (readChannel.read(buffer) < 0) {
-                  break;
-                }
-              }
-            });
-
-    assertThat(e)
-        .hasMessageThat()
-        .contains("Received end of stream result beyond the object size;");
-  }
-
-  @Test
-  public void readBeyondChannelLength() throws Exception {
-    long objectSize = 200L;
-    // First response overshoots the 10 byte limit by 2 bytes
-    byte[] overshootData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
-    // Second response provides the rest of the object size
-    byte[] restData = {0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15};
-
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(
-                new StorageObject()
-                    .setBucket(BUCKET_NAME)
-                    .setName(OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(objectSize))
-                    .setGeneration(1L)),
-            // 1. Mock first read returning 12 bytes
-            dataRangeResponse(overshootData, 0, objectSize),
-            // 2. Mock the second read for the remaining bytes
-            dataRangeResponse(restData, 12, objectSize));
-
-    GoogleCloudStorage gcs = mockedGcsImpl(transport);
-
-    GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel)
-            gcs.open(
-                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-                GoogleCloudStorageReadOptions.builder()
-                    .setFadvise(Fadvise.RANDOM)
-                    .setMinRangeRequestSize(10) // Force requested range to be 10
-                    .build());
-
-    readChannel.setMaxRetries(1);
-
-    // First read of 5 bytes
-    ByteBuffer buffer = ByteBuffer.allocate(30);
-    buffer.limit(5);
-    int bytesRead = readChannel.read(buffer);
-    assertThat(bytesRead).isEqualTo(5);
-
-    // Second read to trigger overshoot and then EOF
-    buffer.limit(20);
-    bytesRead = readChannel.read(buffer);
-
-    // total read should be 7 (remaining in overshootData) + 8 (from second mock to fill buffer
-    // limit 20) = 15
-    assertThat(bytesRead).isEqualTo(15);
-    assertThat(readChannel.position()).isEqualTo(20);
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {

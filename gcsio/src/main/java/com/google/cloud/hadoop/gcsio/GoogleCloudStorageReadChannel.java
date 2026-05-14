@@ -35,8 +35,6 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
-import com.google.cloud.hadoop.util.GcsReadDurationTrackerStream;
-import com.google.cloud.hadoop.util.GcsReadMetricEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -50,7 +48,6 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.Channels;
@@ -328,34 +325,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           // actual size of the data stream when stream compression is used, so we can
           // only ignore
           // this case here.
-          if (currentPosition > contentChannelEnd && currentPosition < size) {
-            logger.atWarning().log(
-                "Received end of stream result after the channel end; at offset: %d "
-                    + "where as stream was suppose to end at: %d for resource: %s of size: %d",
-                currentPosition, contentChannelEnd, resourceId, size);
-
-            // Dropping additional bytes.
-            int overshoot = (int) (currentPosition - contentChannelEnd);
-            buffer.position(buffer.position() - overshoot);
-            currentPosition = contentChannelEnd;
-            totalBytesRead -= overshoot;
-            contentChannelPosition -= overshoot;
-          } else if (currentPosition < contentChannelEnd && currentPosition < size) {
+          if (currentPosition != contentChannelEnd && currentPosition != size) {
             GoogleCloudStorageEventBus.postOnException();
             throw new IOException(
                 String.format(
-                    "Received end of stream result before all requestedBytes were received; "
-                        + "at offset: %d where as stream was suppose to end at: %d for resource: "
-                        + "%s of size: %d",
-                    currentPosition, contentChannelEnd, resourceId, size));
-
-          } else if (currentPosition > size) {
-            GoogleCloudStorageEventBus.postOnException();
-            throw new IOException(
-                String.format(
-                    "Received end of stream result beyond the object size; at offset: %d "
-                        + "where as stream was suppose to end at: %d for resource: %s of size: %d",
-                    currentPosition, contentChannelEnd, resourceId, size));
+                    "Received end of stream result before all the file data has been received;"
+                        + " totalBytesRead: %d, currentPosition: %d,"
+                        + " contentChannelEnd %d, size: %d, object: '%s'",
+                    totalBytesRead, currentPosition, contentChannelEnd, size, resourceId));
           }
 
           // If we have reached an end of a contentChannel but not an end of an object
@@ -759,11 +736,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       objectContentStream = openStream(bytesToRead);
     }
     contentChannel = Channels.newChannel(objectContentStream);
-
-    logger.atFiner().log(
-        "Storage ReadChannel opened at, contentChannelPosition: %d, contentChannelEnd: %d",
-        contentChannelPosition, contentChannelEnd);
-
     checkState(
         contentChannelPosition == currentPosition,
         "contentChannelPosition (%s) should be equal to currentPosition (%s) for '%s'",
@@ -896,8 +868,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /**
-   * Opens an {@link InputStream} to the GCS object at the current position, wrapped with
-   * performance tracking.
+   * Opens the underlying stream, sets its position to the {@link #currentPosition}.
    *
    * <p>If the file encoding in GCS is gzip (and therefore the HTTP client will decompress it), the
    * entire file is always requested, and we seek to the position requested. If the file encoding is
@@ -905,8 +876,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    *
    * @param bytesToRead number of bytes to read from new stream. Ignored if {@link
    *     GoogleCloudStorageReadOptions#getFadvise()} is equal to {@link Fadvise#SEQUENTIAL}.
-   * @return an {@link InputStream} to the object content, typically a {@link
-   *     GcsReadDurationTrackerStream}.
    * @throws IOException on IO error
    */
   protected InputStream openStream(long bytesToRead) throws IOException {
@@ -993,12 +962,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     Storage.Objects.Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
-    long startTime = System.currentTimeMillis();
     try {
       response = getObject.executeMedia();
-      GoogleCloudStorageEventBus.postReadMetricEvent(
-          GcsReadMetricEvent.ofConnection(
-              System.currentTimeMillis() - startTime, URI.create(resourceId.toString())));
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
@@ -1118,11 +1083,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           currentPosition,
           resourceId);
 
-      return new GcsReadDurationTrackerStream(
-          contentStream,
-          URI.create(resourceId.toString()),
-          response.getHeaders(),
-          readOptions.getLatencyLoggingThreshold());
+      return contentStream;
     } catch (IOException e) {
       GoogleCloudStorageEventBus.postOnException();
       try {
