@@ -33,7 +33,9 @@ import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.collect.ImmutableList;
@@ -645,7 +647,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(mockedStorage, times(0)).get(any(com.google.cloud.storage.BlobId.class));
 
     // Mock storage.get for the fallback/lazy fetch
-    com.google.cloud.storage.Blob mockBlob = mock(com.google.cloud.storage.Blob.class);
+    Blob mockBlob = mock(Blob.class);
     when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
     when(mockBlob.getContentEncoding()).thenReturn("text/plain");
     when(mockedStorage.get(any(com.google.cloud.storage.BlobId.class), any())).thenReturn(mockBlob);
@@ -772,6 +774,170 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(bytesRead).isEqualTo(10);
   }
 
+  @Test
+  public void testLazyMetadataFetch_emptyObject_returnsEofCleanly() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setGzipEncodingSupportEnabled(true)
+            .build();
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn(0L);
+    when(mockBlob.getContentEncoding()).thenReturn(null);
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockedStorage.get(any(BlobId.class), org.mockito.Mockito.<Storage.BlobGetOption>any()))
+        .thenReturn(mockBlob);
+    MockStorageReadChannel fakeChannel = new MockStorageReadChannel(ByteString.EMPTY, mockBlob);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(0);
+    assertThat(readChannel.size()).isEqualTo(0L);
+  }
+
+  @Test
+  public void testRead_whenLazyInitFails_closesOrphanedChannel() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    Storage mockStorage = mock(Storage.class);
+    ReadChannel mockReadChannel = mock(ReadChannel.class);
+    when(mockStorage.reader(any(), any())).thenReturn(mockReadChannel);
+    when(mockReadChannel.isOpen()).thenReturn(true);
+    when(mockReadChannel.read(any(ByteBuffer.class)))
+        .thenThrow(new IOException("Simulated Connection Error"));
+    GoogleCloudStorageClientReadChannel channel =
+        new GoogleCloudStorageClientReadChannel(
+            mockStorage,
+            RESOURCE_ID,
+            null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    IOException thrown =
+        assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(10)));
+
+    assertThat(thrown).hasMessageThat().contains("Error reading");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Simulated Connection Error");
+    verify(mockReadChannel, times(1)).close();
+  }
+
+  @Test
+  public void testLazyMetadataFetch_normalForwardRead_fetchesMetadataMidFlight() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+    BlobInfo mockBlobInfo = mock(BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(1L);
+    MockStorageReadChannel fakeChannel = new MockStorageReadChannel(CONTENT, mockBlobInfo);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Read from the beginning (offset 0)
+    int readBytes = 100;
+    ByteBuffer buffer = ByteBuffer.allocate(readBytes);
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(readBytes);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+
+    buffer.flip();
+    byte[] expectedContent = CONTENT.substring(0, readBytes).toByteArray();
+    assertThat(buffer.array()).isEqualTo(expectedContent);
+  }
+
+  @Test
+  public void testLazyMetadataFetch_gzipEncoded_recoversFromBadGuess() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setGzipEncodingSupportEnabled(true)
+            .build();
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlob.getContentEncoding()).thenReturn("gzip");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockedStorage.get(any(BlobId.class), org.mockito.Mockito.<Storage.BlobGetOption>any()))
+        .thenReturn(mockBlob);
+    MockStorageReadChannel fakeChannel = new MockStorageReadChannel(CONTENT, mockBlob);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Seek to a random offset (simulating a bad guess before GZIP is discovered)
+    readChannel.position(100);
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(10);
+    assertThat(readChannel.size()).isEqualTo(-1L);
+  }
+
+  @Test
+  public void testLazyMetadataFetch_seekPastEof_throwsEofException() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn(10L);
+    when(mockBlob.getContentEncoding()).thenReturn(null);
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockedStorage.get(any(BlobId.class), org.mockito.Mockito.<Storage.BlobGetOption>any()))
+        .thenReturn(mockBlob);
+    MockStorageReadChannel fakeChannel =
+        new MockStorageReadChannel(ByteString.copyFromUtf8("0123456789"), mockBlob);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    // Seek to position 15 (which is > objectSize 10)
+    // Because fast fail is disabled, the connector doesn't know this is out of bounds yet.
+    readChannel.position(15);
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+
+    // Once read() is called, the lazy fetch retrieves the actual size (10L).
+    // validateEndOfFile will realize position (15) > objectSize (10) and throw an EOFException.
+    IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
+
+    assertThat(thrown).hasCauseThat().isInstanceOf(EOFException.class);
+
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Invalid seek offset: position value (15) must be between 0 and 10");
+
+    assertThat(readChannel.size()).isEqualTo(10L);
+  }
+
   // A fake ReadChannel that mimics StorageReadChannel by having a getObject method
   // and a class name ending in "StorageReadChannel"
   private static class MockStorageReadChannel extends FakeReadChannel {
@@ -785,6 +951,58 @@ public class GoogleCloudStorageClientReadChannelTest {
     public com.google.api.core.ApiFuture<com.google.cloud.storage.BlobInfo> getObject() {
       return com.google.api.core.ApiFutures.immediateFuture(blobInfo);
     }
+  }
+
+  @Test
+  public void readBeyondChannelLength() throws IOException {
+    // Queue READ_CHUNK for the first read, then MORE_THAN_CHANNEL_LENGTH for the second read
+    // so it overshoots the channel limit.
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(
+                CONTENT,
+                ImmutableList.of(REQUEST_TYPE.READ_CHUNK, REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH)));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+
+    // Enforce a chunk size so that contentChannelEnd is smaller than the full object size
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setMinRangeRequestSize(10).build();
+
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
+
+    readChannel.position(0);
+
+    // 1. First read of 5 bytes. This will open the channel with limit = max(5, 10) = 10.
+    ByteBuffer buffer1 = ByteBuffer.allocate(5);
+    int bytesRead1 = readChannel.read(buffer1);
+    assertThat(bytesRead1).isEqualTo(5);
+
+    // 2. Second read of 10 bytes. The channel limit is still 10.
+    // The FakeReadChannel will return 10 - 5 + 1 = 6 bytes, so currentPosition becomes 11.
+    // Since 11 > 10, it will hit the overshoot block in GoogleCloudStorageClientReadChannel.
+    ByteBuffer buffer2 = ByteBuffer.allocate(10);
+    int bytesRead2 = readChannel.read(buffer2);
+
+    assertThat(bytesRead2).isEqualTo(10);
+    assertThat(readChannel.position()).isEqualTo(15);
+  }
+
+  @Test
+  public void readBeyondObjectSize() throws IOException {
+    fakeReadChannel =
+        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.MORE_THAN_OBJECT_SIZE)));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+
+    int startPosition = 0;
+    readChannel.position(startPosition);
+    IOException e =
+        assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(CHUNK_SIZE)));
+
+    assertThat(e)
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Received end of stream result beyond the object size;");
   }
 
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
@@ -802,10 +1020,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     }
     return new GoogleCloudStorageClientReadChannel(
         mockedStorage,
-        new StorageResourceId(
-            objectInfo.getBucketName(),
-            objectInfo.getObjectName(),
-            objectInfo.getContentGeneration()),
+        objectInfo.getResourceId(),
         objectInfo,
         readOptions,
         GrpcErrorTypeExtractor.INSTANCE,
