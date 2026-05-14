@@ -129,21 +129,6 @@ public enum GhfsStatistic {
       "Discarded read bytes during readVectored operation",
       TYPE_COUNTER),
 
-  STREAM_READ_VECTORED_THREAD_WAIT_DURATION(
-      "stream_readVectored_thread_wait_duration",
-      "Tracks how long a read task waits in the thread pool queue before execution starts",
-      TYPE_DURATION),
-
-  STREAM_READ_CONNECTION_DURATION(
-      "stream_read_connection_duration",
-      "Captures the time taken to establish a connection and receive the initial response from GCS",
-      TYPE_DURATION),
-
-  STREAM_READ_DATA_TRANSFER_DURATION(
-      "stream_read_data_transfer_duration",
-      "Measures the duration of the actual data transfer after the connection is established",
-      TYPE_DURATION),
-
   STREAM_READ_VECTORED_READ_RANGE_DURATION(
       "stream_readVectored_range_duration", "Latency of individual FileRange", TYPE_DURATION),
 

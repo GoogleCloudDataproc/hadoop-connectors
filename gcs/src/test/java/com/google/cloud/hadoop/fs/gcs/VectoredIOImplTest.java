@@ -24,7 +24,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -34,10 +33,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.util.GcsReadMetricEvent;
-import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -88,8 +84,6 @@ public class VectoredIOImplTest {
 
   @Before
   public void before() throws Exception {
-    GoogleCloudStorageEventBus.reset();
-    GoogleCloudStorageEventSubscriber.reset();
     this.ghfs = createInMemoryGoogleHadoopFileSystem();
     // Write a file which will be used across test case to validate the ranges reads
     this.path = new Path(ghfs.getUri().resolve(OBJECT_NAME));
@@ -104,8 +98,6 @@ public class VectoredIOImplTest {
     this.gcsFs = spy(ghfs.getGcsFs());
     this.statistics = new FileSystem.Statistics(ghfs.getScheme());
     this.ghfsStorageStatistics = new GhfsGlobalStorageStatistics();
-    GoogleCloudStorageEventBus.register(
-        GoogleCloudStorageEventSubscriber.getInstance(ghfsStorageStatistics));
     this.vectoredIO = new VectoredIOImpl(vectoredReadOptions, ghfsStorageStatistics);
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
     this.rangeReadThreadStats = new ConcurrentHashMap<>();
@@ -117,8 +109,6 @@ public class VectoredIOImplTest {
       vectoredIO.close();
     }
     ghfsStorageStatistics.reset();
-    GoogleCloudStorageEventBus.reset();
-    GoogleCloudStorageEventSubscriber.reset();
     streamStatistics.close();
     rangeReadThreadStats = null;
   }
@@ -669,76 +659,5 @@ public class VectoredIOImplTest {
 
   private void verifyGcsFsOpenCalls(int callCount) throws IOException {
     verify(gcsFs, times(callCount)).open((FileInfo) any(), any());
-  }
-
-  @Test
-  public void testVectoredIOMetricsWithReadChannel() throws Exception {
-    List<FileRange> fileRanges = new ArrayList<>();
-    // valid range
-    fileRanges.add(FileRange.createFileRange(/* offset */ 0, /* length */ 10));
-
-    GoogleCloudStorageFileSystem mockedGcsFs = mock(GoogleCloudStorageFileSystem.class);
-    when(mockedGcsFs.getOptions()).thenReturn(GoogleCloudStorageFileSystemOptions.DEFAULT);
-
-    GoogleCloudStorageReadChannel mockedChannel = mock(GoogleCloudStorageReadChannel.class);
-
-    when(mockedChannel.read(any(ByteBuffer.class)))
-        .thenAnswer(
-            invocation -> {
-              ByteBuffer buffer = invocation.getArgument(0);
-              int length = buffer.remaining();
-              buffer.position(buffer.position() + length);
-              return length;
-            });
-    when(mockedChannel.isOpen()).thenReturn(true);
-    when(mockedChannel.position(org.mockito.ArgumentMatchers.anyLong())).thenReturn(mockedChannel);
-
-    doAnswer(
-            invocation -> {
-              GoogleCloudStorageEventBus.postReadMetricEvent(
-                  GcsReadMetricEvent.ofConnection(100L, fileInfo.getPath()));
-              GoogleCloudStorageEventBus.postReadMetricEvent(
-                  GcsReadMetricEvent.ofDataTransfer(200L, fileInfo.getPath(), false));
-              return null;
-            })
-        .when(mockedChannel)
-        .close();
-
-    when(mockedGcsFs.open((FileInfo) any(), any())).thenReturn(mockedChannel);
-
-    vectoredIO.readVectored(
-        fileRanges,
-        allocate,
-        mockedGcsFs,
-        fileInfo,
-        fileInfo.getPath(),
-        streamStatistics,
-        rangeReadThreadStats);
-
-    // Wait for the asynchronous tasks to complete
-    for (FileRange range : fileRanges) {
-      range.getData().get(1, TimeUnit.MINUTES);
-    }
-
-    long connectionTime = 0;
-    long dataTransferTime = 0;
-    for (int i = 0; i < 100; i++) {
-      connectionTime =
-          ghfsStorageStatistics.getMax(GhfsStatistic.STREAM_READ_CONNECTION_DURATION.getSymbol());
-      dataTransferTime =
-          ghfsStorageStatistics.getMax(
-              GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION.getSymbol());
-      if (connectionTime == 100L && dataTransferTime == 200L) {
-        break;
-      }
-      Thread.sleep(50);
-    }
-
-    assertThat(connectionTime).isEqualTo(100L);
-    assertThat(dataTransferTime).isEqualTo(200L);
-    assertThat(
-            ghfsStorageStatistics.getMax(
-                GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION.getSymbol()))
-        .isAtLeast(0L);
   }
 }

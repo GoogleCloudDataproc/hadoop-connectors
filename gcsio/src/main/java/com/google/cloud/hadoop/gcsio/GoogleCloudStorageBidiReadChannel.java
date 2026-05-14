@@ -18,8 +18,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.api.client.util.Preconditions.checkArgument;
 import static com.google.api.client.util.Preconditions.checkNotNull;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.max;
 
@@ -51,54 +49,42 @@ import javax.annotation.Nullable;
 public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final int EOF = -1;
-  private StorageResourceId resourceId;
-  private BlobId blobId;
+  private final StorageResourceId resourceId;
+  private final BlobId blobId;
   private final ApiFuture<BlobReadSession> sessionFuture;
   private volatile BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
-  private volatile long objectSize = -1;
+  private long objectSize;
   private boolean open = true;
-  private volatile boolean metadataInitialized = false;
-
-  private final Storage storage;
-  private final GoogleCloudStorageReadOptions readOptions;
   private boolean gzipEncoded = false;
   private final Duration readTimeout;
   private long position = 0;
+  private final GoogleCloudStorageReadOptions readOptions;
   private byte[] footerContent;
   private ByteBuffer internalBuffer;
   private long bufferStartPosition = -1;
 
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
-      StorageResourceId resourceId,
-      @Nullable GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
-    this.storage = storage;
-    this.resourceId = resourceId;
-    this.readOptions = readOptions;
-    this.boundedThreadPool = boundedThreadPool;
+    validate(itemInfo);
+    // TODO(dhritichopra) Remove grpcReadTimeout if redundant and rename to bidiReadTimeout.
     this.readTimeout = readOptions.getGrpcReadTimeout();
-
-    if (itemInfo != null) {
-      validate(itemInfo);
-      initMetadata(
-          itemInfo.getContentEncoding(), itemInfo.getSize(), itemInfo.getContentGeneration());
-    } else if (readOptions.isFastFailOnNotFoundEnabled()) {
-      fetchMetadata();
-    }
-
-    Long generationId =
-        resourceId.getGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID
-            ? null
-            : resourceId.getGenerationId();
-
-    this.blobId = BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), generationId);
+    this.resourceId =
+        new StorageResourceId(
+            itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
+    this.blobId =
+        BlobId.of(
+            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
+    this.readOptions = readOptions;
     this.sessionFuture = storage.blobReadSession(blobId);
     this.blobReadSession = null;
+    this.boundedThreadPool = boundedThreadPool;
+    initMetadata(itemInfo.getContentEncoding(), itemInfo.getSize());
   }
 
   private synchronized BlobReadSession getBlobReadSession() throws IOException {
@@ -121,7 +107,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     if (!dst.hasRemaining()) {
       return 0;
     }
-    ensureMetadataInitialized();
 
     if (position >= objectSize) {
       return EOF;
@@ -187,11 +172,10 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public long size() throws IOException {
-    throwIfNotOpen();
-
-    // Lazily fetch the size if it's not available yet
-    ensureMetadataInitialized();
-
+    if (objectSize == -1) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException("Size of file is not available");
+    }
     return objectSize;
   }
 
@@ -240,8 +224,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
-    throwIfNotOpen();
-    ensureMetadataInitialized();
     long vectoredReadStartTime = System.currentTimeMillis();
     BlobReadSession session = getBlobReadSession();
     ranges.forEach(
@@ -312,33 +294,15 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
   }
 
-  protected void initMetadata(@Nullable String encoding, long sizeFromMetadata, long generation)
+  protected void initMetadata(@Nullable String encoding, long sizeFromMetadata)
       throws UnsupportedOperationException {
-    checkState(!metadataInitialized, "Metadata already initialized");
-
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
     // TODO(dhritichopra) Add Support for GZIP Encoding
     if (gzipEncoded) {
       GoogleCloudStorageEventBus.postOnException();
       throw new UnsupportedOperationException("Gzip Encoded Files are not supported");
     }
-
     objectSize = sizeFromMetadata;
-
-    if (!resourceId.hasGenerationId()) {
-      resourceId =
-          new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName(), generation);
-      blobId = BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), generation);
-    } else {
-      checkState(
-          resourceId.getGenerationId() == generation,
-          "Provided generation (%s) should be equal to fetched generation (%s) for '%s'",
-          resourceId.getGenerationId(),
-          generation,
-          resourceId);
-    }
-
-    metadataInitialized = true;
   }
 
   private void validatePosition(long position) throws IOException {
@@ -566,89 +530,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                 ReadProjectionConfigs.asFutureByteString()
                     .withRangeSpec(RangeSpec.of(offset, length)));
     return futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS);
-  }
-
-  private void ensureMetadataInitialized() throws IOException {
-    // First check (lock-free fast path)
-    if (metadataInitialized) {
-      return;
-    }
-
-    synchronized (this) {
-      // Second check (thread-safe, protects against race conditions)
-      if (metadataInitialized) {
-        return;
-      }
-
-      try {
-        if (this.sessionFuture != null) {
-          // Resolve the ApiFuture to get the actual BlobReadSession object.
-          // We use the configured BidiClientTimeout to prevent the reading thread
-          // from blocking indefinitely if the future hangs.
-          BlobReadSession session =
-              this.sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
-
-          BlobInfo blobInfo = session.getBlobInfo();
-          if (blobInfo != null) {
-            initMetadata(
-                blobInfo.getContentEncoding(), blobInfo.getSize(), blobInfo.getGeneration());
-            return;
-          }
-        }
-      } catch (InterruptedException e) {
-        GoogleCloudStorageEventBus.postOnException();
-        Thread.currentThread().interrupt();
-        logger.atWarning().withCause(e).log(
-            "Interrupted while waiting for BlobReadSession initialization for '%s'", resourceId);
-        throw new IOException("Thread interrupt received.", e);
-      } catch (ExecutionException e) {
-        GoogleCloudStorageEventBus.postOnException();
-        // If the future failed, the network call failed (e.g. 404 Not Found).
-        // We extract the underlying cause and immediately throw to prevent a redundant fallback
-        // call.
-        Throwable cause = e.getCause();
-        if (cause instanceof StorageException && ((StorageException) cause).getCode() == 404) {
-          throw createFileNotFoundException(
-              resourceId.getBucketName(), resourceId.getObjectName(), new IOException(e));
-        }
-        logger.atWarning().withCause(e).log(
-            "Failed to get metadata from BlobReadSession future for '%s'", resourceId);
-      } catch (TimeoutException e) {
-        GoogleCloudStorageEventBus.postOnException();
-        logger.atWarning().withCause(e).log(
-            "Timeout waiting for BlobReadSession initialization for '%s'", resourceId);
-      }
-
-      // Fallback: If the session didn't have it, or the future failed to resolve, do the explicit
-      // network call
-      logger.atInfo().log("Fallback to explicit metadata fetch for '%s'", resourceId);
-      fetchMetadata();
-    }
-  }
-
-  private void fetchMetadata() throws IOException {
-    try {
-      BlobId metadataBlobId =
-          BlobId.of(
-              resourceId.getBucketName(),
-              resourceId.getObjectName(),
-              resourceId.hasGenerationId() ? resourceId.getGenerationId() : null);
-
-      Blob blob =
-          storage.get(
-              metadataBlobId,
-              Storage.BlobGetOption.fields(
-                  Storage.BlobField.CONTENT_ENCODING,
-                  Storage.BlobField.SIZE,
-                  Storage.BlobField.GENERATION));
-
-      if (blob == null) {
-        throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
-      }
-      initMetadata(blob.getContentEncoding(), blob.getSize(), blob.getGeneration());
-    } catch (StorageException e) {
-      throw new IOException("Failed to fetch metadata for " + resourceId, e);
-    }
   }
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {

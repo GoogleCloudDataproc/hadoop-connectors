@@ -115,11 +115,6 @@ public enum GoogleCloudStorageStatistics {
   GCS_API_TIME(
       "gcs_api_time", "Tracks the amount of time spend while calling GCS APIs.", TYPE_COUNTER),
 
-  GCS_READ_DATA_TRANSFER_LATENCY_BREACHED_COUNT(
-      "gcs_read_data_transfer_latency_breached_count",
-      "Counts the number of times the read data transfer latency threshold was breached.",
-      TYPE_COUNTER),
-
   GCS_METADATA_REQUEST(
       "gcs_metadata_request", "Tracks GCS GET metadata API calls.", TYPE_DURATION_TOTAL),
 

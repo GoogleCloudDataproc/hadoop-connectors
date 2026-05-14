@@ -35,9 +35,7 @@ public class FakeReadChannel implements ReadChannel {
     READ_EXCEPTION,
     PARTIAL_READ,
     NEGATIVE_READ,
-    ZERO_READ,
-    MORE_THAN_CHANNEL_LENGTH,
-    MORE_THAN_OBJECT_SIZE
+    ZERO_READ
   }
 
   private final List<REQUEST_TYPE> orderRequestsList;
@@ -92,18 +90,14 @@ public class FakeReadChannel implements ReadChannel {
   }
 
   private int readInternal(ByteBuffer dst, long startIndex, long bytesToRead) {
-    return readInternal(dst, startIndex, bytesToRead, false);
-  }
-
-  private int readInternal(ByteBuffer dst, long startIndex, long bytesToRead, boolean ignoreLimit) {
-    if (!ignoreLimit && currentPosition >= limit) {
+    if (currentPosition >= limit) {
       return -1;
     }
     long readStart = startIndex;
     long readEnd =
         min(
             min(startIndex + bytesToRead, startIndex + dst.remaining()),
-            ignoreLimit ? content.size() : min(content.size(), limit));
+            min(content.size(), limit));
     ByteString messageData = content.substring(toIntExact(readStart), toIntExact(readEnd));
     for (Byte messageDatum : messageData) {
       dst.put(messageDatum);
@@ -125,17 +119,11 @@ public class FakeReadChannel implements ReadChannel {
       case NEGATIVE_READ:
         bytesRead = -1;
         break;
-      case MORE_THAN_CHANNEL_LENGTH:
-        bytesRead =
-            readInternal(dst, currentPosition, toIntExact(limit - currentPosition + 1), true);
-        break;
-      case MORE_THAN_OBJECT_SIZE:
-        bytesRead = content.size() + 1;
-        break;
       case READ_EXCEPTION:
         throw new IOException("Exception occurred in read");
       case PARTIAL_READ:
         bytesRead = readInternal(dst, currentPosition, dst.remaining() / 2);
+        currentPosition += bytesRead;
         throw new IOException("Partial Read Exception");
       default:
         bytesRead = readInternal(dst, currentPosition, CHUNK_SIZE);
