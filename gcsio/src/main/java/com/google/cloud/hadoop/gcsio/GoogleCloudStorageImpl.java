@@ -372,7 +372,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.metricsRecorder =
         MetricsSink.CLOUD_MONITORING == options.getMetricsSink()
-            ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), finalCredentials)
+            ? CloudMonitoringMetricsRecorder.create(
+                options.getProjectId(), finalCredentials, options.getMetricsExportIntervalMs())
             : new NoOpMetricsRecorder();
   }
 
