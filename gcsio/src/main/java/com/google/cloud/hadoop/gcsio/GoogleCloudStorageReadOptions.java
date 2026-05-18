@@ -59,7 +59,7 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBlockSize(64 * 1024 * 1024)
         .setFadviseRequestTrackCount(3)
         .setReadExactRequestedBytesEnabled(false)
-        .setLatencyLoggingThreshold(1000L);
+        .setLatencyLoggingThreshold(10000L);
   }
 
   public abstract Builder toBuilder();
