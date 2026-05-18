@@ -89,6 +89,7 @@ public class FeatureHeaderGeneratorTest {
     BitSet expectedInitialFeatures = new BitSet(BITMASK_SIZE);
     expectedInitialFeatures.set(TrackedFeatures.FADVISE_AUTO.getBitPosition());
     expectedInitialFeatures.set(TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED.getBitPosition());
+    expectedInitialFeatures.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND.getBitPosition());
     String initialHeader = FeatureHeaderGenerator.encode(expectedInitialFeatures);
 
     assertThat(header.getValue()).isEqualTo(initialHeader);
@@ -170,28 +171,29 @@ public class FeatureHeaderGeneratorTest {
       // Define constants for the default features to prevent repeating them
       TrackedFeatures fadviseAuto = TrackedFeatures.FADVISE_AUTO;
       TrackedFeatures hnsEnabled = TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED;
+      TrackedFeatures fastFailEnabled = TrackedFeatures.FAST_FAIL_ON_NOT_FOUND;
 
       return Arrays.asList(
           new Object[][] {
             {
               "Default Options",
               GoogleCloudStorageFileSystemOptions.DEFAULT,
-              createBitSet(fadviseAuto, hnsEnabled)
+              createBitSet(fadviseAuto, hnsEnabled, fastFailEnabled)
             },
             {
               "Fadvise Random",
               buildOptionsWithFadvise(Fadvise.RANDOM),
-              createBitSet(TrackedFeatures.FADVISE_RANDOM, hnsEnabled)
+              createBitSet(TrackedFeatures.FADVISE_RANDOM, hnsEnabled, fastFailEnabled)
             },
             {
               "Fadvise Sequential",
               buildOptionsWithFadvise(Fadvise.SEQUENTIAL),
-              createBitSet(TrackedFeatures.FADVISE_SEQUENTIAL, hnsEnabled)
+              createBitSet(TrackedFeatures.FADVISE_SEQUENTIAL, hnsEnabled, fastFailEnabled)
             },
             {
               "Fadvise AutoRandom",
               buildOptionsWithFadvise(Fadvise.AUTO_RANDOM),
-              createBitSet(TrackedFeatures.FADVISE_AUTORANDOM, hnsEnabled)
+              createBitSet(TrackedFeatures.FADVISE_AUTORANDOM, hnsEnabled, fastFailEnabled)
             },
             {
               "Hierarchical Namespace",
@@ -201,7 +203,7 @@ public class FeatureHeaderGeneratorTest {
                           .setHnBucketRenameEnabled(true)
                           .build())
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled)
+              createBitSet(fadviseAuto, hnsEnabled, fastFailEnabled)
             },
             {
               "HNS Optimizations Enabled",
@@ -211,21 +213,30 @@ public class FeatureHeaderGeneratorTest {
                           .setHnOptimizationEnabled(true)
                           .build())
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.HNS_OPTIMIZATIONS_ENABLED)
+              createBitSet(
+                  fadviseAuto,
+                  hnsEnabled,
+                  TrackedFeatures.HNS_OPTIMIZATIONS_ENABLED,
+                  fastFailEnabled)
             },
             {
               "Performance Cache",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setPerformanceCacheEnabled(true)
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.PERFORMANCE_CACHE_ENABLED)
+              createBitSet(
+                  fadviseAuto,
+                  hnsEnabled,
+                  TrackedFeatures.PERFORMANCE_CACHE_ENABLED,
+                  fastFailEnabled)
             },
             {
               "Cloud Logging Enabled",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setCloudLoggingEnabled(true)
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.CLOUD_LOGGING_ENABLED)
+              createBitSet(
+                  fadviseAuto, hnsEnabled, TrackedFeatures.CLOUD_LOGGING_ENABLED, fastFailEnabled)
             },
             {
               "Trace Log Enabled",
@@ -235,7 +246,8 @@ public class FeatureHeaderGeneratorTest {
                           .setTraceLogEnabled(true)
                           .build())
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.TRACE_LOG_ENABLED)
+              createBitSet(
+                  fadviseAuto, hnsEnabled, TrackedFeatures.TRACE_LOG_ENABLED, fastFailEnabled)
             },
             {
               "Operation Trace Log Enabled",
@@ -245,7 +257,11 @@ public class FeatureHeaderGeneratorTest {
                           .setOperationTraceLogEnabled(true)
                           .build())
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.OPERATION_TRACE_LOG_ENABLED)
+              createBitSet(
+                  fadviseAuto,
+                  hnsEnabled,
+                  TrackedFeatures.OPERATION_TRACE_LOG_ENABLED,
+                  fastFailEnabled)
             },
             {
               "Direct Upload",
@@ -258,19 +274,26 @@ public class FeatureHeaderGeneratorTest {
                                   .build())
                           .build())
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.DIRECT_UPLOAD_ENABLED)
+              createBitSet(
+                  fadviseAuto, hnsEnabled, TrackedFeatures.DIRECT_UPLOAD_ENABLED, fastFailEnabled)
             },
             {
               "Bidi Enabled",
               buildOptionsWithBidi(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.BIDI_ENABLED)
+              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.BIDI_ENABLED, fastFailEnabled)
             },
             {
               "Analytics Core Enabled",
               GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
                   .setAnalyticsCoreEnabled(true)
                   .build(),
-              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.ANALYTICS_CORE_ENABLED)
+              createBitSet(
+                  fadviseAuto, hnsEnabled, TrackedFeatures.ANALYTICS_CORE_ENABLED, fastFailEnabled)
+            },
+            {
+              "Fast Fail Disabled",
+              buildOptionsWithFastFail(false),
+              createBitSet(fadviseAuto, hnsEnabled)
             }
           });
     }
@@ -298,6 +321,18 @@ public class FeatureHeaderGeneratorTest {
   private static GoogleCloudStorageFileSystemOptions buildOptionsWithBidi() {
     GoogleCloudStorageOptions storageOptions =
         GoogleCloudStorageOptions.DEFAULT.toBuilder().setBidiEnabled(true).build();
+    return GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+        .setCloudStorageOptions(storageOptions)
+        .build();
+  }
+
+  private static GoogleCloudStorageFileSystemOptions buildOptionsWithFastFail(boolean enabled) {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.DEFAULT.toBuilder()
+            .setFastFailOnNotFoundEnabled(enabled)
+            .build();
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageOptions.DEFAULT.toBuilder().setReadChannelOptions(readOptions).build();
     return GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
         .setCloudStorageOptions(storageOptions)
         .build();
