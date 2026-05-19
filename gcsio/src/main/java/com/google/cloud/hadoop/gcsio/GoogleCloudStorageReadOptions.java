@@ -61,7 +61,7 @@ public abstract class GoogleCloudStorageReadOptions {
         .setReadExactRequestedBytesEnabled(false)
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30)
-        .setLatencyLoggingThreshold(1000L);
+        .setLatencyLoggingThreshold(10000L);
   }
 
   public abstract Builder toBuilder();
