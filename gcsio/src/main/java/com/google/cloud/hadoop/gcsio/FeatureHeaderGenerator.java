@@ -143,6 +143,11 @@ public class FeatureHeaderGenerator {
     if (fsOptions.isAnalyticsCoreEnabled()) {
       features.set(TrackedFeatures.ANALYTICS_CORE_ENABLED.getBitPosition());
     }
+
+    // Fast fail on not found
+    if (storageOptions.getReadChannelOptions().isFastFailOnNotFoundEnabled()) {
+      features.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND_ENABLED.getBitPosition());
+    }
   }
 
   /**
