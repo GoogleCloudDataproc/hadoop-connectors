@@ -146,7 +146,7 @@ public class FeatureHeaderGenerator {
 
     // Fast fail on not found
     if (storageOptions.getReadChannelOptions().isFastFailOnNotFoundEnabled()) {
-      features.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND.getBitPosition());
+      features.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND_ENABLED.getBitPosition());
     }
   }
 

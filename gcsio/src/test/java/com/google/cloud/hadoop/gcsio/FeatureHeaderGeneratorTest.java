@@ -89,7 +89,7 @@ public class FeatureHeaderGeneratorTest {
     BitSet expectedInitialFeatures = new BitSet(BITMASK_SIZE);
     expectedInitialFeatures.set(TrackedFeatures.FADVISE_AUTO.getBitPosition());
     expectedInitialFeatures.set(TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED.getBitPosition());
-    expectedInitialFeatures.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND.getBitPosition());
+    expectedInitialFeatures.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND_ENABLED.getBitPosition());
     String initialHeader = FeatureHeaderGenerator.encode(expectedInitialFeatures);
 
     assertThat(header.getValue()).isEqualTo(initialHeader);
@@ -171,7 +171,7 @@ public class FeatureHeaderGeneratorTest {
       // Define constants for the default features to prevent repeating them
       TrackedFeatures fadviseAuto = TrackedFeatures.FADVISE_AUTO;
       TrackedFeatures hnsEnabled = TrackedFeatures.HIERARCHICAL_NAMESPACE_ENABLED;
-      TrackedFeatures fastFailEnabled = TrackedFeatures.FAST_FAIL_ON_NOT_FOUND;
+      TrackedFeatures fastFailEnabled = TrackedFeatures.FAST_FAIL_ON_NOT_FOUND_ENABLED;
 
       return Arrays.asList(
           new Object[][] {
