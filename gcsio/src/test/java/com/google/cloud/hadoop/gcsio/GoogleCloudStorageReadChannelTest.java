@@ -160,7 +160,7 @@ public class GoogleCloudStorageReadChannelTest {
     MockHttpTransport transport =
         mockTransport(
             // 1st read request response
-            dataRangeResponse(testData2, seekPosition, testData2.length),
+            dataRangeResponse(testData2, seekPosition, testData.length),
             // 2nd read request response
             dataRangeResponse(testData, 0, testData.length));
 
@@ -974,9 +974,7 @@ public class GoogleCloudStorageReadChannelTest {
               }
             });
 
-    assertThat(e)
-        .hasMessageThat()
-        .contains("Received end of stream result beyond the object size;");
+    assertThat(e).hasMessageThat().contains("Received data beyond the object size");
   }
 
   @Test
@@ -1027,6 +1025,64 @@ public class GoogleCloudStorageReadChannelTest {
     // limit 20) = 15
     assertThat(bytesRead).isEqualTo(15);
     assertThat(readChannel.position()).isEqualTo(20);
+  }
+
+  @Test
+  public void read_withOvershoot_handlesBoundaryWithoutCrashing() throws Exception {
+    long objectSize = 20L;
+    // Full expected data for the object
+    byte[] testData = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+    // The server overshoots the 10-byte limit by sending 12 bytes instead
+    byte[] overshootData = Arrays.copyOfRange(testData, 0, 12);
+    // The subsequent request should start from the correct boundary (offset 10)
+    byte[] restData = Arrays.copyOfRange(testData, 10, 20);
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(objectSize))
+                    .setGeneration(1L)),
+            // Mock the stream returning the 12 overshot bytes
+            dataRangeResponse(overshootData, 0, objectSize),
+            // Mock the second stream fetching the rest of the data from the correct boundary
+            dataRangeResponse(restData, 10, objectSize));
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder()
+                    .setFadvise(Fadvise.RANDOM)
+                    .setMinRangeRequestSize(10) // Force requested range to end at 10
+                    .build());
+    readChannel.setMaxRetries(1);
+
+    // First read (Requesting 5 bytes)
+    // The stream is opened with boundary 10. The mock returns 12 bytes.
+    // The channel reads 5 bytes and leaves 7 in the open stream.
+    ByteBuffer buffer1 = ByteBuffer.allocate(5);
+    int bytesRead1 = readChannel.read(buffer1);
+    assertThat(bytesRead1).isEqualTo(5);
+    assertThat(buffer1.array()).isEqualTo(Arrays.copyOfRange(testData, 0, 5));
+
+    // Second read (Requesting 7 bytes)
+    // The channel reads the remaining 7 bytes from the first stream.
+    // The immediate correction logic intercepts the 2-byte overshoot, rewinds the buffer,
+    // closes the channel, and opens the second stream to fetch the remaining 2 bytes.
+    ByteBuffer buffer2 = ByteBuffer.allocate(7);
+    int bytesRead2 = readChannel.read(buffer2);
+    assertThat(bytesRead2).isEqualTo(7);
+    assertThat(buffer2.array()).isEqualTo(Arrays.copyOfRange(testData, 5, 12));
+
+    // Third read (Requesting 5 bytes)
+    // Previously, this caused an IllegalArgumentException crash.
+    // Now, it simply reads the next 5 bytes from the properly opened second stream!
+    ByteBuffer buffer3 = ByteBuffer.allocate(5);
+    int bytesRead3 = readChannel.read(buffer3);
+    assertThat(bytesRead3).isEqualTo(5);
+    assertThat(buffer3.array()).isEqualTo(Arrays.copyOfRange(testData, 12, 17));
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
