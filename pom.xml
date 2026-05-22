@@ -276,11 +276,6 @@
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-logging</artifactId>
-        <version>3.21.3</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.cloud.gcs.analytics</groupId>
         <artifactId>gcs-analytics-core</artifactId>
         <version>${google.analyticscore.version}</version>
