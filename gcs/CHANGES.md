@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.1.17 - 2026-05-22
 1. Dynamically scale Vectored IO threads based on vCPU.
 1. Prevent zombie threads and resource leaks during vectored reads.
 1. Enhance observability with new read latency metrics and detailed high-latency logging.
