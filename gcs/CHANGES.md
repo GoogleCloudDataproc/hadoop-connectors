@@ -1,6 +1,9 @@
 # Release Notes
 
 ## Next
+1. Dynamically scale Vectored IO threads based on vCPU.
+1. Prevent zombie threads and resource leaks during vectored reads.
+1. Enhance observability with new read latency metrics and detailed high-latency logging.
 1. Track Client Feature Usage using Custom Header
 
 ## 3.1.16 - 2026-04-27
