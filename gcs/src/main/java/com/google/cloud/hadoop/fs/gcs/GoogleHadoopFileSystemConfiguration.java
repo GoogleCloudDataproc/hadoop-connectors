@@ -391,16 +391,16 @@ public class GoogleHadoopFileSystemConfiguration {
               GoogleCloudStorageReadOptions.DEFAULT.getLatencyLoggingThreshold());
 
   /** Minimum distance that will be seeked without merging the ranges together. */
-  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_RANGE_MIN_SEEK =
+  public static final HadoopConfigurationProperty<Long> GCS_VECTORED_READ_RANGE_MIN_SEEK =
       new HadoopConfigurationProperty<>(
           "fs.gs.vectored.read.min.range.seek.size",
-          VectoredReadOptions.DEFAULT.getMinSeekVectoredReadSize());
+          (long) VectoredReadOptions.DEFAULT.getMinSeekVectoredReadSize());
 
   /** Maximum size allowed for a merged range request. */
-  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE =
+  public static final HadoopConfigurationProperty<Long> GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE =
       new HadoopConfigurationProperty<>(
           "fs.gs.vectored.read.merged.range.max.size",
-          VectoredReadOptions.DEFAULT.getMergeRangeMaxSize());
+          (long) VectoredReadOptions.DEFAULT.getMergeRangeMaxSize());
 
   /** Maximum threads to process individual FileRange requests */
   public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_THREADS =
@@ -668,8 +668,10 @@ public class GoogleHadoopFileSystemConfiguration {
     }
     logger.atInfo().log("Using %d threads for vectored reads", readThreads);
     return VectoredReadOptions.builder()
-        .setMinSeekVectoredReadSize(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getInt))
-        .setMergeRangeMaxSize(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getInt))
+        .setMinSeekVectoredReadSize(
+            toIntExact(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getLongBytes)))
+        .setMergeRangeMaxSize(
+            toIntExact(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getLongBytes)))
         .setReadThreads(readThreads);
   }
 
@@ -760,7 +762,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
-        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLongBytes))
         .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))

@@ -72,8 +72,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.vectored.read.threads", 16);
-          put("fs.gs.vectored.read.merged.range.max.size", 8 * 1024 * 1024);
-          put("fs.gs.vectored.read.min.range.seek.size", 4 * 1024);
+          put("fs.gs.vectored.read.merged.range.max.size", 8 * 1024 * 1024L);
+          put("fs.gs.vectored.read.min.range.seek.size", 4 * 1024L);
           put("fs.gs.grpc.checkinterval.timeout", 1_000L);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.directpath.enable", true);
@@ -444,6 +444,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   @Test
   public void sizeProperties_sizeSuffixes() {
     Configuration config = new Configuration();
+    config.set("fs.gs.block.size", "128m");
     config.set("fs.gs.inputstream.inplace.seek.limit", "2048");
     config.set("fs.gs.inputstream.min.range.request.size", "300K");
     config.set("fs.gs.outputstream.buffer.size", "40k");
@@ -451,10 +452,15 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.outputstream.upload.cache.size", "512M");
     config.set("fs.gs.outputstream.upload.chunk.size", "16m");
     config.set("fs.gs.rewrite.max.chunk.size", "2g");
+    config.set("fs.gs.vectored.read.min.range.seek.size", "8k");
+    config.set("fs.gs.vectored.read.merged.range.max.size", "4m");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+    VectoredReadOptions vectoredOptions =
+        GoogleHadoopFileSystemConfiguration.getVectoredReadOptionBuilder(config).build();
 
+    assertThat(options.getReadChannelOptions().getBlockSize()).isEqualTo(128 * 1024 * 1024L);
     assertThat(options.getReadChannelOptions().getInplaceSeekLimit()).isEqualTo(2048);
     assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(300 * 1024);
     assertThat(options.getWriteChannelOptions().getBufferSize()).isEqualTo(40 * 1024);
@@ -462,6 +468,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getWriteChannelOptions().getUploadCacheSize()).isEqualTo(512 * 1024 * 1024);
     assertThat(options.getWriteChannelOptions().getUploadChunkSize()).isEqualTo(16 * 1024 * 1024);
     assertThat(options.getMaxRewriteChunkSize()).isEqualTo(2 * 1024 * 1024 * 1024L);
+    assertThat(vectoredOptions.getMinSeekVectoredReadSize()).isEqualTo(8 * 1024);
+    assertThat(vectoredOptions.getMergeRangeMaxSize()).isEqualTo(4 * 1024 * 1024);
   }
 
   @Test
