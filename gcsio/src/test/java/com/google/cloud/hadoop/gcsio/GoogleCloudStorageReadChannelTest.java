@@ -942,8 +942,7 @@ public class GoogleCloudStorageReadChannelTest {
   @Test
   public void read_objectNameWithSpecialUriChars_doesNotThrow() throws IOException {
     // GCS object names may legally contain characters (e.g. double quotes) that are invalid
-    // in a URI string. URI.create(resourceId.toString()) would throw IllegalArgumentException;
-    // UriPaths.fromResourceId() percent-encodes them correctly.
+    // in a URI string.
     String objectName = "path/to/file\"with\"quotes.parquet";
     byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
     StorageObject object =
@@ -951,21 +950,21 @@ public class GoogleCloudStorageReadChannelTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(object), dataRangeResponse(data, 0, data.length));
 
-    Storage storage = new Storage(transport, new GsonFactory(), r -> {});
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadChannel readChannel =
+    try (GoogleCloudStorageReadChannel readChannel =
         new GoogleCloudStorageReadChannel(
             storage,
             new StorageResourceId(BUCKET_NAME, objectName),
             ApiErrorExtractor.INSTANCE,
             new ClientRequestHelper<>(),
-            GoogleCloudStorageReadOptions.DEFAULT);
+            GoogleCloudStorageReadOptions.DEFAULT)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      int bytesRead = readChannel.read(buf);
 
-    ByteBuffer buf = ByteBuffer.allocate(data.length);
-    int bytesRead = readChannel.read(buf);
-
-    assertThat(bytesRead).isEqualTo(data.length);
-    assertThat(buf.array()).isEqualTo(data);
+      assertThat(bytesRead).isEqualTo(data.length);
+      assertThat(buf.array()).isEqualTo(data);
+    }
   }
 
   @Test
