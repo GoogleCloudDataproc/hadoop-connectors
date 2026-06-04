@@ -44,6 +44,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
@@ -55,6 +57,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -934,6 +937,34 @@ public class GoogleCloudStorageReadChannelTest {
         .isEqualTo(
             "Unexpected end of stream trying to skip 10 bytes to seek to position 10,"
                 + " size: 9223372036854775807 for 'gs://foo-bucket/bar-object'");
+  }
+
+  @Test
+  public void read_objectNameWithSpecialUriChars_doesNotThrow() throws IOException {
+    // GCS object names may legally contain characters (e.g. double quotes) that are invalid
+    // in a URI string.
+    String objectName = "path/to/file\"with\"quotes.parquet";
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    StorageObject object =
+        newStorageObject(BUCKET_NAME, objectName).setSize(BigInteger.valueOf(data.length));
+    MockHttpTransport transport =
+        mockTransport(jsonDataResponse(object), dataRangeResponse(data, 0, data.length));
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
+
+    try (GoogleCloudStorageReadChannel readChannel =
+        new GoogleCloudStorageReadChannel(
+            storage,
+            new StorageResourceId(BUCKET_NAME, objectName),
+            ApiErrorExtractor.INSTANCE,
+            new ClientRequestHelper<>(),
+            GoogleCloudStorageReadOptions.DEFAULT)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      int bytesRead = readChannel.read(buf);
+
+      assertThat(bytesRead).isEqualTo(data.length);
+      assertThat(buf.array()).isEqualTo(data);
+    }
   }
 
   @Test
