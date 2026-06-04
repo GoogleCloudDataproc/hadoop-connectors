@@ -635,6 +635,38 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void testGetFileStatusWithHint() {}
 
   @Test
+  public void hasPathCapability_listStatusStartingFrom_onStandardBucket_returnsTrue()
+      throws Exception {
+    Path standardPath = new Path("gs://" + ghfs.getUri().getAuthority() + "/dir");
+    assertThat(ghfs.hasPathCapability(standardPath, "fs.gs.capability.liststatus.starting.from"))
+        .isTrue();
+  }
+
+  @Test
+  public void hasPathCapability_listStatusStartingFrom_onHnsBucket_returnsFalse() throws Exception {
+    URI initUri = new Path("gs://hns-bucket").toUri();
+    GoogleCloudStorageFileSystem fakeGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            (gcsOptions) ->
+                new InMemoryGoogleCloudStorage(gcsOptions) {
+                  @Override
+                  public boolean isHnBucket(URI src) {
+                    return true;
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
+    fs.initialize(initUri, new Configuration());
+
+    Path hnsPath = new Path("gs://hns-bucket/dir");
+    assertThat(fs.hasPathCapability(hnsPath, "fs.gs.capability.liststatus.starting.from"))
+        .isFalse();
+    fs.close();
+  }
+
+  @Test
   public void close_canBeCalledMultipleTimes() throws Exception {
     // Close the file system
     ghfs.close();
