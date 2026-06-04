@@ -50,7 +50,6 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.Channels;
@@ -973,7 +972,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       response = getObject.executeMedia();
       GoogleCloudStorageEventBus.postReadMetricEvent(
           GcsReadMetricEvent.ofConnection(
-              System.currentTimeMillis() - startTime, URI.create(resourceId.toString())));
+              System.currentTimeMillis() - startTime,
+              UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false)));
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
@@ -1095,7 +1095,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
       return new GcsReadDurationTrackerStream(
           contentStream,
-          URI.create(resourceId.toString()),
+          UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false),
           response.getHeaders(),
           readOptions.getLatencyLoggingThreshold());
     } catch (IOException e) {
