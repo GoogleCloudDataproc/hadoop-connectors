@@ -1052,49 +1052,57 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "contentChannelEnd should be initialized already for '%s'",
         resourceId);
 
+    long footerRangeBytes = contentChannelEnd - contentChannelPosition;
     if (!gzipEncoded
         && readOptions.getFadvise() != Fadvise.SEQUENTIAL
         && contentChannelEnd == size
-        && contentChannelEnd - contentChannelPosition <= readOptions.getMinRangeRequestSize()) {
-      for (int retriesCount = 0; retriesCount < maxRetries; retriesCount++) {
-        try {
-          cacheFooter(response);
-          if (retriesCount != 0) {
-            logger.atInfo().log(
-                "Successfully cached footer after %d retries for '%s'", retriesCount, resourceId);
-          }
-          break;
-        } catch (IOException footerException) {
-          GoogleCloudStorageEventBus.postOnException();
-          if (IoExceptionHelper.isInterrupted(footerException)) {
-            Thread.currentThread().interrupt();
-            throw footerException;
-          }
-          logger.atInfo().withCause(footerException).log(
-              "Failed to prefetch footer (retry #%d/%d) for '%s'",
-              retriesCount + 1, maxRetries, resourceId);
-          if (retriesCount == 0) {
-            readBackOff.get().reset();
-          }
-          if (retriesCount == maxRetries) {
-            resetContentChannel();
-            throw footerException;
-          }
+        && footerRangeBytes <= readOptions.getMinRangeRequestSize()) {
+      if (!readOptions.isFooterCacheEnabled()) {
+        logger.atInfo().log(
+            "Footer cache disabled via read options: not holding the last %d-byte tail in"
+                + " memory for '%s'; streaming from offset %d (object size %d)",
+            footerRangeBytes, resourceId, contentChannelPosition, size);
+      } else {
+        for (int retriesCount = 0; retriesCount < maxRetries; retriesCount++) {
           try {
-            response = getObject.executeMedia();
-            // TODO(b/110832992): validate response range header against
-            // expected/request range.
-          } catch (IOException e) {
-            response = handleExecuteMediaException(e);
+            cacheFooter(response);
+            if (retriesCount != 0) {
+              logger.atInfo().log(
+                  "Successfully cached footer after %d retries for '%s'", retriesCount, resourceId);
+            }
+            break;
+          } catch (IOException footerException) {
+            GoogleCloudStorageEventBus.postOnException();
+            if (IoExceptionHelper.isInterrupted(footerException)) {
+              Thread.currentThread().interrupt();
+              throw footerException;
+            }
+            logger.atInfo().withCause(footerException).log(
+                "Failed to prefetch footer (retry #%d/%d) for '%s'",
+                retriesCount + 1, maxRetries, resourceId);
+            if (retriesCount == 0) {
+              readBackOff.get().reset();
+            }
+            if (retriesCount == maxRetries) {
+              resetContentChannel();
+              throw footerException;
+            }
+            try {
+              response = getObject.executeMedia();
+              // TODO(b/110832992): validate response range header against
+              // expected/request range.
+            } catch (IOException e) {
+              response = handleExecuteMediaException(e);
+            }
           }
         }
+        checkState(
+            footerContent != null,
+            "footerContent should not be null after successful footer prefetch for '%s'",
+            resourceId);
+        resetContentChannel();
+        return openFooterStream();
       }
-      checkState(
-          footerContent != null,
-          "footerContent should not be null after successful footer prefetch for '%s'",
-          resourceId);
-      resetContentChannel();
-      return openFooterStream();
     }
 
     try {

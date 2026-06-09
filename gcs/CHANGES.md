@@ -3,6 +3,10 @@
 ## Next
 1. Add listStatusStartingFrom API.
 
+1. Add `fs.gs.inputstream.footer.cache.enable` to disable the in-memory footer cache for HTTP
+   and gRPC read channels when a large `fs.gs.inputstream.min.range.request.size` would otherwise
+   allocate a very large `byte[]` for the tail.
+
 1. Add AUTO_RANDOM as new fadvise mode.
 
 1. Add getFileStatusWithHint() API

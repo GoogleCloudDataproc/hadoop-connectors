@@ -444,10 +444,21 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           && (contentChannelEnd - contentChannelCurrentPosition)
               <= readOptions.getMinRangeRequestSize()) {
 
+        long footerRangeBytes = contentChannelEnd - contentChannelCurrentPosition;
         if (footerContent == null) {
-          cacheFooter(readableByteChannel);
+          if (readOptions.isFooterCacheEnabled()) {
+            cacheFooter(readableByteChannel);
+          } else {
+            logger.atInfo().log(
+                "Footer cache disabled via read options: not holding the last %d-byte tail in"
+                    + " memory for '%s'; streaming from offset %d (object size %d)",
+                footerRangeBytes, resourceId, contentChannelCurrentPosition, objectSize);
+          }
         }
-        return serveFooterContent();
+        if (footerContent != null) {
+          return serveFooterContent();
+        }
+        return readableByteChannel;
       }
       return readableByteChannel;
     }

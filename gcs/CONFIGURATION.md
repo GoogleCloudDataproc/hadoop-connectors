@@ -494,6 +494,15 @@ Knobs configure the vectoredRead API
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.
 
+*   `fs.gs.inputstream.footer.cache.enable` (default: `true`)
+
+    When true, the connector may read the last range of a non-gzip object into
+    one in-memory **footer cache** and reuse it for reads in that tail. Set to
+    `false` to skip that cache and stream tail bytes from storage instead (useful
+    when `fs.gs.inputstream.min.range.request.size` is very large, for example with
+    `fs.gs.inputstream.fadvise=RANDOM` and non-columnar formats). When disabled, an
+    INFO log may be emitted when a read skips populating the footer cache.
+
 ### gRPC configuration
 
 gRPC is an optimized way to connect with gcs backend. It offers

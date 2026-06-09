@@ -61,7 +61,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setReadExactRequestedBytesEnabled(false)
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30)
-        .setLatencyLoggingThreshold(10000L);
+        .setLatencyLoggingThreshold(10000L)
+        .setFooterCacheEnabled(true);
   }
 
   public abstract Builder toBuilder();
@@ -123,6 +124,14 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setLatencyLoggingThreshold(long)}. */
   public abstract long getLatencyLoggingThreshold();
+
+  /**
+   * When {@code true} (default), the connector may read the last {@link #getMinRangeRequestSize()}
+   * bytes of a non-gzip object into a single in-memory footer cache and serve further reads in that
+   * tail from it (fewer round-trips for backward seeks near EOF). When {@code false}, that cache is
+   * never used; tail reads stream from storage instead.
+   */
+  public abstract boolean isFooterCacheEnabled();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -243,6 +252,12 @@ public abstract class GoogleCloudStorageReadOptions {
      * threshold, then a high latency warning will be logged.
      */
     public abstract Builder setLatencyLoggingThreshold(long latencyLoggingThresholdMillis);
+
+    /**
+     * Enables or disables the in-memory footer cache for HTTP and gRPC read channels (see {@link
+     * #isFooterCacheEnabled()}).
+     */
+    public abstract Builder setFooterCacheEnabled(boolean footerCacheEnabled);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

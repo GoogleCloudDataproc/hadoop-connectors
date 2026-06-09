@@ -38,4 +38,15 @@ public class GoogleCloudStorageReadOptionsTest {
         .hasMessageThat()
         .isEqualTo("inplaceSeekLimit must be non-negative! Got " + inplaceSeekLimit);
   }
+
+  @Test
+  public void footerCacheEnabled_defaultsTrue() {
+    assertThat(GoogleCloudStorageReadOptions.DEFAULT.isFooterCacheEnabled()).isTrue();
+    assertThat(
+            GoogleCloudStorageReadOptions.DEFAULT.toBuilder()
+                .setFooterCacheEnabled(false)
+                .build()
+                .isFooterCacheEnabled())
+        .isFalse();
+  }
 }
