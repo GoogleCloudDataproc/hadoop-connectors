@@ -941,8 +941,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       contentChannelEnd = size;
     } else {
       contentChannelPosition =
-          readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()
-              // Pre-fetch footer if reading end of file.
+          readOptions.getFadvise() != Fadvise.SEQUENTIAL
+                  && readOptions.isFooterCacheEnabled()
+                  && isFooterRead()
+              // Pre-fetch footer if reading end of file (only when footer will be cached).
               ? Math.max(0, size - readOptions.getMinRangeRequestSize())
               : currentPosition;
 
@@ -1058,7 +1060,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         && contentChannelEnd == size
         && footerRangeBytes <= readOptions.getMinRangeRequestSize()) {
       if (!readOptions.isFooterCacheEnabled()) {
-        logger.atInfo().log(
+        logger.atFiner().log(
             "Footer cache disabled via read options: not holding the last %d-byte tail in"
                 + " memory for '%s'; streaming from offset %d (object size %d)",
             footerRangeBytes, resourceId, contentChannelPosition, size);
@@ -1149,6 +1151,9 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   private long getContentChannelPositionForFirstRead(long bytesToRead) {
     if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
         || bytesToRead >= readOptions.getMinRangeRequestSize()) {
+      return currentPosition;
+    }
+    if (!readOptions.isFooterCacheEnabled()) {
       return currentPosition;
     }
     // Prefetch footer (bytes before 'currentPosition' in case of last byte read) lazily.

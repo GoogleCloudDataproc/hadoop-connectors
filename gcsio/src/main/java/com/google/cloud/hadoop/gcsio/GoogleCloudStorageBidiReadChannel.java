@@ -385,7 +385,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       return;
     }
     if (!readOptions.isFooterCacheEnabled()) {
-      logger.atInfo().log(
+      logger.atFiner().log(
           "Footer cache disabled via read options: not holding the last %d-byte tail in"
               + " memory for '%s'",
           footerSize, resourceId);
@@ -459,7 +459,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     if (eligibleForFooterCache && !readOptions.isFooterCacheEnabled()) {
       long tailSliceByteCount =
           objectSize - max(0L, objectSize - readOptions.getMinRangeRequestSize());
-      logger.atInfo().log(
+      logger.atFiner().log(
           "Footer cache disabled via read options: not holding the last %d-byte tail in memory"
               + " for '%s'",
           tailSliceByteCount, resourceId);

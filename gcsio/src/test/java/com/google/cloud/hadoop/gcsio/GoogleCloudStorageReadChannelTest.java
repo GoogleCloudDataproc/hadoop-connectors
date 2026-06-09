@@ -359,6 +359,51 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(rangeHeaders).containsExactly("bytes=8-9", "bytes=7-8").inOrder();
   }
 
+  /**
+   * When footer cache is disabled, reads in the last {@code minRangeRequestSize} bytes must not
+   * align the HTTP range to {@code size - minRangeRequestSize} (which would download and discard a
+   * large tail prefix).
+   */
+  @Test
+  public void footerRangeAlignment_skippedWhenFooterCacheDisabled() throws IOException {
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    int minRange = 8;
+
+    MockHttpTransport transport =
+        mockTransport(
+            dataRangeResponse(new byte[] {testData[9]}, 9, testData.length),
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, 8, testData.length), 8, testData.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.RANDOM)
+            .setMinRangeRequestSize(minRange)
+            .setFooterCacheEnabled(false)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    byte[] oneByte = new byte[1];
+    readChannel.position(9);
+    assertThat(readChannel.read(ByteBuffer.wrap(oneByte))).isEqualTo(1);
+    assertThat(oneByte[0]).isEqualTo(testData[9]);
+
+    readChannel.position(8);
+    byte[] twoBytes = new byte[2];
+    assertThat(readChannel.read(ByteBuffer.wrap(twoBytes))).isEqualTo(2);
+    assertThat(twoBytes).isEqualTo(Arrays.copyOfRange(testData, 8, testData.length));
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    assertThat(rangeHeaders).containsExactly("bytes=9-16", "bytes=8-9").inOrder();
+  }
+
   @Test
   public void read_onlyRequestedRange() throws IOException {
     int rangeSize = 2;
