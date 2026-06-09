@@ -37,6 +37,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpResponse;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
@@ -63,6 +64,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -1058,6 +1060,118 @@ public class GoogleCloudStorageReadChannelTest {
     // limit 20) = 15
     assertThat(bytesRead).isEqualTo(15);
     assertThat(readChannel.position()).isEqualTo(20);
+  }
+
+  @Test
+  public void close_afterPartialMediaRead_invokesHttpDisconnectBeforeClosingChannel()
+      throws IOException {
+    byte[] testData = new byte[100];
+    Arrays.fill(testData, (byte) 0x55);
+    MockHttpTransport transport = mockTransport(dataRangeResponse(testData, 0, testData.length));
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder().setFadvise(Fadvise.SEQUENTIAL).build();
+
+    HttpDisconnectCountingReadChannel readChannel =
+        new HttpDisconnectCountingReadChannel(
+            storage,
+            new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+            ApiErrorExtractor.INSTANCE,
+            new ClientRequestHelper<>(),
+            options);
+
+    readChannel.position(0);
+    assertThat(readChannel.read(ByteBuffer.allocate(1))).isEqualTo(1);
+
+    readChannel.close();
+
+    assertThat(readChannel.getDisconnectHttpResponseCallCount()).isEqualTo(1);
+  }
+
+  @Test
+  public void close_withoutMediaRead_doesNotInvokeHttpDisconnect() throws IOException {
+    StorageObject object = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+    MockHttpTransport transport = mockTransport(jsonDataResponse(object));
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
+
+    HttpDisconnectCountingReadChannel readChannel =
+        new HttpDisconnectCountingReadChannel(
+            storage,
+            new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+            ApiErrorExtractor.INSTANCE,
+            new ClientRequestHelper<>(),
+            newLazyReadOptionsBuilder().setFastFailOnNotFoundEnabled(true).build());
+
+    assertThat(readChannel.size()).isEqualTo(object.getSize().longValue());
+    readChannel.close();
+
+    assertThat(readChannel.getDisconnectHttpResponseCallCount()).isEqualTo(0);
+  }
+
+  @Test
+  public void closeContentChannel_whenReplacingStream_invokesHttpDisconnectEachTime()
+      throws IOException {
+    byte[] testData = new byte[100];
+    Arrays.fill(testData, (byte) 0x33);
+    MockHttpTransport transport =
+        mockTransport(
+            dataRangeResponse(testData, 0, testData.length),
+            dataRangeResponse(Arrays.copyOfRange(testData, 50, 100), 50, testData.length));
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder().setFadvise(Fadvise.SEQUENTIAL).setInplaceSeekLimit(0).build();
+
+    HttpDisconnectCountingReadChannel readChannel =
+        new HttpDisconnectCountingReadChannel(
+            storage,
+            new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+            ApiErrorExtractor.INSTANCE,
+            new ClientRequestHelper<>(),
+            options);
+
+    readChannel.position(0);
+    assertThat(readChannel.read(ByteBuffer.allocate(1))).isEqualTo(1);
+    readChannel.position(50);
+    assertThat(readChannel.read(ByteBuffer.allocate(1))).isEqualTo(1);
+
+    readChannel.close();
+
+    assertThat(readChannel.getDisconnectHttpResponseCallCount()).isEqualTo(2);
+  }
+
+  /**
+   * Subclass for asserting {@link GoogleCloudStorageReadChannel#disconnectHttpResponse} is invoked
+   * when tearing down a partially consumed media response (package-private override).
+   */
+  private static final class HttpDisconnectCountingReadChannel
+      extends GoogleCloudStorageReadChannel {
+
+    private final AtomicInteger disconnectHttpResponseCallCount = new AtomicInteger();
+
+    HttpDisconnectCountingReadChannel(
+        Storage storage,
+        StorageResourceId resourceId,
+        ApiErrorExtractor errorExtractor,
+        ClientRequestHelper<StorageObject> requestHelper,
+        GoogleCloudStorageReadOptions readOptions)
+        throws IOException {
+      super(storage, resourceId, errorExtractor, requestHelper, readOptions);
+    }
+
+    int getDisconnectHttpResponseCallCount() {
+      return disconnectHttpResponseCallCount.get();
+    }
+
+    @Override
+    void disconnectHttpResponse(HttpResponse response) {
+      disconnectHttpResponseCallCount.incrementAndGet();
+      super.disconnectHttpResponse(response);
+    }
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
