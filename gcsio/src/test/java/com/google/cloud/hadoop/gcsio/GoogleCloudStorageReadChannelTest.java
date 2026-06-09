@@ -65,6 +65,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -1168,7 +1169,7 @@ public class GoogleCloudStorageReadChannelTest {
     }
 
     @Override
-    void disconnectHttpResponse(HttpResponse response) {
+    void disconnectHttpResponse(@Nullable HttpResponse response) {
       disconnectHttpResponseCallCount.incrementAndGet();
       super.disconnectHttpResponse(response);
     }

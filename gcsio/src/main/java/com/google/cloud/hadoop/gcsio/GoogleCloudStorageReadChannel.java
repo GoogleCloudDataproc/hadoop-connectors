@@ -556,6 +556,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * Aborts the underlying HTTP request for the current media body, if any. Must run before closing
    * the {@link #contentChannel} so that closing the Apache {@code ContentLengthInputStream} does
    * not synchronously read the rest of the response body.
+   *
+   * <p>Failures from {@link HttpResponse#disconnect()} are expected during normal teardown (for
+   * example when the socket is already closed) and are only logged here; they are not reported via
+   * {@link GoogleCloudStorageEventBus#postOnException()}.
    */
   void disconnectHttpResponse(@Nullable HttpResponse response) {
     if (response == null) {
@@ -564,7 +568,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     try {
       response.disconnect();
     } catch (Exception e) {
-      GoogleCloudStorageEventBus.postOnException();
       logger.atFine().withCause(e).log(
           "Got an exception on HttpResponse.disconnect() for '%s'; ignoring it.", resourceId);
     }
@@ -1168,7 +1171,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       return tracked;
     } catch (IOException e) {
       GoogleCloudStorageEventBus.postOnException();
-      disconnectHttpResponse(response);
+      try {
+        response.disconnect();
+      } catch (IOException closeException) {
+        e.addSuppressed(closeException);
+      }
       throw e;
     }
   }
