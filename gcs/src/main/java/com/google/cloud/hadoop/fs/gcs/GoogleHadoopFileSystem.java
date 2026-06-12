@@ -857,6 +857,24 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
             checkOpen();
 
+            if (isAnalyticsCoreMetadataEnabled()) {
+              GcsItemId itemId = translateToItemId(hadoopPath);
+              try {
+                getAnalyticsCoreGcsFs().delete(itemId, recursive);
+                incrementStatistic(GhfsStatistic.FILES_DELETED);
+                return true;
+              } catch (DirectoryNotEmptyException e) {
+                throw e;
+              } catch (IOException e) {
+                GoogleCloudStorageEventBus.postOnException();
+                if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+                  throw e;
+                }
+                result = false;
+              }
+              return result;
+            }
+
             URI gcsPath = getGcsPath(hadoopPath);
             try {
               getGcsFs().delete(gcsPath, recursive);
@@ -901,6 +919,26 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           checkOpen();
 
           logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
+
+          if (isAnalyticsCoreMetadataEnabled()) {
+            GcsItemId itemId = translateToItemId(hadoopPath);
+            try {
+              List<GcsFileInfo> fileInfos = getAnalyticsCoreGcsFs().listStatus(itemId);
+              FileStatus[] statusArray = fileInfos.stream()
+                  .map(info -> translateToFileStatus(info, hadoopPath))
+                  .toArray(FileStatus[]::new);
+              incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE, statusArray.length);
+              return statusArray;
+            } catch (FileNotFoundException fnfe) {
+              GoogleCloudStorageEventBus.postOnException();
+              throw (FileNotFoundException)
+                  new FileNotFoundException(
+                          String.format(
+                              "listStatus(hadoopPath: %s): '%s' does not exist.",
+                              hadoopPath, itemId))
+                      .initCause(fnfe);
+            }
+          }
 
           URI gcsPath = getGcsPath(hadoopPath);
           List<FileStatus> status;
