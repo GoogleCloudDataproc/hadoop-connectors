@@ -43,6 +43,9 @@ import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsItemInfo;
+import com.google.cloud.gcs.analyticscore.common.PathType;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
@@ -854,6 +857,24 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
             checkOpen();
 
+            if (isAnalyticsCoreMetadataEnabled()) {
+              GcsItemId itemId = translateToItemId(hadoopPath);
+              try {
+                getAnalyticsCoreGcsFs().delete(itemId, recursive);
+                incrementStatistic(GhfsStatistic.FILES_DELETED);
+                return true;
+              } catch (DirectoryNotEmptyException e) {
+                throw e;
+              } catch (IOException e) {
+                GoogleCloudStorageEventBus.postOnException();
+                if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+                  throw e;
+                }
+                result = false;
+              }
+              return result;
+            }
+
             URI gcsPath = getGcsPath(hadoopPath);
             try {
               getGcsFs().delete(gcsPath, recursive);
@@ -898,6 +919,26 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           checkOpen();
 
           logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
+
+          if (isAnalyticsCoreMetadataEnabled()) {
+            GcsItemId itemId = translateToItemId(hadoopPath);
+            try {
+              List<GcsFileInfo> fileInfos = getAnalyticsCoreGcsFs().listStatus(itemId);
+              FileStatus[] statusArray = fileInfos.stream()
+                  .map(info -> translateToFileStatus(info, hadoopPath))
+                  .toArray(FileStatus[]::new);
+              incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE, statusArray.length);
+              return statusArray;
+            } catch (FileNotFoundException fnfe) {
+              GoogleCloudStorageEventBus.postOnException();
+              throw (FileNotFoundException)
+                  new FileNotFoundException(
+                          String.format(
+                              "listStatus(hadoopPath: %s): '%s' does not exist.",
+                              hadoopPath, itemId))
+                      .initCause(fnfe);
+            }
+          }
 
           URI gcsPath = getGcsPath(hadoopPath);
           List<FileStatus> status;
@@ -971,6 +1012,23 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
           checkOpen();
 
+          if (isAnalyticsCoreMetadataEnabled()) {
+            GcsItemId itemId = translateToItemId(hadoopPath);
+            try {
+              getAnalyticsCoreGcsFs().mkdirs(itemId);
+              incrementStatistic(GhfsStatistic.DIRECTORIES_CREATED);
+              return true;
+            } catch (java.nio.file.FileAlreadyExistsException faee) {
+              GoogleCloudStorageEventBus.postOnException();
+              throw (FileAlreadyExistsException)
+                  new FileAlreadyExistsException(
+                          String.format(
+                              "mkdirs(hadoopPath: %s, permission: %s): failed",
+                              hadoopPath, permission))
+                      .initCause(faee);
+            }
+          }
+
           URI gcsPath = getGcsPath(hadoopPath);
           try {
             getGcsFs().mkdirs(gcsPath);
@@ -1005,6 +1063,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
           checkOpen();
+
+          if (isAnalyticsCoreMetadataEnabled()) {
+            GcsItemId itemId = translateToItemId(hadoopPath);
+            PathType typeHint = translateToPathType(hadoopPath);
+            GcsFileInfo itemInfo = getAnalyticsCoreGcsFs().getFileInfo(itemId, typeHint);
+            if (!itemInfo.getItemInfo().exists()) {
+              throw new FileNotFoundException("Item not found: " + hadoopPath);
+            }
+            return translateToFileStatus(itemInfo, hadoopPath);
+          }
 
           URI gcsPath = getGcsPath(hadoopPath);
           FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
@@ -1181,7 +1249,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           checkNotNull(name, "name should not be null");
 
           // track the duration and update the statistics of getXAttr()
-          Map<String, byte[]> attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
+          Map<String, byte[]> attributes;
+          if (isAnalyticsCoreMetadataEnabled()) {
+            GcsItemId itemId = translateToItemId(path);
+            PathType typeHint = translateToPathType(path);
+            GcsFileInfo info = getAnalyticsCoreGcsFs().getFileInfo(itemId, typeHint);
+            attributes = info.getAttributes();
+          } else {
+            attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
+          }
           String xAttrKey = getXAttrKey(name);
           byte[] xAttr =
               attributes.containsKey(xAttrKey) ? getXAttrValue(attributes.get(xAttrKey)) : null;
@@ -1528,6 +1604,14 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     checkOpen();
 
+    if (isAnalyticsCoreMetadataEnabled()) {
+      GcsItemId srcId = translateToItemId(src);
+      GcsItemId dstId = translateToItemId(dst);
+      getAnalyticsCoreGcsFs().rename(srcId, dstId);
+      logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
+      return;
+    }
+
     URI srcPath = getGcsPath(src);
     URI dstPath = getGcsPath(dst);
     getGcsFs().rename(srcPath, dstPath);
@@ -1553,6 +1637,58 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /** Returns FileStatus corresponding to the given FileInfo value. */
+
+  private boolean isAnalyticsCoreMetadataEnabled() {
+    return isAnalyticsCoreEnabled() &&
+        getConf().getBoolean("fs.gs.analytics.core.experimental.metadata.enable", false);
+  }
+
+  private GcsItemId translateToItemId(Path hadoopPath) {
+    URI gcsPath = getGcsPath(hadoopPath);
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ true);
+    return GcsItemId.builder()
+        .setBucketName(resourceId.getBucketName())
+        .setObjectName(resourceId.getObjectName())
+        .build();
+  }
+
+  private PathType translateToPathType(Path hadoopPath) {
+    String pathStr = hadoopPath.toString();
+    if (pathStr.endsWith(".parquet") || pathStr.endsWith(".avro") ||
+        pathStr.endsWith(".orc") || pathStr.endsWith("_SUCCESS")) {
+      return PathType.FILE;
+    }
+    return PathType.UNKNOWN;
+  }
+
+  private FileStatus translateToFileStatus(GcsFileInfo info, Path hadoopPath) {
+    GcsItemInfo itemInfo = info.getItemInfo();
+    boolean isDir = itemInfo.isDirectory() || itemInfo.isNativeHnsFolder() || itemInfo.isInferredDirectory();
+
+    StorageResourceId resourceId = StorageResourceId.fromObjectName(
+        itemInfo.getItemId().getBucketName() + "/" + itemInfo.getItemId().getObjectName());
+    if (isDir && !resourceId.isDirectory()) {
+        resourceId = StorageResourceId.createDirectoryId(itemInfo.getItemId().getBucketName(), itemInfo.getItemId().getObjectName());
+    }
+
+    GoogleCloudStorageItemInfo gcsItemInfo = GoogleCloudStorageItemInfo.createObject(
+        resourceId,
+        itemInfo.getCreationTime() != null ? itemInfo.getCreationTime().toEpochMilli() : 0,
+        itemInfo.getModificationTime() != null ? itemInfo.getModificationTime().toEpochMilli() : 0,
+        itemInfo.getSize() != null ? itemInfo.getSize() : 0,
+        itemInfo.getContentType(),
+        itemInfo.getContentEncoding(),
+        info.getAttributes(),
+        itemInfo.getContentGeneration() != null ? itemInfo.getContentGeneration() : 0,
+        itemInfo.getMetaGeneration() != null ? itemInfo.getMetaGeneration() : 0,
+        null // verificationAttributes
+    );
+
+    FileInfo fileInfo = FileInfo.fromItemInfo(gcsItemInfo);
+    String userName = getUgiUserName();
+    return getGoogleHadoopFileStatus(fileInfo, userName);
+  }
+
   private GoogleHadoopFileStatus getGoogleHadoopFileStatus(FileInfo fileInfo, String userName) {
     checkNotNull(fileInfo, "fileInfo should not be null");
     // GCS does not provide modification time. It only provides creation time.
@@ -2006,9 +2142,19 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     checkNotNull(name, "name should not be null");
     checkArgument(flags != null && !flags.isEmpty(), "flags should not be null or empty");
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+    Map<String, byte[]> attributes;
+    if (isAnalyticsCoreMetadataEnabled()) {
+      GcsItemId itemId = translateToItemId(path);
+      PathType typeHint = translateToPathType(path);
+      GcsFileInfo info = getAnalyticsCoreGcsFs().getFileInfo(itemId, typeHint);
+      if (info.getItemInfo().isNativeHnsFolder()) {
+        throw new UnsupportedOperationException("Custom metadata not supported on HNS native folders");
+      }
+      attributes = info.getAttributes();
+    } else {
+      attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
+    }
     String xAttrKey = getXAttrKey(name);
-    Map<String, byte[]> attributes = fileInfo.getAttributes();
 
     if (attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.REPLACE)) {
       GoogleCloudStorageEventBus.postOnException();
@@ -2025,11 +2171,17 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
               name, new String(value, UTF_8), path));
     }
 
-    UpdatableItemInfo updateInfo =
-        new UpdatableItemInfo(
-            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
-            ImmutableMap.of(xAttrKey, getXAttrValue(value)));
-    getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+    if (isAnalyticsCoreMetadataEnabled()) {
+      GcsItemId itemId = translateToItemId(path);
+      getAnalyticsCoreGcsFs().setXAttr(itemId, ImmutableMap.of(xAttrKey, getXAttrValue(value)));
+    } else {
+      FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+      UpdatableItemInfo updateInfo =
+          new UpdatableItemInfo(
+              StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+              ImmutableMap.of(xAttrKey, getXAttrValue(value)));
+      getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+    }
   }
 
   /** {@inheritDoc} */
@@ -2039,14 +2191,20 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
     Map<String, byte[]> xAttrToRemove = new HashMap<>();
     xAttrToRemove.put(getXAttrKey(name), null);
-    UpdatableItemInfo updateInfo =
-        new UpdatableItemInfo(
-            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
-            xAttrToRemove);
-    getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+
+    if (isAnalyticsCoreMetadataEnabled()) {
+      GcsItemId itemId = translateToItemId(path);
+      getAnalyticsCoreGcsFs().setXAttr(itemId, xAttrToRemove);
+    } else {
+      FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+      UpdatableItemInfo updateInfo =
+          new UpdatableItemInfo(
+              StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+              xAttrToRemove);
+      getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+    }
   }
 
   private boolean isXAttr(String key) {
