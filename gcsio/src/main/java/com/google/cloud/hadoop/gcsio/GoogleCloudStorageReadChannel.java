@@ -372,6 +372,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           if (contentChannelEnd != size && currentPosition == contentChannelEnd) {
             closeContentChannel();
           } else {
+            openMediaResponse = null; // response body fully consumed; no need to abort on close()
             break;
           }
         }
