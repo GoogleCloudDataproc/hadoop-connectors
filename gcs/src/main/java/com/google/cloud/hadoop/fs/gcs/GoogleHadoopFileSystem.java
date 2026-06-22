@@ -320,7 +320,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
-    defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
+    defaultBlockSize = BLOCK_SIZE.get(config, config::getLongBytes);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
 
     initializeFsRoot();
