@@ -147,6 +147,16 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // 3. Test that footer prefetch always disabled for gzipped files.
   private byte[] footerContent;
 
+  /**
+   * The {@link HttpResponse} for the media stream currently returned from {@link #openStream}, if
+   * any. Held so that {@link #closeContentChannel} can call {@link HttpResponse#disconnect()}
+   * before closing the {@link #contentChannel}. Otherwise Apache HTTP's {@code
+   * ContentLengthInputStream} drains the entire remaining entity on {@code InputStream#close()},
+   * which can take minutes on a large object when the caller closes after only reading a small
+   * prefix (e.g. Hadoop distcp aborting a copy).
+   */
+  @Nullable private HttpResponse openMediaResponse;
+
   @VisibleForTesting protected boolean metadataInitialized = false;
 
   /**
@@ -362,6 +372,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           if (contentChannelEnd != size && currentPosition == contentChannelEnd) {
             closeContentChannel();
           } else {
+            openMediaResponse = null; // response body fully consumed; no need to abort on close()
             break;
           }
         }
@@ -525,6 +536,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * already responsible for performing local cleanup at the time the exception was raised.
    */
   protected void closeContentChannel() {
+    disconnectOpenMediaResponse();
     if (contentChannel != null) {
       logger.atFiner().log("Closing internal contentChannel for '%s'", resourceId);
       try {
@@ -539,6 +551,36 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         resetContentChannel();
       }
     }
+  }
+
+  /**
+   * Aborts the underlying HTTP request for the current media body, if any. Must run before closing
+   * the {@link #contentChannel} so that closing the Apache {@code ContentLengthInputStream} does
+   * not synchronously read the rest of the response body.
+   *
+   * <p>Failures from {@link HttpResponse#disconnect()} are expected during normal teardown (for
+   * example when the socket is already closed) and are only logged here; they are not reported via
+   * {@link GoogleCloudStorageEventBus#postOnException()}.
+   */
+  void disconnectHttpResponse(@Nullable HttpResponse response) {
+    if (response == null) {
+      return;
+    }
+    try {
+      response.disconnect();
+    } catch (Exception e) {
+      logger.atFine().withCause(e).log(
+          "Got an exception on HttpResponse.disconnect() for '%s'; ignoring it.", resourceId);
+    }
+  }
+
+  private void disconnectOpenMediaResponse() {
+    if (openMediaResponse == null) {
+      return;
+    }
+    HttpResponse response = openMediaResponse;
+    openMediaResponse = null;
+    disconnectHttpResponse(response);
   }
 
   private void resetContentChannel() {
@@ -1020,6 +1062,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           metadataInitialized, "metadata should be initialized already for '%s'", resourceId);
       if (size == 0) {
         resetContentChannel();
+        disconnectHttpResponse(response);
         return new ByteArrayInputStream(new byte[0]);
       }
       if (gzipEncoded) {
@@ -1030,6 +1073,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           contentChannelEnd = size;
         } else {
           resetContentChannel();
+          disconnectHttpResponse(response);
           return openStream(bytesToRead);
         }
       }
@@ -1118,11 +1162,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           currentPosition,
           resourceId);
 
-      return new GcsReadDurationTrackerStream(
-          contentStream,
-          UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false),
-          response.getHeaders(),
-          readOptions.getLatencyLoggingThreshold());
+      GcsReadDurationTrackerStream tracked =
+          new GcsReadDurationTrackerStream(
+              contentStream,
+              UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false),
+              response.getHeaders(),
+              readOptions.getLatencyLoggingThreshold());
+      openMediaResponse = response;
+      return tracked;
     } catch (IOException e) {
       GoogleCloudStorageEventBus.postOnException();
       try {
