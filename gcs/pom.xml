@@ -321,6 +321,7 @@
                 </relocation>
               </relocations>
               <shadedArtifactAttached>true</shadedArtifactAttached>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
             </configuration>
           </execution>
         </executions>
