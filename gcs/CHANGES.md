@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.1.18 - 2026-06-24
 1. Shade google-cloud-logging.
 1. Fix URI.create() failure on GCS object names with special characters.
