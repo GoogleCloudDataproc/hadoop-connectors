@@ -1,6 +1,9 @@
 # Release Notes
 
 ## Next
+1. Shade google-cloud-logging.
+1. Fix URI.create() failure on GCS object names with special characters.
+1. Fix pom for unshaded gcs artifact.
 
 ## 3.1.17 - 2026-05-22
 1. Dynamically scale Vectored IO threads based on vCPU.
