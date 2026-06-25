@@ -150,7 +150,7 @@ public class StorageClientProvider {
         .setIsTracingEnabled(storageOptions.isTraceLogEnabled())
         .setWriteChannelOptions(storageOptions.getWriteChannelOptions())
         .setProjectId(storageOptions.getProjectId())
-        .setUniverseDomain(storageOptions.getUniverseDomain())
+        .setUniverseDomain(Strings.emptyToNull(storageOptions.getUniverseDomain()))
         .build();
   }
 
