@@ -360,13 +360,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 options.getProxyPassword(),
                 options.getHttpRequestReadTimeout())
             : httpTransport;
-    this.storage =
-        new Storage.Builder(
-                finalHttpTransport, GsonFactory.getDefaultInstance(), this.httpRequestInitializer)
-            .setRootUrl(options.getStorageRootUrl())
-            .setServicePath(options.getStorageServicePath())
-            .setApplicationName(options.getAppName())
-            .build();
+    this.storage = createApiaryStorage(options, finalHttpTransport, this.httpRequestInitializer);
     this.credential = credentials;
     this.storageRequestFactory = new StorageRequestFactory(storage);
 
@@ -374,6 +368,45 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         MetricsSink.CLOUD_MONITORING == options.getMetricsSink()
             ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), finalCredentials)
             : new NoOpMetricsRecorder();
+  }
+
+  /**
+   * Builds the Apiary (JSON/REST) Storage client, honoring the configured universe domain.
+   *
+   * <p>When a universe domain is set, it is passed to the client so it can derive the endpoint
+   * ({@code https://storage.<universeDomain>/}). The endpoint root URL/service path are only set
+   * explicitly when the user configured a custom endpoint, because calling {@code setRootUrl()}
+   * forces the underlying client into "user configured endpoint" mode, which bypasses
+   * universe-domain endpoint construction.
+   */
+  @VisibleForTesting
+  static Storage createApiaryStorage(
+      GoogleCloudStorageOptions options,
+      HttpTransport httpTransport,
+      HttpRequestInitializer httpRequestInitializer) {
+    Storage.Builder storageBuilder =
+        new Storage.Builder(
+                httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
+            .setApplicationName(options.getAppName());
+    if (!isNullOrEmpty(options.getUniverseDomain())) {
+      storageBuilder.setUniverseDomain(options.getUniverseDomain());
+    }
+    if (isCustomStorageEndpoint(options)) {
+      storageBuilder
+          .setRootUrl(options.getStorageRootUrl())
+          .setServicePath(options.getStorageServicePath());
+    }
+    return storageBuilder.build();
+  }
+
+  /**
+   * Returns {@code true} when the user configured a custom Cloud Storage endpoint (root URL or
+   * service path) that differs from the SDK default. An explicit endpoint takes precedence over any
+   * universe-domain-derived endpoint.
+   */
+  private static boolean isCustomStorageEndpoint(GoogleCloudStorageOptions options) {
+    return !Storage.DEFAULT_ROOT_URL.equals(options.getStorageRootUrl())
+        || !Storage.DEFAULT_SERVICE_PATH.equals(options.getStorageServicePath());
   }
 
   private ExecutorService createManualBatchingThreadPool() {
