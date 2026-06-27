@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.Objects.requireNonNullElseGet;
 
-import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.annotations.VisibleForTesting;
@@ -166,8 +165,7 @@ public class HttpTransportFactory {
   static NetHttpTransport.Builder createNetHttpTransportBuilder(
       @Nullable URI proxyUri, @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
-    NetHttpTransport.Builder builder =
-        new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
+    NetHttpTransport.Builder builder = new NetHttpTransport.Builder();
     SSLSocketFactory wrappedSslSocketFactory =
         requireNonNullElseGet(
             builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory);

@@ -78,8 +78,8 @@ public class GoogleHadoopFileSystemConfiguration {
   /**
    * Configuration key for the Cloud Storage universe domain (e.g. for Trusted Partner Cloud /
    * multi-universe deployments). When unset, the {@value #GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR}
-   * environment variable is used; if that is also unset, the default Google universe
-   * ({@code googleapis.com}) is targeted.
+   * environment variable is used; if that is also unset, the default Google universe ({@code
+   * googleapis.com}) is targeted.
    */
   public static final HadoopConfigurationProperty<String> GCS_UNIVERSE_DOMAIN =
       new HadoopConfigurationProperty<>("fs.gs.universe.domain", "");

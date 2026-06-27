@@ -319,8 +319,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   public void resolveUniverseDomain_emptyEnv_returnsNull() {
     Configuration config = new Configuration();
 
-    assertThat(GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(config, ""))
-        .isNull();
+    assertThat(GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(config, "")).isNull();
   }
 
   @Test

@@ -385,8 +385,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       HttpTransport httpTransport,
       HttpRequestInitializer httpRequestInitializer) {
     Storage.Builder storageBuilder =
-        new Storage.Builder(
-                httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
+        new Storage.Builder(httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
             .setApplicationName(options.getAppName());
     if (!isNullOrEmpty(options.getUniverseDomain())) {
       storageBuilder.setUniverseDomain(options.getUniverseDomain());

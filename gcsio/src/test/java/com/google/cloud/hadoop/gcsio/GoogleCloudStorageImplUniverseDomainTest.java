@@ -24,7 +24,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Unit tests for universe-domain handling in {@link GoogleCloudStorageImpl#createApiaryStorage}. */
+/**
+ * Unit tests for universe-domain handling in {@link GoogleCloudStorageImpl#createApiaryStorage}.
+ */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageImplUniverseDomainTest {
 
