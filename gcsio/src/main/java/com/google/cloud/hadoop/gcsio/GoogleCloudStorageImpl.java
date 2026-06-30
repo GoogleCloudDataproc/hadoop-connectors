@@ -358,7 +358,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 options.getProxyAddress(),
                 options.getProxyUsername(),
                 options.getProxyPassword(),
-                options.getHttpRequestReadTimeout())
+                options.getHttpRequestReadTimeout(),
+                /* useSystemDefaultTrustStore= */ usesNonGoogleEndpoint(options))
             : httpTransport;
     this.storage = createApiaryStorage(options, finalHttpTransport, this.httpRequestInitializer);
     this.credential = credentials;
@@ -406,6 +407,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static boolean isCustomStorageEndpoint(GoogleCloudStorageOptions options) {
     return !Storage.DEFAULT_ROOT_URL.equals(options.getStorageRootUrl())
         || !Storage.DEFAULT_SERVICE_PATH.equals(options.getStorageServicePath());
+  }
+
+  /**
+   * Returns {@code true} when requests are routed to a non-Google endpoint: either a custom storage
+   * root URL/service path, or a non-default universe domain (which derives a {@code
+   * storage.<universeDomain>} host). Such endpoints present certificates that are not in Google's
+   * bundled trust store, so the transport must fall back to the JVM default trust store.
+   */
+  private static boolean usesNonGoogleEndpoint(GoogleCloudStorageOptions options) {
+    String universeDomain = options.getUniverseDomain();
+    boolean nonDefaultUniverse =
+        !isNullOrEmpty(universeDomain)
+            && !Credentials.GOOGLE_DEFAULT_UNIVERSE.equals(universeDomain);
+    return isCustomStorageEndpoint(options) || nonDefaultUniverse;
   }
 
   private ExecutorService createManualBatchingThreadPool() {

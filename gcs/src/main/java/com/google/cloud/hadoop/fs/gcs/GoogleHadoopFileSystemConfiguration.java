@@ -65,7 +65,15 @@ public class GoogleHadoopFileSystemConfiguration {
   // Configuration settings.
   // -----------------------------------------------------------------
 
-  /** Configuration key for the Cloud Storage API endpoint root URL. */
+  /**
+   * Configuration key for the Cloud Storage API endpoint root URL.
+   *
+   * <p>This only overrides the JSON/REST endpoint and carries no universe semantics (no credential
+   * universe-domain validation, and no effect on the gRPC endpoint). For Trusted Partner Cloud /
+   * multi-universe (TPC) deployments, prefer {@link #GCS_UNIVERSE_DOMAIN}, which routes both the
+   * JSON/REST and gRPC clients and validates the credentials' universe domain. When both are set,
+   * this explicit root URL takes precedence over the universe-domain-derived endpoint.
+   */
   public static final HadoopConfigurationProperty<String> GCS_ROOT_URL =
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.root.url", GoogleCloudStorageOptions.DEFAULT.getStorageRootUrl());
