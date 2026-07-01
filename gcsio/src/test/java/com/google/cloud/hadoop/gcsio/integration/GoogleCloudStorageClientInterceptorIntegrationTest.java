@@ -30,6 +30,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientGrpcTracingIntercep
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTracingFields;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
@@ -261,7 +262,10 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     GoogleCloudStorageOptions storageOption = GCS_TRACE_OPTIONS.toBuilder().build();
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder()
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .build();
     assertingHandler.flush();
 
     // Execute Parquet-style suffix read
