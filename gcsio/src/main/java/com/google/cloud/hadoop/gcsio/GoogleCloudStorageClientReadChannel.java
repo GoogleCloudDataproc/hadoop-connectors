@@ -652,28 +652,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (gzipEncoded) {
         return 0;
       }
-<<<<<<< HEAD
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
-=======
-
-      // Guess the start boundary if the size is unknown
-      if (objectSize == -1) {
-        if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
-            || bytesToRead >= readOptions.getMinRangeRequestSize()) {
-          return currentPosition;
-        }
-        // Prefetch footer (bytes before 'currentPosition') lazily.
-        // Max prefetch size is (minRangeRequestSize / 2) bytes.
-        if (bytesToRead <= readOptions.getMinRangeRequestSize() / 2) {
-          return Math.max(0, currentPosition - readOptions.getMinRangeRequestSize() / 2);
-        }
-        return Math.max(0, currentPosition - (readOptions.getMinRangeRequestSize() - bytesToRead));
-      }
-
-      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
-          && isFooterRead()
-          && !readOptions.isReadExactRequestedBytesEnabled()) {
->>>>>>> ede7779d (Fast Fail Bug Fix during gRPC Reads (#1685))
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
