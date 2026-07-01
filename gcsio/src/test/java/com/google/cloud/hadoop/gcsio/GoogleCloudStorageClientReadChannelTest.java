@@ -33,6 +33,9 @@ import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -769,9 +772,10 @@ public class GoogleCloudStorageClientReadChannelTest {
   @Test
   public void testLazyMetadataFetch_emptyObject_returnsEofCleanly() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder()
-            .setFastFailOnNotFoundEnabled(false)
-            .setGzipEncodingSupportEnabled(true)
+        DEFAULT_READ_OPTION
+            .toBuilder()
+            .setFastFailOnNotFound(false)
+            .setSupportGzipEncoding(true)
             .build();
     Blob mockBlob = mock(Blob.class);
     when(mockBlob.getSize()).thenReturn(0L);
@@ -800,7 +804,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   @Test
   public void testRead_whenLazyInitFails_closesOrphanedChannel() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
     Storage mockStorage = mock(Storage.class);
     ReadChannel mockReadChannel = mock(ReadChannel.class);
     when(mockStorage.reader(any(), any())).thenReturn(mockReadChannel);
@@ -827,7 +831,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   @Test
   public void testLazyMetadataFetch_normalForwardRead_fetchesMetadataMidFlight() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
     BlobInfo mockBlobInfo = mock(BlobInfo.class);
     when(mockBlobInfo.getSize()).thenReturn((long) OBJECT_SIZE);
     when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
@@ -859,9 +863,10 @@ public class GoogleCloudStorageClientReadChannelTest {
   @Test
   public void testLazyMetadataFetch_gzipEncoded_recoversFromBadGuess() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder()
-            .setFastFailOnNotFoundEnabled(false)
-            .setGzipEncodingSupportEnabled(true)
+        DEFAULT_READ_OPTION
+            .toBuilder()
+            .setFastFailOnNotFound(false)
+            .setSupportGzipEncoding(true)
             .build();
     Blob mockBlob = mock(Blob.class);
     when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
@@ -892,7 +897,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   @Test
   public void testLazyMetadataFetch_seekPastEof_throwsEofException() throws Exception {
     GoogleCloudStorageReadOptions readOptions =
-        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFound(false).build();
     Blob mockBlob = mock(Blob.class);
     when(mockBlob.getSize()).thenReturn(10L);
     when(mockBlob.getContentEncoding()).thenReturn(null);

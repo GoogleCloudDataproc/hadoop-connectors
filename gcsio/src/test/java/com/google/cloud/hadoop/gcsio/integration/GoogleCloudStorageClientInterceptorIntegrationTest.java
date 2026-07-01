@@ -258,11 +258,10 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     // Write a 2MB file to simulate a Parquet block
     byte[] partition =
         writeObject(helperGcs, resourceId, /* partitionSize= */ 2 * 1024 * 1024, partitionsCount);
-    GoogleCloudStorageOptions storageOption =
-        GCS_TRACE_OPTIONS.toBuilder().setBidiEnabled(false).build();
+    GoogleCloudStorageOptions storageOption = GCS_TRACE_OPTIONS.toBuilder().build();
     GoogleCloudStorage gcsImpl = getGCSClientImpl(storageOption);
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
     assertingHandler.flush();
 
     // Execute Parquet-style suffix read
