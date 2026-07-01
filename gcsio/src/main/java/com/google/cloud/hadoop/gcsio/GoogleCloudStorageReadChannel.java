@@ -323,7 +323,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             size = currentPosition;
             contentChannelEnd = currentPosition;
           }
-<<<<<<< HEAD
           if (currentPosition > contentChannelEnd && currentPosition < size) {
             logger.atWarning().log(
                 "Received end of stream result after the channel end; at offset: %d "
@@ -337,13 +336,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             totalBytesRead -= overshoot;
             contentChannelPosition -= overshoot;
           } else if (currentPosition < contentChannelEnd && currentPosition < size) {
-=======
-          // Check that we didn't get a premature End of Stream signal by checking the
-          // number of bytes read against the stream size. Unfortunately we don't have information
-          // about the actual size of the data stream when stream compression is used, so we can
-          // only ignore this case here.
-          if (currentPosition < contentChannelEnd && currentPosition < size) {
->>>>>>> 2bbe3566 (fix : Fix edge case for GCS Overshoot bytes bug in Connector (#1721))
             GoogleCloudStorageEventBus.postOnException();
             throw new IOException(
                 String.format(
