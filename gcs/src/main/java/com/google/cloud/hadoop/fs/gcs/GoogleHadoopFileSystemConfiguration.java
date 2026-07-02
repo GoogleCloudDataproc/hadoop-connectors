@@ -381,6 +381,16 @@ public class GoogleHadoopFileSystemConfiguration {
           GoogleCloudStorageReadOptions.DEFAULT.getMinRangeRequestSize());
 
   /**
+   * When true (default), the connector may read the tail of a non-gzip object (up to the configured
+   * minimum range request size) into one in-memory footer cache and reuse it for reads in that tail.
+   * Set to false to avoid that allocation.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_INPUT_STREAM_FOOTER_CACHE_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.inputstream.footer.cache.enable",
+          GoogleCloudStorageReadOptions.DEFAULT.isFooterCacheEnabled());
+
+  /**
    * Threshold for data transfer latency, if the transfer takes longer than this threshold, then a
    * high latency warning will be logged.
    */
@@ -760,6 +770,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
+        .setFooterCacheEnabled(
+            GCS_INPUT_STREAM_FOOTER_CACHE_ENABLE.get(config, config::getBoolean))
         .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
         .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))

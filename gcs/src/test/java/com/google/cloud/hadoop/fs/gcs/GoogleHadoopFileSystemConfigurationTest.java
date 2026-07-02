@@ -370,6 +370,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.setInt("fs.gs.bidi.thread.count", 5);
     config.setBoolean("fs.gs.bidi.enable", true);
     config.setInt("fs.gs.bidi.client.timeout", 6);
+    config.setBoolean("fs.gs.inputstream.footer.cache.enable", false);
 
     GoogleCloudStorageReadOptions options =
         GoogleHadoopFileSystemConfiguration.getReadChannelOptions(config);
@@ -385,6 +386,15 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getMinRangeRequestSize()).isEqualTo(4L);
     assertThat(options.getBidiThreadCount()).isEqualTo(5);
     assertThat(options.getBidiClientTimeout()).isEqualTo(6);
+    assertThat(options.isFooterCacheEnabled()).isFalse();
+  }
+
+  @Test
+  public void readChannelOptions_footerCache_defaults() {
+    Configuration config = new Configuration();
+    GoogleCloudStorageReadOptions options =
+        GoogleHadoopFileSystemConfiguration.getReadChannelOptions(config);
+    assertThat(options.isFooterCacheEnabled()).isTrue();
   }
 
   @Test

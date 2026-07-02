@@ -384,6 +384,13 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     if (footerSize <= 0) {
       return;
     }
+    if (!readOptions.isFooterCacheEnabled()) {
+      logger.atFiner().log(
+          "Footer cache disabled via read options: not holding the last %d-byte tail in"
+              + " memory for '%s'",
+          footerSize, resourceId);
+      return;
+    }
 
     logger.atFiner().log(
         "Prefetching footer for '%s'. Position: %d, Size: %d",
@@ -443,13 +450,23 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
 
     // The footer is not cached, but we should fetch it as position is in range.
-    boolean shouldPrefetchFooter =
+    boolean eligibleForFooterCache =
         !gzipEncoded
             && footerContent == null
             && isFooterRead()
             && !readOptions.isReadExactRequestedBytesEnabled();
 
-    if (shouldPrefetchFooter) {
+    if (eligibleForFooterCache && !readOptions.isFooterCacheEnabled()) {
+      long tailSliceByteCount =
+          objectSize - max(0L, objectSize - readOptions.getMinRangeRequestSize());
+      logger.atFiner().log(
+          "Footer cache disabled via read options: not holding the last %d-byte tail in memory"
+              + " for '%s'",
+          tailSliceByteCount, resourceId);
+      return Optional.empty();
+    }
+
+    if (eligibleForFooterCache) {
       try {
         cacheFooter();
         // After caching, read the requested part from the new cache.

@@ -451,10 +451,21 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           && (contentChannelEnd - contentChannelCurrentPosition)
               <= readOptions.getMinRangeRequestSize()) {
 
+        long footerRangeBytes = contentChannelEnd - contentChannelCurrentPosition;
         if (footerContent == null) {
-          cacheFooter(readableByteChannel);
+          if (readOptions.isFooterCacheEnabled()) {
+            cacheFooter(readableByteChannel);
+          } else {
+            logger.atFiner().log(
+                "Footer cache disabled via read options: not holding the last %d-byte tail in"
+                    + " memory for '%s'; streaming from offset %d (object size %d)",
+                footerRangeBytes, resourceId, contentChannelCurrentPosition, objectSize);
+          }
         }
-        return serveFooterContent();
+        if (footerContent != null) {
+          return serveFooterContent();
+        }
+        return readableByteChannel;
       }
       return readableByteChannel;
     }
@@ -658,6 +669,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             || bytesToRead >= readOptions.getMinRangeRequestSize()) {
           return currentPosition;
         }
+        if (!readOptions.isFooterCacheEnabled()) {
+          return currentPosition;
+        }
         // Prefetch footer (bytes before 'currentPosition') lazily.
         // Max prefetch size is (minRangeRequestSize / 2) bytes.
         if (bytesToRead <= readOptions.getMinRangeRequestSize() / 2) {
@@ -667,6 +681,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       }
 
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
+          && readOptions.isFooterCacheEnabled()
           && isFooterRead()
           && !readOptions.isReadExactRequestedBytesEnabled()) {
         // Prefetch footer and adjust start position to footerStart.
