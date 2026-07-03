@@ -321,39 +321,16 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             contentChannelEnd = currentPosition;
           }
           // Check that we didn't get a premature End of Stream signal by checking the
-          // number of
-          // bytes read against the stream size. Unfortunately we don't have information
-          // about the
-          // actual size of the data stream when stream compression is used, so we can
-          // only ignore
-          // this case here.
-          if (currentPosition > contentChannelEnd && currentPosition < size) {
-            logger.atWarning().log(
-                "Received end of stream result after the channel end; at offset: %d "
-                    + "where as stream was suppose to end at: %d for resource: %s of size: %d",
-                currentPosition, contentChannelEnd, resourceId, size);
-
-            // Dropping additional bytes.
-            int overshoot = (int) (currentPosition - contentChannelEnd);
-            buffer.position(buffer.position() - overshoot);
-            currentPosition = contentChannelEnd;
-            totalBytesRead -= overshoot;
-            contentChannelPosition -= overshoot;
-          } else if (currentPosition < contentChannelEnd && currentPosition < size) {
+          // number of bytes read against the stream size. Unfortunately we don't have information
+          // about the actual size of the data stream when stream compression is used, so we can
+          // only ignore this case here.
+          if (currentPosition < contentChannelEnd && currentPosition < size) {
             GoogleCloudStorageEventBus.postOnException();
             throw new IOException(
                 String.format(
                     "Received end of stream result before all requestedBytes were received; "
-                        + "at offset: %d where as stream was suppose to end at: %d for resource: "
+                        + "at offset: %d whereas stream was suppose to end at: %d for resource: "
                         + "%s of size: %d",
-                    currentPosition, contentChannelEnd, resourceId, size));
-
-          } else if (currentPosition > size) {
-            GoogleCloudStorageEventBus.postOnException();
-            throw new IOException(
-                String.format(
-                    "Received end of stream result beyond the object size; at offset: %d "
-                        + "where as stream was suppose to end at: %d for resource: %s of size: %d",
                     currentPosition, contentChannelEnd, resourceId, size));
           }
 
@@ -376,6 +353,35 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                   + " after successful read",
               contentChannelPosition,
               currentPosition);
+
+          // Fail fast if the server sent data past the total object size
+          if (size != -1 && currentPosition > size) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new IOException(
+                String.format(
+                    "Received data beyond the object size; at offset: %d "
+                        + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                    currentPosition, contentChannelEnd, resourceId, size));
+          }
+
+          // Handle the overshoot immediately in the successful read case
+          if (contentChannelEnd >= 0
+              && contentChannelEnd != size
+              && currentPosition > contentChannelEnd) {
+            logger.atWarning().log(
+                "Received data after the channel end; at offset: %d "
+                    + "where as stream was suppose to end at: %d for resource: %s of size: %d",
+                currentPosition, contentChannelEnd, resourceId, size);
+
+            int overshoot = (int) (currentPosition - contentChannelEnd);
+            buffer.position(buffer.position() - overshoot);
+            currentPosition = contentChannelEnd;
+            contentChannelPosition = contentChannelEnd;
+            totalBytesRead -= overshoot;
+
+            // Close the channel so the next iteration opens a cleanly aligned stream
+            closeContentChannel();
+          }
         }
 
         if (retriesAttempted != 0) {

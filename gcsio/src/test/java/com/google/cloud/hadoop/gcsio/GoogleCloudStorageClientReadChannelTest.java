@@ -325,6 +325,48 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
+  public void read_withOvershoot_handlesBoundaryWithoutCrashing() throws IOException {
+    // Queue READ_CHUNK for the first read, then MORE_THAN_CHANNEL_LENGTH for the second read
+    // to force the underlying channel to overshoot the limit by exactly 1 byte.
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(
+                CONTENT,
+                ImmutableList.of(REQUEST_TYPE.READ_CHUNK, REQUEST_TYPE.MORE_THAN_CHANNEL_LENGTH)));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    // Enforce a minimum chunk size of 10 bytes
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setMinRangeRequestSize(10).build();
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
+    readChannel.position(0);
+
+    // First read (Requesting 5 bytes)
+    // The channel is opened with a boundary of 10.
+    // It successfully reads 5 bytes, leaving 5 valid bytes before the boundary.
+    ByteBuffer buffer1 = ByteBuffer.allocate(5);
+    int bytesRead1 = readChannel.read(buffer1);
+    assertThat(bytesRead1).isEqualTo(5);
+
+    // Second read (Requesting 6 bytes)
+    // The FakeReadChannel will return 6 bytes (overshooting the 10-byte limit by 1 byte).
+    // With the immediate correction fix, it detects the 1-byte overshoot right away,
+    // rewinds the buffer, closes the channel, and automatically opens the next stream
+    // to fetch the remaining 1 byte.
+    ByteBuffer buffer2 = ByteBuffer.allocate(6);
+    int bytesRead2 = readChannel.read(buffer2);
+    assertThat(bytesRead2).isEqualTo(6);
+
+    // Third read
+    // We pass a fresh buffer
+    // Previously, the EOF block would trigger the retroactive overshoot logic
+    // and crash with an IllegalArgumentException.
+    // Now, it cleanly reads the next 5 bytes from the properly opened second stream!
+    ByteBuffer buffer3 = ByteBuffer.allocate(5);
+    int bytesRead3 = readChannel.read(buffer3);
+    assertThat(bytesRead3).isEqualTo(5);
+  }
+
+  @Test
   public void fadviseAutoRandom_onSequentialRead_switchToSequential() throws IOException {
     long blockSize = CHUNK_SIZE;
     GoogleCloudStorageReadOptions readOptions =
@@ -999,10 +1041,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     IOException e =
         assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(CHUNK_SIZE)));
 
-    assertThat(e)
-        .hasCauseThat()
-        .hasMessageThat()
-        .contains("Received end of stream result beyond the object size;");
+    assertThat(e).hasCauseThat().hasMessageThat().contains("Received data beyond the object size;");
   }
 
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
