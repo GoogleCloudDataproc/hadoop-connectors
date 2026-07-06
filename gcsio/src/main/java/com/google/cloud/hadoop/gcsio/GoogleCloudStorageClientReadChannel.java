@@ -300,6 +300,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // in the first read. Therefore, loop till we either read the required number of
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
+
         int remainingBeforeRead = dst.remaining();
         try {
           if (byteChannel == null) {
@@ -341,12 +342,13 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               contentChannelEnd = currentPosition;
             }
 
-            if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
+            if (currentPosition < contentChannelEnd && currentPosition < objectSize) {
               GoogleCloudStorageEventBus.postOnException();
               throw new IOException(
                   String.format(
-                      "Received end of stream result before all requestedBytes were received;"
-                          + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                      "Received end of stream result before all requestedBytes were received; "
+                          + "at offset: %d where as stream was supposed to end at: %d for resource: "
+                          + "%s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
             }
             // If we have reached an end of a contentChannel but not an end of an object.
@@ -367,6 +369,35 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   + " after successful read",
               contentChannelCurrentPosition,
               currentPosition);
+
+          // Fail fast if the server sent data past the total object size
+          if (objectSize != -1 && currentPosition > objectSize) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new IOException(
+                String.format(
+                    "Received data beyond the object size; at offset: %d "
+                        + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                    currentPosition, contentChannelEnd, resourceId, objectSize));
+          }
+
+          // Handle the overshoot immediately in the successful read case
+          if (contentChannelEnd >= 0
+              && contentChannelEnd != objectSize
+              && currentPosition > contentChannelEnd) {
+            logger.atWarning().log(
+                "Received data after the channel end; at offset: %d "
+                    + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                currentPosition, contentChannelEnd, resourceId, objectSize);
+
+            int overshoot = (int) (currentPosition - contentChannelEnd);
+            dst.position(dst.position() - overshoot);
+            currentPosition = contentChannelEnd;
+            contentChannelCurrentPosition = contentChannelEnd;
+            totalBytesRead -= overshoot;
+
+            // Close the channel so the next iteration opens a cleanly aligned stream
+            closeContentChannel();
+          }
         } catch (Exception e) {
           int partialBytes = partiallyReadBytes(remainingBeforeRead, dst);
           totalBytesRead += partialBytes;
@@ -406,8 +437,17 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
       setChannelBoundaries(bytesToRead);
 
+      logger.atFiner().log(
+          "Opening lazy gRPC channel for '%s' from %d to %d",
+          resourceId, contentChannelCurrentPosition, contentChannelEnd);
+
       ReadableByteChannel readableByteChannel =
-          getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
+          initializeMetadataAndValidateChannel(
+              getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd), bytesToRead);
+
+      logger.atFiner().log(
+          "Storage ReadChannel opened at, contentChannelCurrentPosition: %d, contentChannelEnd: %d",
+          contentChannelCurrentPosition, contentChannelEnd);
 
       if (contentChannelEnd == objectSize
           && (contentChannelEnd - contentChannelCurrentPosition)
@@ -419,6 +459,100 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return serveFooterContent();
       }
       return readableByteChannel;
+    }
+
+    private ReadableByteChannel initializeMetadataAndValidateChannel(
+        ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
+      try {
+        if (!metadataInitialized) {
+          logger.atFine().log(
+              "Metadata not initialized. Forcing lazy channel connection with 0-byte read for '%s'",
+              resourceId);
+
+          // The 0-byte read triggers the actual ReadObjectRequest over the network
+          readableByteChannel.read(ByteBuffer.allocate(0));
+          // Extract the headers to populate objectSize
+          ensureMetadataInitialized(readableByteChannel);
+
+          logger.atFiner().log(
+              "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
+
+          ReadableByteChannel eofChannel = validateEndOfFile(readableByteChannel);
+          if (eofChannel != null) {
+            return eofChannel;
+          }
+
+          ReadableByteChannel gzipChannel = handleGzipDiscovery(readableByteChannel, bytesToRead);
+          if (gzipChannel != null) {
+            return gzipChannel;
+          }
+        }
+
+        if (contentChannelEnd == Long.MAX_VALUE && objectSize != -1) {
+          contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
+          logger.atFiner().log(
+              "Recalculated contentChannelEnd to %d for '%s'", contentChannelEnd, resourceId);
+        }
+
+        return readableByteChannel;
+
+      } catch (IOException | RuntimeException e) {
+        logger.atWarning().withCause(e).log(
+            "Exception occurred during metadata initialization for '%s'. Attempting to safely close orphaned channel.",
+            resourceId);
+        try {
+          if (readableByteChannel != null && readableByteChannel.isOpen()) {
+            readableByteChannel.close();
+            logger.atFine().log("Successfully closed orphaned channel for '%s'", resourceId);
+          }
+        } catch (IOException closeException) {
+          logger.atWarning().withCause(closeException).log(
+              "Failed to close orphaned channel for '%s' during cleanup", resourceId);
+          e.addSuppressed(closeException);
+        }
+        // Directly re-throw the exception exactly as it was caught.
+        // This prevents RuntimeExceptions (like NPEs) from being masked as IOExceptions!
+        throw e;
+      }
+    }
+
+    private ReadableByteChannel validateEndOfFile(ReadableByteChannel readableByteChannel)
+        throws IOException {
+      if (objectSize != -1) {
+        if (currentPosition > objectSize) {
+          // We just fetched the metadata and realized the user's initial seek was invalid
+          // Intercept it and throw the standard Invalid Seek error.
+          readableByteChannel.close();
+          GoogleCloudStorageEventBus.postOnException();
+          throw new EOFException(
+              String.format(
+                  "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
+                  currentPosition, objectSize, resourceId));
+        } else if (currentPosition == objectSize) {
+          // User seeked exactly to the end of the file. Return a clean EOF.
+          readableByteChannel.close();
+          contentChannelCurrentPosition = currentPosition;
+          contentChannelEnd = currentPosition;
+          return Channels.newChannel(new ByteArrayInputStream(new byte[0]));
+        }
+      }
+      return null;
+    }
+
+    private ReadableByteChannel handleGzipDiscovery(
+        ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
+      if (gzipEncoded) {
+        if (currentPosition != 0) {
+          // We guessed the boundary wrong for a GZIP file. Reopen it properly.
+          readableByteChannel.close();
+          // Reset channel boundaries
+          contentChannelCurrentPosition = -1;
+          contentChannelEnd = -1;
+          return openByteChannel(bytesToRead);
+        }
+        contentChannelEnd = objectSize;
+      }
+      return null;
     }
 
     private void ensureMetadataInitialized(ReadableByteChannel readableByteChannel)
@@ -463,7 +597,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private void setChannelBoundaries(long bytesToRead) {
-      contentChannelCurrentPosition = getRangeRequestStart();
+      contentChannelCurrentPosition = getRangeRequestStart(bytesToRead);
       contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
       checkState(
           contentChannelEnd >= contentChannelCurrentPosition,
@@ -514,10 +648,25 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       return Channels.newChannel(new ByteArrayInputStream(footerContent, offset, length));
     }
 
-    private long getRangeRequestStart() {
+    private long getRangeRequestStart(long bytesToRead) {
       if (gzipEncoded) {
         return 0;
       }
+
+      // Guess the start boundary if the size is unknown
+      if (objectSize == -1) {
+        if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
+            || bytesToRead >= readOptions.getMinRangeRequestSize()) {
+          return currentPosition;
+        }
+        // Prefetch footer (bytes before 'currentPosition') lazily.
+        // Max prefetch size is (minRangeRequestSize / 2) bytes.
+        if (bytesToRead <= readOptions.getMinRangeRequestSize() / 2) {
+          return Math.max(0, currentPosition - readOptions.getMinRangeRequestSize() / 2);
+        }
+        return Math.max(0, currentPosition - (readOptions.getMinRangeRequestSize() - bytesToRead));
+      }
+
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
