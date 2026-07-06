@@ -1410,7 +1410,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         return true;
       case GcsConnectorCapabilities.LIST_STATUS_STARTING_FROM:
         try {
-          // getGcs should not be null, there is no way we close the underneath gcs and not close hcfs.
+          // getGcs should not be null, there is no way we close the underneath gcs and not close
+          // hcfs.
           // still added this check to avoid any NPE
           if (isClosed() || getGcsFs().getGcs() == null) {
             return false;

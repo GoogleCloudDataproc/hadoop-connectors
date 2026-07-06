@@ -657,12 +657,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
-    try(GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs)) {
+    try (GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs)) {
       fs.initialize(initUri, new Configuration());
 
       Path hnsPath = new Path("gs://hns-bucket/dir");
       assertThat(fs.hasPathCapability(hnsPath, "fs.gs.capability.liststatus.starting.from"))
-              .isFalse();
+          .isFalse();
     }
   }
 
@@ -670,17 +670,17 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void hasPathCapability_listStatusStartingFrom_fsClosed_returnsFalse() throws Exception {
     URI initUri = new Path("gs://hns-bucket").toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
-            new GoogleCloudStorageFileSystemImpl(
-                    (gcsOptions) ->
-                            new InMemoryGoogleCloudStorage(gcsOptions) {
-                              @Override
-                              public boolean isHnBucket(URI src) {
-                                return false;
-                              }
-                            },
-                    GoogleCloudStorageFileSystemOptions.builder()
-                            .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
-                            .build());
+        new GoogleCloudStorageFileSystemImpl(
+            (gcsOptions) ->
+                new InMemoryGoogleCloudStorage(gcsOptions) {
+                  @Override
+                  public boolean isHnBucket(URI src) {
+                    return false;
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initialize(initUri, new Configuration());
     Path hnsPath = new Path("gs://non-hns-bucket/dir");
@@ -688,7 +688,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
     // even on non hns bucket, if file system is closed capability is disabled.
     assertThat(fs.hasPathCapability(hnsPath, "fs.gs.capability.liststatus.starting.from"))
-            .isFalse();
+        .isFalse();
   }
 
   @Test
