@@ -1410,6 +1410,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         return true;
       case GcsConnectorCapabilities.LIST_STATUS_STARTING_FROM:
         try {
+          if (isClosed()) {
+            return false;
+          }
           return !getGcsFs().getGcs().isHnBucket(getGcsPath(path));
         } catch (IOException e) {
           logger.atWarning().withCause(e).log(
