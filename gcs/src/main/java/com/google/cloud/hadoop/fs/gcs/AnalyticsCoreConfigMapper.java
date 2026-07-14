@@ -79,16 +79,7 @@ final class AnalyticsCoreConfigMapper {
   static Map<String, String> mapConfigs(Configuration config, String prefix) {
     Map<String, String> mappedProperties = config.getValByRegex("^" + prefix.replace(".", "\\."));
 
-    // Pre-process fadvise configuration to match FileAccessPattern expected by Analytics Core
-    String fadvise =
-        mappedProperties.get(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey());
-    if (fadvise != null) {
-      mappedProperties.put(
-          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(),
-          toFileAccessPattern(fadvise));
-    }
-
-    // Direct 1:1 mappings from Connector to Analytics Core
+    // Direct mappings from Connector to Analytics Core
     HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS.forEach(
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
@@ -104,6 +95,9 @@ final class AnalyticsCoreConfigMapper {
       String hadoopKey, Map<String, String> map, String analyticsCoreKey) {
     String value = map.remove(hadoopKey);
     if (value != null) {
+      if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
+        value = toFileAccessPattern(value);
+      }
       map.put(analyticsCoreKey, value);
     }
   }
