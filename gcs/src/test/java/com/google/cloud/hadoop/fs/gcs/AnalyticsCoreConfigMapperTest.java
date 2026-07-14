@@ -46,6 +46,14 @@ public class AnalyticsCoreConfigMapperTest {
         .isEqualTo("1024");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_SIZE_KEY))
         .isEqualTo("2048");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.FILE_ACCESS_PATTERN_KEY))
+        .isEqualTo("RANDOM");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.INPLACE_SEEK_LIMIT_KEY))
+        .isEqualTo("50");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.RANDOM_READ_MIN_REQ_SIZE_KEY))
+        .isEqualTo("100");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.ADAPTIVE_READ_SEQ_THRESHOLD_KEY))
+        .isEqualTo("5");
     assertThat(mapped).containsAtLeastEntriesIn(EXPECTED_MANDATORY_MAPPINGS);
   }
 
@@ -74,6 +82,53 @@ public class AnalyticsCoreConfigMapperTest {
                 GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE
                     .getKey()))
         .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE
+                    .getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_FADVISE_REQUEST_TRACK_COUNT.getKey()))
+        .isFalse();
+  }
+
+  @Test
+  public void mapConfigs_mapsFadviseModesCorrectly() {
+    Configuration config = new Configuration();
+
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(), "SEQUENTIAL");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.FILE_ACCESS_PATTERN_KEY))
+        .isEqualTo("SEQUENTIAL");
+
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(), "RANDOM");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.FILE_ACCESS_PATTERN_KEY))
+        .isEqualTo("RANDOM");
+
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(), "AUTO");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.FILE_ACCESS_PATTERN_KEY))
+        .isEqualTo("AUTO_SEQUENTIAL");
+
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(), "AUTO_RANDOM");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.FILE_ACCESS_PATTERN_KEY))
+        .isEqualTo("AUTO_RANDOM");
   }
 
   @Test
@@ -127,6 +182,13 @@ public class AnalyticsCoreConfigMapperTest {
     config.set(
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
         "2048");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(), "RANDOM");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(), "50");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(),
+        "100");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_FADVISE_REQUEST_TRACK_COUNT.getKey(), "5");
     return config;
   }
 }

@@ -29,6 +29,11 @@ final class AnalyticsCoreConfigMapper {
   static final String MAX_MERGE_SIZE_KEY =
       "analytics-core.read.vectored.range.merged-size.max-bytes";
   static final String USER_AGENT_KEY = "user-agent";
+  static final String FILE_ACCESS_PATTERN_KEY = "analytics-core.read.file-access-pattern";
+  static final String INPLACE_SEEK_LIMIT_KEY = "analytics-core.read.inplace-seek-limit-bytes";
+  static final String RANDOM_READ_MIN_REQ_SIZE_KEY = "analytics-core.random-read.min-request-size";
+  static final String ADAPTIVE_READ_SEQ_THRESHOLD_KEY =
+      "analytics-core.adaptive-read.sequential-read-threshold";
 
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
@@ -45,6 +50,18 @@ final class AnalyticsCoreConfigMapper {
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
               MAX_MERGE_SIZE_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(),
+              INPLACE_SEEK_LIMIT_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(),
+              RANDOM_READ_MIN_REQ_SIZE_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_FADVISE_REQUEST_TRACK_COUNT.getKey(),
+              ADAPTIVE_READ_SEQ_THRESHOLD_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(),
+              FILE_ACCESS_PATTERN_KEY)
           .build();
 
   private AnalyticsCoreConfigMapper() {
@@ -62,7 +79,7 @@ final class AnalyticsCoreConfigMapper {
   static Map<String, String> mapConfigs(Configuration config, String prefix) {
     Map<String, String> mappedProperties = config.getValByRegex("^" + prefix.replace(".", "\\."));
 
-    // Direct 1:1 mappings from Connector to Analytics Core
+    // Direct mappings from Connector to Analytics Core
     HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS.forEach(
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
@@ -78,7 +95,25 @@ final class AnalyticsCoreConfigMapper {
       String hadoopKey, Map<String, String> map, String analyticsCoreKey) {
     String value = map.remove(hadoopKey);
     if (value != null) {
+      if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
+        value = toFileAccessPattern(value);
+      }
       map.put(analyticsCoreKey, value);
+    }
+  }
+
+  private static String toFileAccessPattern(String fadvise) {
+    switch (fadvise.toUpperCase()) {
+      case "AUTO":
+        return "AUTO_SEQUENTIAL";
+      case "AUTO_RANDOM":
+        return "AUTO_RANDOM";
+      case "SEQUENTIAL":
+        return "SEQUENTIAL";
+      case "RANDOM":
+        return "RANDOM";
+      default:
+        return "AUTO_SEQUENTIAL";
     }
   }
 }
