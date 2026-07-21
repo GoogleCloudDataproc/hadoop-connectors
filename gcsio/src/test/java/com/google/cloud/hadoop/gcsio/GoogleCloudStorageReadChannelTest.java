@@ -44,16 +44,20 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
+import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -933,6 +937,341 @@ public class GoogleCloudStorageReadChannelTest {
         .isEqualTo(
             "Unexpected end of stream trying to skip 10 bytes to seek to position 10,"
                 + " size: 9223372036854775807 for 'gs://foo-bucket/bar-object'");
+  }
+
+  @Test
+  public void read_objectNameWithSpecialUriChars_doesNotThrow() throws IOException {
+    // GCS object names may legally contain characters (e.g. double quotes) that are invalid
+    // in a URI string.
+    String objectName = "path/to/file\"with\"quotes.parquet";
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    StorageObject object =
+        newStorageObject(BUCKET_NAME, objectName).setSize(BigInteger.valueOf(data.length));
+    MockHttpTransport transport =
+        mockTransport(jsonDataResponse(object), dataRangeResponse(data, 0, data.length));
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
+
+    try (GoogleCloudStorageReadChannel readChannel =
+        new GoogleCloudStorageReadChannel(
+            storage,
+            new StorageResourceId(BUCKET_NAME, objectName),
+            ApiErrorExtractor.INSTANCE,
+            new ClientRequestHelper<>(),
+            GoogleCloudStorageReadOptions.DEFAULT)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      int bytesRead = readChannel.read(buf);
+
+      assertThat(bytesRead).isEqualTo(data.length);
+      assertThat(buf.array()).isEqualTo(data);
+    }
+  }
+
+  @Test
+  public void readBeyondObjectSize() throws IOException {
+    long objectSize = 10L;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(objectSize))
+                    .setGeneration(1L)),
+            // Ensure content-length accommodates the over-read
+            inputStreamResponse(
+                CONTENT_LENGTH, (long) testData.length, new ByteArrayInputStream(testData)));
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build());
+
+    readChannel.setMaxRetries(0);
+
+    IOException e =
+        assertThrows(
+            IOException.class,
+            () -> {
+              ByteBuffer buffer = ByteBuffer.allocate(testData.length + 1);
+              while (buffer.hasRemaining()) {
+                if (readChannel.read(buffer) < 0) {
+                  break;
+                }
+              }
+            });
+
+    assertThat(e).hasMessageThat().contains("Received data beyond the object size");
+  }
+
+  @Test
+  public void readBeyondChannelLength() throws Exception {
+    long objectSize = 200L;
+    // First response overshoots the 10 byte limit by 2 bytes
+    byte[] overshootData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+    // Second response provides the rest of the object size
+    byte[] restData = {0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15};
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(objectSize))
+                    .setGeneration(1L)),
+            // 1. Mock first read returning 12 bytes
+            dataRangeResponse(overshootData, 0, objectSize),
+            // 2. Mock the second read for the remaining bytes
+            dataRangeResponse(restData, 12, objectSize));
+
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder()
+                    .setFadvise(Fadvise.RANDOM)
+                    .setMinRangeRequestSize(10) // Force requested range to be 10
+                    .build());
+
+    readChannel.setMaxRetries(1);
+
+    // First read of 5 bytes
+    ByteBuffer buffer = ByteBuffer.allocate(30);
+    buffer.limit(5);
+    int bytesRead = readChannel.read(buffer);
+    assertThat(bytesRead).isEqualTo(5);
+
+    // Second read to trigger overshoot and then EOF
+    buffer.limit(20);
+    bytesRead = readChannel.read(buffer);
+
+    // total read should be 7 (remaining in overshootData) + 8 (from second mock to fill buffer
+    // limit 20) = 15
+    assertThat(bytesRead).isEqualTo(15);
+    assertThat(readChannel.position()).isEqualTo(20);
+  }
+
+  @Test
+  public void read_withOvershoot_handlesBoundaryWithoutCrashing() throws Exception {
+    long objectSize = 20L;
+    // Full expected data for the object
+    byte[] testData = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+    // The server overshoots the 10-byte limit by sending 12 bytes instead
+    byte[] overshootData = Arrays.copyOfRange(testData, 0, 12);
+    // The subsequent request should start from the correct boundary (offset 10)
+    byte[] restData = Arrays.copyOfRange(testData, 10, 20);
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(objectSize))
+                    .setGeneration(1L)),
+            // Mock the stream returning the 12 overshot bytes
+            dataRangeResponse(overshootData, 0, objectSize),
+            // Mock the second stream fetching the rest of the data from the correct boundary
+            dataRangeResponse(restData, 10, objectSize));
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder()
+                    .setFadvise(Fadvise.RANDOM)
+                    .setMinRangeRequestSize(10) // Force requested range to end at 10
+                    .build());
+    readChannel.setMaxRetries(1);
+
+    // First read (Requesting 5 bytes)
+    // The stream is opened with boundary 10. The mock returns 12 bytes.
+    // The channel reads 5 bytes and leaves 7 in the open stream.
+    ByteBuffer buffer1 = ByteBuffer.allocate(5);
+    int bytesRead1 = readChannel.read(buffer1);
+    assertThat(bytesRead1).isEqualTo(5);
+    assertThat(buffer1.array()).isEqualTo(Arrays.copyOfRange(testData, 0, 5));
+
+    // Second read (Requesting 7 bytes)
+    // The channel reads the remaining 7 bytes from the first stream.
+    // The immediate correction logic intercepts the 2-byte overshoot, rewinds the buffer,
+    // closes the channel, and opens the second stream to fetch the remaining 2 bytes.
+    ByteBuffer buffer2 = ByteBuffer.allocate(7);
+    int bytesRead2 = readChannel.read(buffer2);
+    assertThat(bytesRead2).isEqualTo(7);
+    assertThat(buffer2.array()).isEqualTo(Arrays.copyOfRange(testData, 5, 12));
+
+    // Third read (Requesting 5 bytes)
+    // Previously, this caused an IllegalArgumentException crash.
+    // Now, it simply reads the next 5 bytes from the properly opened second stream!
+    ByteBuffer buffer3 = ByteBuffer.allocate(5);
+    int bytesRead3 = readChannel.read(buffer3);
+    assertThat(bytesRead3).isEqualTo(5);
+    assertThat(buffer3.array()).isEqualTo(Arrays.copyOfRange(testData, 12, 17));
+  }
+
+  /**
+   * Simulates a Parquet-like read pattern: read footer at end of file, then sequential row group
+   * reads from the beginning. With AUTO fadvise, the backward seek from footer to row groups
+   * triggers random-access mode, causing all subsequent reads to use bounded range requests
+   * instead of a single streaming read.
+   *
+   * <p>This test captures the range headers to prove the mode switch happens, which is the
+   * suspected root cause for Beam 2.74 worker timeouts on Parquet read+join stages (the v2
+   * connector defaulted to SEQUENTIAL at the gcsio level, avoiding the mode switch entirely).
+   */
+  @Test
+  public void fadviseAuto_parquetReadPattern_switchesToRandomAfterFooterRead() throws IOException {
+    // Simulate a 100-byte "file" with a 10-byte footer at the end.
+    // Parquet pattern: read footer at end, then sequential row groups from beginning.
+    byte[] testData = new byte[100];
+    for (int i = 0; i < testData.length; i++) {
+      testData[i] = (byte) i;
+    }
+
+    int footerSize = 10;
+    int footerStart = testData.length - footerSize;
+    int rowGroupSize = 5;
+
+    MockHttpTransport transport =
+        mockTransport(
+            // 1st request: footer read at end of file (seek to position 90)
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, footerStart, testData.length),
+                footerStart,
+                testData.length),
+            // 2nd request: first row group at position 0 — should be bounded if random mode
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, 0, rowGroupSize), 0, testData.length),
+            // 3rd request: second row group at position 5 — also bounded if random mode
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, rowGroupSize, rowGroupSize * 2),
+                rowGroupSize,
+                testData.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(rowGroupSize)
+            .setInplaceSeekLimit(2)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    // Step 1: Read footer at end of file (like Parquet footer read)
+    readChannel.position(footerStart);
+    byte[] footerBytes = new byte[footerSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(footerBytes))).isEqualTo(footerSize);
+    assertThat(footerBytes)
+        .isEqualTo(Arrays.copyOfRange(testData, footerStart, testData.length));
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    // Step 2: Seek back to beginning for row group reads (backward seek → triggers random mode)
+    readChannel.position(0);
+    byte[] rowGroup1 = new byte[rowGroupSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(rowGroup1))).isEqualTo(rowGroupSize);
+    assertThat(rowGroup1).isEqualTo(Arrays.copyOfRange(testData, 0, rowGroupSize));
+    // After backward seek, AUTO mode should have switched to random
+    assertThat(readChannel.randomAccessStatus()).isTrue();
+
+    // Step 3: Next sequential row group — still in random mode, so bounded range request
+    readChannel.position(rowGroupSize);
+    byte[] rowGroup2 = new byte[rowGroupSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(rowGroup2))).isEqualTo(rowGroupSize);
+    assertThat(rowGroup2)
+        .isEqualTo(Arrays.copyOfRange(testData, rowGroupSize, rowGroupSize * 2));
+    // Still random — one-way latch in AUTO mode
+    assertThat(readChannel.randomAccessStatus()).isTrue();
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    // The key assertion: after the footer read, all subsequent reads use bounded ranges.
+    // bytes=90-  : first read, sequential (unbounded)
+    // bytes=0-4  : after backward seek, now random (bounded to minRangeRequestSize=5)
+    // bytes=5-9  : still random (bounded)
+    //
+    // With SEQUENTIAL fadvise (the v2 default), these would all be unbounded:
+    // bytes=90-, bytes=0-, bytes=5-
+    assertThat(rangeHeaders).containsExactly("bytes=90-", "bytes=0-4", "bytes=5-9").inOrder();
+  }
+
+  /**
+   * Same Parquet-like pattern but with SEQUENTIAL fadvise (the v2 gcsio default). All reads use
+   * unbounded ranges regardless of seek pattern — no mode switching occurs.
+   */
+  @Test
+  public void fadviseSequential_parquetReadPattern_neverSwitchesToRandom() throws IOException {
+    byte[] testData = new byte[100];
+    for (int i = 0; i < testData.length; i++) {
+      testData[i] = (byte) i;
+    }
+
+    int footerSize = 10;
+    int footerStart = testData.length - footerSize;
+    int rowGroupSize = 5;
+
+    MockHttpTransport transport =
+        mockTransport(
+            // 1st request: footer read — unbounded, streams entire remainder
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, footerStart, testData.length),
+                footerStart,
+                testData.length),
+            // 2nd request: row group at 0 — unbounded, streams entire file
+            dataRangeResponse(testData, 0, testData.length),
+            // 3rd request: row group at 5 — won't actually happen (in-place skip within stream)
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, rowGroupSize, testData.length),
+                rowGroupSize,
+                testData.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .setMinRangeRequestSize(rowGroupSize)
+            .setInplaceSeekLimit(2)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    // Step 1: Read footer
+    readChannel.position(footerStart);
+    byte[] footerBytes = new byte[footerSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(footerBytes))).isEqualTo(footerSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    // Step 2: Seek back to beginning — SEQUENTIAL never switches
+    readChannel.position(0);
+    byte[] rowGroup1 = new byte[rowGroupSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(rowGroup1))).isEqualTo(rowGroupSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    // Step 3: Next sequential row group — skip in place within the open stream
+    readChannel.position(rowGroupSize);
+    byte[] rowGroup2 = new byte[rowGroupSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(rowGroup2))).isEqualTo(rowGroupSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    // All unbounded — SEQUENTIAL never caps the range, and after the backward seek
+    // the stream reopens at 0 but still unbounded. The 3rd row group read is served
+    // in-place from the open stream (no new HTTP request).
+    assertThat(rangeHeaders).containsExactly("bytes=90-", "bytes=0-").inOrder();
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
