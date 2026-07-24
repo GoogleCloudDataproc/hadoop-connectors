@@ -95,6 +95,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -671,6 +672,31 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           return new FSDataInputStream(
               GoogleHadoopFSInputStream.create(this, fileStatus.getFileInfo(), statistics));
         });
+  }
+
+  /**
+   * Prewarms channels for reading multiple Hadoop paths. This is GCS-specific extension API.
+   *
+   * <p>This is an experimental API and can change without notice.
+   *
+   * @param pathSizeMap Map of Hadoop paths to their expected sizes.
+   * @throws IOException on IO error
+   */
+  public void multiOpen(Map<Path, Long> pathSizeMap) throws IOException {
+    checkOpen();
+    checkArgument(pathSizeMap != null, "pathSizeMap must not be null");
+
+    logger.atFine().log("multiOpen(pathSizeMap=%s)", pathSizeMap);
+
+    Map<StorageResourceId, Long> resourcesAndSizes = new LinkedHashMap<>();
+    for (Map.Entry<Path, Long> entry : pathSizeMap.entrySet()) {
+      long size = (entry.getValue() == null || entry.getValue() < 0) ? -1L : entry.getValue();
+      URI gcsPath = getGcsPath(entry.getKey());
+      resourcesAndSizes.put(
+          StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false), size);
+    }
+
+    getGcsFs().getGcs().multiOpen(resourcesAndSizes);
   }
 
   @Override

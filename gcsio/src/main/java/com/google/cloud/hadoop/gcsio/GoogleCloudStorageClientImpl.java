@@ -76,6 +76,8 @@ import com.google.cloud.storage.StorageException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -101,6 +103,7 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -116,7 +119,8 @@ import javax.annotation.Nullable;
  * the appropriate API call(s) google-cloud-storage client.
  */
 @VisibleForTesting
-public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
+public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
+    implements BidiChannelCallback {
   private static final String USER_AGENT = "user-agent";
   private static final String RAPID = "RAPID";
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -124,9 +128,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   // Maximum number of times to retry deletes in the case of precondition
   // failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
+  private static final int MAX_PREWARM_FILES_PER_CALL = 20;
 
   private final GoogleCloudStorageOptions storageOptions;
   @VisibleForTesting final StorageClientWrapper storageWrapper;
+
+  private final Cache<StorageResourceId, ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel>>
+      channelPool;
+
+  private volatile boolean closed = false;
 
   private static final StorageClientProvider storageClientProvider = new StorageClientProvider();
 
@@ -191,6 +201,23 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .build());
 
     this.storageOptions = options;
+    this.channelPool =
+        CacheBuilder.newBuilder()
+            .maximumSize(storageOptions.getReadChannelOptions().getBidiCacheMaxSize())
+            .expireAfterAccess(
+                Duration.ofSeconds(storageOptions.getReadChannelOptions().getBidiCacheExpireSec()))
+            .<StorageResourceId, ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel>>
+                removalListener(
+                    notification -> {
+                      ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+                          notification.getValue();
+                      if (queue != null) {
+                        for (GoogleCloudStorageBidiReadChannel channel : queue) {
+                          channel.actualClose();
+                        }
+                      }
+                    })
+            .build();
     this.storageWrapper =
         clientLibraryStorage == null
             ? storageClientProvider.getStorage(
@@ -1317,12 +1344,19 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     // storage.get(gcsItemInfo.getBucketName()).getLocationType() here instead of
     // flag
     if (storageOptions.isBidiEnabled()) {
+      GoogleCloudStorageBidiReadChannel channel =
+          checkoutChannel(resourceId, gcsItemInfo, readOptions);
+      if (channel != null) {
+        return channel;
+      }
       return new GoogleCloudStorageBidiReadChannel(
           storageWrapper.getStorage(),
           resourceId,
           gcsItemInfo,
           readOptions,
-          getBoundedThreadPool(readOptions.getBidiThreadCount()));
+          getBoundedThreadPool(readOptions.getBidiThreadCount()),
+          /* isMockMetadata= */ false,
+          /* callback= */ this);
     } else {
       return new GoogleCloudStorageClientReadChannel(
           storageWrapper.getStorage(),
@@ -1334,7 +1368,117 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     }
   }
 
-  private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
+  @Override
+  public void multiOpen(
+      Map<StorageResourceId, Long> resourcesAndSizes, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    logger.atFiner().log("multiOpen(%s, %s)", resourcesAndSizes, readOptions);
+    if (!storageOptions.isBidiEnabled()) {
+      return;
+    }
+    checkArgument(resourcesAndSizes != null, "resourcesAndSizes must not be null");
+
+    // Prewarming is speculative. To prevent thread exhaustion, we limit prewarming to
+    // the first N files in the request. The remaining files will be opened normally on-demand.
+    int prewarmCount = 0;
+    for (Map.Entry<StorageResourceId, Long> entry : resourcesAndSizes.entrySet()) {
+      if (prewarmCount++ >= MAX_PREWARM_FILES_PER_CALL) {
+        logger.atFine().log(
+            "Reached maximum prewarm limit of %d files. Skipping remaining files.",
+            MAX_PREWARM_FILES_PER_CALL);
+        break;
+      }
+      StorageResourceId resourceId = entry.getKey();
+      long size = (entry.getValue() == null || entry.getValue() < 0) ? -1L : entry.getValue();
+
+      StorageResourceId normalizedKey =
+          new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName());
+      ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+          channelPool.getIfPresent(normalizedKey);
+      if (queue != null && !queue.isEmpty()) {
+        logger.atFine().log("Skipping prewarm for %s, already cached", resourceId);
+        continue;
+      }
+
+      backgroundTasksThreadPool.submit(
+          () -> {
+            try {
+              GoogleCloudStorageBidiReadChannel channel =
+                  new GoogleCloudStorageBidiReadChannel(
+                      storageWrapper.getStorage(),
+                      resourceId,
+                      GoogleCloudStorageItemInfo.createObject(
+                          resourceId,
+                          /* creationTime= */ 0,
+                          /* modificationTime= */ 0,
+                          size,
+                          /* contentType= */ null,
+                          /* contentEncoding= */ null,
+                          /* metadata= */ null,
+                          /* generation= */ 0,
+                          /* metageneration= */ 0,
+                          /* verificationAttributes= */ null),
+                      readOptions,
+                      getBoundedThreadPool(readOptions.getBidiThreadCount()),
+                      /* isMockMetadata= */ true,
+                      /* callback= */ this);
+
+              channel.ensureMetadataInitialized();
+              returnChannel(resourceId, channel);
+            } catch (IOException e) {
+              logger.atWarning().withCause(e).log("Failed to prewarm channel for %s", resourceId);
+            }
+          });
+    }
+  }
+
+  private GoogleCloudStorageBidiReadChannel checkoutChannel(
+      StorageResourceId resourceId,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions) {
+    StorageResourceId normalizedKey = normalizeKey(resourceId);
+    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+        channelPool.getIfPresent(normalizedKey);
+    if (queue == null) {
+      return null;
+    }
+
+    while (true) {
+      GoogleCloudStorageBidiReadChannel channel = queue.poll();
+      if (channel == null) {
+        return null;
+      }
+      if (!channel.isOpen()) {
+        continue;
+      }
+
+      long idleTimeMs = System.currentTimeMillis() - channel.getLastAccessTime();
+      if (idleTimeMs > TimeUnit.SECONDS.toMillis(readOptions.getBidiCacheExpireSec())) {
+        channel.actualClose();
+        continue;
+      }
+
+      if (itemInfo != null && itemInfo.getContentGeneration() != 0) {
+        try {
+          channel.ensureMetadataInitialized();
+          if (channel.getGeneration() != itemInfo.getContentGeneration()) {
+            channel.actualClose();
+            channelPool.invalidate(normalizedKey);
+            return null;
+          }
+        } catch (IOException e) {
+          logger.atWarning().withCause(e).log("Failed to initialize metadata for cached channel");
+          channel.actualClose();
+          continue;
+        }
+      }
+
+      channel.resetState();
+      return channel;
+    }
+  }
+
+  private synchronized ExecutorService getBoundedThreadPool(int bidiThreadCount) {
     if (boundedThreadPool == null) {
       boundedThreadPool =
           new ThreadPoolExecutor(
@@ -1353,8 +1497,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   @Override
   public void close() {
+    this.closed = true;
     try {
       try {
+        if (channelPool != null) {
+          channelPool.invalidateAll();
+        }
         storageWrapper.close();
       } catch (Exception e) {
         logger.atWarning().withCause(e).log("Error occurred while closing the storage client");
@@ -1703,6 +1851,34 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
         blob.getGeneration() == null ? 0 : blob.getGeneration(),
         blob.getMetageneration() == null ? 0 : blob.getMetageneration(),
         new VerificationAttributes(md5Hash, crc32c));
+  }
+
+  @Override
+  public void returnChannel(
+      StorageResourceId resourceId, GoogleCloudStorageBidiReadChannel channel) {
+    StorageResourceId normalizedKey = normalizeKey(resourceId);
+    if (!closed && channel.isOpen()) {
+      ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+          channelPool.asMap().computeIfAbsent(normalizedKey, k -> new ConcurrentLinkedQueue<>());
+      queue.offer(channel);
+    } else {
+      channel.actualClose();
+    }
+  }
+
+  @Override
+  public void invalidate(StorageResourceId resourceId) {
+    channelPool.invalidate(normalizeKey(resourceId));
+  }
+
+  private StorageResourceId normalizeKey(StorageResourceId resourceId) {
+    return new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName());
+  }
+
+  @VisibleForTesting
+  Cache<StorageResourceId, ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel>>
+      getChannelPool() {
+    return channelPool;
   }
 
   public static Builder builder() {
