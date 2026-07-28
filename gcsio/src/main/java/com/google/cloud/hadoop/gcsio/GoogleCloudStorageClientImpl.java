@@ -160,14 +160,15 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
           BlobField.UPDATED);
 
   // Thread-pool used for background tasks.
-  private ExecutorService backgroundTasksThreadPool =
+  @VisibleForTesting
+  ExecutorService backgroundTasksThreadPool =
       Executors.newCachedThreadPool(
           new ThreadFactoryBuilder()
               .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
 
-  private ExecutorService boundedThreadPool;
+  @VisibleForTesting ExecutorService boundedThreadPool;
 
   private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
 
@@ -1398,45 +1399,49 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
           new StorageResourceId(resourceId.getBucketName(), resourceId.getObjectName());
       ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
           channelPool.getIfPresent(normalizedKey);
-      if (queue != null && !queue.isEmpty()) {
+      if (queue == null || queue.isEmpty()) {
+        prewarmChannel(resourceId, size, readOptions);
+      } else {
         logger.atFine().log("Skipping prewarm for %s, already cached", resourceId);
-        continue;
       }
-
-      backgroundTasksThreadPool.submit(
-          () -> {
-            GoogleCloudStorageBidiReadChannel channel = null;
-            try {
-              channel =
-                  new GoogleCloudStorageBidiReadChannel(
-                      storageWrapper.getStorage(),
-                      resourceId,
-                      GoogleCloudStorageItemInfo.createObject(
-                          resourceId,
-                          /* creationTime= */ 0,
-                          /* modificationTime= */ 0,
-                          size,
-                          /* contentType= */ null,
-                          /* contentEncoding= */ null,
-                          /* metadata= */ null,
-                          /* generation= */ 0,
-                          /* metageneration= */ 0,
-                          /* verificationAttributes= */ null),
-                      readOptions,
-                      getBoundedThreadPool(readOptions.getBidiThreadCount()),
-                      /* isMockMetadata= */ true,
-                      /* callback= */ this);
-
-              channel.ensureMetadataInitialized();
-              returnChannel(resourceId, channel);
-            } catch (IOException e) {
-              logger.atWarning().withCause(e).log("Failed to prewarm channel for %s", resourceId);
-              if (channel != null) {
-                channel.actualClose();
-              }
-            }
-          });
     }
+  }
+
+  private void prewarmChannel(
+      StorageResourceId resourceId, long size, GoogleCloudStorageReadOptions readOptions) {
+    backgroundTasksThreadPool.submit(
+        () -> {
+          GoogleCloudStorageBidiReadChannel channel = null;
+          try {
+            channel =
+                new GoogleCloudStorageBidiReadChannel(
+                    storageWrapper.getStorage(),
+                    resourceId,
+                    GoogleCloudStorageItemInfo.createObject(
+                        resourceId,
+                        /* creationTime= */ 0,
+                        /* modificationTime= */ 0,
+                        size,
+                        /* contentType= */ null,
+                        /* contentEncoding= */ null,
+                        /* metadata= */ null,
+                        /* generation= */ 0,
+                        /* metageneration= */ 0,
+                        /* verificationAttributes= */ null),
+                    readOptions,
+                    getBoundedThreadPool(readOptions.getBidiThreadCount()),
+                    /* isMockMetadata= */ true,
+                    /* callback= */ this);
+
+            channel.ensureMetadataInitialized();
+            returnChannel(resourceId, channel);
+          } catch (IOException e) {
+            logger.atWarning().withCause(e).log("Failed to prewarm channel for %s", resourceId);
+            if (channel != null) {
+              channel.actualClose();
+            }
+          }
+        });
   }
 
   private GoogleCloudStorageBidiReadChannel checkoutChannel(
@@ -1450,39 +1455,39 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
       return null;
     }
 
-    while (true) {
-      GoogleCloudStorageBidiReadChannel channel = queue.poll();
-      if (channel == null) {
-        return null;
-      }
-      if (!channel.isOpen()) {
-        continue;
-      }
-
-      long idleTimeNs = System.nanoTime() - channel.getLastAccessTimeNs();
-      if (idleTimeNs > TimeUnit.SECONDS.toNanos(readOptions.getBidiCacheExpireSec())) {
-        channel.actualClose();
-        continue;
-      }
-
-      if (itemInfo != null && itemInfo.getContentGeneration() != 0) {
+    GoogleCloudStorageBidiReadChannel channel;
+    while ((channel = queue.poll()) != null) {
+      if (channel.isOpen() && !isIdleAndClose(channel, readOptions)) {
+        if (itemInfo == null || itemInfo.getContentGeneration() == 0) {
+          channel.resetState();
+          return channel;
+        }
         try {
           channel.ensureMetadataInitialized();
-          if (channel.getGeneration() != itemInfo.getContentGeneration()) {
-            channel.actualClose();
-            channelPool.invalidate(normalizedKey);
-            return null;
+          if (channel.getGeneration() == itemInfo.getContentGeneration()) {
+            channel.resetState();
+            return channel;
           }
+          channel.actualClose();
+          channelPool.invalidate(normalizedKey);
+          return null;
         } catch (IOException e) {
           logger.atWarning().withCause(e).log("Failed to initialize metadata for cached channel");
           channel.actualClose();
-          continue;
         }
       }
-
-      channel.resetState();
-      return channel;
     }
+    return null;
+  }
+
+  private boolean isIdleAndClose(
+      GoogleCloudStorageBidiReadChannel channel, GoogleCloudStorageReadOptions readOptions) {
+    long idleTimeNs = System.nanoTime() - channel.getLastAccessTimeNs();
+    if (idleTimeNs > TimeUnit.SECONDS.toNanos(readOptions.getBidiCacheExpireSec())) {
+      channel.actualClose();
+      return true;
+    }
+    return false;
   }
 
   private synchronized ExecutorService getBoundedThreadPool(int bidiThreadCount) {

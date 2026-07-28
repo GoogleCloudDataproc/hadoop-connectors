@@ -26,6 +26,7 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Storage;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -62,6 +63,8 @@ public class GoogleCloudStorageClientBidiPoolingTest {
             /* downscopedAccessTokenFn= */ null,
             /* pCUExecutorService= */ null,
             /* featureHeaderGenerator= */ null);
+    gcsClient.backgroundTasksThreadPool = MoreExecutors.newDirectExecutorService();
+    gcsClient.boundedThreadPool = MoreExecutors.newDirectExecutorService();
   }
 
   @Test
@@ -84,17 +87,8 @@ public class GoogleCloudStorageClientBidiPoolingTest {
         .thenReturn(ApiFutures.immediateFuture(customSession));
 
     gcsClient.multiOpen(ImmutableMap.of(resourceId, 100L));
-
-    // Wait for cache to have 1 element using robust polling
-    long deadline = System.currentTimeMillis() + 2000;
-    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue = null;
-    while (System.currentTimeMillis() < deadline) {
-      queue = gcsClient.getChannelPool().getIfPresent(resourceId);
-      if (queue != null && !queue.isEmpty()) {
-        break;
-      }
-      Thread.sleep(50);
-    }
+    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+        gcsClient.getChannelPool().getIfPresent(resourceId);
 
     SeekableByteChannel channel1 = gcsClient.open(resourceId);
     channel1.close();
@@ -132,17 +126,8 @@ public class GoogleCloudStorageClientBidiPoolingTest {
         .thenReturn(ApiFutures.immediateFuture(customSession));
 
     gcsClient.multiOpen(ImmutableMap.of(resourceId, 100L));
-
-    // Wait for cache
-    long deadline = System.currentTimeMillis() + 2000;
-    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue = null;
-    while (System.currentTimeMillis() < deadline) {
-      queue = gcsClient.getChannelPool().getIfPresent(resourceId);
-      if (queue != null && !queue.isEmpty()) {
-        break;
-      }
-      Thread.sleep(50);
-    }
+    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+        gcsClient.getChannelPool().getIfPresent(resourceId);
     GoogleCloudStorageBidiReadChannel prewarmedChannel = queue != null ? queue.peek() : null;
 
     gcsClient.close();
@@ -187,17 +172,8 @@ public class GoogleCloudStorageClientBidiPoolingTest {
         .thenReturn(ApiFutures.immediateFuture(customSession2));
 
     gcsClient.multiOpen(ImmutableMap.of(resourceId, 100L));
-
-    // Wait for cache to have 1 element (the re-opened channel)
-    long deadline = System.currentTimeMillis() + 2000;
-    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue = null;
-    while (System.currentTimeMillis() < deadline) {
-      queue = gcsClient.getChannelPool().getIfPresent(resourceId);
-      if (queue != null && !queue.isEmpty()) {
-        break;
-      }
-      Thread.sleep(50);
-    }
+    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+        gcsClient.getChannelPool().getIfPresent(resourceId);
     GoogleCloudStorageBidiReadChannel channel = queue != null ? queue.peek() : null;
 
     assertThat(queue).isNotNull();
@@ -229,16 +205,8 @@ public class GoogleCloudStorageClientBidiPoolingTest {
         .thenReturn(ApiFutures.immediateFuture(customSession));
 
     gcsClient.multiOpen(ImmutableMap.of(resourceId, -1L));
-
-    long deadline = System.currentTimeMillis() + 2000;
-    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue = null;
-    while (System.currentTimeMillis() < deadline) {
-      queue = gcsClient.getChannelPool().getIfPresent(resourceId);
-      if (queue != null && !queue.isEmpty()) {
-        break;
-      }
-      Thread.sleep(50);
-    }
+    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+        gcsClient.getChannelPool().getIfPresent(resourceId);
     GoogleCloudStorageBidiReadChannel channel = queue != null ? queue.peek() : null;
 
     assertThat(queue).isNotNull();
@@ -315,9 +283,6 @@ public class GoogleCloudStorageClientBidiPoolingTest {
     }
 
     gcsClient.multiOpen(mapBuilder.build());
-
-    // Wait for tasks to complete
-    Thread.sleep(1000);
 
     // Verify cache has exactly 20 elements (since the limit is 20)
     int cachedCount = 0;
@@ -658,16 +623,8 @@ public class GoogleCloudStorageClientBidiPoolingTest {
           public void close() {}
         });
 
-    // Wait for the background executor callbacks to run and return the channel
-    long deadline = System.currentTimeMillis() + 2000;
-    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue = null;
-    while (System.currentTimeMillis() < deadline) {
-      queue = gcsClient.getChannelPool().getIfPresent(resourceId);
-      if (queue != null && !queue.isEmpty()) {
-        break;
-      }
-      Thread.sleep(50);
-    }
+    ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+        gcsClient.getChannelPool().getIfPresent(resourceId);
 
     // Verify it was successfully returned to the pool!
     assertThat(queue).isNotNull();

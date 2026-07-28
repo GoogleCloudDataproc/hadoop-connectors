@@ -149,11 +149,14 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   @Override
   public int read(ByteBuffer dst) throws IOException {
     lastAccessTimeNs = System.nanoTime();
-    throwIfNotOpen();
-    if (!dst.hasRemaining()) {
-      return 0;
+    synchronized (this) {
+      throwIfNotOpen();
+      pendingReads.incrementAndGet();
     }
     try {
+      if (!dst.hasRemaining()) {
+        return 0;
+      }
       ensureMetadataInitialized();
 
       if (position >= objectSize) {
@@ -200,6 +203,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     } catch (IOException e) {
       failed = true;
       throw e;
+    } finally {
+      decrementPendingReads(1);
     }
   }
 
@@ -282,16 +287,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
           blobReadSession.close();
         } else if (sessionFuture != null) {
           if (sessionFuture.isDone()) {
-            try {
-              BlobReadSession readSession = sessionFuture.get();
-              if (readSession != null) {
-                readSession.close();
-              }
-            } catch (Exception e) {
-              logger.atFine().withCause(e).log(
-                  "Failed to get/close completed BlobReadSession during close() for '%s'",
-                  resourceId);
-            }
+            closeCompletedSessionFuture();
           } else {
             sessionFuture.cancel(true);
           }
@@ -304,6 +300,18 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         blobReadSession = null;
         open = false;
       }
+    }
+  }
+
+  private void closeCompletedSessionFuture() {
+    try {
+      BlobReadSession readSession = sessionFuture.get();
+      if (readSession != null) {
+        readSession.close();
+      }
+    } catch (Exception e) {
+      logger.atFine().withCause(e).log(
+          "Failed to get/close completed BlobReadSession during close() for '%s'", resourceId);
     }
   }
 
