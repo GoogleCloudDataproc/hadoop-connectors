@@ -101,9 +101,45 @@ public class HttpTransportFactory {
       @Nullable RedactedString proxyPassword,
       @Nullable Duration readTimeout)
       throws IOException {
+    return createHttpTransport(
+        proxyAddress,
+        proxyUsername,
+        proxyPassword,
+        readTimeout,
+        /* useSystemDefaultTrustStore= */ false);
+  }
+
+  /**
+   * Create an {@link HttpTransport} based on a type class, optional HTTP proxy, optional socket
+   * read timeout and a choice of certificate trust store.
+   *
+   * @param proxyAddress The HTTP proxy to use with the transport. Of the form hostname:port. If
+   *     empty no proxy will be used.
+   * @param proxyUsername The HTTP proxy username to use with the transport. If empty no proxy
+   *     username will be used.
+   * @param proxyPassword The HTTP proxy password to use with the transport. If empty no proxy
+   *     password will be used.
+   * @param readTimeout The socket read timeout to apply immediately on all HTTP requests. If empty,
+   *     no socket read timeout will be applied.
+   * @param useSystemDefaultTrustStore When {@code true}, validate TLS certificates against the
+   *     JVM's default trust store instead of Google's bundled certificate trust store. This is
+   *     required for custom endpoints (e.g. Trusted Partner Cloud / non-default universe domains)
+   *     whose CA is not part of Google's bundle. Default Google endpoints should pass {@code
+   *     false}.
+   * @return The resulting HttpTransport.
+   * @throws IllegalArgumentException If the proxy address is invalid.
+   * @throws IOException If there is an issue connecting to Google's Certification server.
+   */
+  public static HttpTransport createHttpTransport(
+      @Nullable String proxyAddress,
+      @Nullable RedactedString proxyUsername,
+      @Nullable RedactedString proxyPassword,
+      @Nullable Duration readTimeout,
+      boolean useSystemDefaultTrustStore)
+      throws IOException {
     logger.atFiner().log(
-        "createHttpTransport(%s, %s, %s, %s)",
-        proxyAddress, proxyUsername, proxyPassword, readTimeout);
+        "createHttpTransport(%s, %s, %s, %s, %s)",
+        proxyAddress, proxyUsername, proxyPassword, readTimeout, useSystemDefaultTrustStore);
     checkArgument(
         proxyAddress != null || (proxyUsername == null && proxyPassword == null),
         "if proxyAddress is null then proxyUsername and proxyPassword should be null too");
@@ -117,7 +153,7 @@ public class HttpTransportFactory {
               ? new PasswordAuthentication(
                   proxyUsername.value(), proxyPassword.value().toCharArray())
               : null;
-      return createNetHttpTransport(proxyUri, proxyAuth, readTimeout);
+      return createNetHttpTransport(proxyUri, proxyAuth, readTimeout, useSystemDefaultTrustStore);
     } catch (GeneralSecurityException e) {
       throw new IOException(e);
     }
@@ -137,6 +173,29 @@ public class HttpTransportFactory {
       @Nullable URI proxyUri,
       @Nullable PasswordAuthentication proxyAuth,
       @Nullable Duration readTimeout)
+      throws IOException, GeneralSecurityException {
+    return createNetHttpTransport(
+        proxyUri, proxyAuth, readTimeout, /* useSystemDefaultTrustStore= */ false);
+  }
+
+  /**
+   * Create an {@link NetHttpTransport} for calling Google APIs with an optional HTTP proxy and a
+   * choice of certificate trust store.
+   *
+   * @param proxyUri Optional HTTP proxy URI to use with the transport.
+   * @param proxyAuth Optional HTTP proxy credentials to authenticate with the transport proxy.
+   * @param readTimeout Optional socket read timeout to apply immediately on all HTTP requests.
+   * @param useSystemDefaultTrustStore When {@code true}, validate TLS certificates against the
+   *     JVM's default trust store instead of Google's bundled certificate trust store.
+   * @return The resulting HttpTransport.
+   * @throws IOException If there is an issue connecting to Google's certification server.
+   * @throws GeneralSecurityException If there is a security issue with the keystore.
+   */
+  public static NetHttpTransport createNetHttpTransport(
+      @Nullable URI proxyUri,
+      @Nullable PasswordAuthentication proxyAuth,
+      @Nullable Duration readTimeout,
+      boolean useSystemDefaultTrustStore)
       throws IOException, GeneralSecurityException {
     checkArgument(
         proxyUri != null || proxyAuth == null,
@@ -159,15 +218,28 @@ public class HttpTransportFactory {
             }
           });
     }
-    return createNetHttpTransportBuilder(proxyUri, readTimeout).build();
+    return createNetHttpTransportBuilder(proxyUri, readTimeout, useSystemDefaultTrustStore).build();
   }
 
   @VisibleForTesting
   static NetHttpTransport.Builder createNetHttpTransportBuilder(
       @Nullable URI proxyUri, @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
-    NetHttpTransport.Builder builder =
-        new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
+    return createNetHttpTransportBuilder(
+        proxyUri, readTimeout, /* useSystemDefaultTrustStore= */ false);
+  }
+
+  @VisibleForTesting
+  static NetHttpTransport.Builder createNetHttpTransportBuilder(
+      @Nullable URI proxyUri, @Nullable Duration readTimeout, boolean useSystemDefaultTrustStore)
+      throws IOException, GeneralSecurityException {
+    // Default Google endpoints pin to Google's bundled certificate trust store. Custom endpoints
+    // (e.g. Trusted Partner Cloud / non-default universe domains) use a CA that is not part of that
+    // bundle, so fall back to the JVM's default trust store for them.
+    NetHttpTransport.Builder builder = new NetHttpTransport.Builder();
+    if (!useSystemDefaultTrustStore) {
+      builder.trustCertificates(GoogleUtils.getCertificateTrustStore());
+    }
     SSLSocketFactory wrappedSslSocketFactory =
         requireNonNullElseGet(
             builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory);
