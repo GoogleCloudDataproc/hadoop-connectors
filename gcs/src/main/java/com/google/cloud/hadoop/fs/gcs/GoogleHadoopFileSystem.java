@@ -690,6 +690,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     Map<StorageResourceId, Long> resourcesAndSizes = new LinkedHashMap<>();
     for (Map.Entry<Path, Long> entry : pathSizeMap.entrySet()) {
+      checkArgument(entry.getKey() != null, "pathSizeMap keys must not be null");
       long size = (entry.getValue() == null || entry.getValue() < 0) ? -1L : entry.getValue();
       URI gcsPath = getGcsPath(entry.getKey());
       resourcesAndSizes.put(

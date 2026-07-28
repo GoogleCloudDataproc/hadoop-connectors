@@ -74,7 +74,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   private final boolean isMockMetadata;
   private final BidiChannelCallback callback;
-  private volatile long lastAccessTime;
+  private volatile long lastAccessTimeNs;
   private volatile boolean failed = false;
   private final AtomicBoolean closeTriggered = new AtomicBoolean(false);
   private final AtomicInteger pendingReads = new AtomicInteger(0);
@@ -106,7 +106,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.readTimeout = readOptions.getGrpcReadTimeout();
     this.isMockMetadata = isMockMetadata;
     this.callback = callback;
-    this.lastAccessTime = System.currentTimeMillis();
+    this.lastAccessTimeNs = System.nanoTime();
 
     if (itemInfo != null) {
       if (isMockMetadata) {
@@ -148,7 +148,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
-    lastAccessTime = System.currentTimeMillis();
+    lastAccessTimeNs = System.nanoTime();
     throwIfNotOpen();
     if (!dst.hasRemaining()) {
       return 0;
@@ -257,7 +257,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     if (!closeTriggered.compareAndSet(false, true)) {
       return;
     }
@@ -307,8 +307,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
   }
 
-  private void decrementAndCheckClose() {
-    if (pendingReads.decrementAndGet() != 0 || !closeTriggered.get()) {
+  private synchronized void decrementPendingReads(int count) {
+    if (pendingReads.addAndGet(-count) != 0 || !closeTriggered.get()) {
       return;
     }
     if (returnTriggered.compareAndSet(false, true)) {
@@ -320,63 +320,77 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
   }
 
+  private void decrementAndCheckClose() {
+    decrementPendingReads(1);
+  }
+
   @Override
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    lastAccessTime = System.currentTimeMillis();
+    lastAccessTimeNs = System.nanoTime();
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
-    throwIfNotOpen();
+    synchronized (this) {
+      throwIfNotOpen();
+      pendingReads.addAndGet(ranges.size());
+    }
+    int queuedRangesCount = 0;
     try {
       ensureMetadataInitialized();
       long vectoredReadStartTime = System.currentTimeMillis();
       BlobReadSession session = getBlobReadSession();
-      pendingReads.addAndGet(ranges.size());
-      ranges.forEach(
-          range -> {
-            ApiFuture<DisposableByteString> futureBytes =
-                session.readAs(
-                    ReadProjectionConfigs.asFutureByteString()
-                        .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
-            ApiFutures.addCallback(
-                futureBytes,
-                new ApiFutureCallback<>() {
-                  @Override
-                  public void onFailure(Throwable t) {
-                    failed = true;
-                    range.getData().completeExceptionally(t);
-                    logger.atFiner().log(
-                        "Vectored Read failed for range starting from %d with length %d",
-                        range.getOffset(), range.getLength());
-                    decrementAndCheckClose();
-                  }
+      for (VectoredIORange range : ranges) {
+        ApiFuture<DisposableByteString> futureBytes =
+            session.readAs(
+                ReadProjectionConfigs.asFutureByteString()
+                    .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
+        ApiFutures.addCallback(
+            futureBytes,
+            new ApiFutureCallback<>() {
+              @Override
+              public void onFailure(Throwable t) {
+                failed = true;
+                range.getData().completeExceptionally(t);
+                logger.atFiner().log(
+                    "Vectored Read failed for range starting from %d with length %d",
+                    range.getOffset(), range.getLength());
+                decrementAndCheckClose();
+              }
 
-                  @Override
-                  public void onSuccess(DisposableByteString disposableByteString) {
-                    try {
-                      long bytesRead =
-                          processBytesAndCompleteRange(disposableByteString, range, allocate);
-                      logger.atFiner().log(
-                          "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
-                          range.getOffset(),
-                          range.getLength(),
-                          bytesRead,
-                          System.currentTimeMillis() - vectoredReadStartTime);
-                    } catch (Throwable t) {
-                      failed = true;
-                      range.getData().completeExceptionally(t);
-                      logger.atFiner().log(
-                          "Vectored Read failed for range starting from %d with length %d",
-                          range.getOffset(), range.getLength());
-                    } finally {
-                      decrementAndCheckClose();
-                    }
-                  }
-                },
-                boundedThreadPool);
-          });
-    } catch (IOException e) {
+              @Override
+              public void onSuccess(DisposableByteString disposableByteString) {
+                try {
+                  long bytesRead =
+                      processBytesAndCompleteRange(disposableByteString, range, allocate);
+                  logger.atFiner().log(
+                      "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
+                      range.getOffset(),
+                      range.getLength(),
+                      bytesRead,
+                      System.currentTimeMillis() - vectoredReadStartTime);
+                } catch (Throwable t) {
+                  failed = true;
+                  range.getData().completeExceptionally(t);
+                  logger.atFiner().log(
+                      "Vectored Read failed for range starting from %d with length %d",
+                      range.getOffset(), range.getLength());
+                } finally {
+                  decrementAndCheckClose();
+                }
+              }
+            },
+            boundedThreadPool);
+        queuedRangesCount++;
+      }
+    } catch (Throwable t) {
       failed = true;
-      throw e;
+      int unqueued = ranges.size() - queuedRangesCount;
+      if (unqueued > 0) {
+        decrementPendingReads(unqueued);
+      }
+      if (t instanceof IOException) {
+        throw (IOException) t;
+      }
+      throw new IOException(t);
     }
   }
 
@@ -798,8 +812,8 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
   }
 
-  long getLastAccessTime() {
-    return lastAccessTime;
+  long getLastAccessTimeNs() {
+    return lastAccessTimeNs;
   }
 
   long getGeneration() {
@@ -814,5 +828,6 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.closeTriggered.set(false);
     this.returnTriggered.set(false);
     this.pendingReads.set(0);
+    this.lastAccessTimeNs = System.nanoTime();
   }
 }

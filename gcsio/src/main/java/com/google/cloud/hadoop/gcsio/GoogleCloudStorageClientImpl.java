@@ -1373,6 +1373,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
       Map<StorageResourceId, Long> resourcesAndSizes, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("multiOpen(%s, %s)", resourcesAndSizes, readOptions);
+    if (closed) {
+      throw new IllegalStateException("Storage client is closed");
+    }
     if (!storageOptions.isBidiEnabled()) {
       return;
     }
@@ -1402,8 +1405,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
 
       backgroundTasksThreadPool.submit(
           () -> {
+            GoogleCloudStorageBidiReadChannel channel = null;
             try {
-              GoogleCloudStorageBidiReadChannel channel =
+              channel =
                   new GoogleCloudStorageBidiReadChannel(
                       storageWrapper.getStorage(),
                       resourceId,
@@ -1427,6 +1431,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
               returnChannel(resourceId, channel);
             } catch (IOException e) {
               logger.atWarning().withCause(e).log("Failed to prewarm channel for %s", resourceId);
+              if (channel != null) {
+                channel.actualClose();
+              }
             }
           });
     }
@@ -1452,8 +1459,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
         continue;
       }
 
-      long idleTimeMs = System.currentTimeMillis() - channel.getLastAccessTime();
-      if (idleTimeMs > TimeUnit.SECONDS.toMillis(readOptions.getBidiCacheExpireSec())) {
+      long idleTimeNs = System.nanoTime() - channel.getLastAccessTimeNs();
+      if (idleTimeNs > TimeUnit.SECONDS.toNanos(readOptions.getBidiCacheExpireSec())) {
         channel.actualClose();
         continue;
       }
@@ -1479,6 +1486,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
   }
 
   private synchronized ExecutorService getBoundedThreadPool(int bidiThreadCount) {
+    if (closed) {
+      throw new IllegalStateException("Storage client is closed");
+    }
     if (boundedThreadPool == null) {
       boundedThreadPool =
           new ThreadPoolExecutor(
