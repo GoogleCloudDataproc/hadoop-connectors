@@ -244,6 +244,17 @@ public interface GoogleCloudStorageFileSystem {
   }
 
   /**
+   * Return all the files which are lexicographically equal or greater than the provided path. This
+   * is an experimental API and can change without notice.
+   *
+   * @param startsFrom Given path.
+   * @return Information about all the files which satisfies the criteria.
+   */
+  default List<FileInfo> listFileInfoStartingFrom(URI startsFrom) throws IOException {
+    return listFileInfoStartingFrom(startsFrom, ListFileOptions.DEFAULT);
+  }
+
+  /**
    * If the given path points to a directory then the information about its children is returned,
    * otherwise information about the given file is returned.
    *
@@ -252,6 +263,16 @@ public interface GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    */
   List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException;
+
+  /**
+   * Return all the files which are lexicographically equal or greater than the provided path. This
+   * is an experimental API and can change without notice.
+   *
+   * @param startsFrom Given path.
+   * @return Information about all the files which satisfies the criteria.
+   */
+  List<FileInfo> listFileInfoStartingFrom(URI startsFrom, ListFileOptions listOptions)
+      throws IOException;
 
   /**
    * Returns the list of folder resources in the prefix. It lists all the folder resources

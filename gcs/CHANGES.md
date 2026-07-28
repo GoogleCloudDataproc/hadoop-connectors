@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add listStatusStartingFrom API.
 
 ## 3.0.19 - 2026-03-26
 1. Enable move by default
