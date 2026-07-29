@@ -652,5 +652,4 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(fs.hasPathCapability(hnsPath, "fs.gs.capability.liststatus.starting.from"))
         .isFalse();
   }
-
 }
