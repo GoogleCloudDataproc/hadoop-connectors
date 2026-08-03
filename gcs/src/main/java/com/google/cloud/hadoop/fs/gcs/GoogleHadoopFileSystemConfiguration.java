@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.getConfigKeyPrefixes;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.toIntExact;
 
@@ -64,7 +65,15 @@ public class GoogleHadoopFileSystemConfiguration {
   // Configuration settings.
   // -----------------------------------------------------------------
 
-  /** Configuration key for the Cloud Storage API endpoint root URL. */
+  /**
+   * Configuration key for the Cloud Storage API endpoint root URL.
+   *
+   * <p>This only overrides the JSON/REST endpoint and carries no universe semantics (no credential
+   * universe-domain validation, and no effect on the gRPC endpoint). For Trusted Partner Cloud /
+   * multi-universe (TPC) deployments, prefer {@link #GCS_UNIVERSE_DOMAIN}, which routes both the
+   * JSON/REST and gRPC clients and validates the credentials' universe domain. When both are set,
+   * this explicit root URL takes precedence over the universe-domain-derived endpoint.
+   */
   public static final HadoopConfigurationProperty<String> GCS_ROOT_URL =
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.root.url", GoogleCloudStorageOptions.DEFAULT.getStorageRootUrl());
@@ -73,6 +82,19 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_SERVICE_PATH =
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.service.path", GoogleCloudStorageOptions.DEFAULT.getStorageServicePath());
+
+  /**
+   * Configuration key for the Cloud Storage universe domain (e.g. for Trusted Partner Cloud /
+   * multi-universe deployments). When unset, the {@value #GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR}
+   * environment variable is used; if that is also unset, the default Google universe ({@code
+   * googleapis.com}) is targeted.
+   */
+  public static final HadoopConfigurationProperty<String> GCS_UNIVERSE_DOMAIN =
+      new HadoopConfigurationProperty<>("fs.gs.universe.domain", "");
+
+  /** Environment variable consulted as a fallback for the universe domain. */
+  @VisibleForTesting
+  static final String GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR = "GOOGLE_CLOUD_UNIVERSE_DOMAIN";
 
   /**
    * Key for the permissions that we report a file or directory to have. Can either be octal or
@@ -714,6 +736,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId))
         .setStorageRootUrl(GCS_ROOT_URL.get(config, config::get))
         .setStorageServicePath(GCS_SERVICE_PATH.get(config, config::get))
+        .setUniverseDomain(
+            resolveUniverseDomain(config, System.getenv(GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR)))
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
@@ -724,6 +748,25 @@ public class GoogleHadoopFileSystemConfiguration {
         .setFinalizeBeforeClose(
             GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean))
         .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean));
+  }
+
+  /**
+   * Resolves the universe domain to target. Precedence: the {@code fs.gs.universe.domain} property,
+   * then the {@code GOOGLE_CLOUD_UNIVERSE_DOMAIN} environment variable, then {@code null} (the
+   * default Google universe, googleapis.com).
+   *
+   * @param config the Hadoop configuration to read the property from
+   * @param envUniverseDomain the value of the {@code GOOGLE_CLOUD_UNIVERSE_DOMAIN} environment
+   *     variable (passed in for testability), may be {@code null}
+   * @return the resolved universe domain, or {@code null} for the default Google universe
+   */
+  @VisibleForTesting
+  static String resolveUniverseDomain(Configuration config, String envUniverseDomain) {
+    String fromConfig = GCS_UNIVERSE_DOMAIN.get(config, config::get);
+    if (!isNullOrEmpty(fromConfig)) {
+      return fromConfig;
+    }
+    return isNullOrEmpty(envUniverseDomain) ? null : envUniverseDomain;
   }
 
   @VisibleForTesting

@@ -22,9 +22,11 @@ import com.google.auth.Credentials;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.storage.GrpcStorageOptions;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
@@ -148,6 +150,7 @@ public class StorageClientProvider {
         .setIsTracingEnabled(storageOptions.isTraceLogEnabled())
         .setWriteChannelOptions(storageOptions.getWriteChannelOptions())
         .setProjectId(storageOptions.getProjectId())
+        .setUniverseDomain(Strings.emptyToNull(storageOptions.getUniverseDomain()))
         .build();
   }
 
@@ -175,18 +178,32 @@ public class StorageClientProvider {
     final ImmutableMap<String, String> headers =
         getUpdatedHeaders(storageOptions, featureHeaderGenerator);
 
-    return StorageOptions.grpc()
-        .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
-        .setHeaderProvider(() -> headers)
-        .setGrpcInterceptorProvider(
-            () -> getInterceptors(interceptors, storageOptions, downscopedAccessTokenFn))
-        .setCredentials(
-            credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
-        .setBlobWriteSessionConfig(
-            getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
-        .setProjectId(storageOptions.getProjectId())
-        .build()
-        .getService();
+    String universeDomain = storageOptions.getUniverseDomain();
+    boolean nonDefaultUniverse =
+        !Strings.isNullOrEmpty(universeDomain)
+            && !Credentials.GOOGLE_DEFAULT_UNIVERSE.equals(universeDomain);
+    // Direct Google Access (DirectPath) is only available in the default universe
+    // (googleapis.com); disable it for any other universe so requests route through
+    // storage.<universeDomain>.
+    boolean attemptDirectPath = storageOptions.isDirectPathPreferred() && !nonDefaultUniverse;
+
+    GrpcStorageOptions.Builder storageOptionsBuilder =
+        StorageOptions.grpc()
+            .setAttemptDirectPath(attemptDirectPath)
+            .setHeaderProvider(() -> headers)
+            .setGrpcInterceptorProvider(
+                () -> getInterceptors(interceptors, storageOptions, downscopedAccessTokenFn))
+            .setCredentials(
+                credentials != null ? credentials : getNoCredentials(downscopedAccessTokenFn))
+            .setBlobWriteSessionConfig(
+                getSessionConfig(storageOptions.getWriteChannelOptions(), pCUExecutorService))
+            .setProjectId(storageOptions.getProjectId());
+    if (!Strings.isNullOrEmpty(universeDomain)) {
+      // The storage client rewrites the host to https://storage.<universeDomain> when a universe
+      // domain is set, so an explicit setHost() is not required here.
+      storageOptionsBuilder.setUniverseDomain(universeDomain);
+    }
+    return storageOptionsBuilder.build().getService();
   }
 
   private static ImmutableList<ClientInterceptor> getInterceptors(

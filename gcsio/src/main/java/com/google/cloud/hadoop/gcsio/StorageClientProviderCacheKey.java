@@ -50,6 +50,10 @@ public abstract class StorageClientProviderCacheKey {
 
   public abstract boolean getIsDirectPathPreferred();
 
+  /** Universe domain to target, or null for the default Google universe (googleapis.com). */
+  @Nullable
+  public abstract String getUniverseDomain();
+
   public abstract StorageClientProviderCacheKey.Builder toBuilder();
 
   @AutoValue.Builder
@@ -67,6 +71,8 @@ public abstract class StorageClientProviderCacheKey {
     public abstract Builder setProjectId(String value);
 
     public abstract Builder setIsDirectPathPreferred(boolean value);
+
+    public abstract Builder setUniverseDomain(@Nullable String value);
 
     public abstract StorageClientProviderCacheKey build();
   }

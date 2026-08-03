@@ -122,6 +122,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
+          put("fs.gs.universe.domain", "");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.operation.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
@@ -302,6 +303,64 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
     assertThat(options.getStorageRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
     assertThat(options.getStorageServicePath()).isEqualTo("storage/dev_v1/");
+  }
+
+  @Test
+  public void resolveUniverseDomain_unset_returnsNull() {
+    Configuration config = new Configuration();
+
+    assertThat(
+            GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(
+                config, /* envUniverseDomain= */ null))
+        .isNull();
+  }
+
+  @Test
+  public void resolveUniverseDomain_emptyEnv_returnsNull() {
+    Configuration config = new Configuration();
+
+    assertThat(GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(config, "")).isNull();
+  }
+
+  @Test
+  public void resolveUniverseDomain_fromEnvOnly_returnsEnv() {
+    Configuration config = new Configuration();
+
+    assertThat(
+            GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(config, "env-universe.com"))
+        .isEqualTo("env-universe.com");
+  }
+
+  @Test
+  public void resolveUniverseDomain_fromConfigOnly_returnsConfig() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.universe.domain", "config-universe.com");
+
+    assertThat(
+            GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(
+                config, /* envUniverseDomain= */ null))
+        .isEqualTo("config-universe.com");
+  }
+
+  @Test
+  public void resolveUniverseDomain_configWinsOverEnv() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.universe.domain", "config-universe.com");
+
+    assertThat(
+            GoogleHadoopFileSystemConfiguration.resolveUniverseDomain(config, "env-universe.com"))
+        .isEqualTo("config-universe.com");
+  }
+
+  @Test
+  public void getGcsOptionsBuilder_propagatesConfiguredUniverseDomain() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.universe.domain", "config-universe.com");
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.getUniverseDomain()).isEqualTo("config-universe.com");
   }
 
   @Test
