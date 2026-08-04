@@ -438,7 +438,7 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_EXPIRE_SEC =
       new HadoopConfigurationProperty<>("fs.gs.bidi.cache.expire.sec", 600);
 
-  /** Configuration key for maximum unique files cached in the pool. */
+  /** Configuration key for maximum unique objects cached in the pool. */
   public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_MAX_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.bidi.cache.max.size", 100);
 

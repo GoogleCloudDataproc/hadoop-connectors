@@ -1356,7 +1356,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
           gcsItemInfo,
           readOptions,
           getBoundedThreadPool(readOptions.getBidiThreadCount()),
-          /* isMockMetadata= */ false,
+          /* isSpeculativeMetadata= */ false,
           /* callback= */ this);
     } else {
       return new GoogleCloudStorageClientReadChannel(
@@ -1430,7 +1430,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
                         /* verificationAttributes= */ null),
                     readOptions,
                     getBoundedThreadPool(readOptions.getBidiThreadCount()),
-                    /* isMockMetadata= */ true,
+                    /* isSpeculativeMetadata= */ true,
                     /* callback= */ this);
 
             channel.ensureMetadataInitialized();
@@ -1876,6 +1876,9 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
       ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
           channelPool.asMap().computeIfAbsent(normalizedKey, k -> new ConcurrentLinkedQueue<>());
       queue.offer(channel);
+      if (closed) {
+        channelPool.invalidate(normalizedKey);
+      }
     } else {
       channel.actualClose();
     }

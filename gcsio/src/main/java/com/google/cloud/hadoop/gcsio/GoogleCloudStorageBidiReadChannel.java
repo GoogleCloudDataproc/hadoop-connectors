@@ -72,7 +72,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private ByteBuffer internalBuffer;
   private long bufferStartPosition = -1;
 
-  private final boolean isMockMetadata;
+  private final boolean isSpeculativeMetadata;
   private final BidiChannelCallback callback;
   private volatile long lastAccessTimeNs;
   private volatile boolean failed = false;
@@ -96,7 +96,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       @Nullable GoogleCloudStorageItemInfo itemInfo,
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool,
-      boolean isMockMetadata,
+      boolean isSpeculativeMetadata,
       @Nullable BidiChannelCallback callback)
       throws IOException {
     this.storage = storage;
@@ -104,12 +104,12 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     this.readOptions = readOptions;
     this.boundedThreadPool = boundedThreadPool;
     this.readTimeout = readOptions.getGrpcReadTimeout();
-    this.isMockMetadata = isMockMetadata;
+    this.isSpeculativeMetadata = isSpeculativeMetadata;
     this.callback = callback;
     this.lastAccessTimeNs = System.nanoTime();
 
     if (itemInfo != null) {
-      if (isMockMetadata) {
+      if (isSpeculativeMetadata) {
         this.objectSize = itemInfo.getSize();
         this.gzipEncoded = false;
       } else {
@@ -149,9 +149,12 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   @Override
   public int read(ByteBuffer dst) throws IOException {
     lastAccessTimeNs = System.nanoTime();
-    synchronized (this) {
+    pendingReads.incrementAndGet();
+    try {
       throwIfNotOpen();
-      pendingReads.incrementAndGet();
+    } catch (IOException e) {
+      decrementPendingReads(1);
+      throw e;
     }
     try {
       if (!dst.hasRemaining()) {
@@ -262,7 +265,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
     if (!closeTriggered.compareAndSet(false, true)) {
       return;
     }
@@ -315,7 +318,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
   }
 
-  private synchronized void decrementPendingReads(int count) {
+  private void decrementPendingReads(int count) {
     if (pendingReads.addAndGet(-count) != 0 || !closeTriggered.get()) {
       return;
     }
@@ -337,9 +340,12 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       throws IOException {
     lastAccessTimeNs = System.nanoTime();
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
-    synchronized (this) {
+    pendingReads.addAndGet(ranges.size());
+    try {
       throwIfNotOpen();
-      pendingReads.addAndGet(ranges.size());
+    } catch (IOException e) {
+      decrementPendingReads(ranges.size());
+      throw e;
     }
     int queuedRangesCount = 0;
     try {
@@ -424,7 +430,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   private void throwIfNotOpen() throws IOException {
-    if (!isOpen()) {
+    if (!isOpen() || closeTriggered.get()) {
       GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();
     }
@@ -713,7 +719,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
           BlobInfo blobInfo = session.getBlobInfo();
           if (blobInfo != null) {
             long realSize = blobInfo.getSize();
-            if (isMockMetadata && this.objectSize >= 0 && realSize != this.objectSize) {
+            if (isSpeculativeMetadata && this.objectSize >= 0 && realSize != this.objectSize) {
               blobInfo = handleSizeMismatch(session, realSize);
               realSize = blobInfo.getSize();
             }

@@ -77,6 +77,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
@@ -95,7 +96,6 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -675,9 +675,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /**
-   * Prewarms channels for reading multiple Hadoop paths. This is GCS-specific extension API.
+   * Speculatively prewarms channels for reading multiple Hadoop paths. This is a GCS-specific
+   * extension API.
    *
-   * <p>This is an experimental API and can change without notice.
+   * <p>This is an experimental API and can change without notice. Prewarming is best-effort;
+   * individual prewarming failures will not cause this API to fail, and the number of channels
+   * prewarmed may be limited by cache capacity.
    *
    * @param pathSizeMap Map of Hadoop paths to their expected sizes.
    * @throws IOException on IO error
@@ -688,7 +691,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     logger.atFine().log("multiOpen(pathSizeMap=%s)", pathSizeMap);
 
-    Map<StorageResourceId, Long> resourcesAndSizes = new LinkedHashMap<>();
+    Map<StorageResourceId, Long> resourcesAndSizes =
+        Maps.newLinkedHashMapWithExpectedSize(pathSizeMap.size());
     for (Map.Entry<Path, Long> entry : pathSizeMap.entrySet()) {
       checkArgument(entry.getKey() != null, "pathSizeMap keys must not be null");
       long size = (entry.getValue() == null || entry.getValue() < 0) ? -1L : entry.getValue();
