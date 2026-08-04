@@ -427,11 +427,29 @@ Knobs configure the vectoredRead API
 
 *   `fs.gs.storage.root.url` (default: `https://storage.googleapis.com/`)
 
-    Google Cloud Storage root URL.
+    Google Cloud Storage root URL. This only overrides the JSON/REST endpoint and
+    carries no universe semantics (no credential universe-domain validation, and
+    it does not affect the gRPC endpoint). For Trusted Partner Cloud /
+    multi-universe (TPC) deployments, prefer `fs.gs.universe.domain`, which routes
+    both the JSON/REST and gRPC clients and validates the credentials' universe
+    domain. When both are set, this explicit root URL takes precedence over the
+    universe-domain-derived endpoint.
 
 *   `fs.gs.storage.service.path` (default: `storage/v1/`)
 
     Google Cloud Storage service path.
+
+*   `fs.gs.universe.domain` (default: none)
+
+    Universe domain to target, for Trusted Partner Cloud / multi-universe
+    deployments (e.g. `my-partner-universe.com`). When set, both the JSON/REST
+    and gRPC clients route requests to `storage.<universe-domain>` and validate
+    it against the credentials' universe domain. When unset, the
+    `GOOGLE_CLOUD_UNIVERSE_DOMAIN` environment variable is used as a fallback;
+    if that is also unset, the default Google universe (`googleapis.com`) is
+    targeted. An explicitly configured `fs.gs.storage.root.url` takes precedence
+    over the universe-domain-derived endpoint. Direct Google Access (DirectPath)
+    is automatically disabled for non-default universes.
 
 ### Fadvise feature configuration
 
