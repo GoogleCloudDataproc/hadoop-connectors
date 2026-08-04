@@ -57,6 +57,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
       new HashMap<>() {
         {
           put("fs.gs.analytics.core.enable", false);
+          put("fs.gs.analytics.write.enable", false);
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
