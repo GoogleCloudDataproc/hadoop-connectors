@@ -224,7 +224,8 @@ class GoogleHadoopOutputStream extends OutputStream
 
       GoogleCloudStorageOutputStream rawStream =
           ghfs.createAnalyticsCoreOutputStream(itemId, writeOptions);
-      return new GcsAnalyticsCoreOutputStreamWrapper(rawStream);
+      OutputStream outputStream = new GcsAnalyticsCoreOutputStreamWrapper(rawStream);
+      return maybeWrapInBufferedOutputStream(ghfs, outputStream);
     } else {
       GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
       WritableByteChannel channel;
@@ -237,10 +238,19 @@ class GoogleHadoopOutputStream extends OutputStream
                 .initCause(e);
       }
       OutputStream outputStream = Channels.newOutputStream(channel);
-      int bufferSize =
-          gcsfs.getOptions().getCloudStorageOptions().getWriteChannelOptions().getBufferSize();
-      return bufferSize > 0 ? new BufferedOutputStream(outputStream, bufferSize) : outputStream;
+      return maybeWrapInBufferedOutputStream(ghfs, outputStream);
     }
+  }
+
+  private static OutputStream maybeWrapInBufferedOutputStream(
+      GoogleHadoopFileSystem ghfs, OutputStream outputStream) {
+    int bufferSize =
+        ghfs.getGcsFs()
+            .getOptions()
+            .getCloudStorageOptions()
+            .getWriteChannelOptions()
+            .getBufferSize();
+    return bufferSize > 0 ? new BufferedOutputStream(outputStream, bufferSize) : outputStream;
   }
 
   @Override

@@ -26,14 +26,15 @@ import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
-import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsItemId;
 import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
@@ -43,6 +44,7 @@ import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -353,7 +355,6 @@ public class GoogleHadoopOutputStreamTest {
   public void write_withAnalyticsWriteEnabled_delegatesToAnalyticsOutputStream() throws Exception {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
-
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_write.txt"));
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
@@ -361,18 +362,23 @@ public class GoogleHadoopOutputStreamTest {
             analyticsGhfs.getGcsPath(objectPath),
             CreateFileOptions.DEFAULT,
             new FileSystem.Statistics(analyticsGhfs.getScheme()));
-
     byte[] data = {0x0f, 0x0e, 0x0e, 0x0d};
-    fout.write(data, 0, data.length);
 
-    verify(mockStream).write(data, 0, data.length);
+    fout.write(data, 0, data.length);
+    fout.close();
+
+    // Verify that write was called on the GoogleCloudStorageOutputStream with the same arguments
+    verify(mockStream)
+        .write(
+            argThat(buf -> Arrays.equals(Arrays.copyOfRange(buf, 0, data.length), data)),
+            eq(0),
+            eq(data.length));
   }
 
   @Test
   public void close_withAnalyticsWriteEnabled_closesAnalyticsOutputStream() throws Exception {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
-
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_close.txt"));
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
@@ -413,7 +419,6 @@ public class GoogleHadoopOutputStreamTest {
                     analyticsGhfs.getGcsPath(objectPath),
                     CreateFileOptions.DEFAULT,
                     new FileSystem.Statistics(analyticsGhfs.getScheme())));
-
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -431,12 +436,9 @@ public class GoogleHadoopOutputStreamTest {
 
           @Override
           GcsFileSystem getAnalyticsCoreGcsFs() {
-            GcsFileSystem mockFs = mock(GcsFileSystem.class);
-            GcsFileSystemOptions options = mock(GcsFileSystemOptions.class);
-            GcsClientOptions clientOptions = mock(GcsClientOptions.class);
-            when(mockFs.getFileSystemOptions()).thenReturn(options);
-            when(options.getGcsClientOptions()).thenReturn(clientOptions);
-            when(clientOptions.getGcsWriteOptions()).thenReturn(GcsWriteOptions.builder().build());
+            GcsFileSystem mockFs = mock(GcsFileSystem.class, RETURNS_DEEP_STUBS);
+            when(mockFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions())
+                .thenReturn(GcsWriteOptions.builder().build());
             return mockFs;
           }
 
