@@ -34,6 +34,15 @@ final class AnalyticsCoreConfigMapper {
   static final String RANDOM_READ_MIN_REQ_SIZE_KEY = "analytics-core.random-read.min-request-size";
   static final String ADAPTIVE_READ_SEQ_THRESHOLD_KEY =
       "analytics-core.adaptive-read.sequential-read-threshold";
+  static final String UPLOAD_CHUNK_SIZE_KEY = "channel.write.chunk-size-bytes";
+  static final String UPLOAD_TYPE_KEY = "channel.write.upload-type";
+  static final String TEMPORARY_PATHS_KEY = "channel.write.temporary-paths";
+  static final String PCU_BUFFER_COUNT_KEY = "channel.write.pcu.buffer.count";
+  static final String PCU_BUFFER_CAPACITY_KEY = "channel.write.pcu.buffer.capacity-bytes";
+  static final String PCU_PART_FILE_CLEANUP_TYPE_KEY = "channel.write.pcu.part-file.cleanup-type";
+  static final String PCU_PART_FILE_NAME_PREFIX_KEY = "channel.write.pcu.part-file.name-prefix";
+  static final String ENCRYPTION_KEY_KEY = "encryption-key";
+  static final String CHECKSUM_VALIDATION_ENABLED_KEY = "channel.write.checksum-validation.enabled";
 
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
@@ -62,6 +71,26 @@ final class AnalyticsCoreConfigMapper {
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(),
               FILE_ACCESS_PATTERN_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(),
+              UPLOAD_CHUNK_SIZE_KEY)
+          .put(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey(), UPLOAD_TYPE_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_COUNT.getKey(),
+              PCU_BUFFER_COUNT_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_CAPACITY.getKey(),
+              PCU_BUFFER_CAPACITY_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey(),
+              PCU_PART_FILE_CLEANUP_TYPE_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_NAME_PREFIX.getKey(),
+              PCU_PART_FILE_NAME_PREFIX_KEY)
+          .put(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), ENCRYPTION_KEY_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(),
+              CHECKSUM_VALIDATION_ENABLED_KEY)
           .build();
 
   private AnalyticsCoreConfigMapper() {
@@ -84,9 +113,24 @@ final class AnalyticsCoreConfigMapper {
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
 
+    // Handle temporary paths: use fs.gs.write.temporary.dirs if set, otherwise fallback to
+    // hadoop.tmp.dir
+    String tempPaths =
+        mappedProperties.remove(
+            GoogleHadoopFileSystemConfiguration.GCS_WRITE_TEMPORARY_FILES_PATH.getKey());
+    if (tempPaths == null || tempPaths.isEmpty()) {
+      tempPaths = config.get("hadoop.tmp.dir");
+    }
+    if (tempPaths != null && !tempPaths.isEmpty()) {
+      mappedProperties.put(prefix + TEMPORARY_PATHS_KEY, tempPaths);
+    }
+
     // User agent is computed from GHFS_ID and an optional suffix, not a simple 1:1 mapping.
     mappedProperties.put(
         prefix + USER_AGENT_KEY, GoogleHadoopFileSystemConfiguration.getApplicationName(config));
+
+    // Ensure client.type is explicitly removed from mapped properties to prevent crashes
+    mappedProperties.remove(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey());
 
     return mappedProperties;
   }
@@ -97,9 +141,16 @@ final class AnalyticsCoreConfigMapper {
     if (value != null) {
       if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
         value = toFileAccessPattern(value);
+      } else if (hadoopKey.equals(
+          GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey())) {
+        value = toChecksumValidationEnabled(value);
       }
       map.put(analyticsCoreKey, value);
     }
+  }
+
+  private static String toChecksumValidationEnabled(String checksumType) {
+    return String.valueOf(!"NONE".equalsIgnoreCase(checksumType));
   }
 
   private static String toFileAccessPattern(String fadvise) {

@@ -54,6 +54,22 @@ public class AnalyticsCoreConfigMapperTest {
         .isEqualTo("100");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.ADAPTIVE_READ_SEQ_THRESHOLD_KEY))
         .isEqualTo("5");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_CHUNK_SIZE_KEY))
+        .isEqualTo("33554432");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_TYPE_KEY))
+        .isEqualTo("CHUNK_UPLOAD");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PCU_BUFFER_COUNT_KEY))
+        .isEqualTo("5");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PCU_BUFFER_CAPACITY_KEY))
+        .isEqualTo("16777216");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PCU_PART_FILE_CLEANUP_TYPE_KEY))
+        .isEqualTo("ALWAYS");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PCU_PART_FILE_NAME_PREFIX_KEY))
+        .isEqualTo("prefix-");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.ENCRYPTION_KEY_KEY))
+        .isEqualTo("my-csek-key");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.CHECKSUM_VALIDATION_ENABLED_KEY))
+        .isEqualTo("true");
     assertThat(mapped).containsAtLeastEntriesIn(EXPECTED_MANDATORY_MAPPINGS);
   }
 
@@ -98,6 +114,35 @@ public class AnalyticsCoreConfigMapperTest {
     assertThat(
             mapped.containsKey(
                 GoogleHadoopFileSystemConfiguration.GCS_FADVISE_REQUEST_TRACK_COUNT.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_COUNT.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_CAPACITY.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_NAME_PREFIX.getKey()))
+        .isFalse();
+    assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey()))
+        .isFalse();
+    assertThat(
+            mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey()))
+        .isFalse();
+    assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey()))
         .isFalse();
   }
 
@@ -189,6 +234,57 @@ public class AnalyticsCoreConfigMapperTest {
         GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(),
         "100");
     config.set(GoogleHadoopFileSystemConfiguration.GCS_FADVISE_REQUEST_TRACK_COUNT.getKey(), "5");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(),
+        "33554432");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey(), "CHUNK_UPLOAD");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_COUNT.getKey(), "5");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_CAPACITY.getKey(), "16777216");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey(), "ALWAYS");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_NAME_PREFIX.getKey(), "prefix-");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), "my-csek-key");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(), "CRC32C");
+    config.set("fs.gs.client.type", "STORAGE_CLIENT");
     return config;
+  }
+
+  @Test
+  public void mapConfigs_mapsChecksumValidationEnabled() {
+    Configuration config = new Configuration();
+
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(), "NONE");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.CHECKSUM_VALIDATION_ENABLED_KEY))
+        .isEqualTo("false");
+
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(), "CRC32C");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.CHECKSUM_VALIDATION_ENABLED_KEY))
+        .isEqualTo("true");
+  }
+
+  @Test
+  public void mapConfigs_mapsTemporaryPathsOrFallback() {
+    Configuration config = new Configuration();
+
+    // Fallback to hadoop.tmp.dir
+    config.set("hadoop.tmp.dir", "/hadoop/tmp");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.TEMPORARY_PATHS_KEY))
+        .isEqualTo("/hadoop/tmp");
+
+    // Override with fs.gs.write.temporary.dirs
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_WRITE_TEMPORARY_FILES_PATH.getKey(),
+        "/gcs/tmp1,/gcs/tmp2");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.TEMPORARY_PATHS_KEY))
+        .isEqualTo("/gcs/tmp1,/gcs/tmp2");
   }
 }
