@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.verify;
 
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
@@ -39,6 +40,14 @@ public class GcsAnalyticsCoreOutputStreamWrapperTest {
   @Before
   public void setUp() {
     adapter = new GcsAnalyticsCoreOutputStreamWrapper(mockOutputStream);
+  }
+
+  @Test
+  public void constructor_nullDelegate_throwsException() {
+    NullPointerException exception =
+        assertThrows(
+            NullPointerException.class, () -> new GcsAnalyticsCoreOutputStreamWrapper(null));
+    assertThat(exception).hasMessageThat().contains("delegate cannot be null");
   }
 
   @Test

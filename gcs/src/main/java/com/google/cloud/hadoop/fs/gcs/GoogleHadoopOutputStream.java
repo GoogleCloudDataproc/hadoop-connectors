@@ -200,8 +200,14 @@ class GoogleHadoopOutputStream extends OutputStream
   private static OutputStream createOutputStream(
       GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
     if (ghfs.isAnalyticsWriteEnabled()) {
-      logger.atInfo().log("Using Analytics Core write path for %s", gcsPath);
       GcsFileSystem analyticsGcsFs = ghfs.getAnalyticsCoreGcsFs();
+      if (analyticsGcsFs == null) {
+        throw new IOException(
+            String.format(
+                "Analytics write path is enabled, but the analytics filesystem is not initialized"
+                    + " (getAnalyticsCoreGcsFs() returned null). Cannot write to %s",
+                gcsPath));
+      }
       GcsWriteOptions baseWriteOptions =
           analyticsGcsFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions();
       boolean overwrite = options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE;

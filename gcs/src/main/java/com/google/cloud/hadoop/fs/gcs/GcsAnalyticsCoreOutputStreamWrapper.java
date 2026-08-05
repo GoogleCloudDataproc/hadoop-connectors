@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -33,8 +35,7 @@ class GcsAnalyticsCoreOutputStreamWrapper extends OutputStream {
   private final GoogleCloudStorageOutputStream delegate;
 
   public GcsAnalyticsCoreOutputStreamWrapper(GoogleCloudStorageOutputStream delegate) {
-    this.delegate = delegate;
-    logger.atInfo().log("GcsAnalyticsCoreOutputStreamWrapper created");
+    this.delegate = checkNotNull(delegate, "delegate cannot be null");
   }
 
   @Override
@@ -51,10 +52,8 @@ class GcsAnalyticsCoreOutputStreamWrapper extends OutputStream {
 
   @Override
   public synchronized void close() throws IOException {
-    logger.atInfo().log("Closing GcsAnalyticsCoreOutputStreamWrapper");
     try {
       delegate.close();
-      logger.atInfo().log("Closed GcsAnalyticsCoreOutputStreamWrapper successfully");
     } catch (IOException e) {
       logger.atWarning().withCause(e).log("Failed to close GcsAnalyticsCoreOutputStreamWrapper");
       throw e;

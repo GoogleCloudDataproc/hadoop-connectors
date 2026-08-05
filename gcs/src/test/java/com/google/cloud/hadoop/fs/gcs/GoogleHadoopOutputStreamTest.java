@@ -386,6 +386,40 @@ public class GoogleHadoopOutputStreamTest {
     verify(mockStream, atLeastOnce()).close();
   }
 
+  @Test
+  public void write_withAnalyticsWriteEnabledButFsNull_throwsException() throws Exception {
+    GoogleHadoopFileSystem analyticsGhfs =
+        new GoogleHadoopFileSystem(ghfs.getGcsFs()) {
+          @Override
+          boolean isAnalyticsWriteEnabled() {
+            return true;
+          }
+
+          @Override
+          GcsFileSystem getAnalyticsCoreGcsFs() {
+            return null;
+          }
+        };
+    analyticsGhfs.initialize(ghfs.getUri(), ghfs.getConf());
+
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_null_fs.txt"));
+
+    IOException exception =
+        assertThrows(
+            IOException.class,
+            () ->
+                new GoogleHadoopOutputStream(
+                    analyticsGhfs,
+                    analyticsGhfs.getGcsPath(objectPath),
+                    CreateFileOptions.DEFAULT,
+                    new FileSystem.Statistics(analyticsGhfs.getScheme())));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Analytics write path is enabled, but the analytics filesystem is not initialized");
+  }
+
   private GoogleHadoopFileSystem createAnalyticsEnabledGhfs(
       GoogleCloudStorageOutputStream mockStream) throws IOException {
     GoogleHadoopFileSystem analyticsGhfs =
