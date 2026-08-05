@@ -397,7 +397,7 @@ public class GoogleHadoopOutputStreamTest {
     GoogleHadoopFileSystem analyticsGhfs =
         new GoogleHadoopFileSystem(ghfs.getGcsFs()) {
           @Override
-          boolean isAnalyticsWriteEnabled() {
+          boolean isAnalyticsCoreWriteEnabled() {
             return true;
           }
 
@@ -430,7 +430,7 @@ public class GoogleHadoopOutputStreamTest {
     GoogleHadoopFileSystem analyticsGhfs =
         new GoogleHadoopFileSystem(ghfs.getGcsFs()) {
           @Override
-          boolean isAnalyticsWriteEnabled() {
+          boolean isAnalyticsCoreWriteEnabled() {
             return true;
           }
 

@@ -414,7 +414,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       }
       // TODO(user): Initialize analyticsCoreGcsFs lazily when GCS_LAZY_INITIALIZATION_ENABLE is
       // true, to avoid eager initialization.
-      if (isAnalyticsCoreEnabled() || isAnalyticsWriteEnabled()) {
+      if (isAnalyticsCoreEnabled() || isAnalyticsCoreWriteEnabled()) {
         analyticsCoreGcsFs = createAnalyticsGcsFs(config);
       }
     }

@@ -199,7 +199,7 @@ class GoogleHadoopOutputStream extends OutputStream
 
   private static OutputStream createOutputStream(
       GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
-    if (ghfs.isAnalyticsWriteEnabled()) {
+    if (ghfs.isAnalyticsCoreWriteEnabled()) {
       GcsFileSystem analyticsGcsFs = ghfs.getAnalyticsCoreGcsFs();
       if (analyticsGcsFs == null) {
         throw new IOException(
