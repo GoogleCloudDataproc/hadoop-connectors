@@ -44,14 +44,14 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setStatusParallelEnabled(true)
         .setCloudLoggingEnabled(false)
         .setAnalyticsCoreEnabled(false)
-        .setAnalyticsWriteEnabled(false);
+        .setAnalyticsCoreWriteEnabled(false);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isAnalyticsCoreEnabled();
 
-  public abstract boolean isAnalyticsWriteEnabled();
+  public abstract boolean isAnalyticsCoreWriteEnabled();
 
   public abstract boolean isPerformanceCacheEnabled();
 
@@ -84,7 +84,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
     public abstract Builder setAnalyticsCoreEnabled(boolean enabled);
 
-    public abstract Builder setAnalyticsWriteEnabled(boolean enabled);
+    public abstract Builder setAnalyticsCoreWriteEnabled(boolean enabled);
 
     public abstract Builder setPerformanceCacheEnabled(boolean performanceCacheEnabled);
 

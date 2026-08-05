@@ -656,7 +656,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
         .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean))
         .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean))
-        .setAnalyticsWriteEnabled(GCS_ANALYTICS_CORE_WRITE_ENABLE.get(config, config::getBoolean));
+        .setAnalyticsCoreWriteEnabled(
+            GCS_ANALYTICS_CORE_WRITE_ENABLE.get(config, config::getBoolean));
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {

@@ -1810,7 +1810,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /** Checks if Analytics Core write path is enabled. */
-  boolean isAnalyticsWriteEnabled() {
+  boolean isAnalyticsCoreWriteEnabled() {
     return GCS_ANALYTICS_CORE_WRITE_ENABLE.get(getConf(), getConf()::getBoolean);
   }
 
