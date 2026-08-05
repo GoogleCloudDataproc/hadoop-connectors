@@ -26,7 +26,17 @@ import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
@@ -337,5 +347,72 @@ public class GoogleHadoopOutputStreamTest {
       }
     }
     return allReadBytes.toByteArray();
+  }
+
+  @Test
+  public void write_withAnalyticsWriteEnabled_delegatesToAnalyticsOutputStream() throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_write.txt"));
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            analyticsGhfs,
+            analyticsGhfs.getGcsPath(objectPath),
+            CreateFileOptions.DEFAULT,
+            new FileSystem.Statistics(analyticsGhfs.getScheme()));
+
+    byte[] data = {0x0f, 0x0e, 0x0e, 0x0d};
+    fout.write(data, 0, data.length);
+
+    verify(mockStream).write(data, 0, data.length);
+  }
+
+  @Test
+  public void close_withAnalyticsWriteEnabled_closesAnalyticsOutputStream() throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_close.txt"));
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            analyticsGhfs,
+            analyticsGhfs.getGcsPath(objectPath),
+            CreateFileOptions.DEFAULT,
+            new FileSystem.Statistics(analyticsGhfs.getScheme()));
+
+    fout.close();
+
+    verify(mockStream, atLeastOnce()).close();
+  }
+
+  private GoogleHadoopFileSystem createAnalyticsEnabledGhfs(
+      GoogleCloudStorageOutputStream mockStream) throws IOException {
+    GoogleHadoopFileSystem analyticsGhfs =
+        new GoogleHadoopFileSystem(ghfs.getGcsFs()) {
+          @Override
+          boolean isAnalyticsWriteEnabled() {
+            return true;
+          }
+
+          @Override
+          GcsFileSystem getAnalyticsCoreGcsFs() {
+            GcsFileSystem mockFs = mock(GcsFileSystem.class);
+            GcsFileSystemOptions options = mock(GcsFileSystemOptions.class);
+            GcsClientOptions clientOptions = mock(GcsClientOptions.class);
+            when(mockFs.getFileSystemOptions()).thenReturn(options);
+            when(options.getGcsClientOptions()).thenReturn(clientOptions);
+            when(clientOptions.getGcsWriteOptions()).thenReturn(GcsWriteOptions.builder().build());
+            return mockFs;
+          }
+
+          @Override
+          GoogleCloudStorageOutputStream createAnalyticsCoreOutputStream(
+              GcsItemId gcsItemId, GcsWriteOptions writeOptions) {
+            return mockStream;
+          }
+        };
+    analyticsGhfs.initialize(ghfs.getUri(), ghfs.getConf());
+    return analyticsGhfs;
   }
 }

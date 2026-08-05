@@ -21,6 +21,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -188,29 +192,49 @@ class GoogleHadoopOutputStream extends OutputStream
 
     this.tmpOut =
         createOutputStream(
-            ghfs.getGcsFs(),
-            tmpGcsPath,
-            tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
+            ghfs, tmpGcsPath, tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
     this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
     this.traceFactory = ghfs.getTraceFactory();
   }
 
   private static OutputStream createOutputStream(
-      GoogleCloudStorageFileSystem gcsfs, URI gcsPath, CreateFileOptions options)
-      throws IOException {
-    WritableByteChannel channel;
-    try {
-      channel = gcsfs.create(gcsPath, options);
-    } catch (java.nio.file.FileAlreadyExistsException e) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
-              .initCause(e);
+      GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+    if (ghfs.isAnalyticsWriteEnabled()) {
+      logger.atInfo().log("Using Analytics Core write path for %s", gcsPath);
+      GcsFileSystem analyticsGcsFs = ghfs.getAnalyticsCoreGcsFs();
+      GcsWriteOptions baseWriteOptions =
+          analyticsGcsFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions();
+      boolean overwrite = options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE;
+      StorageResourceId resourceId =
+          StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
+      GcsItemId itemId =
+          GcsItemId.builder()
+              .setBucketName(resourceId.getBucketName())
+              .setObjectName(resourceId.getObjectName())
+              .build();
+
+      GcsWriteOptions writeOptions =
+          baseWriteOptions.toBuilder().setOverwriteExisting(overwrite).build();
+
+      GoogleCloudStorageOutputStream rawStream =
+          ghfs.createAnalyticsCoreOutputStream(itemId, writeOptions);
+      return new GcsAnalyticsCoreOutputStreamWrapper(rawStream);
+    } else {
+      GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
+      WritableByteChannel channel;
+      try {
+        channel = gcsfs.create(gcsPath, options);
+      } catch (java.nio.file.FileAlreadyExistsException e) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw (FileAlreadyExistsException)
+            new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
+                .initCause(e);
+      }
+      OutputStream outputStream = Channels.newOutputStream(channel);
+      int bufferSize =
+          gcsfs.getOptions().getCloudStorageOptions().getWriteChannelOptions().getBufferSize();
+      return bufferSize > 0 ? new BufferedOutputStream(outputStream, bufferSize) : outputStream;
     }
-    OutputStream outputStream = Channels.newOutputStream(channel);
-    int bufferSize =
-        gcsfs.getOptions().getCloudStorageOptions().getWriteChannelOptions().getBufferSize();
-    return bufferSize > 0 ? new BufferedOutputStream(outputStream, bufferSize) : outputStream;
   }
 
   @Override
@@ -339,7 +363,7 @@ class GoogleHadoopOutputStream extends OutputStream
 
     logger.atFiner().log(
         "hsync(): Opening next temporary tail file %s at %d index", tmpGcsPath, tmpIndex);
-    tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
+    tmpOut = createOutputStream(ghfs, tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
 
     long finishMs = System.currentTimeMillis();
     logger.atFiner().log("Took %dms to sync() for %s", finishMs - startMs, dstGcsPath);
@@ -349,6 +373,8 @@ class GoogleHadoopOutputStream extends OutputStream
     // TODO(user): return early when 0 bytes have been written in the temp files
     tmpOut.close();
 
+    // TODO(user): Support generation ID retrieval for GcsAnalyticsCoreOutputStreamWrapper once
+    // gcs-analytics-core exposes it. Currently falls back to UNKNOWN_GENERATION_ID.
     long tmpGenerationId =
         tmpOut instanceof GoogleCloudStorageItemInfo.Provider
             ? ((GoogleCloudStorageItemInfo.Provider) tmpOut).getItemInfo().getContentGeneration()

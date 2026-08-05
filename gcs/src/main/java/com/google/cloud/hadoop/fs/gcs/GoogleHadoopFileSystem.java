@@ -44,7 +44,10 @@ import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
@@ -409,7 +412,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       } else {
         initializeGcsFs(createGcsFs(config));
       }
-      if (isAnalyticsCoreEnabled()) {
+      if (isAnalyticsCoreEnabled() || isAnalyticsWriteEnabled()) {
         analyticsCoreGcsFs = createAnalyticsGcsFs(config);
       }
     }
@@ -1802,6 +1805,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsFileInfo gcsFileInfo)
       throws IOException {
     return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsFileInfo);
+  }
+
+  GoogleCloudStorageOutputStream createAnalyticsCoreOutputStream(
+      GcsItemId gcsItemId, GcsWriteOptions writeOptions) throws IOException {
+    return GoogleCloudStorageOutputStream.create(analyticsCoreGcsFs, gcsItemId, writeOptions);
   }
 
   /** Checks if Analytics Core is enabled. */
