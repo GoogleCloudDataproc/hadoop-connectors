@@ -89,7 +89,7 @@ final class AnalyticsCoreConfigMapper {
               PCU_PART_FILE_NAME_PREFIX_KEY)
           .put(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), ENCRYPTION_KEY_KEY)
           .put(
-              GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(),
+              GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(),
               CHECKSUM_VALIDATION_ENABLED_KEY)
           .build();
 
@@ -141,16 +141,9 @@ final class AnalyticsCoreConfigMapper {
     if (value != null) {
       if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
         value = toFileAccessPattern(value);
-      } else if (hadoopKey.equals(
-          GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey())) {
-        value = toChecksumValidationEnabled(value);
       }
       map.put(analyticsCoreKey, value);
     }
-  }
-
-  private static String toChecksumValidationEnabled(String checksumType) {
-    return String.valueOf(!"NONE".equalsIgnoreCase(checksumType));
   }
 
   private static String toFileAccessPattern(String fadvise) {

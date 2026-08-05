@@ -140,7 +140,8 @@ public class AnalyticsCoreConfigMapperTest {
     assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey()))
         .isFalse();
     assertThat(
-            mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey()))
+            mapped.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey()))
         .isFalse();
     assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey()))
         .isFalse();
@@ -245,7 +246,8 @@ public class AnalyticsCoreConfigMapperTest {
     config.set(
         GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_NAME_PREFIX.getKey(), "prefix-");
     config.set(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), "my-csek-key");
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(), "CRC32C");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(), "true");
     config.set("fs.gs.client.type", "STORAGE_CLIENT");
     return config;
   }
@@ -254,13 +256,15 @@ public class AnalyticsCoreConfigMapperTest {
   public void mapConfigs_mapsChecksumValidationEnabled() {
     Configuration config = new Configuration();
 
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(), "NONE");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(), "false");
     assertThat(
             AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
                 .get("fs.gs." + AnalyticsCoreConfigMapper.CHECKSUM_VALIDATION_ENABLED_KEY))
         .isEqualTo("false");
 
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(), "CRC32C");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(), "true");
     assertThat(
             AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
                 .get("fs.gs." + AnalyticsCoreConfigMapper.CHECKSUM_VALIDATION_ENABLED_KEY))
