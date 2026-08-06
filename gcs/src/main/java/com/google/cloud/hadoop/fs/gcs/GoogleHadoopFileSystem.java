@@ -1362,6 +1362,21 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       case GcsConnectorCapabilities.OPEN_WITH_STATUS:
       case GcsConnectorCapabilities.GET_FILE_STATUS_WITH_HINT:
         return true;
+      case GcsConnectorCapabilities.LIST_STATUS_STARTING_FROM:
+        try {
+          // getGcs should not be null, there is no way we close the underneath gcs and not close
+          // hcfs.
+          // still added this check to avoid any NPE
+          if (isClosed() || getGcsFs().getGcs() == null) {
+            return false;
+          }
+          return !getGcsFs().getGcs().isHnBucket(getGcsPath(path));
+        } catch (IOException e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to check if path '%s' is in HNS-enabled bucket for capability '%s'",
+              path, capability);
+          return false;
+        }
       default:
         return false;
     }
@@ -2077,5 +2092,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     public static final String OPEN_WITH_STATUS = "fs.gs.capability.open.with.status";
     public static final String GET_FILE_STATUS_WITH_HINT =
         "fs.gs.capability.getfilestatus.with.hint";
+    public static final String LIST_STATUS_STARTING_FROM =
+        "fs.gs.capability.liststatus.starting.from";
   }
 }
