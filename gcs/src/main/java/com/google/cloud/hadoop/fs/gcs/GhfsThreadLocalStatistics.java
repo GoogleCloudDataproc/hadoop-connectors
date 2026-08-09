@@ -81,6 +81,13 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     }
   }
 
+  void increment(String s, long count) {
+    Metric m = Metric.getMetricByName(s);
+    if (m != null) {
+      m.increment(count);
+    }
+  }
+
   @Override
   public Iterator<LongStatistic> getLongStatistics() {
     return this.metrics.entrySet().stream()
@@ -114,12 +121,24 @@ class GhfsThreadLocalStatistics extends StorageStatistics {
     STREAM_READ_VECTORED_COUNT("readVectoredCount"),
     STREAM_READ_VECTORED_RANGE_COUNT("readVectoredRangeCount");
 
+    private static final Map<String, Metric> BY_LABEL = new HashMap<>();
+
+    static {
+      for (Metric e : values()) {
+        BY_LABEL.put(e.metricName, e);
+      }
+    }
+
     private final String metricName;
     private final ThreadLocalValue metricValue;
 
     Metric(String metricName) {
       this.metricName = metricName;
       this.metricValue = new ThreadLocalValue();
+    }
+
+    public static Metric getMetricByName(String label) {
+      return BY_LABEL.get(label);
     }
 
     void reset() {

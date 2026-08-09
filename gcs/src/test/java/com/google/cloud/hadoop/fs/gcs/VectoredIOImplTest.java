@@ -41,6 +41,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
@@ -77,6 +78,7 @@ public class VectoredIOImplTest {
   private GhfsGlobalStorageStatistics ghfsStorageStatistics;
   private GhfsInputStreamStatistics streamStatistics;
   private FileSystem.Statistics statistics;
+  private ConcurrentHashMap<String, Long> rangeReadThreadStats;
 
   @Before
   public void before() throws Exception {
@@ -96,6 +98,7 @@ public class VectoredIOImplTest {
     this.ghfsStorageStatistics = new GhfsGlobalStorageStatistics();
     this.vectoredIO = new VectoredIOImpl(vectoredReadOptions, ghfsStorageStatistics);
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+    this.rangeReadThreadStats = new ConcurrentHashMap<>();
   }
 
   @After
@@ -105,6 +108,7 @@ public class VectoredIOImplTest {
     }
     ghfsStorageStatistics.reset();
     streamStatistics.close();
+    rangeReadThreadStats = null;
   }
 
   @Test
@@ -118,7 +122,13 @@ public class VectoredIOImplTest {
         IllegalArgumentException.class,
         () ->
             vectoredIO.readVectored(
-                fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics));
+                fileRanges,
+                allocate,
+                gcsFs,
+                fileInfo,
+                fileInfo.getPath(),
+                streamStatistics,
+                rangeReadThreadStats));
     fileRanges.clear();
 
     // invalid offset
@@ -127,7 +137,13 @@ public class VectoredIOImplTest {
         EOFException.class,
         () ->
             vectoredIO.readVectored(
-                fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics));
+                fileRanges,
+                allocate,
+                gcsFs,
+                fileInfo,
+                fileInfo.getPath(),
+                streamStatistics,
+                rangeReadThreadStats));
   }
 
   @Test
@@ -140,7 +156,13 @@ public class VectoredIOImplTest {
         FileRange.createFileRange(
             /* offset */ vectoredReadOptions.getMinSeekVectoredReadSize() + 10, rangeLength));
     vectoredIO.readVectored(
-        fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        gcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
     verifyRangeContent(fileRanges);
     // callCount is equal to disjointRangeRequests
     verifyGcsFsOpenCalls(/* callCount */ 2);
@@ -175,7 +197,13 @@ public class VectoredIOImplTest {
     offset += discardedBytes;
     fileRanges.add(FileRange.createFileRange(offset, rangeLength));
     vectoredIO.readVectored(
-        fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        gcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
     verifyRangeContent(fileRanges);
     // Ranges are merged, data is read from single channel
     verifyGcsFsOpenCalls(/* callCount */ 1);
@@ -219,7 +247,13 @@ public class VectoredIOImplTest {
         .thenReturn(new MockedReadChannel(), new MockedReadChannel());
 
     vectoredIO.readVectored(
-        fileRanges, allocate, mockedGcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        mockedGcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
     verifyRangeException(fileRanges);
 
     verify(mockedGcsFs, times(2)).open((FileInfo) any(), any());
@@ -248,7 +282,13 @@ public class VectoredIOImplTest {
         .thenReturn(new MockedReadChannel());
 
     vectoredIO.readVectored(
-        fileRanges, allocate, mockedGcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        mockedGcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
 
     verifyRangeException(fileRanges);
 
@@ -275,7 +315,13 @@ public class VectoredIOImplTest {
             IllegalArgumentException.class,
             () ->
                 vectoredIO.readVectored(
-                    fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics));
+                    fileRanges,
+                    allocate,
+                    gcsFs,
+                    fileInfo,
+                    fileInfo.getPath(),
+                    streamStatistics,
+                    rangeReadThreadStats));
     assertThat((e.getMessage())).contains("overlapping");
   }
 
@@ -315,7 +361,13 @@ public class VectoredIOImplTest {
         new VectoredIOImpl(
             vectoredReadOptions.toBuilder().setReadThreads(1).build(), ghfsStorageStatistics);
     vectoredIO.readVectored(
-        fileRanges, allocate, mockedGcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        mockedGcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
     verifyRangeException(fileRanges);
 
     // open is called only as per combinedRange and not as per request FileRange
@@ -377,7 +429,13 @@ public class VectoredIOImplTest {
     fileRanges.add(overFlowRange);
 
     vectoredIO.readVectored(
-        fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        gcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
     verifyRangeContent(Arrays.asList(validRange));
     verifyRangeException(Arrays.asList(overFlowRange));
     assertThat(
@@ -408,7 +466,13 @@ public class VectoredIOImplTest {
     FileRange overFlowRange = FileRange.createFileRange(offset, rangeLength);
     fileRanges.add(overFlowRange);
     vectoredIO.readVectored(
-        fileRanges, allocate, gcsFs, fileInfo, fileInfo.getPath(), streamStatistics);
+        fileRanges,
+        allocate,
+        gcsFs,
+        fileInfo,
+        fileInfo.getPath(),
+        streamStatistics,
+        rangeReadThreadStats);
 
     verifyRangeException(fileRanges);
 

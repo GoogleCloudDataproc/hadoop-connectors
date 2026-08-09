@@ -37,6 +37,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -83,6 +84,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private final GhfsStreamStats streamStats;
   private final GhfsStreamStats seekStreamStats;
   private final GhfsStreamStats vectoredReadStats;
+  private final ConcurrentHashMap<String, Long> rangeReadThreadStats;
 
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
@@ -160,6 +162,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     this.vectoredReadStats =
         new GhfsStreamStats(
             storageStatistics, GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS, gcsPath);
+    this.rangeReadThreadStats = new ConcurrentHashMap<>();
 
     this.traceFactory = ghfs.getTraceFactory();
     this.vectoredIOSupplier = ghfs.getVectoredIOSupplier();
@@ -182,7 +185,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           long startTimeNs = System.nanoTime();
           vectoredIOSupplier
               .get()
-              .readVectored(ranges, allocate, gcsFs, fileInfo, gcsPath, streamStatistics);
+              .readVectored(
+                  ranges,
+                  allocate,
+                  gcsFs,
+                  fileInfo,
+                  gcsPath,
+                  streamStatistics,
+                  rangeReadThreadStats);
           statistics.incrementReadOps(1);
           vectoredReadStats.updateVectoredReadStreamStats(startTimeNs);
           return null;
@@ -297,6 +307,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
               }
             } finally {
               statistics.incrementBytesRead(streamStatistics.getBytesRead());
+              mergeRangeReadThreadStats();
+              rangeReadThreadStats.clear();
               streamStats.close();
               seekStreamStats.close();
               vectoredReadStats.close();
@@ -308,6 +320,17 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (!isClosed) {
       streamStatistics.close();
     }
+  }
+
+  /**
+   * Merges the range read stats collected in readVectored call to threadLocal stats of main thread.
+   */
+  private void mergeRangeReadThreadStats() {
+    GhfsThreadLocalStatistics tlStats = storageStatistics.getThreadLocalStatistics();
+    rangeReadThreadStats.forEach(
+        (key, value) -> {
+          tlStats.increment(key, value);
+        });
   }
 
   /**
