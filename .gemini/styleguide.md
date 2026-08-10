@@ -1,14 +1,14 @@
 # 📋 Google Cloud Hadoop Connectors - Code Review & Style Guidelines
 
 ## 🎯 Purpose & Scope
-This guide defines coding standards, architecture principles, performance rules, concurrency guidelines, testing practices, and PR hygiene for the `hadoop-connectors` repository (`gcs`, `gcsio`, `bigquery`, `util`). Reviewers and AI coding agents MUST validate all changes against these guidelines, prioritizing **stability, thread safety, high performance, and ecosystem compatibility**.
+This guide defines coding standards, architecture principles, performance rules, concurrency guidelines, testing practices, and PR hygiene for the `hadoop-connectors` repository. Reviewers and AI coding agents MUST validate all changes against these guidelines, prioritizing **stability, thread safety, high performance, and ecosystem compatibility**.
 
 ---
 
 ## 🌍 1. Open Source & Ecosystem Compatibility
 *The `hadoop-connectors` library forms the foundation for Big Data workloads on Google Cloud (Apache Spark, Hadoop, Hive, Flink, Presto/Trino, Dataproc). Incompatibilities or performance regressions can cause cluster-wide outages.*
 
-* **License Compliance:** Every source file (`.java`, `.py`, `.sh`, `.xml`, `.properties`) **MUST** start with the standard Apache License 2.0 header.
+* **License Compliance:** Every source file **MUST** start with the standard Apache License 2.0 header.
 * **Dependency Hygiene & Shading:** Do not introduce unvetted third-party dependencies. Dependencies (e.g. Guava, gRPC, Protobuf, Jackson, Google Cloud SDKs) must be properly shaded/relocated in `pom.xml` to prevent classpath conflicts in user applications.
 * **Binary & Semantic Backward Compatibility:** Public APIs (`GoogleHadoopFileSystem`, `GoogleCloudStorage`, public configuration keys) must maintain backward compatibility. Do not modify public method signatures without formal deprecation cycles.
 * **Security & Credential Governance:** **NEVER** log, expose, or commit credentials, private keys, service account tokens, or authorization headers. Sanitize exception messages to prevent token leaks.
@@ -29,7 +29,7 @@ This guide defines coding standards, architecture principles, performance rules,
 *Filesystem operations are invoked concurrently by multiple parallel executor tasks and threads.*
 
 * **Avoid Redundant Synchronization:** Do **NOT** add redundant `synchronized` modifiers to wrapper classes or methods where the underlying stream (such as Hadoop's `FSDataOutputStream`) is single-threaded by specification, or where higher-layer synchronization already guarantees safety.
-* **Atomic State Transitions & TOCTOU:** `volatile` alone does not provide atomicity. Avoid Time-Of-Check to Time-Of-Use (TOCTOU) race conditions (e.g., checking `if (!closed && channel.isOpen())` before inserting into a pool/queue). Use `ReentrantLock` or `AtomicBoolean`/`AtomicInteger` primitives for critical state transitions.
+* **Atomic State Transitions & TOCTOU:** Avoid Time-Of-Check to Time-Of-Use (TOCTOU) race conditions (e.g., checking `if (!closed && channel.isOpen())` before inserting into a pool/queue). Use `ReentrantLock` or `AtomicBoolean`/`AtomicInteger` primitives for critical state transitions.
 * **Strict Resource Cleanup & Idempotent Closure:** All streams, channels, and client objects implementing `AutoCloseable` **MUST** be managed via `try-with-resources`. Implementations of `close()` **MUST** be idempotent, thread-safe, and handle repeated invocations gracefully without throwing redundant exceptions or leaking channels.
 * **Thread & Channel Cleanup:** Gracefully shut down background thread pools (`ExecutorService`), gRPC channels, and background monitoring tasks to prevent zombie thread leaks.
 
@@ -74,10 +74,14 @@ This guide defines coding standards, architecture principles, performance rules,
 
 ---
 
-## 🤖 Instructions for AI Coding Agents (Gemini Code Assist / Jetski)
+## 🤖 Instructions for AI Coding Agents (Gemini Code Assist / Antigravity)
 When writing, refactoring, or reviewing code for this repository, coding agents **MUST**:
 1. Verify Apache 2.0 license headers are present on all new files.
-2. Ensure strict resource cleanup (`try-with-resources`) and idempotent `close()` behavior.
-3. Check inner loops for unnecessary object allocations, lambdas, or string concatenations.
-4. Enforce Guava `Preconditions` for argument checks and Google Truth for test assertions.
-5. Translate low-level storage exceptions to standard Hadoop `IOException` types without duplicate logging.
+2. Check for potential memory leaks or unclosed resources.
+3. Ensure no proprietary libraries or unapproved dependencies are used.
+4. Scrutinize I/O paths for performance bottlenecks (e.g., excessive seeking or blocking).
+5. Enforce Google Java Style and Guava usage.
+6. Ensure strict resource cleanup (`try-with-resources`) and idempotent `close()` behavior.
+7. Check inner loops for unnecessary object allocations, lambdas, or string concatenations.
+8. Enforce Guava `Preconditions` for argument checks and Google Truth for test assertions.
+9. Translate low-level storage exceptions to standard Hadoop `IOException` types without duplicate logging.
