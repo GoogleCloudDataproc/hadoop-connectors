@@ -61,7 +61,9 @@ public abstract class GoogleCloudStorageReadOptions {
         .setReadExactRequestedBytesEnabled(false)
         .setBidiThreadCount(16)
         .setBidiClientTimeout(30)
-        .setLatencyLoggingThreshold(10000L);
+        .setLatencyLoggingThreshold(10000L)
+        .setBidiCacheExpireSec(600)
+        .setBidiCacheMaxSize(100);
   }
 
   public abstract Builder toBuilder();
@@ -123,6 +125,10 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setLatencyLoggingThreshold(long)}. */
   public abstract long getLatencyLoggingThreshold();
+
+  public abstract int getBidiCacheExpireSec();
+
+  public abstract int getBidiCacheMaxSize();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -243,6 +249,10 @@ public abstract class GoogleCloudStorageReadOptions {
      * threshold, then a high latency warning will be logged.
      */
     public abstract Builder setLatencyLoggingThreshold(long latencyLoggingThresholdMillis);
+
+    public abstract Builder setBidiCacheExpireSec(int expireSec);
+
+    public abstract Builder setBidiCacheMaxSize(int maxSize);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

@@ -140,6 +140,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.client.timeout", 30);
           put("fs.gs.bidi.finalize.on.close", false);
           put("fs.gs.storage.client.cache.enable", false);
+          put("fs.gs.bidi.cache.max.size", 100);
+          put("fs.gs.bidi.cache.expire.sec", 600);
         }
       };
 
