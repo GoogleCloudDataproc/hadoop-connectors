@@ -40,6 +40,8 @@ public class AnalyticsCoreConfigMapperTest {
         .isEqualTo("my-project");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
         .isEqualTo("user-project");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.SERVICE_HOST_KEY))
+        .isEqualTo("http://emulator:8080/");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.READ_THREAD_COUNT_KEY))
         .isEqualTo("10");
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_GAP_KEY))
@@ -80,6 +82,8 @@ public class AnalyticsCoreConfigMapperTest {
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
     assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey()))
+        .isFalse();
+    assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL.getKey()))
         .isFalse();
     assertThat(
             mapped.containsKey(
@@ -222,6 +226,8 @@ public class AnalyticsCoreConfigMapperTest {
     config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "my-project");
     config.set(
         GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(), "user-project");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "AUTO");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL.getKey(), "http://emulator:8080/");
     config.set(GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(), "10");
     config.set(
         GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(), "1024");
@@ -290,5 +296,78 @@ public class AnalyticsCoreConfigMapperTest {
             AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
                 .get("fs.gs." + AnalyticsCoreConfigMapper.TEMPORARY_PATHS_KEY))
         .isEqualTo("/gcs/tmp1,/gcs/tmp2");
+  }
+
+  @Test
+  public void mapConfigs_normalizesUploadType() {
+    Configuration config = new Configuration();
+
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey(), "chunk-upload");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_TYPE_KEY))
+        .isEqualTo("CHUNK_UPLOAD");
+
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey(),
+        "parallel-composite-upload");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_TYPE_KEY))
+        .isEqualTo("PARALLEL_COMPOSITE_UPLOAD");
+  }
+
+  @Test
+  public void mapConfigs_mapsRequesterPaysProjectIdConditionally() {
+    Configuration config = new Configuration();
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(), "user-project");
+
+    // Mode is not set (defaults to DISABLED) -> should NOT map project ID
+    Map<String, String> mappedDefault = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+    assertThat(mappedDefault.containsKey("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isFalse();
+    // But it should still remove the source key from result if it was there
+    assertThat(
+            mappedDefault.containsKey(
+                GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey()))
+        .isFalse();
+
+    // Mode is DISABLED explicitly -> should NOT map project ID
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "DISABLED");
+    Map<String, String> mappedDisabled = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+    assertThat(mappedDisabled.containsKey("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isFalse();
+
+    // Mode is AUTO -> should map project ID
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "AUTO");
+    Map<String, String> mappedAuto = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+    assertThat(mappedAuto.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isEqualTo("user-project");
+
+    // Mode is ENABLED -> should map project ID
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "ENABLED");
+    Map<String, String> mappedEnabled = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+    assertThat(mappedEnabled.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isEqualTo("user-project");
+  }
+
+  @Test
+  public void mapConfigs_normalizesPcuPartFileCleanupType() {
+    Configuration config = new Configuration();
+
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey(), "on-success");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.PCU_PART_FILE_CLEANUP_TYPE_KEY))
+        .isEqualTo("ON_SUCCESS");
+
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey(), "always");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.PCU_PART_FILE_CLEANUP_TYPE_KEY))
+        .isEqualTo("ALWAYS");
   }
 }

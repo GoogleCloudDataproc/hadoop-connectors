@@ -15,6 +15,7 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -24,6 +25,7 @@ final class AnalyticsCoreConfigMapper {
 
   static final String PROJECT_ID_KEY = "project-id";
   static final String USER_PROJECT_KEY = "user-project";
+  static final String SERVICE_HOST_KEY = "service.host";
   static final String READ_THREAD_COUNT_KEY = "analytics-core.read.thread.count";
   static final String MAX_MERGE_GAP_KEY = "analytics-core.read.vectored.range.merge-gap.max-bytes";
   static final String MAX_MERGE_SIZE_KEY =
@@ -47,9 +49,7 @@ final class AnalyticsCoreConfigMapper {
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
           .put(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), PROJECT_ID_KEY)
-          .put(
-              GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
-              USER_PROJECT_KEY)
+          .put(GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL.getKey(), SERVICE_HOST_KEY)
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(),
               READ_THREAD_COUNT_KEY)
@@ -113,6 +113,21 @@ final class AnalyticsCoreConfigMapper {
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
 
+    // Handle requester pays project ID conditionally
+    String requesterPaysMode =
+        config.get(
+            GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(),
+            GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getDefault().name());
+    if (RequesterPaysMode.DISABLED.name().equalsIgnoreCase(requesterPaysMode)) {
+      mappedProperties.remove(
+          GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey());
+    } else {
+      mapAndRemoveSource(
+          GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
+          mappedProperties,
+          prefix + USER_PROJECT_KEY);
+    }
+
     // Handle temporary paths: use fs.gs.write.temporary.dirs if set, otherwise fallback to
     // hadoop.tmp.dir
     String tempPaths =
@@ -141,9 +156,18 @@ final class AnalyticsCoreConfigMapper {
     if (value != null) {
       if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
         value = toFileAccessPattern(value);
+      } else if (hadoopKey.equals(
+              GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey())
+          || hadoopKey.equals(
+              GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey())) {
+        value = normalizeEnum(value);
       }
       map.put(analyticsCoreKey, value);
     }
+  }
+
+  private static String normalizeEnum(String value) {
+    return value.replace('-', '_').toUpperCase();
   }
 
   private static String toFileAccessPattern(String fadvise) {
