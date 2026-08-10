@@ -104,6 +104,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -1490,7 +1491,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
     return false;
   }
 
-  private synchronized ExecutorService getBoundedThreadPool(int bidiThreadCount) {
+  private ExecutorService getBoundedThreadPool(int bidiThreadCount) {
     if (closed) {
       throw new IllegalStateException("Storage client is closed");
     }
@@ -1873,11 +1874,14 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
       StorageResourceId resourceId, GoogleCloudStorageBidiReadChannel channel) {
     StorageResourceId normalizedKey = normalizeKey(resourceId);
     if (!closed && channel.isOpen()) {
-      ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
-          channelPool.asMap().computeIfAbsent(normalizedKey, k -> new ConcurrentLinkedQueue<>());
-      queue.offer(channel);
-      if (closed) {
-        channelPool.invalidate(normalizedKey);
+      try {
+        ConcurrentLinkedQueue<GoogleCloudStorageBidiReadChannel> queue =
+            channelPool.get(normalizedKey, ConcurrentLinkedQueue::new);
+        queue.offer(channel);
+      } catch (ExecutionException e) {
+        logger.atWarning().withCause(e).log(
+            "Failed to get queue from channel pool for %s", normalizedKey);
+        channel.actualClose();
       }
     } else {
       channel.actualClose();

@@ -762,7 +762,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private BlobInfo handleSizeMismatch(BlobReadSession staleSession, long realSize)
       throws IOException, InterruptedException, ExecutionException, TimeoutException {
     logger.atWarning().log(
-        "Size mismatch detected for '%s' (mock: %d, real: %d). Triggering recovery.",
+        "Size mismatch detected for '%s' (speculative: %d, real: %d). Triggering recovery.",
         resourceId, this.objectSize, realSize);
 
     if (callback != null) {
