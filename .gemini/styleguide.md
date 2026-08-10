@@ -20,7 +20,7 @@ This guide defines coding standards, architecture principles, performance rules,
 
 * **Zero-Copy & Direct Buffering:** Utilize zero-copy transfers, direct byte buffers, and vectored I/O (`readVectored`) where applicable for maximum I/O throughput.
 * **Inner Loop Allocation Control:** Do **NOT** allocate large objects, temporary byte arrays, Java Streams, or lambdas inside tight data-plane read/write inner loops (e.g., `read()`, `write()`, payload copy loops). Use primitive loops to minimize garbage collection (GC) pauses.
-* **Efficient Parameterized Logging:** Avoid string concatenation in log statements (e.g., `logger.atFine().log("Read " + bytes)`). Always use parameterized logging (`logger.atFine().log("Read %d bytes", bytes)` or `logger.atFine().log(String.format(...))`). Avoid logging inside high-frequency data path methods unless guarded by explicit debug flags.
+* **Efficient Parameterized Logging:** Avoid string concatenation in log statements (e.g., `logger.atFine().log("Read " + bytes)`). Always use parameterized logging (e.g. `logger.atFine().log("Read %d bytes", bytes)`. Avoid logging inside high-frequency data path methods unless guarded by explicit debug flags.
 * **Low-Overhead Metrics:** Metric tracking (e.g., `GhfsThreadLocalStats`, latency counters, event bus notifications) **MUST** have near-zero execution overhead. Avoid lock contention when updating metrics (use `Atomic` counters or thread-local storage). Ensure metrics are not double-counted (e.g., during stream wraps or repeated `close()` calls).
 
 ---
