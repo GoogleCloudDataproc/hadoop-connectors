@@ -69,8 +69,8 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_singleByte");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
-
     byte[] expected = "hello analytics core write".getBytes(UTF_8);
+
     try (FSDataOutputStream out = fs.create(hadoopPath)) {
       for (byte b : expected) {
         out.write(b);
@@ -86,8 +86,8 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_byteArray");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
-
     byte[] expected = "hello analytics core write array".getBytes(UTF_8);
+
     try (FSDataOutputStream out = fs.create(hadoopPath)) {
       out.write(expected, 0, expected.length);
     }
@@ -101,7 +101,6 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_largeData");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
-
     byte[] expected = new byte[2 * 1024 * 1024]; // 2 MiB
     new Random().nextBytes(expected);
 
@@ -117,12 +116,11 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
   public void write_withZeroBufferSize_writesContentCorrectly() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_withZeroBufferSize");
     Path hadoopPath = new Path(path);
-
     Configuration config = getTestConfig();
     config.setInt("fs.gs.outputstream.buffer.size", 0);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
-
     byte[] expected = "hello analytics core unbuffered write".getBytes(UTF_8);
+
     try (FSDataOutputStream out = fs.create(hadoopPath)) {
       out.write(expected);
     }
@@ -132,11 +130,10 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
   }
 
   @Test
-  public void hsync() throws Exception {
+  public void hsync_writesContentCorrectly() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "hsync");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
-
     byte[] expected = new byte[5];
     new Random().nextBytes(expected);
 
@@ -160,11 +157,12 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "overwrite_true");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
-
     byte[] initialContent = "initial content".getBytes(UTF_8);
+
     try (FSDataOutputStream out = fs.create(hadoopPath, true)) {
       out.write(initialContent);
     }
+
     assertThat(gcsFsIHelper.readFile(path)).isEqualTo(initialContent);
 
     byte[] newContent = "overwritten content".getBytes(UTF_8);
@@ -179,8 +177,8 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "overwrite_false");
     Path hadoopPath = new Path(path);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
-
     byte[] initialContent = "initial content".getBytes(UTF_8);
+
     try (FSDataOutputStream out = fs.create(hadoopPath, false)) {
       out.write(initialContent);
     }
