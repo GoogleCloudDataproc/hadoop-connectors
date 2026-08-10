@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsItemId;
 import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
@@ -40,6 +41,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.BufferedOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -49,6 +51,7 @@ import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -213,11 +216,29 @@ class GoogleHadoopOutputStream extends OutputStream
       boolean overwrite = options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE;
       StorageResourceId resourceId =
           StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
-      GcsItemId itemId =
+      GcsItemId.Builder itemIdBuilder =
           GcsItemId.builder()
               .setBucketName(resourceId.getBucketName())
-              .setObjectName(resourceId.getObjectName())
-              .build();
+              .setObjectName(resourceId.getObjectName());
+      long generation = StorageResourceId.UNKNOWN_GENERATION_ID;
+      try {
+        GcsFileInfo fileInfo = analyticsGcsFs.getFileInfo(itemIdBuilder.build());
+        // If we reach here, the file exists.
+        if (!overwrite) {
+          GoogleCloudStorageEventBus.postOnException();
+          throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
+        }
+        generation = ((Optional<Long>) fileInfo.getItemInfo().getContentGeneration()).orElse(0L);
+      } catch (FileNotFoundException e) {
+        // If file does not exist, set the generation as 0.
+        generation = 0L;
+      }
+      GcsItemId itemId;
+      if (generation == StorageResourceId.UNKNOWN_GENERATION_ID) {
+        itemId = itemIdBuilder.build();
+      } else {
+        itemId = itemIdBuilder.setContentGeneration(generation).build();
+      }
 
       GcsWriteOptions writeOptions =
           baseWriteOptions.toBuilder().setOverwriteExisting(overwrite).build();

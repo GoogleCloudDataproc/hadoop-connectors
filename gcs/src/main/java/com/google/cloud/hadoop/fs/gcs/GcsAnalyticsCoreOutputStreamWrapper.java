@@ -33,6 +33,7 @@ class GcsAnalyticsCoreOutputStreamWrapper extends OutputStream {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private final GoogleCloudStorageOutputStream delegate;
+  private boolean closed = false;
 
   public GcsAnalyticsCoreOutputStreamWrapper(GoogleCloudStorageOutputStream delegate) {
     this.delegate = checkNotNull(delegate, "delegate cannot be null");
@@ -52,11 +53,14 @@ class GcsAnalyticsCoreOutputStreamWrapper extends OutputStream {
 
   @Override
   public synchronized void close() throws IOException {
+    if (closed) {
+      logger.atFiner().log("close(): Stream already closed, ignoring.");
+      return;
+    }
     try {
       delegate.close();
-    } catch (IOException e) {
-      logger.atWarning().withCause(e).log("Failed to close GcsAnalyticsCoreOutputStreamWrapper");
-      throw e;
+    } finally {
+      closed = true;
     }
   }
 }

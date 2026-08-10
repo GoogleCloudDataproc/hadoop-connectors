@@ -41,6 +41,7 @@ import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
+import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
@@ -63,6 +64,8 @@ import org.junit.runners.JUnit4;
 /** Unittests for fine-grained edge cases in {@link GoogleHadoopOutputStream}. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopOutputStreamTest {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private GoogleHadoopFileSystem ghfs;
 
@@ -439,6 +442,12 @@ public class GoogleHadoopOutputStreamTest {
             GcsFileSystem mockFs = mock(GcsFileSystem.class, RETURNS_DEEP_STUBS);
             when(mockFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions())
                 .thenReturn(GcsWriteOptions.builder().build());
+            try {
+              when(mockFs.getFileInfo(org.mockito.ArgumentMatchers.any(GcsItemId.class)))
+                  .thenThrow(new java.io.FileNotFoundException("File not found (mocked)"));
+            } catch (IOException e) {
+              logger.atWarning().withCause(e).log("Failed to stub getFileInfo");
+            }
             return mockFs;
           }
 
