@@ -26,6 +26,7 @@ import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
@@ -443,8 +444,8 @@ public class GoogleHadoopOutputStreamTest {
             when(mockFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions())
                 .thenReturn(GcsWriteOptions.builder().build());
             try {
-              when(mockFs.getFileInfo(org.mockito.ArgumentMatchers.any(GcsItemId.class)))
-                  .thenThrow(new java.io.FileNotFoundException("File not found (mocked)"));
+              when(mockFs.getFileInfo(any(GcsItemId.class)))
+                  .thenThrow(new IOException("Object not found: (mocked)"));
             } catch (IOException e) {
               logger.atWarning().withCause(e).log("Failed to stub getFileInfo");
             }
