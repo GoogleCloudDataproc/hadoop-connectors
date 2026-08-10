@@ -24,10 +24,12 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.channels.ClosedChannelException;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
@@ -183,13 +185,13 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
       out.write(initialContent);
     }
 
-    assertThrows(IOException.class, () -> fs.create(hadoopPath, false));
+    assertThrows(FileAlreadyExistsException.class, () -> fs.create(hadoopPath, false));
   }
 
   @Test
   public void write_directOutputStream_writesContentCorrectly() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_directOutputStream");
-    GoogleHadoopFileSystem ghfs = setupGhfs("write_directOutputStream");
+    GoogleHadoopFileSystem ghfs = setupGhfs(path);
 
     byte[] expected = "hello analytics core direct stream write".getBytes(UTF_8);
     try (GoogleHadoopOutputStream out =
@@ -201,20 +203,20 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
   }
 
   @Test
-  public void write_whenClosed_throwsIOException() throws Exception {
+  public void write_whenClosed_throwsClosedChannelException() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_after_closed");
-    GoogleHadoopFileSystem ghfs = setupGhfs("write_after_closed");
+    GoogleHadoopFileSystem ghfs = setupGhfs(path);
 
     GoogleHadoopOutputStream out = createGhfsOutputStream(ghfs, path, CreateFileOptions.DEFAULT);
     out.close();
 
-    assertThrows(IOException.class, () -> out.write(1));
+    assertThrows(ClosedChannelException.class, () -> out.write(1));
   }
 
   @Test
   public void write_zeroBytes_createsEmptyFile() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_zeroBytes");
-    GoogleHadoopFileSystem ghfs = setupGhfs("write_zeroBytes");
+    GoogleHadoopFileSystem ghfs = setupGhfs(path);
 
     try (GoogleHadoopOutputStream out =
         createGhfsOutputStream(ghfs, path, CreateFileOptions.DEFAULT)) {
@@ -224,8 +226,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     assertThat(gcsFsIHelper.readFile(path)).isEqualTo(new byte[0]);
   }
 
-  private GoogleHadoopFileSystem setupGhfs(String tag) throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), tag);
+  private GoogleHadoopFileSystem setupGhfs(URI path) throws Exception {
     return GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getTestConfig());
   }
 
