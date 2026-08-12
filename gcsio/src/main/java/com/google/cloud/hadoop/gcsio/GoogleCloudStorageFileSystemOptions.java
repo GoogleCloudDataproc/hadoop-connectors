@@ -43,12 +43,15 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
         .setStatusParallelEnabled(true)
         .setCloudLoggingEnabled(false)
-        .setAnalyticsCoreEnabled(false);
+        .setAnalyticsCoreEnabled(false)
+        .setAnalyticsCoreWriteEnabled(false);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isAnalyticsCoreEnabled();
+
+  public abstract boolean isAnalyticsCoreWriteEnabled();
 
   public abstract boolean isPerformanceCacheEnabled();
 
@@ -80,6 +83,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setClientType(ClientType clientType);
 
     public abstract Builder setAnalyticsCoreEnabled(boolean enabled);
+
+    public abstract Builder setAnalyticsCoreWriteEnabled(boolean enabled);
 
     public abstract Builder setPerformanceCacheEnabled(boolean performanceCacheEnabled);
 
