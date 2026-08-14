@@ -239,6 +239,8 @@ class GoogleHadoopOutputStream extends OutputStream
       }
       generation = ((Optional<Long>) fileInfo.getItemInfo().getContentGeneration()).orElse(0L);
     } catch (IOException e) {
+      // TODO(user): Remove this exception message check once analytics-core throws a specific
+      // FileNotFoundException / NoSuchFileException for non-existent objects.
       if (e.getMessage() != null && e.getMessage().startsWith("Object not found:")) {
         // If file does not exist, set the generation as 0.
         generation = 0L;
