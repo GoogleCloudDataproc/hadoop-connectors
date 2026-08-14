@@ -35,11 +35,11 @@ public class GcsAnalyticsCoreOutputStreamWrapperTest {
 
   @Mock private GoogleCloudStorageOutputStream mockOutputStream;
 
-  private GcsAnalyticsCoreOutputStreamWrapper adapter;
+  private GcsAnalyticsCoreOutputStreamWrapper outputStreamWrapper;
 
   @Before
   public void setUp() {
-    adapter = new GcsAnalyticsCoreOutputStreamWrapper(mockOutputStream);
+    outputStreamWrapper = new GcsAnalyticsCoreOutputStreamWrapper(mockOutputStream);
   }
 
   @Test
@@ -52,20 +52,20 @@ public class GcsAnalyticsCoreOutputStreamWrapperTest {
 
   @Test
   public void write_int_delegatesToOutputStream() throws IOException {
-    adapter.write(1);
+    outputStreamWrapper.write(1);
     verify(mockOutputStream).write(1);
   }
 
   @Test
   public void write_bytes_delegatesToOutputStream() throws IOException {
     byte[] bytes = new byte[] {1, 2, 3};
-    adapter.write(bytes, 1, 2);
+    outputStreamWrapper.write(bytes, 1, 2);
     verify(mockOutputStream).write(bytes, 1, 2);
   }
 
   @Test
   public void close_delegatesToOutputStream() throws IOException {
-    adapter.close();
+    outputStreamWrapper.close();
     verify(mockOutputStream).close();
   }
 

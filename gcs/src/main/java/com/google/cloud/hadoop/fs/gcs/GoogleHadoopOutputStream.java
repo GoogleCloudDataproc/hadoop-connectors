@@ -201,69 +201,79 @@ class GoogleHadoopOutputStream extends OutputStream
 
   private static OutputStream createOutputStream(
       GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
-    if (ghfs.isAnalyticsCoreWriteEnabled()) {
-      GcsFileSystem analyticsGcsFs = ghfs.getAnalyticsCoreGcsFs();
-      if (analyticsGcsFs == null) {
-        throw new IOException(
-            String.format(
-                "Analytics write path is enabled, but the analytics filesystem is not initialized"
-                    + " (getAnalyticsCoreGcsFs() returned null). Cannot write to %s",
-                gcsPath));
-      }
-      GcsWriteOptions baseWriteOptions =
-          analyticsGcsFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions();
-      boolean overwrite = options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE;
-      StorageResourceId resourceId =
-          StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
-      GcsItemId.Builder itemIdBuilder =
-          GcsItemId.builder()
-              .setBucketName(resourceId.getBucketName())
-              .setObjectName(resourceId.getObjectName());
-      long generation = StorageResourceId.UNKNOWN_GENERATION_ID;
-      try {
-        GcsFileInfo fileInfo = analyticsGcsFs.getFileInfo(itemIdBuilder.build());
-        // If we reach here, the file exists.
-        if (!overwrite) {
-          GoogleCloudStorageEventBus.postOnException();
-          throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
-        }
-        generation = ((Optional<Long>) fileInfo.getItemInfo().getContentGeneration()).orElse(0L);
-      } catch (IOException e) {
-        if (e.getMessage() != null && e.getMessage().startsWith("Object not found:")) {
-          // If file does not exist, set the generation as 0.
-          generation = 0L;
-        } else {
-          throw e;
-        }
-      }
-      GcsItemId itemId;
-      if (generation == StorageResourceId.UNKNOWN_GENERATION_ID) {
-        itemId = itemIdBuilder.build();
-      } else {
-        itemId = itemIdBuilder.setContentGeneration(generation).build();
-      }
+    OutputStream outputStream =
+        ghfs.isAnalyticsCoreWriteEnabled()
+            ? createAnalyticsCoreOutputStream(ghfs, gcsPath, options)
+            : createLegacyOutputStream(ghfs, gcsPath, options);
+    return maybeWrapInBufferedOutputStream(ghfs, outputStream);
+  }
 
-      GcsWriteOptions writeOptions =
-          baseWriteOptions.toBuilder().setOverwriteExisting(overwrite).build();
-
-      GoogleCloudStorageOutputStream rawStream =
-          ghfs.createAnalyticsCoreOutputStream(itemId, writeOptions);
-      OutputStream outputStream = new GcsAnalyticsCoreOutputStreamWrapper(rawStream);
-      return maybeWrapInBufferedOutputStream(ghfs, outputStream);
-    } else {
-      GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
-      WritableByteChannel channel;
-      try {
-        channel = gcsfs.create(gcsPath, options);
-      } catch (java.nio.file.FileAlreadyExistsException e) {
-        GoogleCloudStorageEventBus.postOnException();
-        throw (FileAlreadyExistsException)
-            new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
-                .initCause(e);
-      }
-      OutputStream outputStream = Channels.newOutputStream(channel);
-      return maybeWrapInBufferedOutputStream(ghfs, outputStream);
+  private static OutputStream createAnalyticsCoreOutputStream(
+      GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+    GcsFileSystem analyticsGcsFs = ghfs.getAnalyticsCoreGcsFs();
+    if (analyticsGcsFs == null) {
+      throw new IOException(
+          String.format(
+              "Analytics write path is enabled, but the analytics filesystem is not initialized"
+                  + " (getAnalyticsCoreGcsFs() returned null). Cannot write to %s",
+              gcsPath));
     }
+    GcsWriteOptions baseWriteOptions =
+        analyticsGcsFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions();
+    boolean overwrite = options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE;
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
+    GcsItemId.Builder itemIdBuilder =
+        GcsItemId.builder()
+            .setBucketName(resourceId.getBucketName())
+            .setObjectName(resourceId.getObjectName());
+    long generation = StorageResourceId.UNKNOWN_GENERATION_ID;
+    // TODO(user): Check if FileAlreadyExistsException can be thrown during stream creation in
+    // Analytics Core rather than doing an explicit getFileInfo check here.
+    try {
+      GcsFileInfo fileInfo = analyticsGcsFs.getFileInfo(itemIdBuilder.build());
+      // If we reach here, the file exists.
+      if (!overwrite) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
+      }
+      generation = ((Optional<Long>) fileInfo.getItemInfo().getContentGeneration()).orElse(0L);
+    } catch (IOException e) {
+      if (e.getMessage() != null && e.getMessage().startsWith("Object not found:")) {
+        // If file does not exist, set the generation as 0.
+        generation = 0L;
+      } else {
+        throw e;
+      }
+    }
+    GcsItemId itemId;
+    if (generation == StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemId = itemIdBuilder.build();
+    } else {
+      itemId = itemIdBuilder.setContentGeneration(generation).build();
+    }
+
+    GcsWriteOptions writeOptions =
+        baseWriteOptions.toBuilder().setOverwriteExisting(overwrite).build();
+
+    GoogleCloudStorageOutputStream rawStream =
+        ghfs.createAnalyticsCoreOutputStream(itemId, writeOptions);
+    return new GcsAnalyticsCoreOutputStreamWrapper(rawStream);
+  }
+
+  private static OutputStream createLegacyOutputStream(
+      GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+    GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
+    WritableByteChannel channel;
+    try {
+      channel = gcsfs.create(gcsPath, options);
+    } catch (java.nio.file.FileAlreadyExistsException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw (FileAlreadyExistsException)
+          new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
+              .initCause(e);
+    }
+    return Channels.newOutputStream(channel);
   }
 
   private static OutputStream maybeWrapInBufferedOutputStream(
