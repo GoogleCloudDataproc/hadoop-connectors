@@ -412,6 +412,14 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.enable", GoogleCloudStorageOptions.DEFAULT.isGrpcEnabled());
 
+  /** Configuration key for idle timeout (TTL) for cached connections. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_EXPIRE_SEC =
+      new HadoopConfigurationProperty<>("fs.gs.bidi.cache.expire.sec", 600);
+
+  /** Configuration key for maximum unique objects cached in the pool. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_MAX_SIZE =
+      new HadoopConfigurationProperty<>("fs.gs.bidi.cache.max.size", 100);
+
   /** Configuration key for enabling checksum validation for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
       new HadoopConfigurationProperty<>(
@@ -763,6 +771,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .setLatencyLoggingThreshold(
             GCS_INPUT_STREAM_LATENCY_LOGGING_THRESHOLD_MS.get(config, config::getLong))
+        .setBidiCacheExpireSec(GCS_BIDI_CACHE_EXPIRE_SEC.get(config, config::getInt))
+        .setBidiCacheMaxSize(GCS_BIDI_CACHE_MAX_SIZE.get(config, config::getInt))
         .build();
   }
 

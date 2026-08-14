@@ -71,6 +71,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
@@ -652,6 +653,36 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           return new FSDataInputStream(
               GoogleHadoopFSInputStream.create(this, fileStatus.getFileInfo(), statistics));
         });
+  }
+
+  /**
+   * Speculatively prewarms channels for reading multiple Hadoop paths. This is a GCS-specific
+   * extension API.
+   *
+   * <p>This is an experimental API and can change without notice. Prewarming is best-effort;
+   * individual prewarming failures will not cause this API to fail, and the number of channels
+   * prewarmed may be limited by cache capacity.
+   *
+   * @param pathSizeMap Map of Hadoop paths to their expected sizes.
+   * @throws IOException on IO error
+   */
+  public void multiOpen(Map<Path, Long> pathSizeMap) throws IOException {
+    checkOpen();
+    checkArgument(pathSizeMap != null, "pathSizeMap must not be null");
+
+    logger.atFine().log("multiOpen(pathSizeMap=%s)", pathSizeMap);
+
+    Map<StorageResourceId, Long> resourcesAndSizes =
+        Maps.newLinkedHashMapWithExpectedSize(pathSizeMap.size());
+    for (Map.Entry<Path, Long> entry : pathSizeMap.entrySet()) {
+      checkArgument(entry.getKey() != null, "pathSizeMap keys must not be null");
+      long size = (entry.getValue() == null || entry.getValue() < 0) ? -1L : entry.getValue();
+      URI gcsPath = getGcsPath(entry.getKey());
+      resourcesAndSizes.put(
+          StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false), size);
+    }
+
+    getGcsFs().getGcs().multiOpen(resourcesAndSizes);
   }
 
   @Override

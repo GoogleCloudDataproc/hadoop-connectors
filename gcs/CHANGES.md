@@ -5,6 +5,7 @@
 1. Implement fast fail for Bidi Read.
 1. Fast Fail Bug Fix during gRPC Reads.
 1. Log and drop while receiving the additional bytes from server.
+1. Add Bidi Bulk Open API
 
 ## 4.0.4 - 2026-03-26
 1. Add Integration test for chained Downscoping Interceptors
