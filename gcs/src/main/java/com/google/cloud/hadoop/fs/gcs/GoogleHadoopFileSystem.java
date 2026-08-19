@@ -701,7 +701,17 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false), size);
     }
 
-    getGcsFs().getGcs().multiOpen(resourcesAndSizes);
+    trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_OPEN,
+        pathSizeMap,
+        this.traceFactory,
+        () -> {
+          getGcsFs().getGcs().multiOpen(resourcesAndSizes);
+          return null;
+        },
+        TrackedFeatures.MULTI_OPEN_API);
   }
 
   @Override
