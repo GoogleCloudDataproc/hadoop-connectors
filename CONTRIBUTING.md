@@ -21,3 +21,12 @@ All submissions, including submissions by project members, require review. We
 use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
+
+
+## Branching and Backporting Policy
+
+To maintain consistency across supported releases and prevent missing fixes in newer releases, all contributors must follow this workflow:
+
+1. **Primary PR on `master`:** Always open your initial Pull Request against the `master` branch.
+2. **Determine Target Versions:** Identify the minimum version branch where your change or fix needs to be released.
+3. **Backport to All Higher Active Branches:** Once the PR is approved/merged into `master`, backport the change to the minimum version branch **and all higher active version branches** (for example, if a fix targets `3.1`, open backport PRs for `3.1`, `4.0`, and any higher active branches).
