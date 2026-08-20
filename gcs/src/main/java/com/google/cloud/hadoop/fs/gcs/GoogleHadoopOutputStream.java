@@ -50,7 +50,6 @@ import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -237,7 +236,7 @@ class GoogleHadoopOutputStream extends OutputStream
         GoogleCloudStorageEventBus.postOnException();
         throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
       }
-      generation = ((Optional<Long>) fileInfo.getItemInfo().getContentGeneration()).orElse(0L);
+      generation = fileInfo.getItemInfo().getContentGeneration().orElse(0L);
     } catch (IOException e) {
       // TODO(user): Remove this exception message check once analytics-core throws a specific
       // FileNotFoundException / NoSuchFileException for non-existent objects.

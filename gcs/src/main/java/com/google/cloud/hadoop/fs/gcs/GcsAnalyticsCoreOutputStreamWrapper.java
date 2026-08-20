@@ -41,7 +41,6 @@ class GcsAnalyticsCoreOutputStreamWrapper extends OutputStream {
 
   @Override
   public synchronized void write(int b) throws IOException {
-    logger.atFiner().log("write(int)");
     delegate.write(b);
   }
 
