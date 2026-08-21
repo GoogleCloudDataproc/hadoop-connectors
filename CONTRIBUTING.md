@@ -33,4 +33,3 @@ To maintain consistency across supported releases and prevent missing fixes in n
 4. **Backport to All Higher Active Branches:** Once the PR is approved/merged into `master`, backport the change to the minimum version branch **and all higher active version branches** (for example, if a fix targets `3.1`, open backport PRs for `3.1`, `4.0`, and any higher active branches).
 
 > **Note:** Backporting to older release branches is optional. If you choose not to backport your change, it will naturally be included in the next release branch cut from `master`.
-
