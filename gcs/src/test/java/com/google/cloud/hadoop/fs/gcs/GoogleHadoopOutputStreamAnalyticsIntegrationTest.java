@@ -16,6 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_WRITE_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
@@ -38,7 +41,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for GoogleHadoopOutputStream with Analytics Core write path enabled. */
+/**
+ * Integration tests for GoogleHadoopOutputStream with Analytics Core write path enabled.
+ *
+ * <p>TODO: In a follow up PR the existing integration tests would be parameterized to run with
+ * analytics core.
+ */
 @RunWith(JUnit4.class)
 public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
@@ -59,8 +67,8 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   private Configuration getTestConfig() {
     Configuration conf = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    conf.setBoolean("fs.gs.analytics.core.enable", true);
-    conf.setBoolean("fs.gs.analytics.core.write.enable", true);
+    conf.setBoolean(GCS_ANALYTICS_CORE_ENABLE.getKey(), true);
+    conf.setBoolean(GCS_ANALYTICS_CORE_WRITE_ENABLE.getKey(), true);
     return conf;
   }
 
@@ -135,7 +143,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_withZeroBufferSize");
     Path hadoopPath = new Path(path);
     Configuration config = getTestConfig();
-    config.setInt("fs.gs.outputstream.buffer.size", 0);
+    config.setInt(GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
     byte[] expected = "hello analytics core unbuffered write".getBytes(UTF_8);
 
