@@ -315,6 +315,13 @@ public class AnalyticsCoreConfigMapperTest {
             AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
                 .get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_TYPE_KEY))
         .isEqualTo("PARALLEL_COMPOSITE_UPLOAD");
+
+    // Invalid value falls back to default CHUNK_UPLOAD
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey(), "invalid-type");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_TYPE_KEY))
+        .isEqualTo("CHUNK_UPLOAD");
   }
 
   @Test
@@ -350,6 +357,33 @@ public class AnalyticsCoreConfigMapperTest {
     Map<String, String> mappedEnabled = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
     assertThat(mappedEnabled.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
         .isEqualTo("user-project");
+
+    // Fallback to fs.gs.project.id when fs.gs.requester.pays.project.id is not set
+    Configuration fallbackConfig = new Configuration();
+    fallbackConfig.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "my-project");
+
+    fallbackConfig.set(
+        GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "AUTO");
+    Map<String, String> mappedFallbackAuto =
+        AnalyticsCoreConfigMapper.mapConfigs(fallbackConfig, "fs.gs.");
+    assertThat(mappedFallbackAuto.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isEqualTo("my-project");
+
+    fallbackConfig.set(
+        GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "ENABLED");
+    Map<String, String> mappedFallbackEnabled =
+        AnalyticsCoreConfigMapper.mapConfigs(fallbackConfig, "fs.gs.");
+    assertThat(mappedFallbackEnabled.get("fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isEqualTo("my-project");
+
+    fallbackConfig.set(
+        GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(), "DISABLED");
+    Map<String, String> mappedFallbackDisabled =
+        AnalyticsCoreConfigMapper.mapConfigs(fallbackConfig, "fs.gs.");
+    assertThat(
+            mappedFallbackDisabled.containsKey(
+                "fs.gs." + AnalyticsCoreConfigMapper.USER_PROJECT_KEY))
+        .isFalse();
   }
 
   @Test
@@ -365,6 +399,15 @@ public class AnalyticsCoreConfigMapperTest {
 
     config.set(
         GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey(), "always");
+    assertThat(
+            AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
+                .get("fs.gs." + AnalyticsCoreConfigMapper.PCU_PART_FILE_CLEANUP_TYPE_KEY))
+        .isEqualTo("ALWAYS");
+
+    // Invalid value falls back to default ALWAYS
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey(),
+        "invalid-cleanup");
     assertThat(
             AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.")
                 .get("fs.gs." + AnalyticsCoreConfigMapper.PCU_PART_FILE_CLEANUP_TYPE_KEY))

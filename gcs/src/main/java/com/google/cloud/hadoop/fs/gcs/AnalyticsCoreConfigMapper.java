@@ -113,19 +113,23 @@ final class AnalyticsCoreConfigMapper {
         (hadoopKey, analyticsKey) ->
             mapAndRemoveSource(hadoopKey, mappedProperties, prefix + analyticsKey));
 
-    // Handle requester pays project ID conditionally
+    // Handle requester pays project ID: when enabled, use fs.gs.requester.pays.project.id if set,
+    // otherwise fallback to fs.gs.project.id
     String requesterPaysMode =
         config.get(
             GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getKey(),
             GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_MODE.getDefault().name());
-    if (RequesterPaysMode.DISABLED.name().equalsIgnoreCase(requesterPaysMode)) {
-      mappedProperties.remove(
-          GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey());
-    } else {
-      mapAndRemoveSource(
-          GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
-          mappedProperties,
-          prefix + USER_PROJECT_KEY);
+    String requesterPaysProjectId =
+        mappedProperties.remove(
+            GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey());
+    if (!RequesterPaysMode.DISABLED.name().equalsIgnoreCase(requesterPaysMode)) {
+      if (requesterPaysProjectId == null || requesterPaysProjectId.isEmpty()) {
+        requesterPaysProjectId =
+            config.get(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey());
+      }
+      if (requesterPaysProjectId != null && !requesterPaysProjectId.isEmpty()) {
+        mappedProperties.put(prefix + USER_PROJECT_KEY, requesterPaysProjectId);
+      }
     }
 
     // Handle temporary paths: use fs.gs.write.temporary.dirs if set, otherwise fallback to
@@ -157,17 +161,41 @@ final class AnalyticsCoreConfigMapper {
       if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
         value = toFileAccessPattern(value);
       } else if (hadoopKey.equals(
-              GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey())
-          || hadoopKey.equals(
-              GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey())) {
-        value = normalizeEnum(value);
+          GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey())) {
+        value = toUploadType(value);
+      } else if (hadoopKey.equals(
+          GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE.getKey())) {
+        value = toPartFileCleanupType(value);
       }
       map.put(analyticsCoreKey, value);
     }
   }
 
-  private static String normalizeEnum(String value) {
-    return value.replace('-', '_').toUpperCase();
+  private static String toUploadType(String uploadType) {
+    String normalized = uploadType.replace('-', '_').toUpperCase();
+    switch (normalized) {
+      case "CHUNK_UPLOAD":
+      case "WRITE_TO_DISK_THEN_UPLOAD":
+      case "JOURNALING":
+      case "PARALLEL_COMPOSITE_UPLOAD":
+        return normalized;
+      default:
+        return GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getDefault().name();
+    }
+  }
+
+  private static String toPartFileCleanupType(String cleanupType) {
+    String normalized = cleanupType.replace('-', '_').toUpperCase();
+    switch (normalized) {
+      case "ALWAYS":
+      case "NEVER":
+      case "ON_SUCCESS":
+        return normalized;
+      default:
+        return GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_CLEANUP_TYPE
+            .getDefault()
+            .name();
+    }
   }
 
   private static String toFileAccessPattern(String fadvise) {
