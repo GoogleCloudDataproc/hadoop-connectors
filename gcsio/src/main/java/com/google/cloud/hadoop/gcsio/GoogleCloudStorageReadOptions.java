@@ -262,6 +262,10 @@ public abstract class GoogleCloudStorageReadOptions {
           options.getInplaceSeekLimit() >= 0,
           "inplaceSeekLimit must be non-negative! Got %s",
           options.getInplaceSeekLimit());
+      checkState(
+          options.getFadviseRequestTrackCount() > 0,
+          "fadviseRequestTrackCount must be greater than 0! Got %s",
+          options.getFadviseRequestTrackCount());
       return options;
     }
   }

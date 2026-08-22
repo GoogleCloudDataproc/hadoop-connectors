@@ -65,7 +65,8 @@ class FileAccessPatternManager {
       return;
     }
     updateSeekFlags(currentPosition);
-    if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM) {
+    if (readOptions.getFadvise() == Fadvise.AUTO_RANDOM
+        || readOptions.getFadvise() == Fadvise.AUTO) {
       if (randomAccess) {
         if (shouldAdaptToSequential(currentPosition)) {
           unsetRandomAccess();
@@ -74,10 +75,6 @@ class FileAccessPatternManager {
         if (shouldAdaptToRandomAccess(currentPosition)) {
           setRandomAccess();
         }
-      }
-    } else if (readOptions.getFadvise() == Fadvise.AUTO) {
-      if (shouldAdaptToRandomAccess(currentPosition)) {
-        setRandomAccess();
       }
     }
   }
@@ -140,10 +137,14 @@ class FileAccessPatternManager {
   }
 
   private boolean shouldDetectSequentialAccess() {
-    return randomAccess
-        && !isBackwardOrForwardSeekRequested()
-        && consecutiveSequentialCount >= readOptions.getFadviseRequestTrackCount()
-        && readOptions.getFadvise() == Fadvise.AUTO_RANDOM;
+    if (!randomAccess) {
+      return false;
+    }
+    if (readOptions.getFadvise() == Fadvise.AUTO) {
+      return true;
+    }
+    return readOptions.getFadvise() == Fadvise.AUTO_RANDOM
+        && !isBackwardOrForwardSeekRequested();
   }
 
   private boolean shouldDetectRandomAccess() {
@@ -154,10 +155,14 @@ class FileAccessPatternManager {
 
   private void setRandomAccess() {
     randomAccess = true;
+    consecutiveSequentialCount = 0;
   }
 
   private void unsetRandomAccess() {
     randomAccess = false;
+    consecutiveSequentialCount = 0;
+    isBackwardSeekRequested = false;
+    isForwardSeekRequested = false;
   }
 
   private boolean isBackwardOrForwardSeekRequested() {
