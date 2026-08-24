@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_WRITE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPLICATION_NAME_SUFFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -409,7 +410,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       } else {
         initializeGcsFs(createGcsFs(config));
       }
-      if (isAnalyticsCoreEnabled()) {
+      // TODO(user): Initialize analyticsCoreGcsFs lazily when GCS_LAZY_INITIALIZATION_ENABLE is
+      // true, to avoid eager initialization.
+      if (isAnalyticsCoreEnabled() || isAnalyticsCoreWriteEnabled()) {
         analyticsCoreGcsFs = createAnalyticsGcsFs(config);
       }
     }
@@ -1859,9 +1862,19 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsFileInfo);
   }
 
+  GoogleCloudStorageOutputStream createAnalyticsCoreOutputStream(
+      GcsItemId gcsItemId, GcsWriteOptions writeOptions) throws IOException {
+    return GoogleCloudStorageOutputStream.create(analyticsCoreGcsFs, gcsItemId, writeOptions);
+  }
+
   /** Checks if Analytics Core is enabled. */
   boolean isAnalyticsCoreEnabled() {
     return GCS_ANALYTICS_CORE_ENABLE.get(getConf(), getConf()::getBoolean);
+  }
+
+  /** Checks if Analytics Core write path is enabled. */
+  boolean isAnalyticsCoreWriteEnabled() {
+    return GCS_ANALYTICS_CORE_WRITE_ENABLE.get(getConf(), getConf()::getBoolean);
   }
 
   public Supplier<VectoredIOImpl> getVectoredIOSupplier() {
