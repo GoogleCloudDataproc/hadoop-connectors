@@ -45,8 +45,8 @@ import org.junit.runners.JUnit4;
 /**
  * Integration tests for GoogleHadoopOutputStream with Analytics Core write path enabled.
  *
- * <p>TODO: In a follow up PR the existing integration tests would be parameterized to run with
- * analytics core.
+ * <p>TODO: In a follow-up task, consolidate this suite with GoogleHadoopOutputStreamIntegrationTest
+ * by parameterizing the test matrix to cover both default and analytics core write paths.
  */
 @RunWith(JUnit4.class)
 public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
