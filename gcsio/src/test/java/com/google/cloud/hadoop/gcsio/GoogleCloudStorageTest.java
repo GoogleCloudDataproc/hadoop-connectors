@@ -1099,8 +1099,12 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(GoogleCloudStorageReadOptions.Fadvise.SEQUENTIAL)
+            .build();
     GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
+        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID, readOptions);
     assertThat(readChannel.isOpen()).isTrue();
     assertThat(readChannel.position()).isEqualTo(0);
 

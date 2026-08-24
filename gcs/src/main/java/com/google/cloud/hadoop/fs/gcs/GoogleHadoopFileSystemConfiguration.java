@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.getConfigKeyPrefixes;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.toIntExact;
 
@@ -64,7 +65,15 @@ public class GoogleHadoopFileSystemConfiguration {
   // Configuration settings.
   // -----------------------------------------------------------------
 
-  /** Configuration key for the Cloud Storage API endpoint root URL. */
+  /**
+   * Configuration key for the Cloud Storage API endpoint root URL.
+   *
+   * <p>This only overrides the JSON/REST endpoint and carries no universe semantics (no credential
+   * universe-domain validation, and no effect on the gRPC endpoint). For Trusted Partner Cloud /
+   * multi-universe (TPC) deployments, prefer {@link #GCS_UNIVERSE_DOMAIN}, which routes both the
+   * JSON/REST and gRPC clients and validates the credentials' universe domain. When both are set,
+   * this explicit root URL takes precedence over the universe-domain-derived endpoint.
+   */
   public static final HadoopConfigurationProperty<String> GCS_ROOT_URL =
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.root.url", GoogleCloudStorageOptions.DEFAULT.getStorageRootUrl());
@@ -73,6 +82,19 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_SERVICE_PATH =
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.service.path", GoogleCloudStorageOptions.DEFAULT.getStorageServicePath());
+
+  /**
+   * Configuration key for the Cloud Storage universe domain (e.g. for Trusted Partner Cloud /
+   * multi-universe deployments). When unset, the {@value #GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR}
+   * environment variable is used; if that is also unset, the default Google universe ({@code
+   * googleapis.com}) is targeted.
+   */
+  public static final HadoopConfigurationProperty<String> GCS_UNIVERSE_DOMAIN =
+      new HadoopConfigurationProperty<>("fs.gs.universe.domain", "");
+
+  /** Environment variable consulted as a fallback for the universe domain. */
+  @VisibleForTesting
+  static final String GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR = "GOOGLE_CLOUD_UNIVERSE_DOMAIN";
 
   /**
    * Key for the permissions that we report a file or directory to have. Can either be octal or
@@ -391,16 +413,16 @@ public class GoogleHadoopFileSystemConfiguration {
               GoogleCloudStorageReadOptions.DEFAULT.getLatencyLoggingThreshold());
 
   /** Minimum distance that will be seeked without merging the ranges together. */
-  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_RANGE_MIN_SEEK =
+  public static final HadoopConfigurationProperty<Long> GCS_VECTORED_READ_RANGE_MIN_SEEK =
       new HadoopConfigurationProperty<>(
           "fs.gs.vectored.read.min.range.seek.size",
-          VectoredReadOptions.DEFAULT.getMinSeekVectoredReadSize());
+          (long) VectoredReadOptions.DEFAULT.getMinSeekVectoredReadSize());
 
   /** Maximum size allowed for a merged range request. */
-  public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE =
+  public static final HadoopConfigurationProperty<Long> GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE =
       new HadoopConfigurationProperty<>(
           "fs.gs.vectored.read.merged.range.max.size",
-          VectoredReadOptions.DEFAULT.getMergeRangeMaxSize());
+          (long) VectoredReadOptions.DEFAULT.getMergeRangeMaxSize());
 
   /** Maximum threads to process individual FileRange requests */
   public static final HadoopConfigurationProperty<Integer> GCS_VECTORED_READ_THREADS =
@@ -411,6 +433,14 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.enable", GoogleCloudStorageOptions.DEFAULT.isGrpcEnabled());
+
+  /** Configuration key for idle timeout (TTL) for cached connections. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_EXPIRE_SEC =
+      new HadoopConfigurationProperty<>("fs.gs.bidi.cache.expire.sec", 600);
+
+  /** Configuration key for maximum unique objects cached in the pool. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_MAX_SIZE =
+      new HadoopConfigurationProperty<>("fs.gs.bidi.cache.max.size", 100);
 
   /** Configuration key for enabling checksum validation for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
@@ -674,8 +704,10 @@ public class GoogleHadoopFileSystemConfiguration {
     }
     logger.atInfo().log("Using %d threads for vectored reads", readThreads);
     return VectoredReadOptions.builder()
-        .setMinSeekVectoredReadSize(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getInt))
-        .setMergeRangeMaxSize(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getInt))
+        .setMinSeekVectoredReadSize(
+            toIntExact(GCS_VECTORED_READ_RANGE_MIN_SEEK.get(config, config::getLongBytes)))
+        .setMergeRangeMaxSize(
+            toIntExact(GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.get(config, config::getLongBytes)))
         .setReadThreads(readThreads);
   }
 
@@ -718,6 +750,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId))
         .setStorageRootUrl(GCS_ROOT_URL.get(config, config::get))
         .setStorageServicePath(GCS_SERVICE_PATH.get(config, config::get))
+        .setUniverseDomain(
+            resolveUniverseDomain(config, System.getenv(GOOGLE_CLOUD_UNIVERSE_DOMAIN_ENV_VAR)))
         .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setOperationTraceLogEnabled(GCS_OPERATION_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
@@ -728,6 +762,25 @@ public class GoogleHadoopFileSystemConfiguration {
         .setFinalizeBeforeClose(
             GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean))
         .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean));
+  }
+
+  /**
+   * Resolves the universe domain to target. Precedence: the {@code fs.gs.universe.domain} property,
+   * then the {@code GOOGLE_CLOUD_UNIVERSE_DOMAIN} environment variable, then {@code null} (the
+   * default Google universe, googleapis.com).
+   *
+   * @param config the Hadoop configuration to read the property from
+   * @param envUniverseDomain the value of the {@code GOOGLE_CLOUD_UNIVERSE_DOMAIN} environment
+   *     variable (passed in for testability), may be {@code null}
+   * @return the resolved universe domain, or {@code null} for the default Google universe
+   */
+  @VisibleForTesting
+  static String resolveUniverseDomain(Configuration config, String envUniverseDomain) {
+    String fromConfig = GCS_UNIVERSE_DOMAIN.get(config, config::get);
+    if (!isNullOrEmpty(fromConfig)) {
+      return fromConfig;
+    }
+    return isNullOrEmpty(envUniverseDomain) ? null : envUniverseDomain;
   }
 
   @VisibleForTesting
@@ -766,12 +819,14 @@ public class GoogleHadoopFileSystemConfiguration {
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLongBytes))
         .setMinRangeRequestSize(
             GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
-        .setBlockSize(BLOCK_SIZE.get(config, config::getLong))
+        .setBlockSize(BLOCK_SIZE.get(config, config::getLongBytes))
         .setFadviseRequestTrackCount(GCS_FADVISE_REQUEST_TRACK_COUNT.get(config, config::getInt))
         .setBidiThreadCount(GCS_BIDI_THREAD_COUNT.get(config, config::getInt))
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .setLatencyLoggingThreshold(
             GCS_INPUT_STREAM_LATENCY_LOGGING_THRESHOLD_MS.get(config, config::getLong))
+        .setBidiCacheExpireSec(GCS_BIDI_CACHE_EXPIRE_SEC.get(config, config::getInt))
+        .setBidiCacheMaxSize(GCS_BIDI_CACHE_MAX_SIZE.get(config, config::getInt))
         .build();
   }
 

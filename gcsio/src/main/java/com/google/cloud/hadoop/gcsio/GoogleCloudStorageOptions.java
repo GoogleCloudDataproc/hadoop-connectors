@@ -90,6 +90,13 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract String getStorageServicePath();
 
+  /**
+   * Universe domain to target (e.g. for Trusted Partner Cloud / multi-universe deployments). When
+   * {@code null} or empty the client uses the default Google universe ({@code googleapis.com}).
+   */
+  @Nullable
+  public abstract String getUniverseDomain();
+
   public abstract boolean isGrpcWriteEnabled();
 
   @Nullable
@@ -187,6 +194,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setStorageRootUrl(String rootUrl);
 
     public abstract Builder setStorageServicePath(String servicePath);
+
+    public abstract Builder setUniverseDomain(@Nullable String universeDomain);
 
     public abstract Builder setProjectId(String projectId);
 

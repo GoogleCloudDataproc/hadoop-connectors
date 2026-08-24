@@ -23,12 +23,14 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.cloud.hadoop.util.HttpTransportFactory.CustomSslSocketFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -146,6 +148,43 @@ public class HttpTransportFactoryTest {
             /* proxyUri= */ null, /* readTimeout= */ null);
 
     assertThat(builder.getSslSocketFactory()).isInstanceOf(CustomSslSocketFactory.class);
+  }
+
+  @Test
+  public void createNetHttpTransportBuilder_defaultTrustStore_doesNotUseSystemDefault()
+      throws GeneralSecurityException, IOException {
+    NetHttpTransport.Builder builder =
+        HttpTransportFactory.createNetHttpTransportBuilder(
+            /* proxyUri= */ null, /* readTimeout= */ null, /* useSystemDefaultTrustStore= */ false);
+
+    // Google's bundled trust store yields a dedicated SSLSocketFactory, not the JVM default.
+    assertThat(builder.getSslSocketFactory()).isInstanceOf(CustomSslSocketFactory.class);
+    assertThat(unwrap((CustomSslSocketFactory) builder.getSslSocketFactory()))
+        .isNotSameInstanceAs(HttpsURLConnection.getDefaultSSLSocketFactory());
+  }
+
+  @Test
+  public void createNetHttpTransportBuilder_systemDefaultTrustStore_usesSystemDefault()
+      throws GeneralSecurityException, IOException {
+    NetHttpTransport.Builder builder =
+        HttpTransportFactory.createNetHttpTransportBuilder(
+            /* proxyUri= */ null, /* readTimeout= */ null, /* useSystemDefaultTrustStore= */ true);
+
+    // For custom/TPC endpoints we fall back to the JVM's default trust store.
+    assertThat(builder.getSslSocketFactory()).isInstanceOf(CustomSslSocketFactory.class);
+    assertThat(unwrap((CustomSslSocketFactory) builder.getSslSocketFactory()))
+        .isSameInstanceAs(HttpsURLConnection.getDefaultSSLSocketFactory());
+  }
+
+  /** Returns the {@link SSLSocketFactory} wrapped inside a {@link CustomSslSocketFactory}. */
+  private static SSLSocketFactory unwrap(CustomSslSocketFactory factory) {
+    try {
+      Field field = CustomSslSocketFactory.class.getDeclaredField("wrappedSockedFactory");
+      field.setAccessible(true);
+      return (SSLSocketFactory) field.get(factory);
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError("Failed to read wrapped SSLSocketFactory", e);
+    }
   }
 
   @Test
