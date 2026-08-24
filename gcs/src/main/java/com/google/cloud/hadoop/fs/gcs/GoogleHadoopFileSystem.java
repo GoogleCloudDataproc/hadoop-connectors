@@ -44,10 +44,7 @@ import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
-import com.google.cloud.gcs.analyticscore.client.GcsItemId;
-import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
-import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
@@ -81,6 +78,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
@@ -324,7 +322,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
-    defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
+    defaultBlockSize = BLOCK_SIZE.get(config, config::getLongBytes);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
 
     initializeFsRoot();
@@ -677,6 +675,46 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           return new FSDataInputStream(
               GoogleHadoopFSInputStream.create(this, fileStatus.getFileInfo(), statistics));
         });
+  }
+
+  /**
+   * Speculatively prewarms channels for reading multiple Hadoop paths. This is a GCS-specific
+   * extension API.
+   *
+   * <p>This is an experimental API and can change without notice. Prewarming is best-effort;
+   * individual prewarming failures will not cause this API to fail, and the number of channels
+   * prewarmed may be limited by cache capacity.
+   *
+   * @param pathSizeMap Map of Hadoop paths to their expected sizes.
+   * @throws IOException on IO error
+   */
+  public void multiOpen(Map<Path, Long> pathSizeMap) throws IOException {
+    checkOpen();
+    checkArgument(pathSizeMap != null, "pathSizeMap must not be null");
+
+    logger.atFine().log("multiOpen(pathSizeMap=%s)", pathSizeMap);
+
+    Map<StorageResourceId, Long> resourcesAndSizes =
+        Maps.newLinkedHashMapWithExpectedSize(pathSizeMap.size());
+    for (Map.Entry<Path, Long> entry : pathSizeMap.entrySet()) {
+      checkArgument(entry.getKey() != null, "pathSizeMap keys must not be null");
+      long size = (entry.getValue() == null || entry.getValue() < 0) ? -1L : entry.getValue();
+      URI gcsPath = getGcsPath(entry.getKey());
+      resourcesAndSizes.put(
+          StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false), size);
+    }
+
+    trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_OPEN,
+        pathSizeMap,
+        this.traceFactory,
+        () -> {
+          getGcsFs().getGcs().multiOpen(resourcesAndSizes);
+          return null;
+        },
+        TrackedFeatures.MULTI_OPEN_API);
   }
 
   @Override
@@ -1414,6 +1452,21 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       case GcsConnectorCapabilities.OPEN_WITH_STATUS:
       case GcsConnectorCapabilities.GET_FILE_STATUS_WITH_HINT:
         return true;
+      case GcsConnectorCapabilities.LIST_STATUS_STARTING_FROM:
+        try {
+          // getGcs should not be null, there is no way we close the underneath gcs and not close
+          // hcfs.
+          // still added this check to avoid any NPE
+          if (isClosed() || getGcsFs().getGcs() == null) {
+            return false;
+          }
+          return !getGcsFs().getGcs().isHnBucket(getGcsPath(path));
+        } catch (IOException e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to check if path '%s' is in HNS-enabled bucket for capability '%s'",
+              path, capability);
+          return false;
+        }
       default:
         return false;
     }
@@ -2172,5 +2225,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     public static final String OPEN_WITH_STATUS = "fs.gs.capability.open.with.status";
     public static final String GET_FILE_STATUS_WITH_HINT =
         "fs.gs.capability.getfilestatus.with.hint";
+    public static final String LIST_STATUS_STARTING_FROM =
+        "fs.gs.capability.liststatus.starting.from";
   }
 }

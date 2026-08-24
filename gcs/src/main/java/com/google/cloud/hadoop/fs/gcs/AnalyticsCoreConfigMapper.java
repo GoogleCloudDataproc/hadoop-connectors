@@ -51,6 +51,9 @@ final class AnalyticsCoreConfigMapper {
           .put(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), PROJECT_ID_KEY)
           .put(GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL.getKey(), SERVICE_HOST_KEY)
           .put(
+              GoogleHadoopFileSystemConfiguration.GCS_REQUESTER_PAYS_PROJECT_ID.getKey(),
+              USER_PROJECT_KEY)
+          .put(
               GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(),
               READ_THREAD_COUNT_KEY)
           .put(
