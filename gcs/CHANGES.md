@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 4.0.5 - 2026-08-26
 
 1. Implement fast fail for Bidi Read.
