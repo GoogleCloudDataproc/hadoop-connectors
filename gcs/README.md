@@ -60,7 +60,7 @@ There are multiple ways to access data stored in Google Cloud Storage:
     or `fs -ls /dir/file`
 *   the
     [Cloud Platform Console Cloud Storage browser](https://cloud.google.com/storage/docs/gettingstarted-console)
-*   [`gsutil cp`](https://cloud.google.com/storage/docs/gsutil/commands/cp)
-*   [`gsutil rsync`](https://cloud.google.com/storage/docs/gsutil/commands/rsync)
+*   [`gcloud storage cp`](https://docs.cloud.google.com/sdk/gcloud/reference/storage/cp)
+*   [`gcloud storage rsync`](https://cloud.google.com/sdk/gcloud/reference/storage/rsync)
 *   The
     [Cloud Storage JSON API](https://cloud.google.com/storage/docs/json_api/v1/)
