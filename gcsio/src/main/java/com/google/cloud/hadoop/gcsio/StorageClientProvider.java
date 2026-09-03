@@ -202,6 +202,16 @@ public class StorageClientProvider {
       // The storage client rewrites the host to https://storage.<universeDomain> when a universe
       // domain is set, so an explicit setHost() is not required here.
       storageOptionsBuilder.setUniverseDomain(universeDomain);
+    } else {
+      String rootUrl = storageOptions.getStorageRootUrl();
+      if (!Strings.isNullOrEmpty(rootUrl)
+          && !com.google.api.services.storage.Storage.DEFAULT_ROOT_URL.equals(rootUrl)) {
+        String rawHost =
+            rootUrl
+                .replaceFirst("^(google-c2p:///|google-c2p://|https?://)", "")
+                .replaceAll("/$", "");
+        storageOptionsBuilder.setHost("https://" + rawHost);
+      }
     }
     return storageOptionsBuilder.build().getService();
   }
