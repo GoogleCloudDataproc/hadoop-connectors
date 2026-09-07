@@ -54,6 +54,10 @@ public abstract class StorageClientProviderCacheKey {
   @Nullable
   public abstract String getUniverseDomain();
 
+  /** Custom host to target for gRPC, or null if default. */
+  @Nullable
+  public abstract String getCustomHost();
+
   public abstract StorageClientProviderCacheKey.Builder toBuilder();
 
   @AutoValue.Builder
@@ -73,6 +77,8 @@ public abstract class StorageClientProviderCacheKey {
     public abstract Builder setIsDirectPathPreferred(boolean value);
 
     public abstract Builder setUniverseDomain(@Nullable String value);
+
+    public abstract Builder setCustomHost(@Nullable String value);
 
     public abstract StorageClientProviderCacheKey build();
   }

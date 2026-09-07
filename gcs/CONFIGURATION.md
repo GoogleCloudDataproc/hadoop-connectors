@@ -541,6 +541,14 @@ better latency and increased bandwidth. Currently supported only for read/write 
 
 * `fs.gs.storage.client.cache.enable` (default: `false`) enables gRPC storage client caching so FileSystem objects with similar configs can share the client.
 
+* `fs.gs.grpc.server.address` (default: none, alias: `fs.gs.grpc.endpoint`)
+
+    Google Cloud Storage gRPC endpoint or server address (e.g.
+    `storage-preprod-test-grpc.googleusercontent.com` or
+    `google-c2p:///storage-preprod-test-grpc.googleusercontent.com`). Effective
+    when `fs.gs.client.type` is set to `STORAGE_CLIENT`. When configured, allows
+    separating the gRPC endpoint from the JSON/REST endpoint (`fs.gs.storage.root.url`).
+
 
 ### Bidi configurations
 **Note:  Bidi configurations are effective only if `fs.gs.client.type` is set to `STORAGE_CLIENT` (gRPC).**

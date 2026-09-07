@@ -448,6 +448,10 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.grpc.checksums.enable",
           GoogleCloudStorageReadOptions.DEFAULT.isGrpcChecksumsEnabled());
 
+  /** Configuration key for the Cloud Storage gRPC server address / endpoint. */
+  public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.server.address", null, "fs.gs.grpc.endpoint");
+
   /** Configuration key for check interval for gRPC request timeout to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT =
       new HadoopConfigurationProperty<>(
@@ -720,6 +724,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKey(GCS_ENCRYPTION_KEY.getPassword(config))
         .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.getPassword(config))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
+        .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setHnBucketRenameEnabled(GCS_HIERARCHICAL_NAMESPACE_ENABLE.get(config, config::getBoolean))
         .setGrpcMessageTimeoutCheckInterval(GCS_GRPC_CHECK_INTERVAL_TIMEOUT.getTimeDuration(config))
         .setHttpRequestConnectTimeout(GCS_HTTP_CONNECT_TIMEOUT.getTimeDuration(config))

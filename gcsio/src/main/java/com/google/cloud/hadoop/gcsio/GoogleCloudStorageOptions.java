@@ -46,6 +46,7 @@ public abstract class GoogleCloudStorageOptions {
         .setBatchThreads(15)
         .setCopyWithRewriteEnabled(true)
         .setDirectPathPreferred(true)
+        .setGrpcServerAddress(null)
         .setGrpcEnabled(false)
         .setGrpcMessageTimeoutCheckInterval(Duration.ofSeconds(1))
         .setHttpRequestConnectTimeout(Duration.ofSeconds(5))
@@ -85,6 +86,9 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isTrafficDirectorEnabled();
 
   public abstract boolean isDirectPathPreferred();
+
+  @Nullable
+  public abstract String getGrpcServerAddress();
 
   public abstract String getStorageRootUrl();
 
@@ -190,6 +194,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
     public abstract Builder setDirectPathPreferred(boolean directPathPreferred);
+
+    public abstract Builder setGrpcServerAddress(@Nullable String grpcServerAddress);
 
     public abstract Builder setStorageRootUrl(String rootUrl);
 

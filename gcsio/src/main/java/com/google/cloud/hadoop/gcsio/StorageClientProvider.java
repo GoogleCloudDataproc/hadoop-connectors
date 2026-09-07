@@ -151,7 +151,25 @@ public class StorageClientProvider {
         .setWriteChannelOptions(storageOptions.getWriteChannelOptions())
         .setProjectId(storageOptions.getProjectId())
         .setUniverseDomain(Strings.emptyToNull(storageOptions.getUniverseDomain()))
+        .setCustomHost(getCustomHost(storageOptions))
         .build();
+  }
+
+  private static String getCustomHost(GoogleCloudStorageOptions storageOptions) {
+    String grpcServerAddress = storageOptions.getGrpcServerAddress();
+    if (!Strings.isNullOrEmpty(grpcServerAddress)) {
+      return grpcServerAddress
+          .replaceFirst("^(google-c2p:///|google-c2p://|https?://)", "")
+          .replaceAll("/$", "");
+    }
+    String rootUrl = storageOptions.getStorageRootUrl();
+    if (!Strings.isNullOrEmpty(rootUrl)
+        && !com.google.api.services.storage.Storage.DEFAULT_ROOT_URL.equals(rootUrl)) {
+      return rootUrl
+          .replaceFirst("^(google-c2p:///|google-c2p://|https?://)", "")
+          .replaceAll("/$", "");
+    }
+    return null;
   }
 
   /** Determines if the storage instance can be served from the cache. */
@@ -203,14 +221,9 @@ public class StorageClientProvider {
       // domain is set, so an explicit setHost() is not required here.
       storageOptionsBuilder.setUniverseDomain(universeDomain);
     } else {
-      String rootUrl = storageOptions.getStorageRootUrl();
-      if (!Strings.isNullOrEmpty(rootUrl)
-          && !com.google.api.services.storage.Storage.DEFAULT_ROOT_URL.equals(rootUrl)) {
-        String rawHost =
-            rootUrl
-                .replaceFirst("^(google-c2p:///|google-c2p://|https?://)", "")
-                .replaceAll("/$", "");
-        storageOptionsBuilder.setHost("https://" + rawHost);
+      String customHost = getCustomHost(storageOptions);
+      if (!Strings.isNullOrEmpty(customHost)) {
+        storageOptionsBuilder.setHost("https://" + customHost);
       }
     }
     return storageOptionsBuilder.build().getService();
