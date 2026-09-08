@@ -42,6 +42,7 @@ public class TrackedFeaturesTest {
             .put(TrackedFeatures.RENAME_API, 12)
             .put(TrackedFeatures.ANALYTICS_CORE_ENABLED, 13)
             .put(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND_ENABLED, 14)
+            .put(TrackedFeatures.MULTI_OPEN_API, 15)
             .build();
 
     // Verifies that no new features have been added without updating this test.
