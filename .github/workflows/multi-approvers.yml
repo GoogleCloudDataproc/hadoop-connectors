@@ -30,10 +30,10 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Checkout Repository'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' # v4
 
       - name: 'Check Two-Party Review Status'
-        uses: 'abcxyz/actions/.github/actions/multi-approvers@cd65e574b76ed2293095f5e6331267b9b8202d86'
+        uses: 'abcxyz/actions/.github/actions/multi-approvers@cd65e574b76ed2293095f5e6331267b9b8202d86' # main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           user-id-allowlist: 'rajeevpodar,ShreyasSinha,ajayky-os,chandra-siri,prudhvimaharishi,animesh-g,Dhriti07,shrutisinghania,dheerajsngh,cpriti-os,nidhiii-27,singhravidutt'
