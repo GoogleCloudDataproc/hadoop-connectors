@@ -380,6 +380,13 @@ default service account impersonation.
     be no-op if called more frequently than minimum sync interval and `hsync()`
     will block until an end of a min sync interval.
 
+*   `fs.gs.operation.compose.delete-source.enable` (default: `false`)
+
+    If `true`, deletes non-destination source objects during compose operations,
+    bypassing soft-delete retention. This is used during Hadoop writes to clean
+    up temporary tail objects directly within the compose request. Is effective
+    only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.
+
 #### Vectored Read configuration
 
 Knobs configure the vectoredRead API

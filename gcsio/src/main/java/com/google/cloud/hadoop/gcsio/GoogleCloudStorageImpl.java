@@ -2763,6 +2763,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // TODO(user): Maybe set generationIds for source objects as well here.
             .map(input -> new ComposeRequest.SourceObjects().setName(input.getObjectName()))
             .collect(Collectors.toList());
+    ComposeRequest composeRequest =
+        new ComposeRequest()
+            .setSourceObjects(sourceObjects)
+            .setDestination(
+                new StorageObject()
+                    .setContentType(options.getContentType())
+                    .setContentEncoding(options.getContentEncoding())
+                    .setMetadata(encodeMetadata(options.getMetadata())));
+    if (options.isDeleteSourceObjects()) {
+      composeRequest.setDeleteSourceObjects(true);
+    }
     Storage.Objects.Compose compose =
         initializeRequest(
             storage
@@ -2770,13 +2781,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 .compose(
                     destination.getBucketName(),
                     destination.getObjectName(),
-                    new ComposeRequest()
-                        .setSourceObjects(sourceObjects)
-                        .setDestination(
-                            new StorageObject()
-                                .setContentType(options.getContentType())
-                                .setContentEncoding(options.getContentEncoding())
-                                .setMetadata(encodeMetadata(options.getMetadata())))),
+                    composeRequest),
             destination.getBucketName());
 
     compose.setIfGenerationMatch(

@@ -669,6 +669,18 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
 
+  /**
+   * Configuration key to delete source objects during compose operation, bypassing soft-delete
+   * retention.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_COMPOSE_DELETE_SOURCE_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.compose.delete-source.enable",
+          GoogleCloudStorageOptions.DEFAULT.isComposeDeleteSourceEnabled());
+
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_OPERATION_COMPOSE_DELETE_SOURCE_ENABLE = GCS_COMPOSE_DELETE_SOURCE_ENABLE;
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -755,7 +767,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setFinalizeBeforeClose(
             GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean))
-        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean));
+        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean))
+        .setComposeDeleteSourceEnabled(
+            GCS_COMPOSE_DELETE_SOURCE_ENABLE.get(config, config::getBoolean));
   }
 
   /**
