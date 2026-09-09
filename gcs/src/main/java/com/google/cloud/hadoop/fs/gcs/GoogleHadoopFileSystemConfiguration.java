@@ -670,8 +670,9 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
 
   /**
-   * Configuration key to delete source objects during compose operation, bypassing soft-delete
-   * retention.
+   * Configuration key to delete intermediate temporary source objects during compose operations
+   * in parallel composite uploads/writes, bypassing soft-delete retention. Does not affect
+   * regular compose operations such as concat.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_COMPOSE_DELETE_SOURCE_ENABLE =
       new HadoopConfigurationProperty<>(
