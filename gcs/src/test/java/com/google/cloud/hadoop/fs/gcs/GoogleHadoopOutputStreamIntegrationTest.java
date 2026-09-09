@@ -362,7 +362,8 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     FileStatus[] statuses = fs.listStatus(hadoopPath.getParent());
     if (statuses != null) {
       for (FileStatus status : statuses) {
-        assertThat(status.getPath().getName()).doesNotContain(".tmp.ghfs.");
+        assertThat(status.getPath().getName())
+            .doesNotContain(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
       }
     }
   }

@@ -383,11 +383,12 @@ default service account impersonation.
 *   `fs.gs.operation.compose.delete-source.enable` (default: `false`)
 
     If `true`, deletes intermediate temporary source objects during compose operations
-    in parallel composite uploads / writes, bypassing soft-delete retention. This is
-    used during Hadoop stream writes (`GoogleHadoopOutputStream`) to clean up temporary tail
-    component objects directly within the compose request instead of queuing asynchronous
-    deletion tasks. This applies only to parallel composite uploads / write operations and
-    does not affect regular compose operations (such as `FileSystem.concat`).
+    in Hadoop stream writes (`GoogleHadoopOutputStream`), bypassing soft-delete retention.
+    This is used during multi-component stream writes (e.g. workflows calling `hsync()`)
+    to clean up temporary tail objects directly within the compose request instead of queuing
+    asynchronous deletion tasks. This applies only to Hadoop stream write compose operations
+    and does not affect regular compose operations (such as `FileSystem.concat`), nor does
+    it apply to Parallel Composite Uploads (`fs.gs.client.upload.type=PARALLEL_COMPOSITE_UPLOAD`).
 
 #### Vectored Read configuration
 
