@@ -678,9 +678,6 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.operation.compose.delete-source.enable",
           GoogleCloudStorageOptions.DEFAULT.isComposeDeleteSourceEnabled());
 
-  public static final HadoopConfigurationProperty<Boolean>
-      GCS_OPERATION_COMPOSE_DELETE_SOURCE_ENABLE = GCS_COMPOSE_DELETE_SOURCE_ENABLE;
-
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))

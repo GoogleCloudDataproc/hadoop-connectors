@@ -384,8 +384,7 @@ default service account impersonation.
 
     If `true`, deletes non-destination source objects during compose operations,
     bypassing soft-delete retention. This is used during Hadoop writes to clean
-    up temporary tail objects directly within the compose request. Is effective
-    only if `fs.gs.client.type` is set to `HTTP_API_CLIENT`.
+    up temporary tail objects directly within the compose request.
 
 #### Vectored Read configuration
 

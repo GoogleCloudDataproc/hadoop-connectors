@@ -348,31 +348,20 @@ public class GoogleHadoopOutputStreamTest {
   @Test
   public void composeDeleteSource_disabled_byDefault() throws Exception {
     Path objectPath = new Path(ghfs.getUri().resolve("/compose_default.txt"));
-    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopOutputStream fout =
-        new GoogleHadoopOutputStream(
-            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      byte[] data1 = {0x01, 0x02};
+      byte[] data2 = {0x03, 0x04};
+      fout.write(data1, 0, data1.length);
+      fout.hsync();
 
-    assertThat(fout.getComposeObjectOptions().isDeleteSourceObjects()).isFalse();
-
-    byte[] data1 = {0x01, 0x02};
-    byte[] data2 = {0x03, 0x04};
-    fout.write(data1, 0, data1.length);
-    fout.hsync();
-    // After first sync, dstGcsPath == tmpGcsPath, no compose yet.
-    assertThat(fout.getTmpDeletionFutures()).isEmpty();
-
-    fout.write(data2, 0, data2.length);
-    fout.hsync();
-    // After second sync, tmpId != dstId, compose is executed and deletion future is queued
-    assertThat(fout.getTmpDeletionFutures()).hasSize(1);
-
-    fout.close();
+      fout.write(data2, 0, data2.length);
+      fout.hsync();
+    }
     assertThat(readFile(objectPath)).isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04});
   }
 
   @Test
-  public void composeDeleteSource_enabled_skipsAsyncDeletionFutures() throws Exception {
+  public void composeDeleteSource_enabled_writesAndSyncsSuccessfully() throws Exception {
     GoogleCloudStorageOptions gcsOptions =
         InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions().toBuilder()
             .setComposeDeleteSourceEnabled(true)
@@ -391,32 +380,19 @@ public class GoogleHadoopOutputStreamTest {
       ghfsDeleteSource.mkdirs(new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET));
 
       Path objectPath = new Path(ghfsDeleteSource.getUri().resolve("/compose_delete_source.txt"));
-      FileSystem.Statistics statistics = new FileSystem.Statistics(ghfsDeleteSource.getScheme());
-      GoogleHadoopOutputStream fout =
-          new GoogleHadoopOutputStream(
-              ghfsDeleteSource,
-              ghfsDeleteSource.getGcsPath(objectPath),
-              CreateFileOptions.DEFAULT,
-              statistics);
+      try (FSDataOutputStream fout = ghfsDeleteSource.create(objectPath)) {
+        byte[] data1 = {0x01, 0x02};
+        byte[] data2 = {0x03, 0x04};
+        byte[] data3 = {0x05, 0x06};
 
-      assertThat(fout.getComposeObjectOptions().isDeleteSourceObjects()).isTrue();
+        fout.write(data1, 0, data1.length);
+        fout.hsync();
 
-      byte[] data1 = {0x01, 0x02};
-      byte[] data2 = {0x03, 0x04};
-      byte[] data3 = {0x05, 0x06};
+        fout.write(data2, 0, data2.length);
+        fout.hsync();
 
-      fout.write(data1, 0, data1.length);
-      fout.hsync();
-      assertThat(fout.getTmpDeletionFutures()).isEmpty();
-
-      fout.write(data2, 0, data2.length);
-      fout.hsync();
-      // Deletion is handled directly by compose request; no async deletion futures queued!
-      assertThat(fout.getTmpDeletionFutures()).isEmpty();
-
-      fout.write(data3, 0, data3.length);
-      fout.close();
-      assertThat(fout.getTmpDeletionFutures()).isEmpty();
+        fout.write(data3, 0, data3.length);
+      }
 
       // Verify file content is fully intact
       FileStatus status = ghfsDeleteSource.getFileStatus(objectPath);

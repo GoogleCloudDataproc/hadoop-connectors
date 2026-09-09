@@ -30,7 +30,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -490,15 +489,5 @@ class GoogleHadoopOutputStream extends OutputStream
       default:
         return false;
     }
-  }
-
-  @VisibleForTesting
-  CreateObjectOptions getComposeObjectOptions() {
-    return composeObjectOptions;
-  }
-
-  @VisibleForTesting
-  List<Future<Void>> getTmpDeletionFutures() {
-    return tmpDeletionFutures;
   }
 }
