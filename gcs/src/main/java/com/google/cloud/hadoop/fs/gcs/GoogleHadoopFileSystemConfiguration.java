@@ -669,6 +669,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
 
+  /** Configuration key for enabling Analytics Core metadata routing. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_METADATA_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.analytics.core.experimental.metadata.enable", false);
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))

@@ -45,6 +45,20 @@ final class AnalyticsCoreConfigMapper {
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
               MAX_MERGE_SIZE_KEY)
+          .put("bucket.delete.enable", "analytics-core.bucket.delete.enabled")
+          .put("marker.file.pattern", "analytics-core.directory.marker.file.pattern")
+          .put("list.max.items.per.call", "analytics-core.directory.list.max-items")
+          .put("max.wait.for.empty.object.creation", "analytics-core.directory.mkdir.wait-timeout-ms")
+          .put("implicit.dir.repair.enable", "analytics-core.directory.implicit-repair.enabled")
+          .put("copy.with.rewrite.enable", "analytics-core.directory.rename.copy-with-rewrite.enabled")
+          .put("rewrite.max.chunk.size", "analytics-core.directory.rename.rewrite-chunk-size-bytes")
+          .put("max.requests.per.batch", "analytics-core.batch.max-requests")
+          .put("batch.threads", "analytics-core.batch.thread.count")
+          .put("status.parallel.enable", "analytics-core.metadata.status-parallel.enabled")
+          .put("glob.algorithm", "analytics-core.metadata.glob-algorithm")
+          .put("create.items.conflict.check.enable", "analytics-core.directory.mkdir.conflict-check.enabled")
+          .put("performance.cache.enable", "analytics-core.metadata.performance-cache.enabled")
+          .put("performance.cache.max.entry.age", "analytics-core.metadata.performance-cache.max-entry-age-ms")
           .build();
 
   private AnalyticsCoreConfigMapper() {
@@ -70,6 +84,22 @@ final class AnalyticsCoreConfigMapper {
     // User agent is computed from GHFS_ID and an optional suffix, not a simple 1:1 mapping.
     mappedProperties.put(
         prefix + USER_AGENT_KEY, GoogleHadoopFileSystemConfiguration.getApplicationName(config));
+
+    // Remove fs.gs.operation.move.enable from mapped properties if present
+    mappedProperties.remove(prefix + "operation.move.enable");
+
+    // Unified flag for hierarchical namespace APIs
+    String hnsFoldersEnabledStr = mappedProperties.remove(prefix + "hierarchical.namespace.folders.enable");
+    String hnsFoldersOptimizationStr = mappedProperties.remove(prefix + "hierarchical.namespace.folders.optimization.enable");
+
+    boolean hnsFoldersEnabled = hnsFoldersEnabledStr != null ? Boolean.parseBoolean(hnsFoldersEnabledStr) : true; // Connector default is true
+    boolean hnsFoldersOptimization = hnsFoldersOptimizationStr != null ? Boolean.parseBoolean(hnsFoldersOptimizationStr) : false; // Connector default is false
+
+    if (hnsFoldersEnabled || hnsFoldersOptimization) {
+      mappedProperties.put(prefix + "analytics-core.hns.api.enable", "true");
+    } else {
+      mappedProperties.put(prefix + "analytics-core.hns.api.enable", "false");
+    }
 
     return mappedProperties;
   }
