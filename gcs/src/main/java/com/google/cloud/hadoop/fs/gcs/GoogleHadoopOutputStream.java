@@ -175,11 +175,12 @@ class GoogleHadoopOutputStream extends OutputStream
             && ghfs.getGcsFs().getOptions().getCloudStorageOptions().isComposeDeleteSourceEnabled();
     this.composeObjectOptions =
         GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
-            createFileOptions.toBuilder()
-                // Set write mode to OVERWRITE because we use compose operation to append new data
-                // to an existing object
-                .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
-                .build())
+                createFileOptions.toBuilder()
+                    // Set write mode to OVERWRITE because we use compose operation to append new
+                    // data
+                    // to an existing object
+                    .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+                    .build())
             .toBuilder()
             .setDeleteSourceObjects(this.composeDeleteSourceEnabled)
             .build();

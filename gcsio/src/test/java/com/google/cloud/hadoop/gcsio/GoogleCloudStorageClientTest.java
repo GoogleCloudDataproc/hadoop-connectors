@@ -642,9 +642,7 @@ public class GoogleCloudStorageClientTest {
           mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
 
       gcs.composeObjects(
-          sources,
-          destination,
-          CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
+          sources, destination, CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
     }
 
     assertEquals(mockStorage.getRequests().size(), 2);

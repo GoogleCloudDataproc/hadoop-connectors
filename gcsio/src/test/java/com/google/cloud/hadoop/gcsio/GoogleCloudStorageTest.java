@@ -3703,9 +3703,7 @@ public class GoogleCloudStorageTest {
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.composeObjects(
-        sources,
-        destinationId,
-        CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
+        sources, destinationId, CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
 
     // First request is getRequestString (getWriteGeneration), second is compose
     assertThat(requests).hasSize(2);

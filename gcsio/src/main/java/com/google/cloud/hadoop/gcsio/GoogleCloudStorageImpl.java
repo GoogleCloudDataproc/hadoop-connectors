@@ -2778,10 +2778,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         initializeRequest(
             storage
                 .objects()
-                .compose(
-                    destination.getBucketName(),
-                    destination.getObjectName(),
-                    composeRequest),
+                .compose(destination.getBucketName(), destination.getObjectName(), composeRequest),
             destination.getBucketName());
 
     compose.setIfGenerationMatch(

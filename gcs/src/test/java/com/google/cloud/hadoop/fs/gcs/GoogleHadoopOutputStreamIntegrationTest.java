@@ -309,7 +309,8 @@ public class GoogleHadoopOutputStreamIntegrationTest {
 
   @Test
   public void writeWithComposeDeleteSource_grpcClient() throws Exception {
-    // PipeType is only applicable to HTTP_API_CLIENT; run once to avoid duplicate executions for gRPC
+    // PipeType is only applicable to HTTP_API_CLIENT; run once to avoid duplicate executions for
+    // gRPC
     assumeTrue(pipeType == PipeType.IO_STREAM_PIPE);
     testComposeDeleteSource(ClientType.STORAGE_CLIENT);
   }
