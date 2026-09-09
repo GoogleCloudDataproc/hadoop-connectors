@@ -20,16 +20,15 @@ gcloud auth application-default login
 *(Verify your active token anytime using `gcloud auth application-default print-access-token`)*.
 
 ### Configure Google Cloud Project ID
-Verify that the `GCS_TEST_PROJECT_ID` environment variable is set:
+Set the `GCS_TEST_PROJECT_ID` environment variable (default: `gcs-hyd-connector-benchmarks`):
 ```bash
-export GCS_TEST_PROJECT_ID="<your-gcp-project-id>"
+export GCS_TEST_PROJECT_ID="${GCS_TEST_PROJECT_ID:-gcs-hyd-connector-benchmarks}"
 ```
 
-### Ensure Compatible Java Environment
-Integration tests should run with JDK 17 (or JDK 11+):
-```bash
-export JAVA_HOME=/usr/lib/jvm/java-1.17.0-openjdk-amd64
-```
+### Ensure Compatible Java Environment (JDK 17)
+Ensure that `JAVA_HOME` points to a valid JDK 17 installation:
+- Check `java -version` and `echo $JAVA_HOME`.
+- If unset or invalid, locate an installed JDK 17 on the system (or install if missing) and export `JAVA_HOME`.
 
 ## 2. Enable ADC for Integration Tests
 
@@ -65,4 +64,3 @@ mvn verify -Pintegration-test -pl gcsio
 ## 4. Verification & Troubleshooting
 - **Token Check:** Verify valid credentials using `gcloud auth application-default print-access-token`.
 - **Permissions:** Verify the authenticated account has appropriate IAM permissions on the test bucket (e.g., `roles/storage.objectAdmin`).
-- **Reference:** [Connector FAQs: Using ADC for local testing](http://go/connector-faqs#can-we-use-application-default-credentials-adc-for-local-testing??)
