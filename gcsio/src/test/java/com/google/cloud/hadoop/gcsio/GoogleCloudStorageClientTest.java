@@ -623,6 +623,65 @@ public class GoogleCloudStorageClientTest {
     assertThat(actualRequest.getDestination().getName()).contains(TEST_OBJECT_NAME);
     assertThat(actualRequest.getSourceObjects(0).getName()).isEqualTo("object1");
     assertThat(actualRequest.getSourceObjects(1).getName()).isEqualTo("object2");
+    assertThat(actualRequest.getDeleteSourceObjects()).isFalse();
+  }
+
+  @Test
+  public void composeObjects_withDeleteSourceObjects_setsDeleteSourceObjectsOnRequest()
+      throws Exception {
+    mockStorage.addResponse(TEST_OBJECT);
+    mockStorage.addResponse(TEST_OBJECT);
+    List<StorageResourceId> sources =
+        ImmutableList.of(
+            new StorageResourceId(TEST_BUCKET_NAME, "object1"),
+            new StorageResourceId(TEST_BUCKET_NAME, "object2"));
+    StorageResourceId destination = new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.composeObjects(
+          sources, destination, CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
+    }
+
+    assertEquals(mockStorage.getRequests().size(), 2);
+
+    ComposeObjectRequest actualRequest = (ComposeObjectRequest) mockStorage.getRequests().get(1);
+    assertThat(actualRequest.getDestination().getName()).contains(TEST_OBJECT_NAME);
+    assertThat(actualRequest.getSourceObjects(0).getName()).isEqualTo("object1");
+    assertThat(actualRequest.getSourceObjects(1).getName()).isEqualTo("object2");
+    assertThat(actualRequest.getDeleteSourceObjects()).isTrue();
+  }
+
+  @Test
+  public void composeObjects_withoutDeleteSourceObjects_doesNotSetDeleteSourceObjectsOnRequest()
+      throws Exception {
+    mockStorage.addResponse(TEST_OBJECT);
+    mockStorage.addResponse(TEST_OBJECT);
+    List<StorageResourceId> sources =
+        ImmutableList.of(
+            new StorageResourceId(TEST_BUCKET_NAME, "object1"),
+            new StorageResourceId(TEST_BUCKET_NAME, "object2"));
+    StorageResourceId destination = new StorageResourceId(TEST_BUCKET_NAME, TEST_OBJECT_NAME);
+
+    try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
+      GoogleCloudStorage gcs =
+          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+
+      gcs.composeObjects(
+          sources,
+          destination,
+          CreateObjectOptions.builder().setDeleteSourceObjects(false).build());
+    }
+
+    assertEquals(mockStorage.getRequests().size(), 2);
+
+    ComposeObjectRequest actualRequest = (ComposeObjectRequest) mockStorage.getRequests().get(1);
+    assertThat(actualRequest.getDestination().getName()).contains(TEST_OBJECT_NAME);
+    assertThat(actualRequest.getSourceObjects(0).getName()).isEqualTo("object1");
+    assertThat(actualRequest.getSourceObjects(1).getName()).isEqualTo("object2");
+    assertThat(actualRequest.getDeleteSourceObjects()).isFalse();
   }
 
   @Test

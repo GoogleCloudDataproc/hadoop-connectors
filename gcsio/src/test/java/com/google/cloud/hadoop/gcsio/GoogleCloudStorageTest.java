@@ -55,7 +55,10 @@ import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpStatusCodes;
+import com.google.api.client.http.LowLevelHttpRequest;
+import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
 import com.google.api.client.util.ExponentialBackOff;
@@ -99,6 +102,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -3665,6 +3669,118 @@ public class GoogleCloudStorageTest {
             composeRequestString(
                 BUCKET_NAME, destination, generationId, /* replaceGenerationId= */ false))
         .inOrder();
+  }
+
+  @Test
+  public void testComposeObjects_withDeleteSourceObjects() throws Exception {
+    String destination = "composedObject";
+    StorageResourceId destinationId = new StorageResourceId(BUCKET_NAME, destination);
+    StorageObject destinationObject = newStorageObject(BUCKET_NAME, destination);
+
+    List<StorageResourceId> sources =
+        ImmutableList.of(
+            new StorageResourceId(BUCKET_NAME, "object1"),
+            new StorageResourceId(BUCKET_NAME, "object2"));
+
+    List<MockLowLevelHttpRequest> requests = new ArrayList<>();
+    MockHttpTransport transport =
+        new MockHttpTransport() {
+          @Override
+          public LowLevelHttpRequest buildRequest(String method, String url) {
+            MockLowLevelHttpRequest request =
+                new MockLowLevelHttpRequest() {
+                  @Override
+                  public LowLevelHttpResponse execute() throws IOException {
+                    return jsonDataResponse(destinationObject);
+                  }
+                };
+            requests.add(request);
+            return request;
+          }
+        };
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    gcs.composeObjects(
+        sources, destinationId, CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
+
+    // First request is getRequestString (getWriteGeneration), second is compose
+    assertThat(requests).hasSize(2);
+    assertThat(requests.get(1).getContentAsString()).contains("\"deleteSourceObjects\":true");
+  }
+
+  @Test
+  public void testComposeObjects_withoutDeleteSourceObjects() throws Exception {
+    String destination = "composedObject";
+    StorageResourceId destinationId = new StorageResourceId(BUCKET_NAME, destination);
+    StorageObject destinationObject = newStorageObject(BUCKET_NAME, destination);
+
+    List<StorageResourceId> sources =
+        ImmutableList.of(
+            new StorageResourceId(BUCKET_NAME, "object1"),
+            new StorageResourceId(BUCKET_NAME, "object2"));
+
+    List<MockLowLevelHttpRequest> requests = new ArrayList<>();
+    MockHttpTransport transport =
+        new MockHttpTransport() {
+          @Override
+          public LowLevelHttpRequest buildRequest(String method, String url) {
+            MockLowLevelHttpRequest request =
+                new MockLowLevelHttpRequest() {
+                  @Override
+                  public LowLevelHttpResponse execute() throws IOException {
+                    return jsonDataResponse(destinationObject);
+                  }
+                };
+            requests.add(request);
+            return request;
+          }
+        };
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    gcs.composeObjects(
+        sources,
+        destinationId,
+        CreateObjectOptions.builder().setDeleteSourceObjects(false).build());
+
+    // First request is getRequestString (getWriteGeneration), second is compose
+    assertThat(requests).hasSize(2);
+    assertThat(requests.get(1).getContentAsString()).doesNotContain("deleteSourceObjects");
+  }
+
+  @Test
+  public void testCompose_doesNotSetDeleteSourceObjects() throws Exception {
+    List<String> sources = ImmutableList.of("object1", "object2");
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+
+    List<MockLowLevelHttpRequest> requests = new ArrayList<>();
+    MockHttpTransport transport =
+        new MockHttpTransport() {
+          @Override
+          public LowLevelHttpRequest buildRequest(String method, String url) {
+            MockLowLevelHttpRequest request =
+                new MockLowLevelHttpRequest() {
+                  @Override
+                  public LowLevelHttpResponse execute() throws IOException {
+                    return jsonDataResponse(storageObject);
+                  }
+                };
+            requests.add(request);
+            return request;
+          }
+        };
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, "application/octet-stream");
+
+    // First request is getRequestString, second is compose
+    assertThat(requests).hasSize(2);
+    assertThat(requests.get(1).getContentAsString()).doesNotContain("deleteSourceObjects");
   }
 
   /** Coverage for GoogleCloudStorageItemInfo.metadataEquals. */

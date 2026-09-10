@@ -696,6 +696,17 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     try (WritableByteChannel destChannel = create(destination, options)) {
       destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
     }
+    if (options.isDeleteSourceObjects()) {
+      List<StorageResourceId> toDelete = new ArrayList<>();
+      for (StorageResourceId sourceId : sources) {
+        if (!sourceId.equals(destination)) {
+          toDelete.add(sourceId);
+        }
+      }
+      if (!toDelete.isEmpty()) {
+        deleteObjects(toDelete);
+      }
+    }
     return getItemInfo(destination);
   }
 
