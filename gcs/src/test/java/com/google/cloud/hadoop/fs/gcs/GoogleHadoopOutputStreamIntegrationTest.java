@@ -316,8 +316,9 @@ public class GoogleHadoopOutputStreamIntegrationTest {
   }
 
   private void testComposeDeleteSource(ClientType clientType) throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri("compose_del_src_" + clientType);
-    Path hadoopPath = new Path(path);
+    Path dir = new Path(gcsFsIHelper.getUniqueObjectUri("compose_del_src_" + clientType));
+    Path hadoopPath = new Path(dir, "test_file");
+    URI path = hadoopPath.toUri();
 
     Configuration config = getTestConfig();
     config.setEnum("fs.gs.client.type", clientType);
@@ -360,11 +361,10 @@ public class GoogleHadoopOutputStreamIntegrationTest {
 
     // Verify that no temporary tail files remain in the directory
     FileStatus[] statuses = fs.listStatus(hadoopPath.getParent());
-    if (statuses != null) {
-      for (FileStatus status : statuses) {
-        assertThat(status.getPath().getName())
-            .doesNotContain(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
-      }
+    assertThat(statuses).isNotNull();
+    for (FileStatus status : statuses) {
+      assertThat(status.getPath().getName())
+          .doesNotContain(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
     }
   }
 }

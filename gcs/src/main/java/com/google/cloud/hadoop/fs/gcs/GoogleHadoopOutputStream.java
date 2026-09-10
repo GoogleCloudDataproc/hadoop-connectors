@@ -169,10 +169,7 @@ class GoogleHadoopOutputStream extends OutputStream
             ? null
             : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
     this.composeDeleteSourceEnabled =
-        ghfs.getGcsFs() != null
-            && ghfs.getGcsFs().getOptions() != null
-            && ghfs.getGcsFs().getOptions().getCloudStorageOptions() != null
-            && ghfs.getGcsFs().getOptions().getCloudStorageOptions().isComposeDeleteSourceEnabled();
+        ghfs.getGcsFs().getOptions().getCloudStorageOptions().isComposeDeleteSourceEnabled();
     this.composeObjectOptions =
         GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
                 createFileOptions.toBuilder()
