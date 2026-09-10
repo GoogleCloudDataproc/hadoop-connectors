@@ -1,0 +1,39 @@
+name: 'multi-approvers'
+
+on:
+  pull_request:
+    types:
+      - 'opened'
+      - 'edited'
+      - 'reopened'
+      - 'synchronize'
+      - 'ready_for_review'
+      - 'review_requested'
+      - 'review_request_removed'
+  pull_request_review:
+    types:
+      - 'submitted'
+      - 'dismissed'
+
+# Ensure only one run per PR is active to reduce API consumption
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  actions: 'write'
+  contents: 'read'
+  pull-requests: 'read'
+
+jobs:
+  multi-approvers:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout Repository'
+        uses: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' # v4
+
+      - name: 'Check Two-Party Review Status'
+        uses: 'abcxyz/actions/.github/actions/multi-approvers@cd65e574b76ed2293095f5e6331267b9b8202d86' # main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          user-id-allowlist: 'rajeevpodar,ShreyasSinha,ajayky-os,chandra-siri,prudhvimaharishi,animesh-g,Dhriti07,shrutisinghania,dheerajsngh,cpriti-os,nidhiii-27,singhravidutt'
