@@ -3684,20 +3684,8 @@ public class GoogleCloudStorageTest {
 
     List<MockLowLevelHttpRequest> requests = new ArrayList<>();
     MockHttpTransport transport =
-        new MockHttpTransport() {
-          @Override
-          public LowLevelHttpRequest buildRequest(String method, String url) {
-            MockLowLevelHttpRequest request =
-                new MockLowLevelHttpRequest() {
-                  @Override
-                  public LowLevelHttpResponse execute() throws IOException {
-                    return jsonDataResponse(destinationObject);
-                  }
-                };
-            requests.add(request);
-            return request;
-          }
-        };
+        mockTransport(
+            requests, jsonDataResponse(destinationObject), jsonDataResponse(destinationObject));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
@@ -3723,20 +3711,8 @@ public class GoogleCloudStorageTest {
 
     List<MockLowLevelHttpRequest> requests = new ArrayList<>();
     MockHttpTransport transport =
-        new MockHttpTransport() {
-          @Override
-          public LowLevelHttpRequest buildRequest(String method, String url) {
-            MockLowLevelHttpRequest request =
-                new MockLowLevelHttpRequest() {
-                  @Override
-                  public LowLevelHttpResponse execute() throws IOException {
-                    return jsonDataResponse(destinationObject);
-                  }
-                };
-            requests.add(request);
-            return request;
-          }
-        };
+        mockTransport(
+            requests, jsonDataResponse(destinationObject), jsonDataResponse(destinationObject));
 
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);

@@ -43,7 +43,6 @@ import java.nio.channels.ClosedChannelException;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -355,7 +354,7 @@ public class GoogleHadoopOutputStreamTest {
 
   @Test
   public void composeDeleteSource_disabled_byDefault() throws Exception {
-    AtomicReference<CreateObjectOptions> capturedOptions = new AtomicReference<>();
+    List<CreateObjectOptions> capturedOptions = new CopyOnWriteArrayList<>();
     List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
 
     try (GoogleHadoopFileSystem trackingGhfs =
@@ -368,7 +367,7 @@ public class GoogleHadoopOutputStreamTest {
                       StorageResourceId destination,
                       CreateObjectOptions createOptions)
                       throws IOException {
-                    capturedOptions.set(createOptions);
+                    capturedOptions.add(createOptions);
                     return super.composeObjects(sources, destination, createOptions);
                   }
 
@@ -394,13 +393,17 @@ public class GoogleHadoopOutputStreamTest {
         fout.hsync();
       }
 
-      // Verify that compose request did not request deleteSourceObjects
-      assertThat(capturedOptions.get()).isNotNull();
-      assertThat(capturedOptions.get().isDeleteSourceObjects()).isFalse();
+      // Verify both compose requests (from hsync and close) did not request deleteSourceObjects
+      assertThat(capturedOptions).hasSize(2);
+      assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isFalse();
+      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isFalse();
 
-      // Verify that the temporary tail file was deleted via the background cleanup thread pool
-      assertThat(backgroundDeletedObjects).isNotEmpty();
+      // Verify that temporary tail files from both hsync and close were deleted via the
+      // background cleanup thread pool
+      assertThat(backgroundDeletedObjects).hasSize(2);
       assertThat(backgroundDeletedObjects.get(0).getObjectName())
+          .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+      assertThat(backgroundDeletedObjects.get(1).getObjectName())
           .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
 
       // Verify file content is fully intact
@@ -410,7 +413,7 @@ public class GoogleHadoopOutputStreamTest {
 
   @Test
   public void composeDeleteSource_enabled_writesAndSyncsSuccessfully() throws Exception {
-    AtomicReference<CreateObjectOptions> capturedOptions = new AtomicReference<>();
+    List<CreateObjectOptions> capturedOptions = new CopyOnWriteArrayList<>();
     List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
 
     GoogleCloudStorageOptions gcsOptions =
@@ -427,7 +430,7 @@ public class GoogleHadoopOutputStreamTest {
                       StorageResourceId destination,
                       CreateObjectOptions createOptions)
                       throws IOException {
-                    capturedOptions.set(createOptions);
+                    capturedOptions.add(createOptions);
                     return super.composeObjects(sources, destination, createOptions);
                   }
 
@@ -467,9 +470,10 @@ public class GoogleHadoopOutputStreamTest {
         fout.write(data3, 0, data3.length);
       }
 
-      // Verify that compose request requested deleteSourceObjects
-      assertThat(capturedOptions.get()).isNotNull();
-      assertThat(capturedOptions.get().isDeleteSourceObjects()).isTrue();
+      // Verify both compose requests (from hsync and close) requested deleteSourceObjects
+      assertThat(capturedOptions).hasSize(2);
+      assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isTrue();
+      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isTrue();
 
       // Verify that no cleanup tasks were submitted to the background deletion thread pool
       assertThat(backgroundDeletedObjects).isEmpty();

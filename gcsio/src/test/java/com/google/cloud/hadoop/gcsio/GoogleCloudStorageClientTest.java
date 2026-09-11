@@ -617,6 +617,7 @@ public class GoogleCloudStorageClientTest {
       gcs.compose(TEST_BUCKET_NAME, sources, TEST_OBJECT_NAME, "application/octet-stream");
     }
 
+    // First request is getObject (getWriteGeneration), second is compose
     assertEquals(mockStorage.getRequests().size(), 2);
 
     ComposeObjectRequest actualRequest = (ComposeObjectRequest) mockStorage.getRequests().get(1);
@@ -645,6 +646,7 @@ public class GoogleCloudStorageClientTest {
           sources, destination, CreateObjectOptions.builder().setDeleteSourceObjects(true).build());
     }
 
+    // First request is getObject (getWriteGeneration), second is compose
     assertEquals(mockStorage.getRequests().size(), 2);
 
     ComposeObjectRequest actualRequest = (ComposeObjectRequest) mockStorage.getRequests().get(1);
@@ -675,6 +677,7 @@ public class GoogleCloudStorageClientTest {
           CreateObjectOptions.builder().setDeleteSourceObjects(false).build());
     }
 
+    // First request is getObject (getWriteGeneration), second is compose
     assertEquals(mockStorage.getRequests().size(), 2);
 
     ComposeObjectRequest actualRequest = (ComposeObjectRequest) mockStorage.getRequests().get(1);
