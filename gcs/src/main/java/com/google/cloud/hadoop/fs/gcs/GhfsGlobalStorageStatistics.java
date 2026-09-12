@@ -37,6 +37,7 @@ import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION;
 import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTAL;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
 import com.google.cloud.hadoop.util.ITraceFactory;
@@ -45,6 +46,12 @@ import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LazyArgs;
 import com.google.common.util.concurrent.AtomicDouble;
+import io.opencensus.common.Scope;
+import io.opencensus.stats.Stats;
+import io.opencensus.tags.TagContext;
+import io.opencensus.tags.TagMetadata;
+import io.opencensus.tags.TagValue;
+import io.opencensus.tags.Tags;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -118,6 +125,32 @@ public class GhfsGlobalStorageStatistics extends StorageStatistics {
       stats.updateStats(statistic, elapsedMs, context);
       stats.updateConnectorHadoopApiTime(elapsedMs);
       logger.atFine().log("%s(%s); elapsed=%s", statistic.getSymbol(), context, elapsedMs);
+
+      if (CloudMonitoringMetricsRecorder.isCloudMonitoringEnabled()) {
+        try {
+          // Format "INVOCATION_OPEN" -> "open"
+          String typeValue =
+              statistic.getSymbol().replace("INVOCATION_", "").replace("ACTION_", "").toLowerCase();
+
+          TagContext tagContext =
+              Tags.getTagger()
+                  .emptyBuilder()
+                  .put(
+                      CloudMonitoringMetricsRecorder.TYPE,
+                      TagValue.create(typeValue),
+                      TagMetadata.create(TagMetadata.TagTtl.NO_PROPAGATION))
+                  .build();
+
+          try (Scope ignored = Tags.getTagger().withTagContext(tagContext)) {
+            Stats.getStatsRecorder()
+                .newMeasureMap()
+                .put(CloudMonitoringMetricsRecorder.GCS_DURATION, elapsedMs)
+                .record();
+          }
+        } catch (Exception e) {
+          logger.atWarning().withCause(e).log("Failed to record duration to OpenCensus");
+        }
+      }
 
       // Periodically log the metrics. Once every 5 minutes.
       logger.atInfo().atMostEvery(5, TimeUnit.MINUTES).log(
