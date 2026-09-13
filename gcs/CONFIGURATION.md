@@ -2,6 +2,14 @@
 
 ### General configuration
 
+*   `fs.gs.analytics.core.enable` (default: `false`)
+
+    Activates the instantiation of AnalyticCoreGcsfs.
+
+*   `fs.gs.metadata.use.analytics.enable` (default: `false`)
+
+    Forces rename, delete, mkdirs, listStatus, and getFileStatus to route execution strictly to the Analytics Core engine.
+
 *   `fs.gs.project.id` (not set by default)
 
     Google Cloud Project ID with access to Google Cloud Storage buckets.
