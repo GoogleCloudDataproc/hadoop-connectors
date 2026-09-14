@@ -71,7 +71,8 @@ public abstract class GoogleCloudStorageOptions {
         .setStorageClientCachingEnabled(false)
         .setBidiEnabled(false)
         .setFinalizeBeforeClose(false)
-        .setHnOptimizationEnabled(false);
+        .setHnOptimizationEnabled(false)
+        .setComposeDeleteSourceEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -159,6 +160,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isFinalizeBeforeClose();
 
   public abstract boolean isHnOptimizationEnabled();
+
+  public abstract boolean isComposeDeleteSourceEnabled();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -257,6 +260,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setBidiEnabled(boolean bidiEnabled);
 
     public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
+
+    public abstract Builder setComposeDeleteSourceEnabled(boolean composeDeleteSourceEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

@@ -38,7 +38,8 @@ public abstract class CreateObjectOptions {
         .setEnsureEmptyObjectsMetadataMatch(true)
         .setKmsKeyName(null)
         .setMetadata(ImmutableMap.of())
-        .setOverwriteExisting(false);
+        .setOverwriteExisting(false)
+        .setDeleteSourceObjects(false);
   }
 
   public abstract Builder toBuilder();
@@ -71,6 +72,9 @@ public abstract class CreateObjectOptions {
   /** Whether to overwrite any existing objects with the same name */
   public abstract boolean isOverwriteExisting();
 
+  /** Whether to delete source objects during compose operations */
+  public abstract boolean isDeleteSourceObjects();
+
   @AutoValue.Builder
   public abstract static class Builder {
 
@@ -86,6 +90,8 @@ public abstract class CreateObjectOptions {
     public abstract Builder setMetadata(Map<String, byte[]> metadata);
 
     public abstract Builder setOverwriteExisting(boolean overwriteExisting);
+
+    public abstract Builder setDeleteSourceObjects(boolean deleteSourceObjects);
 
     protected abstract CreateObjectOptions autoBuild();
 
