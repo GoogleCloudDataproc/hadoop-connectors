@@ -14,7 +14,7 @@
 
 # This Dockerfile creates an image for running presubmit tests.
 # The package below is for OpenJDK 17.
-FROM docker pull us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk:17@sha256:98f0304b3a3b7c12ce641177a99d1f3be56f532473a528fda38d53d519cafb13
+FROM docker pull us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk@sha256:98f0304b3a3b7c12ce641177a99d1f3be56f532473a528fda38d53d519cafb13
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
