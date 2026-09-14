@@ -16,5 +16,8 @@
 # The package below is for OpenJDK 17.
 FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk@sha256:98f0304b3a3b7c12ce641177a99d1f3be56f532473a528fda38d53d519cafb13
 
+# Install the tools Maven Wrapper and Codecov upload need
+RUN apt-get update && apt-get install -y curl wget
+
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
