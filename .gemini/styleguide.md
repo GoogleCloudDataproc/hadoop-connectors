@@ -63,6 +63,7 @@ This guide defines coding standards, architecture principles, performance rules,
 * **Precise Exception Assertions:** Use `assertThrows(ExpectedException.class, () -> ...)` rather than catching generic `IOException` or `Exception` to avoid masking unexpected runtime errors.
 * **Fakes Over Mocks:** Use `FakeGoogleCloudStorage` or `test-lib` fake implementations rather than fragile mock objects.
 * **Test Resource Isolation:** Integration tests must generate unique GCS object URIs (e.g., appending UUIDs or tags) to prevent resource collisions during parallel test executions.
+* **Local Integration Testing with ADC:** When running integration tests locally without a service account JSON key, use the [running-integration-test skill](skills/running-integration-test.md) to authenticate via Application Default Credentials (`gcloud auth application-default login`) and set `GCS_TEST_APPLICATION_DEFAULT_ENABLE=true`.
 
 ---
 
@@ -85,3 +86,4 @@ When writing, refactoring, or reviewing code for this repository, coding agents 
 7. Check inner loops for unnecessary object allocations, lambdas, or string concatenations.
 8. Enforce Guava `Preconditions` for argument checks and Google Truth for test assertions.
 9. Translate low-level storage exceptions to standard Hadoop `IOException` types without duplicate logging.
+10. When asked to execute or instruct running integration tests locally, coding agents MUST follow the [running-integration-test skill](skills/running-integration-test.md) to set up ADC credentials and ensure `GCS_TEST_APPLICATION_DEFAULT_ENABLE=true` is exported.
