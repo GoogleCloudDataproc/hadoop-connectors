@@ -37,4 +37,5 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # TODO: Replace individual aliases with a GitHub team/group later
+          team: ''
           user-id-allowlist: 'rajeevpodar,ShreyasSinha,ajayky-os,prudhvimaharishi,animesh-g,shrutisinghania,dheerajsngh,singhravidutt'
