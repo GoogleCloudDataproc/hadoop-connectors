@@ -36,6 +36,4 @@ jobs:
         uses: 'abcxyz/actions/.github/actions/multi-approvers@cd65e574b76ed2293095f5e6331267b9b8202d86' # main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # TODO: Replace individual aliases with a GitHub team/group later
-          team: ''
-          user-id-allowlist: 'rajeevpodar,ShreyasSinha,ajayky-os,prudhvimaharishi,animesh-g,shrutisinghania,dheerajsngh,singhravidutt'
+          team: 'gcs-connector-team'
