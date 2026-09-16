@@ -30,9 +30,11 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_TIME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_METADATA_REQUEST;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.cloud.hadoop.util.GcsDataTransferEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
@@ -171,6 +173,14 @@ public class GoogleCloudStorageStatisticsTest {
     GoogleCloudStorageEventBus.postOnException();
     GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
     verifyCounterStats.incrementCounter(EXCEPTION_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_dataTransferTime() {
+    GoogleCloudStorageEventBus.postDataTransferEvent(new GcsDataTransferEvent(5));
+    GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
+    verifyCounterStats.incrementCounter(GCS_API_TIME, 5);
     verifyStatistics(verifyCounterStats);
   }
 

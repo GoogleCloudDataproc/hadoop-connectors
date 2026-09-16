@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTA
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
+import com.google.cloud.hadoop.util.GcsDataTransferEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
@@ -112,6 +113,16 @@ public class GoogleCloudStorageEventSubscriber {
     } else if (eventType == EventType.EXCEPTION) {
       storageStatistics.incrementGcsExceptionCount();
     }
+  }
+
+  /**
+   * Folds time spent pulling object payload off the socket into {@code gcsApiTime}, alongside the
+   * time-to-first-byte already recorded when the response headers arrive.
+   */
+  @Subscribe
+  private void subscriberOnDataTransfer(@Nonnull GcsDataTransferEvent event) {
+    storageStatistics.incrementCounter(
+        GoogleCloudStorageStatistics.GCS_API_TIME, event.getDurationMs());
   }
 
   private void updateMetric(GhfsStatistic stat, long duration, Object eventContext) {
