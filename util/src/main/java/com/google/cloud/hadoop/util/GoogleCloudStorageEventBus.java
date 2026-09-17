@@ -76,4 +76,13 @@ public class GoogleCloudStorageEventBus {
   public static void postGcsJsonApiEvent(IGcsJsonApiEvent gcsJsonApiEvent) {
     eventBus.post(gcsJsonApiEvent);
   }
+
+  /**
+   * Posting data transfer event to invoke the corresponding Subscriber method.
+   *
+   * @param event carries time spent transferring object payload bytes off the socket.
+   */
+  public static void postDataTransferEvent(GcsDataTransferEvent event) {
+    eventBus.post(event);
+  }
 }

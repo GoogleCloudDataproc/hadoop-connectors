@@ -35,6 +35,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.GcsReadDurationTrackerStream;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
@@ -807,7 +808,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     checkState(size > 0, "size should be greater than 0 for '%s'", resourceId);
     int footerSize = toIntExact(response.getHeaders().getContentLength());
     footerContent = new byte[footerSize];
-    try (InputStream footerStream = response.getContent()) {
+    try (InputStream responseStream = response.getContent();
+        InputStream footerStream = new GcsReadDurationTrackerStream(responseStream)) {
       int totalBytesRead = 0;
       int bytesRead = 0;
       do {
@@ -1039,7 +1041,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
 
     try {
-      InputStream contentStream = response.getContent();
+      InputStream contentStream = new GcsReadDurationTrackerStream(response.getContent());
       logger.atFiner().log(
           "Opened stream from %d position with %s range and %d bytesToRead for '%s'",
           currentPosition, rangeHeader, bytesToRead, resourceId);
