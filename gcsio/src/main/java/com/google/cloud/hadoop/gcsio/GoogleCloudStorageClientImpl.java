@@ -1365,6 +1365,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                     destination.hasGenerationId()
                         ? destination.getGenerationId()
                         : getWriteGeneration(destination, true)))
+            .setDeleteSourceObjects(options.isDeleteSourceObjects())
             .build();
 
     Blob composedBlob;
