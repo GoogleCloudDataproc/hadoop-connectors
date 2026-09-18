@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add fs.gs.universe.domain support for Google multi-universe (TPC)
 
 ## 3.1.18 - 2026-06-24
 1. Shade google-cloud-logging.
