@@ -13,11 +13,8 @@
 # limitations under the License.
 
 # This Dockerfile creates an image for running presubmit tests.
-# The image below is for OpenJDK 17-slim.
-FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk@sha256:779635c0c3d23cc8dbab2d8c1ee4cf2a9202e198dfc8f4c0b279824d9b8e0f22
-
-# Install the tools Maven Wrapper needs to download its JAR
-RUN apt-get update && apt-get install -y curl wget
+# The package below is for OpenJDK 17.
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/openjdk@sha256:98f0304b3a3b7c12ce641177a99d1f3be56f532473a528fda38d53d519cafb13
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
