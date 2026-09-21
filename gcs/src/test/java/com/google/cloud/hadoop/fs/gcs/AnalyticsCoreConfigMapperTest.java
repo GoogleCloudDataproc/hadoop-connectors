@@ -16,16 +16,23 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.alias.CredentialProvider;
+import org.apache.hadoop.security.alias.CredentialProviderFactory;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 /** Unit tests for {@link AnalyticsCoreConfigMapper}. */
 @RunWith(JUnit4.class)
 public class AnalyticsCoreConfigMapperTest {
+
+  @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
   private static final Map<String, String> EXPECTED_MANDATORY_MAPPINGS =
       Map.of("fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
@@ -219,6 +226,72 @@ public class AnalyticsCoreConfigMapperTest {
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
     assertThat(mapped).containsExactlyEntriesIn(EXPECTED_MANDATORY_MAPPINGS);
+  }
+
+  @Test
+  public void mapConfigs_mapsEncryptionKeyToDecryptionKey() {
+    Configuration config = new Configuration();
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), "csek-value");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsEntry("fs.gs." + AnalyticsCoreConfigMapper.DECRYPTION_KEY_KEY, "csek-value");
+  }
+
+  @Test
+  public void mapConfigs_removesConnectorSpelledEncryptionKey() {
+    Configuration config = new Configuration();
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), "csek-value");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .doesNotContainKey(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey());
+  }
+
+  @Test
+  public void mapConfigs_resolvesEncryptionKeyFromCredentialProvider() throws Exception {
+    Configuration config = createConfigWithJceksEncryptionKey("secrets.jceks", "jceks-csek-value");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsEntry("fs.gs." + AnalyticsCoreConfigMapper.DECRYPTION_KEY_KEY, "jceks-csek-value");
+  }
+
+  @Test
+  public void mapConfigs_resolvesEncryptionKeyForWriteFromCredentialProvider() throws Exception {
+    Configuration config =
+        createConfigWithJceksEncryptionKey("secrets-write.jceks", "jceks-csek-value");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsEntry("fs.gs." + AnalyticsCoreConfigMapper.ENCRYPTION_KEY_KEY, "jceks-csek-value");
+  }
+
+  @Test
+  public void mapConfigs_encryptionKeyUnset_omitsEncryptionAndDecryptionKeys() {
+    Configuration config = new Configuration();
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped).doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.ENCRYPTION_KEY_KEY);
+    assertThat(mapped).doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.DECRYPTION_KEY_KEY);
+  }
+
+  private Configuration createConfigWithJceksEncryptionKey(String fileName, String secret)
+      throws Exception {
+    Configuration config = new Configuration();
+    config.set(
+        HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH,
+        "jceks://file" + tempFolder.getRoot().toPath().resolve(fileName));
+    CredentialProvider credentialProvider = CredentialProviderFactory.getProviders(config).get(0);
+    credentialProvider.createCredentialEntry(
+        GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), secret.toCharArray());
+    credentialProvider.flush();
+    return config;
   }
 
   private Configuration createTestConfiguration() {
