@@ -32,6 +32,7 @@ import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
@@ -39,6 +40,7 @@ import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.common.flogger.GoogleLogger;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -108,7 +110,15 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     if (ghfs.isAnalyticsCoreEnabled()) {
-      FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      GoogleCloudStorageReadOptions readOptions =
+          gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions();
+      FileInfo fileInfo = null;
+      if (readOptions.isFastFailOnNotFoundEnabled()) {
+        fileInfo = gcsFs.getFileInfoObject(gcsPath);
+        if (!fileInfo.exists()) {
+          throw new FileNotFoundException("File not found: " + gcsPath);
+        }
+      }
       SeekableByteChannel channel = createAnalyticsCoreReadChannel(ghfs, fileInfo, gcsPath);
       return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
     }
@@ -156,21 +166,48 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   private static SeekableByteChannel createAnalyticsCoreReadChannel(
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, URI gcsPath) throws IOException {
-    checkNotNull(fileInfo, "fileInfo must not be null");
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
     GcsItemId.Builder itemIdBuilder =
         GcsItemId.builder()
             .setBucketName(resourceId.getBucketName())
             .setObjectName(resourceId.getObjectName());
-    boolean hasGenerationId = fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID;
-    if (hasGenerationId) {
-      itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
+    long generationId =
+        fileInfo != null ? fileInfo.getGenerationId() : resourceId.getGenerationId();
+    if (generationId != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemIdBuilder.setContentGeneration(generationId);
     }
     GcsItemId itemId = itemIdBuilder.build();
+
+    if (fileInfo == null) {
+      GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(itemId);
+      GcsAnalyticsCoreInputStreamWrapper.SizeProvider sizeProvider =
+          () -> {
+            try {
+              // Analytics Core resolves the size from the read response, so this doesn't cost a
+              // metadata request.
+              long streamSize = inputStream.size();
+              if (streamSize >= 0) {
+                return streamSize;
+              }
+            } catch (Exception e) {
+              logger.atFine().withCause(e).log(
+                  "Could not resolve the size of '%s' from the read channel", gcsPath);
+            }
+            logger.atFine().log("Falling back to a metadata request for the size of '%s'", gcsPath);
+            FileInfo info = ghfs.getGcsFs().getFileInfoObject(gcsPath);
+            if (!info.exists()) {
+              throw new FileNotFoundException("File not found: " + gcsPath);
+            }
+            return info.getSize();
+          };
+
+      return new GcsAnalyticsCoreInputStreamWrapper(inputStream, -1, sizeProvider);
+    }
+
     GcsItemInfo.Builder itemInfoBuilder =
         GcsItemInfo.builder().setItemId(itemId).setSize(fileInfo.getSize());
-    if (hasGenerationId) {
-      itemInfoBuilder.setContentGeneration(fileInfo.getGenerationId());
+    if (generationId != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemInfoBuilder.setContentGeneration(generationId);
     }
     GcsItemInfo gcsItemInfo = itemInfoBuilder.build();
     GcsFileInfo gcsFileInfo =
@@ -180,7 +217,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             .setAttributes(fileInfo.getAttributes())
             .build();
     GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(gcsFileInfo);
-    return new GcsAnalyticsCoreInputStreamWrapper(inputStream, fileInfo.getSize());
+    return new GcsAnalyticsCoreInputStreamWrapper(
+        inputStream, fileInfo.getSize(), () -> fileInfo.getSize());
   }
 
   private GoogleHadoopFSInputStream(

@@ -51,7 +51,7 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
 
   @Before
   public void setUp() {
-    adapter = new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, size);
+    adapter = new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, size, () -> size);
   }
 
   @Test
@@ -228,5 +228,26 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
     adapter.readFully(100L, buffer, 0, 100);
 
     verify(mockInputStream).readFully(100L, buffer, 0, 100);
+  }
+
+  @Test
+  public void size_whenInitiallyUnknown_lazyLoadsAndCachesSize() throws IOException {
+    java.util.concurrent.atomic.AtomicInteger callCount =
+        new java.util.concurrent.atomic.AtomicInteger(0);
+    GcsAnalyticsCoreInputStreamWrapper.SizeProvider provider =
+        () -> {
+          callCount.incrementAndGet();
+          return 500L;
+        };
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, -1, provider);
+
+    // Call size first time: should fetch
+    assertThat(lazyAdapter.size()).isEqualTo(500L);
+    assertThat(callCount.get()).isEqualTo(1);
+
+    // Call size second time: should return cached
+    assertThat(lazyAdapter.size()).isEqualTo(500L);
+    assertThat(callCount.get()).isEqualTo(1);
   }
 }

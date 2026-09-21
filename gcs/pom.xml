@@ -201,6 +201,12 @@
                   </includes>
                 </filter>
                 <filter>
+                  <artifact>com.github.ben-manes.caffeine:caffeine</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
                   <artifact>*:*</artifact>
                   <excludes>
                     <exclude>*.json</exclude>
