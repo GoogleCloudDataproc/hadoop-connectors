@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Skip soft delete for compose operations using deleteSourceObjects
 
 ## 3.1.18 - 2026-06-24
 1. Shade google-cloud-logging.
