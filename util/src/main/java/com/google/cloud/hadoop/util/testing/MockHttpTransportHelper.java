@@ -43,6 +43,8 @@ import com.google.common.io.CharStreams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -107,25 +109,33 @@ public final class MockHttpTransportHelper {
   private MockHttpTransportHelper() {}
 
   public static MockHttpTransport mockTransport(Object... responsesIn) {
+    return mockTransport(new ArrayList<>(), responsesIn);
+  }
+
+  public static MockHttpTransport mockTransport(
+      List<MockLowLevelHttpRequest> requests, Object... responsesIn) {
     return new MockHttpTransport() {
       int responsesIndex = 0;
       final Object[] responses = responsesIn;
 
       @Override
       public LowLevelHttpRequest buildRequest(String method, String url) {
-        return new MockLowLevelHttpRequest() {
-          @Override
-          public LowLevelHttpResponse execute() throws IOException {
-            Object response = responses[responsesIndex++];
-            if (response instanceof IOException) {
-              throw (IOException) response;
-            }
-            if (response instanceof RuntimeException) {
-              throw (RuntimeException) response;
-            }
-            return (LowLevelHttpResponse) response;
-          }
-        };
+        MockLowLevelHttpRequest request =
+            new MockLowLevelHttpRequest() {
+              @Override
+              public LowLevelHttpResponse execute() throws IOException {
+                Object response = responses[responsesIndex++];
+                if (response instanceof IOException) {
+                  throw (IOException) response;
+                }
+                if (response instanceof RuntimeException) {
+                  throw (RuntimeException) response;
+                }
+                return (LowLevelHttpResponse) response;
+              }
+            };
+        requests.add(request);
+        return request;
       }
     };
   }
