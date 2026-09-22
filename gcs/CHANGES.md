@@ -2,6 +2,7 @@
 
 ## Next
 1. Skip soft delete for compose operations using deleteSourceObjects
+1. Upgrade google.api-client-libraries.version to 2.9.0
 
 ## 4.0.5 - 2026-08-26
 
