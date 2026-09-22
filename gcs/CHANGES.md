@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Skip soft delete for compose operations using deleteSourceObjects
 
 ## 4.0.5 - 2026-08-26
 
