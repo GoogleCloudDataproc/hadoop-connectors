@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.1.19 - 2026-09-22
 1. Add fs.gs.universe.domain support for Google multi-universe (TPC)
 
