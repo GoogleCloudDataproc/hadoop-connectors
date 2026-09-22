@@ -3,6 +3,9 @@
 ## Next
 1. Skip soft delete for compose operations using deleteSourceObjects
 
+## 3.1.19 - 2026-09-22
+1. Add fs.gs.universe.domain support for Google multi-universe (TPC)
+
 ## 3.1.18 - 2026-06-24
 1. Shade google-cloud-logging.
 1. Fix URI.create() failure on GCS object names with special characters.
