@@ -106,7 +106,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       String initBucket = ghfsHelper.ghfs.getUri().getAuthority();
       if (initBucket != null
           && ghfsHelper.getStorage().getItemInfo(new StorageResourceId(initBucket)).exists()) {
-        ghfsHelper.clearRealGcsBucket(initBucket, /* isZonal= */ false);
+        ghfsHelper.clearRealGcsBucket(initBucket);
         return;
       }
     }

@@ -629,6 +629,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void listObjectInfoStartingFrom_lexicographicalOrdrer() throws IOException {
+    // Prefix with '~' so test objects sort after existing objects in the shared bucket.
     String testDirectory = "~" + name.getMethodName();
 
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =

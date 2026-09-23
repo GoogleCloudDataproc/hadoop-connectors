@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -63,8 +64,6 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   private static final TestBucketHelper BUCKET_HELPER =
       new TestBucketHelper(TEST_BUCKET_NAME_PREFIX);
 
-  private final TestBucketHelper bucketHelper = BUCKET_HELPER;
-
   private static String cachedSharedBucketName1;
   private static String cachedSharedBucketName2;
   private static String cachedZonalSharedBucketName1;
@@ -93,8 +92,8 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   }
 
   public boolean isRealGcs() {
-    GoogleCloudStorage storage = getStorage();
-    return storage != null && !(storage instanceof InMemoryGoogleCloudStorage);
+    GoogleCloudStorage storage = checkNotNull(getStorage(), "storage cannot be null");
+    return !(storage instanceof InMemoryGoogleCloudStorage);
   }
 
   /** Perform initialization once before tests are run. */
@@ -131,13 +130,13 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       throws IOException {
     if (cachedBucketName != null
         && getStorage().getItemInfo(new StorageResourceId(cachedBucketName)).exists()) {
-      clearRealGcsBucket(cachedBucketName, isZonal);
+      clearRealGcsBucket(cachedBucketName);
       return cachedBucketName;
     }
     return createUniqueZonalOrRegionalBucket(suffix, isZonal);
   }
 
-  public void clearRealGcsBucket(String bucketName, boolean isZonal) throws IOException {
+  public void clearRealGcsBucket(String bucketName) throws IOException {
     GoogleCloudStorage storage = getStorage();
     List<GoogleCloudStorageItemInfo> items =
         storage.listObjectInfo(
@@ -146,7 +145,9 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       storage.deleteObjects(
           items.stream().map(GoogleCloudStorageItemInfo::getResourceId).collect(toList()));
     }
-    if (isZonal) {
+    if (storage.isHnBucket(
+        UriPaths.fromStringPathComponents(
+            bucketName, /* objectName= */ null, /* allowEmptyObjectName= */ true))) {
       clearBucket(bucketName);
     }
   }
@@ -159,7 +160,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     }
     try {
       if (getStorage() != null) {
-        bucketHelper.cleanup(getStorage());
+        BUCKET_HELPER.cleanup(getStorage());
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to cleanup test buckets", e);
@@ -577,7 +578,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * identified by calling isTestBucketName() for that bucket.
    */
   public String getUniqueBucketName(String suffix) {
-    return bucketHelper.getUniqueBucketName(suffix);
+    return BUCKET_HELPER.getUniqueBucketName(suffix);
   }
 
   /** Convert request to string representation that could be used for assertions in tests */
