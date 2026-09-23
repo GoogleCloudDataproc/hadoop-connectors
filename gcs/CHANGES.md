@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 3.0.20 - 2026-09-23
 1. Add listStatusStartingFrom API.
 
 ## 3.0.19 - 2026-03-26
