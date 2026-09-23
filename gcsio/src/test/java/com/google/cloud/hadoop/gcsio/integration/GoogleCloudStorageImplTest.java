@@ -73,7 +73,9 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -86,8 +88,8 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
 
-  private TestBucketHelper bucketHelper;
-  private String testBucket;
+  private static TestBucketHelper bucketHelper;
+  private static String testBucket;
 
   private static final GoogleCloudStorageOptions GCS_OPTIONS = getStandardOptionBuilder().build();
 
@@ -114,23 +116,43 @@ public class GoogleCloudStorageImplTest {
         }
       };
 
+  @BeforeClass
+  public static void beforeAll() throws IOException {
+    bucketHelper = new TestBucketHelper("dataproc-gcs-impl");
+    testBucket = bucketHelper.getUniqueBucketPrefix();
+    GoogleCloudStorage gcs = GoogleCloudStorageTestHelper.createGoogleCloudStorage();
+    try {
+      gcs.createBucket(testBucket);
+    } finally {
+      gcs.close();
+    }
+  }
+
   @Before
   public void before() throws IOException {
     helperGcs =
         testStorageClientImpl
             ? GoogleCloudStorageTestHelper.createGcsClientImpl()
             : GoogleCloudStorageTestHelper.createGoogleCloudStorage();
-    bucketHelper = new TestBucketHelper("dataproc-gcs-impl");
-    testBucket = bucketHelper.getUniqueBucketPrefix();
-    helperGcs.createBucket(testBucket);
   }
 
   @After
   public void after() throws IOException {
-    try {
-      bucketHelper.cleanup(helperGcs);
-    } finally {
+    if (helperGcs != null) {
       helperGcs.close();
+    }
+  }
+
+  @AfterClass
+  public static void afterAll() throws IOException {
+    if (bucketHelper != null) {
+      GoogleCloudStorage gcs = GoogleCloudStorageTestHelper.createGoogleCloudStorage();
+      try {
+        bucketHelper.cleanup(gcs);
+      } finally {
+        bucketHelper = null;
+        gcs.close();
+      }
     }
   }
 
@@ -797,9 +819,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void listObjectInfo_withFoldersAsPrefixes_returnsFolders() throws IOException {
-    String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
-    helperGcs.createBucket(
-        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    String hnsBucket = createHnsBucket();
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
@@ -828,9 +848,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void listObjectInfo_withoutFoldersAsPrefixes_doesNotReturnFolders() throws IOException {
-    String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
-    helperGcs.createBucket(
-        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    String hnsBucket = createHnsBucket();
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
@@ -857,9 +875,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void listObjectInfo_withFoldersAsPrefixes_returnFolders() throws IOException {
-    String hnsBucket = bucketHelper.getUniqueBucketPrefix() + "-hns";
-    helperGcs.createBucket(
-        hnsBucket, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    String hnsBucket = createHnsBucket();
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
