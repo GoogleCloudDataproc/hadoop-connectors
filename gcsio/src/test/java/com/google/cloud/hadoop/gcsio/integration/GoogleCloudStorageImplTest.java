@@ -629,7 +629,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void listObjectInfoStartingFrom_lexicographicalOrdrer() throws IOException {
-    String testDirectory = name.getMethodName();
+    String testDirectory = "~" + name.getMethodName();
 
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
@@ -637,24 +637,28 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId2 = new StorageResourceId(testBucket, testDirectory + "/object2");
     StorageResourceId resourceId1 = new StorageResourceId(testBucket, testDirectory + "/object1");
 
-    trackingGcs.delegate.createEmptyObject(resourceId3);
-    trackingGcs.delegate.createEmptyObject(resourceId2);
-    trackingGcs.delegate.createEmptyObject(resourceId1);
+    try {
+      trackingGcs.delegate.createEmptyObject(resourceId3);
+      trackingGcs.delegate.createEmptyObject(resourceId2);
+      trackingGcs.delegate.createEmptyObject(resourceId1);
 
-    // Verify that directory object not listed
-    List<GoogleCloudStorageItemInfo> listedItems =
-        helperGcs.listObjectInfoStartingFrom(testBucket, testDirectory + "/");
-    assertThat(listedItems.stream().map(GoogleCloudStorageItemInfo::getResourceId).toArray())
-        .asList()
-        .containsExactlyElementsIn(
-            ImmutableList.builder()
-                .add(resourceId1)
-                .add(resourceId2)
-                .add(resourceId3)
-                .build()
-                .toArray())
-        .inOrder();
-    trackingGcs.delegate.close();
+      // Verify that directory object not listed
+      List<GoogleCloudStorageItemInfo> listedItems =
+          helperGcs.listObjectInfoStartingFrom(testBucket, testDirectory + "/");
+      assertThat(listedItems.stream().map(GoogleCloudStorageItemInfo::getResourceId).toArray())
+          .asList()
+          .containsExactlyElementsIn(
+              ImmutableList.builder()
+                  .add(resourceId1)
+                  .add(resourceId2)
+                  .add(resourceId3)
+                  .build()
+                  .toArray())
+          .inOrder();
+    } finally {
+      helperGcs.deleteObjects(ImmutableList.of(resourceId1, resourceId2, resourceId3));
+      trackingGcs.delegate.close();
+    }
   }
 
   @Test
