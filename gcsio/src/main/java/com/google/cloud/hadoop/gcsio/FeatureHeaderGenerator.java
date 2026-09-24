@@ -148,6 +148,11 @@ public class FeatureHeaderGenerator {
     if (storageOptions.getReadChannelOptions().isFastFailOnNotFoundEnabled()) {
       features.set(TrackedFeatures.FAST_FAIL_ON_NOT_FOUND_ENABLED.getBitPosition());
     }
+
+    // Compose delete source
+    if (storageOptions.isComposeDeleteSourceEnabled()) {
+      features.set(TrackedFeatures.COMPOSE_DELETE_SOURCE_ENABLED.getBitPosition());
+    }
   }
 
   /**
