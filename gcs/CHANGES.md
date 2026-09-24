@@ -5,6 +5,7 @@
 1. Upgrade google.api-client-libraries.version to 2.9.0
 1. Add fs.gs.universe.domain support for Google multi-universe (TPC)
 1. Optimize integration tests by enabling shared bucket reuse
+1. Add feature tracking for COMPOSE_DELETE_SOURCE_ENABLED
 
 ## 4.0.5 - 2026-08-26
 

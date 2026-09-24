@@ -138,6 +138,11 @@ public class FeatureHeaderGenerator {
     if (fsOptions.isCloudLoggingEnabled()) {
       features.set(TrackedFeatures.CLOUD_LOGGING_ENABLED.getBitPosition());
     }
+
+    // Compose delete source
+    if (storageOptions.isComposeDeleteSourceEnabled()) {
+      features.set(TrackedFeatures.COMPOSE_DELETE_SOURCE_ENABLED.getBitPosition());
+    }
   }
 
   /**
