@@ -4,6 +4,7 @@
 1. Skip soft delete for compose operations using deleteSourceObjects
 1. Upgrade google.api-client-libraries.version to 2.9.0
 1. Add fs.gs.universe.domain support for Google multi-universe (TPC)
+1. Optimize integration tests by enabling shared bucket reuse
 
 ## 4.0.5 - 2026-08-26
 
