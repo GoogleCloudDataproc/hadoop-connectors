@@ -380,6 +380,16 @@ default service account impersonation.
     be no-op if called more frequently than minimum sync interval and `hsync()`
     will block until an end of a min sync interval.
 
+*   `fs.gs.operation.compose.delete-source.enable` (default: `false`)
+
+    If `true`, deletes intermediate temporary source objects during compose operations
+    in Hadoop stream writes (`GoogleHadoopOutputStream`), bypassing soft-delete retention.
+    This is used during multi-component stream writes (e.g. workflows calling `hsync()`)
+    to clean up temporary tail objects directly within the compose request instead of queuing
+    asynchronous deletion tasks. This applies only to Hadoop stream write compose operations
+    and does not affect regular compose operations (such as `FileSystem.concat`), nor does
+    it apply to Parallel Composite Uploads (`fs.gs.client.upload.type=PARALLEL_COMPOSITE_UPLOAD`).
+
 #### Vectored Read configuration
 
 Knobs configure the vectoredRead API
@@ -427,11 +437,29 @@ Knobs configure the vectoredRead API
 
 *   `fs.gs.storage.root.url` (default: `https://storage.googleapis.com/`)
 
-    Google Cloud Storage root URL.
+    Google Cloud Storage root URL. This only overrides the JSON/REST endpoint and
+    carries no universe semantics (no credential universe-domain validation, and
+    it does not affect the gRPC endpoint). For Trusted Partner Cloud /
+    multi-universe (TPC) deployments, prefer `fs.gs.universe.domain`, which routes
+    both the JSON/REST and gRPC clients and validates the credentials' universe
+    domain. When both are set, this explicit root URL takes precedence over the
+    universe-domain-derived endpoint.
 
 *   `fs.gs.storage.service.path` (default: `storage/v1/`)
 
     Google Cloud Storage service path.
+
+*   `fs.gs.universe.domain` (default: none)
+
+    Universe domain to target, for Trusted Partner Cloud / multi-universe
+    deployments (e.g. `my-partner-universe.com`). When set, both the JSON/REST
+    and gRPC clients route requests to `storage.<universe-domain>` and validate
+    it against the credentials' universe domain. When unset, the
+    `GOOGLE_CLOUD_UNIVERSE_DOMAIN` environment variable is used as a fallback;
+    if that is also unset, the default Google universe (`googleapis.com`) is
+    targeted. An explicitly configured `fs.gs.storage.root.url` takes precedence
+    over the universe-domain-derived endpoint. Direct Google Access (DirectPath)
+    is automatically disabled for non-default universes.
 
 ### Fadvise feature configuration
 

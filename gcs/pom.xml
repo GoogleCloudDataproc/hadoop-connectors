@@ -227,6 +227,7 @@
                   <include>com.google.cloud.bigdataoss</include>
                   <include>com.google.cloud.grpc</include>
                   <include>com.google.cloud.http</include>
+                  <include>com.google.cloud.logging</include>
                   <include>com.google.cloud.opentelemetry</include>
                   <include>com.google.flogger</include>
                   <include>com.google.code.gson</include>
@@ -264,6 +265,7 @@
                     <include>com.google.cloud.hadoop.gcsio.**</include>
                     <include>com.google.cloud.hadoop.util.**</include>
                     <include>com.google.cloud.http.**</include>
+                    <include>com.google.cloud.logging.**</include>
                     <include>com.google.cloud.monitoring.**</include>
                     <include>com.google.cloud.opentelemetry.**</include>
                     <include>com.google.cloud.spi.**</include>
@@ -335,6 +337,7 @@
                 </relocation>
               </relocations>
               <shadedArtifactAttached>true</shadedArtifactAttached>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
             </configuration>
           </execution>
         </executions>
