@@ -264,6 +264,16 @@ public class FeatureHeaderGeneratorTest {
               "Bidi Enabled",
               buildOptionsWithBidi(),
               createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.BIDI_ENABLED)
+            },
+            {
+              "Compose Delete Source Enabled",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setCloudStorageOptions(
+                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                          .setComposeDeleteSourceEnabled(true)
+                          .build())
+                  .build(),
+              createBitSet(fadviseAuto, hnsEnabled, TrackedFeatures.COMPOSE_DELETE_SOURCE_ENABLED)
             }
           });
     }
