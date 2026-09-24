@@ -17,15 +17,18 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.MultipartContent;
 import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
+import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.Iterables;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -51,7 +54,11 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   // Prefix used for naming test buckets.
   public static final String TEST_BUCKET_NAME_PREFIX = "dataproc-gcs-gcsio";
 
-  private final TestBucketHelper bucketHelper = new TestBucketHelper(TEST_BUCKET_NAME_PREFIX);
+  private static final TestBucketHelper BUCKET_HELPER =
+      new TestBucketHelper(TEST_BUCKET_NAME_PREFIX);
+
+  private static String cachedSharedBucketName1;
+  private static String cachedSharedBucketName2;
 
   // Name of test buckets.
   public String sharedBucketName1;
@@ -63,20 +70,81 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     this.gcs = gcs;
   }
 
+  protected GoogleCloudStorage getStorage() {
+    return gcs;
+  }
+
+  public boolean isRealGcs() {
+    GoogleCloudStorage storage = checkNotNull(getStorage(), "storage cannot be null");
+    return !(storage instanceof InMemoryGoogleCloudStorage);
+  }
+
   /** Perform initialization once before tests are run. */
   public void beforeAllTests() throws IOException {
     // Create a couple of buckets. The first one is used by most tests.
     // The second one is used by some tests (eg, copy()).
-    sharedBucketName1 = createUniqueBucket("shared-1");
-    sharedBucketName2 = createUniqueBucket("shared-2");
+    if (!isRealGcs()) {
+      sharedBucketName1 = createUniqueBucket("shared-1");
+      sharedBucketName2 = createUniqueBucket("shared-2");
+      return;
+    }
+    cachedSharedBucketName1 = ensureReusableBucket(cachedSharedBucketName1, "shared-1");
+    cachedSharedBucketName2 = ensureReusableBucket(cachedSharedBucketName2, "shared-2");
+    sharedBucketName1 = cachedSharedBucketName1;
+    sharedBucketName2 = cachedSharedBucketName2;
+  }
+
+  private String ensureReusableBucket(String cachedBucketName, String suffix) throws IOException {
+    if (cachedBucketName != null
+        && getStorage().getItemInfo(new StorageResourceId(cachedBucketName)).exists()) {
+      clearRealGcsBucket(cachedBucketName);
+      return cachedBucketName;
+    }
+    return createUniqueBucket(suffix);
+  }
+
+  public void clearRealGcsBucket(String bucketName) throws IOException {
+    GoogleCloudStorage storage = getStorage();
+    List<GoogleCloudStorageItemInfo> items =
+        storage.listObjectInfo(
+            bucketName, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
+    if (!items.isEmpty()) {
+      storage.deleteObjects(
+          items.stream().map(GoogleCloudStorageItemInfo::getResourceId).collect(toList()));
+    }
+    if (storage.isHnBucket(
+        UriPaths.fromStringPathComponents(
+            bucketName, /* objectName= */ null, /* allowEmptyObjectName= */ true))) {
+      clearBucket(bucketName);
+    }
   }
 
   /** Perform clean-up once after all tests are turn. */
   public void afterAllTests() {
+    if (isRealGcs()) {
+      cleanupAllBuckets(getStorage());
+      return;
+    }
     try {
-      bucketHelper.cleanup(gcs);
+      if (getStorage() != null) {
+        BUCKET_HELPER.cleanup(getStorage());
+      }
     } catch (IOException e) {
       throw new RuntimeException("Failed to cleanup test buckets", e);
+    }
+  }
+
+  public static void cleanupAllBuckets(GoogleCloudStorage storage) {
+    if (storage == null) {
+      return;
+    }
+    try {
+      BUCKET_HELPER.cleanup(storage);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to cleanup test buckets", e);
+    } finally {
+      cachedSharedBucketName1 = null;
+      cachedSharedBucketName2 = null;
     }
   }
 
@@ -475,7 +543,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * identified by calling isTestBucketName() for that bucket.
    */
   public String getUniqueBucketName(String suffix) {
-    return bucketHelper.getUniqueBucketName(suffix);
+    return BUCKET_HELPER.getUniqueBucketName(suffix);
   }
 
   /** Convert request to string representation that could be used for assertions in tests */

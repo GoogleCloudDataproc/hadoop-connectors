@@ -4,6 +4,7 @@
 
 ## 3.0.20 - 2026-09-23
 1. Add listStatusStartingFrom API.
+1. Optimize integration tests by enabling shared bucket reuse
 
 ## 3.0.19 - 2026-03-26
 1. Enable move by default
