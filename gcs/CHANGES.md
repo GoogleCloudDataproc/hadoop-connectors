@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Skip soft delete for compose operations using deleteSourceObjects
 1. Optimize integration tests by enabling shared bucket reuse
 
 ## 3.1.19 - 2026-09-22
