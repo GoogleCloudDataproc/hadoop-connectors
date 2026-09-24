@@ -24,6 +24,8 @@ import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
@@ -76,6 +78,17 @@ public class HadoopFileSystemIntegrationHelper
     this.ghfs = hfs;
   }
 
+  @Override
+  protected GoogleCloudStorage getStorage() {
+    if (ghfs instanceof GoogleHadoopFileSystem) {
+      GoogleCloudStorageFileSystem gcsFs = ((GoogleHadoopFileSystem) ghfs).getGcsFs();
+      if (gcsFs != null) {
+        return gcsFs.getGcs();
+      }
+    }
+    return super.getStorage();
+  }
+
   /** Turn off statistics collection. */
   public void setIgnoreStatistics() {
     statistics = FileSystemStatistics.IGNORE;
@@ -113,7 +126,9 @@ public class HadoopFileSystemIntegrationHelper
   @Override
   public void afterAllTests() {
     try {
-      ghfs.delete(new Path(ghfs.getUri()), true);
+      if (!isRealGcs()) {
+        ghfs.delete(new Path(ghfs.getUri()), true);
+      }
       super.afterAllTests();
     } catch (Exception e) {
       throw new RuntimeException(

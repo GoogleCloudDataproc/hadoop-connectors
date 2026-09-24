@@ -54,6 +54,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -123,15 +124,34 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
+  private static boolean hasRealGcsBucketsToCleanup = false;
+
   @After
   public void after() throws IOException {
-    if (gcs != null) {
-      gcsiHelper.afterAllTests();
+    if (gcsiHelper != null) {
+      if (gcsiHelper.isRealGcs()) {
+        hasRealGcsBucketsToCleanup = true;
+      } else {
+        gcsiHelper.afterAllTests();
+      }
       gcsiHelper = null;
     }
     if (gcsfs != null) {
       gcsfs.close();
       gcsfs = null;
+    }
+  }
+
+  @AfterClass
+  public static void afterClass() throws IOException {
+    if (hasRealGcsBucketsToCleanup) {
+      GoogleCloudStorage cleanupGcs = GoogleCloudStorageTestHelper.createGoogleCloudStorage();
+      try {
+        GoogleCloudStorageIntegrationHelper.cleanupAllBuckets(cleanupGcs);
+      } finally {
+        hasRealGcsBucketsToCleanup = false;
+        cleanupGcs.close();
+      }
     }
   }
 
@@ -410,7 +430,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String testBucket = gcsiHelper.createUniqueBucket("list");
+    String testBucket = sharedBucketName1;
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
@@ -488,7 +508,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, /* expectedToExist= */ false);
 
     validateListFileInfo(
-        null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);
+        null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2);
   }
 
   @Test
@@ -498,7 +518,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String testBucket = gcsiHelper.createUniqueBucket("list");
+    String testBucket = sharedBucketName1;
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
