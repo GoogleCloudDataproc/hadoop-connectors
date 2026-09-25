@@ -38,13 +38,21 @@ import java.util.function.IntFunction;
  */
 class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
 
-  private final long size;
+  @FunctionalInterface
+  interface SizeProvider {
+    long getSize() throws IOException;
+  }
+
+  private long size;
   private final GoogleCloudStorageInputStream inputStream;
+  private final SizeProvider sizeProvider;
   private boolean channelIsOpen;
 
-  GcsAnalyticsCoreInputStreamWrapper(GoogleCloudStorageInputStream inputStream, long size) {
+  GcsAnalyticsCoreInputStreamWrapper(
+      GoogleCloudStorageInputStream inputStream, long size, SizeProvider sizeProvider) {
     this.inputStream = inputStream;
     this.size = size;
+    this.sizeProvider = sizeProvider;
     this.channelIsOpen = true;
   }
 
@@ -98,7 +106,10 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
   @Override
   public long size() throws IOException {
     checkOpen();
-    return size;
+    if (this.size < 0) {
+      this.size = sizeProvider.getSize();
+    }
+    return this.size;
   }
 
   @Override

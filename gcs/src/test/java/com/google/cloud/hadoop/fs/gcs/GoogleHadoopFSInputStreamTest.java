@@ -17,17 +17,20 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -38,6 +41,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -79,7 +83,7 @@ public class GoogleHadoopFSInputStreamTest {
       new GhfsGlobalStorageStatistics();
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     gcsPath = URI.create("gs://test-bucket/test-file");
     fileInfo =
         FileInfo.fromItemInfo(
@@ -114,6 +118,12 @@ public class GoogleHadoopFSInputStreamTest {
     when(mockOptions.getCloudStorageOptions()).thenReturn(mockCloudStorageOptions);
     when(mockCloudStorageOptions.getReadChannelOptions()).thenReturn(mockReadChannelOptions);
     when(mockReadChannelOptions.isFastFailOnNotFoundEnabled()).thenReturn(false);
+    lenient()
+        .when(mockGhfs.createAnalyticsCoreInputStream(any(GcsFileInfo.class)))
+        .thenReturn(mockAnalyticsInputStream);
+    lenient()
+        .when(mockGhfs.createAnalyticsCoreInputStream(any(GcsItemId.class)))
+        .thenReturn(mockAnalyticsInputStream);
     when(mockInputStreamStatistics.trackDuration(any(String.class), anyLong()))
         .thenReturn(mockDurationTracker);
     try {
@@ -252,5 +262,48 @@ public class GoogleHadoopFSInputStreamTest {
     inputStream.close();
 
     verify(mockAnalyticsInputStream).close();
+  }
+
+  @Test
+  public void create_withAnalyticsCoreEnabled_fastFailDisabled_doesNotGetFileInfoEagerly()
+      throws IOException {
+    when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockReadChannelOptions.isFastFailOnNotFoundEnabled()).thenReturn(false);
+
+    // Mock stream creation with GcsItemId
+    when(mockGhfs.createAnalyticsCoreInputStream(any(GcsItemId.class)))
+        .thenReturn(mockAnalyticsInputStream);
+
+    GoogleHadoopFSInputStream inputStream =
+        GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
+
+    assertThat(inputStream).isNotNull();
+    // Verify getFileInfoObject was never called
+    verify(mockGcsFs, never()).getFileInfoObject(any());
+  }
+
+  @Test
+  public void
+      create_withAnalyticsCoreEnabled_fastFailEnabled_getFileInfoEagerlyAndValidatesExistence()
+          throws IOException {
+    when(mockGhfs.isAnalyticsCoreEnabled()).thenReturn(true);
+    when(mockGhfs.getAnalyticsCoreGcsFs()).thenReturn(mockAnalyticsGcsFs);
+    when(mockReadChannelOptions.isFastFailOnNotFoundEnabled()).thenReturn(true);
+
+    // Stub a non-existent FileInfo
+    FileInfo nonExistentInfo = mock(FileInfo.class);
+    when(nonExistentInfo.exists()).thenReturn(false);
+    when(mockGcsFs.getFileInfoObject(gcsPath)).thenReturn(nonExistentInfo);
+
+    try {
+      GoogleHadoopFSInputStream.create(mockGhfs, gcsPath, statistics);
+      fail("Expected FileNotFoundException to be thrown");
+    } catch (FileNotFoundException e) {
+      assertThat(e.getMessage()).contains("File not found: " + gcsPath);
+    }
+
+    // Verify getFileInfoObject was called
+    verify(mockGcsFs).getFileInfoObject(gcsPath);
   }
 }
