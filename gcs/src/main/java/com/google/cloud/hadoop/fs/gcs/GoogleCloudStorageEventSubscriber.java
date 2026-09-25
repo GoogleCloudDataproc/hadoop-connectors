@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.gcsio.StatisticTypeEnum.TYPE_DURATION_TOTA
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StatisticTypeEnum;
+import com.google.cloud.hadoop.util.GCSChecksumFailureEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.EventType;
 import com.google.cloud.hadoop.util.GcsJsonApiEvent.RequestType;
@@ -139,6 +140,11 @@ public class GoogleCloudStorageEventSubscriber {
   @Subscribe
   private void subscriberOnException(IOException exception) {
     storageStatistics.incrementGcsExceptionCount();
+  }
+
+  @Subscribe
+  private void onGcsChecksumFailure(GCSChecksumFailureEvent exception) {
+    storageStatistics.incrementWriteChecksumFailureCount();
   }
 
   /**

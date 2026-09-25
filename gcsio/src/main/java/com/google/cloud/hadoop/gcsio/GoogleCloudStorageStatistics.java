@@ -27,6 +27,10 @@ import java.util.EnumSet;
 /** Statistics which are collected in GCS Connector. */
 public enum GoogleCloudStorageStatistics {
   EXCEPTION_COUNT("exception_count", "Counts the number of exceptions encountered", TYPE_COUNTER),
+  WRITE_CHECKSUM_FAILURE_COUNT(
+      "write_checksum_failure_count",
+      "Counts the number of checksum failures during write",
+      TYPE_COUNTER),
 
   /** Status Code Counters for JSON Path */
   GCS_API_REQUEST_COUNT(
