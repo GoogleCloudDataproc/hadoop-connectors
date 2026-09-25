@@ -34,9 +34,11 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -44,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileRange;
+import org.apache.hadoop.fs.StorageStatistics.LongStatistic;
 import org.apache.hadoop.fs.VectoredReadUtils;
 import org.apache.hadoop.fs.impl.CombinedFileRange;
 
@@ -90,6 +93,8 @@ public class VectoredIOImpl implements Closeable {
    * @param fileInfo FileInfo of the gcs object agaisnt which range request are fired, this can be
    *     null for some code path fall back to URI path provided.
    * @param gcsPath URI of the gcs object for which the range requests are fired.
+   * @param rangeReadThreadStats concurrent map to capture all threadLocal stats collected during
+   *     range processing.
    * @throws IOException If invalid range is requested, offset<0.
    */
   public void readVectored(
@@ -98,10 +103,11 @@ public class VectoredIOImpl implements Closeable {
       GoogleCloudStorageFileSystem gcsFs,
       FileInfo fileInfo,
       @Nonnull URI gcsPath,
-      GhfsInputStreamStatistics streamStatistics)
+      GhfsInputStreamStatistics streamStatistics,
+      final ConcurrentHashMap<String, Long> rangeReadThreadStats)
       throws IOException {
     VectoredReadChannel vectoredReadChannel =
-        new VectoredReadChannel(gcsFs, fileInfo, gcsPath, streamStatistics);
+        new VectoredReadChannel(gcsFs, fileInfo, gcsPath, streamStatistics, rangeReadThreadStats);
     vectoredReadChannel.readVectored(ranges, allocate);
   }
 
@@ -109,14 +115,18 @@ public class VectoredIOImpl implements Closeable {
 
     private final GhfsInputStreamStatistics streamStatistics;
     private final ReadChannelProvider channelProvider;
+    // aggregates the threadLocal stats for individual ranges.
+    private final ConcurrentHashMap<String, Long> rangeStatsAccumulator;
 
     public VectoredReadChannel(
         GoogleCloudStorageFileSystem gcsFs,
         FileInfo fileInfo,
         URI gcsPath,
-        GhfsInputStreamStatistics streamStatistics) {
+        GhfsInputStreamStatistics streamStatistics,
+        final ConcurrentHashMap<String, Long> rangeStatsAccumulator) {
       this.channelProvider = new ReadChannelProvider(gcsFs, fileInfo, gcsPath);
       this.streamStatistics = streamStatistics;
+      this.rangeStatsAccumulator = rangeStatsAccumulator;
     }
 
     private void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
@@ -136,6 +146,9 @@ public class VectoredIOImpl implements Closeable {
           boundedThreadPool.submit(
               () -> {
                 logger.atFiner().log("Submitting range %s for execution.", sortedRange);
+                // Reset thread stats as a new task is being submitted to this thread.
+                // all required stats must be collected before task is finished.
+                resetThreadLocalStats();
                 readSingleRange(sortedRange, allocate, channelProvider);
                 long endTimer = System.currentTimeMillis();
                 storageStatistics.updateStats(
@@ -156,6 +169,10 @@ public class VectoredIOImpl implements Closeable {
               () -> {
                 logger.atFiner().log(
                     "Submitting combinedRange %s for execution.", combinedFileRange);
+
+                // Reset thread stats as a new task is being submitted to this thread.
+                // all required stats must be collected before task is finished.
+                resetThreadLocalStats();
                 readCombinedRange(combinedFileRange, allocate, channelProvider);
                 long endTimer = System.currentTimeMillis();
                 storageStatistics.updateStats(
@@ -177,6 +194,32 @@ public class VectoredIOImpl implements Closeable {
     private void updateBytesRead(int readBytes) {
       streamStatistics.bytesRead(readBytes);
       storageStatistics.streamReadBytes(readBytes);
+    }
+
+    /**
+     * Function to capture the thread local stats of thread processing the range to shared stats
+     * map. It also resets them so same stats wouldn't get captured multiple times.
+     */
+    private void captureAndResetThreadLocalStats() {
+      GhfsThreadLocalStatistics tlStats = storageStatistics.getThreadLocalStatistics();
+      Iterator<LongStatistic> itr = tlStats.getLongStatistics();
+      while (itr.hasNext()) {
+        LongStatistic lStats = itr.next();
+        String lKey = lStats.getName();
+        long lValue = lStats.getValue();
+        rangeStatsAccumulator.merge(lKey, lValue, Long::sum);
+      }
+      // given we have merged the threadLocal stats, resetting it so that it wouldn't captured
+      // again.
+      resetThreadLocalStats();
+    }
+
+    /**
+     * Reset the thread local stats of caller thread. It is suppose to be called form the reader
+     * thread of range request. If called on main thread all thread local stats will be lost.
+     */
+    private void resetThreadLocalStats() {
+      storageStatistics.getThreadLocalStatistics().reset();
     }
 
     private List<CombinedFileRange> getCombinedFileRange(List<? extends FileRange> sortedRanges) {
@@ -233,6 +276,7 @@ public class VectoredIOImpl implements Closeable {
           storageStatistics.incrementCounter(
               GhfsStatistic.STREAM_READ_VECTORED_EXTRA_READ_BYTES, discardedBytes);
 
+          captureAndResetThreadLocalStats();
           if (numRead >= totalBytesRead) {
             ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
             child.getData().complete(childBuffer);
@@ -252,6 +296,7 @@ public class VectoredIOImpl implements Closeable {
         logger.atWarning().withCause(e).log(
             "Exception while reading combinedFileRange:%s for path: %s",
             combinedFileRange, channelProvider.gcsPath);
+        captureAndResetThreadLocalStats();
         combinedFileRange.getData().completeExceptionally(e);
         // complete exception all the underlying ranges which have not already
         // finished.
@@ -295,13 +340,15 @@ public class VectoredIOImpl implements Closeable {
                   "EOF reached before whole range can be read, range: %s, path: %s",
                   range, channelProvider.gcsPath));
         }
-        range.getData().complete(dst);
         updateBytesRead(range.getLength());
+        captureAndResetThreadLocalStats();
         logger.atFiner().log(
             "Read single range completed from range: %s, path: %s", range, channelProvider.gcsPath);
+        range.getData().complete(dst);
       } catch (Exception e) {
         logger.atWarning().withCause(e).log(
             "Exception while reading range:%s for path: %s", range, channelProvider.gcsPath);
+        captureAndResetThreadLocalStats();
         range.getData().completeExceptionally(e);
       }
     }
