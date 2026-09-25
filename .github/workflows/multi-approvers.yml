@@ -1,7 +1,8 @@
 name: 'multi-approvers'
 
 on:
-  pull_request:
+  # zizmor: ignore[dangerous-triggers] - Required to access MULTI_APPROVERS_TOKEN on fork PRs; no PR code is checked out
+  pull_request_target:
     types:
       - 'opened'
       - 'edited'
@@ -17,7 +18,7 @@ on:
 
 # Ensure only one run per PR is active to reduce API consumption
 concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  group: '${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}'
   cancel-in-progress: true
 
 permissions:
@@ -29,9 +30,6 @@ jobs:
   multi-approvers:
     runs-on: 'ubuntu-latest'
     steps:
-      - name: 'Checkout Repository'
-        uses: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' # v4
-
       - name: 'Check Two-Party Review Status'
         uses: 'abcxyz/actions/.github/actions/multi-approvers@cd65e574b76ed2293095f5e6331267b9b8202d86' # main
         with:
