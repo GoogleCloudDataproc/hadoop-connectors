@@ -669,6 +669,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
 
+  /** Configuration key for enabling GCS Analytics Core write path. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_WRITE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.analytics.core.write.enable", false);
   /**
    * Configuration key to delete intermediate temporary source objects during compose operations in
    * Hadoop stream writes (e.g. workflows calling {@code hsync()}), bypassing soft-delete retention.
@@ -692,7 +695,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
         .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean))
-        .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean));
+        .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean))
+        .setAnalyticsCoreWriteEnabled(
+            GCS_ANALYTICS_CORE_WRITE_ENABLE.get(config, config::getBoolean));
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
