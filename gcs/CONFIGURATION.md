@@ -216,6 +216,8 @@
 
     *   `USER_CREDENTIALS` - configure [user credentials](#user-credentials)
 
+    *   `WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE` - configure workload identity federation 
+
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
     The path to the JSON keyfile for the service account when `fs.gs.auth.type`
@@ -231,6 +233,11 @@
 *   `fs.gs.token.server.url` (not set by default)
 
     Google Token Server root URL.
+
+*   `fs.gs.auth.workload.identity.federation.credential.config.file`
+
+    The path to the credential configuration file for workload identity federation when `fs.gs.auth.type`
+    property is set to `WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE`.
 
 #### User credentials
 
