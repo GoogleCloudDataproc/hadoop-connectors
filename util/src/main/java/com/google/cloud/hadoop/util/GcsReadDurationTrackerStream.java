@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.client.http.HttpHeaders;
 import com.google.common.flogger.GoogleLogger;
 import java.io.FilterInputStream;
@@ -39,7 +41,7 @@ public class GcsReadDurationTrackerStream extends FilterInputStream {
       URI streamPath,
       HttpHeaders responseHeaders,
       long latencyLoggingThresholdMs) {
-    super(delegate);
+    super(checkNotNull(delegate, "delegate cannot be null"));
     this.streamPath = streamPath;
     this.responseHeaders = responseHeaders;
     this.latencyLoggingThresholdMs = latencyLoggingThresholdMs;
