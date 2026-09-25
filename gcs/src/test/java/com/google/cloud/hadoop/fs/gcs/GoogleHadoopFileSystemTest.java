@@ -53,6 +53,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
@@ -710,5 +711,105 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     ghfs.close();
     // Close again - should not throw.
     ghfs.close();
+  }
+
+  @Test
+  public void initialize_downscopedTokensAndAnalyticsCoreEnabled_throwsIOException()
+      throws Exception {
+    Configuration config = accessTokenProviderConfig(DownscopedAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    IOException exception =
+        assertThrows(IOException.class, () -> fs.initialize(new URI("gs://foobar/"), config));
+
+    assertThat(exception).hasMessageThat().contains("fs.gs.analytics.core.enable");
+  }
+
+  @Test
+  public void initialize_downscopedTokensAndAnalyticsCoreWriteEnabled_throwsIOException()
+      throws Exception {
+    Configuration config = accessTokenProviderConfig(DownscopedAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.write.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    IOException exception =
+        assertThrows(IOException.class, () -> fs.initialize(new URI("gs://foobar/"), config));
+
+    assertThat(exception).hasMessageThat().contains("fs.gs.analytics.core.write.enable");
+  }
+
+  @Test
+  public void initialize_downscopedTokensAndAnalyticsCoreEnabled_namesTheAccessTokenType()
+      throws Exception {
+    Configuration config = accessTokenProviderConfig(DownscopedAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    IOException exception =
+        assertThrows(IOException.class, () -> fs.initialize(new URI("gs://foobar/"), config));
+
+    assertThat(exception).hasMessageThat().contains("DOWNSCOPED");
+  }
+
+  @Test
+  public void initialize_downscopedTokensAndAnalyticsCoreDisabled_succeeds() throws Exception {
+    Configuration config = accessTokenProviderConfig(DownscopedAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", false);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    assertThat(fs.isAnalyticsCoreEnabled()).isFalse();
+  }
+
+  @Test
+  public void initialize_genericTokensAndAnalyticsCoreEnabled_succeeds() throws Exception {
+    Configuration config = accessTokenProviderConfig(TestingAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    assertThat(fs.isAnalyticsCoreEnabled()).isTrue();
+  }
+
+  private static Configuration accessTokenProviderConfig(
+      Class<? extends AccessTokenProvider> provider) {
+    Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
+    config.setClass("fs.gs.auth.access.token.provider", provider, AccessTokenProvider.class);
+    return config;
+  }
+
+  /** An {@link AccessTokenProvider} that reports issuing downscoped, per-request tokens. */
+  public static final class DownscopedAccessTokenProvider implements AccessTokenProvider {
+
+    private Configuration config;
+
+    @Override
+    public AccessTokenType getAccessTokenType() {
+      return AccessTokenType.DOWNSCOPED;
+    }
+
+    @Override
+    public AccessToken getAccessToken() {
+      return new AccessToken("downscoped-access-token", Instant.now().plusSeconds(600));
+    }
+
+    @Override
+    public void refresh() {
+      // no-op
+    }
+
+    @Override
+    public void setConf(Configuration config) {
+      this.config = config;
+    }
+
+    @Override
+    public Configuration getConf() {
+      return config;
+    }
   }
 }
