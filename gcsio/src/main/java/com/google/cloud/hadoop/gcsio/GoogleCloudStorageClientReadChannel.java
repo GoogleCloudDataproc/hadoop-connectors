@@ -347,28 +347,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                           + "at offset: %d where as stream was supposed to end at: %d for resource: "
                           + "%s of size: %d",
                       currentPosition, contentChannelEnd, resourceId, objectSize));
-
-            } else if (currentPosition > objectSize) {
-              GoogleCloudStorageEventBus.postOnException();
-              throw new IOException(
-                  String.format(
-                      "Received end of stream result beyond the object size; at offset: %d "
-                          + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
-                      currentPosition, contentChannelEnd, resourceId, objectSize));
-            } else if (currentPosition > contentChannelEnd) {
-              logger.atWarning().log(
-                  "Received end of stream result after the channel end; at offset: %d "
-                      + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
-                  currentPosition, contentChannelEnd, resourceId, objectSize);
-              // Dropping additional bytes.
-              int overshoot = (int) (currentPosition - contentChannelEnd);
-              dst.position(dst.position() - overshoot);
-              currentPosition = contentChannelEnd;
-              totalBytesRead -= overshoot;
-              contentChannelCurrentPosition -= overshoot;
-
-              closeContentChannel();
-              continue;
             }
             // If we have reached an end of a contentChannel but not an end of an object.
             // then close contentChannel and continue reading an object if necessary.
@@ -388,6 +366,35 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
                   + " after successful read",
               contentChannelCurrentPosition,
               currentPosition);
+
+          // Fail fast if the server sent data past the total object size
+          if (objectSize != -1 && currentPosition > objectSize) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new IOException(
+                String.format(
+                    "Received data beyond the object size; at offset: %d "
+                        + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                    currentPosition, contentChannelEnd, resourceId, objectSize));
+          }
+
+          // Handle the overshoot immediately in the successful read case
+          if (contentChannelEnd >= 0
+              && contentChannelEnd != objectSize
+              && currentPosition > contentChannelEnd) {
+            logger.atWarning().log(
+                "Received data after the channel end; at offset: %d "
+                    + "whereas stream was supposed to end at: %d for resource: %s of size: %d",
+                currentPosition, contentChannelEnd, resourceId, objectSize);
+
+            int overshoot = (int) (currentPosition - contentChannelEnd);
+            dst.position(dst.position() - overshoot);
+            currentPosition = contentChannelEnd;
+            contentChannelCurrentPosition = contentChannelEnd;
+            totalBytesRead -= overshoot;
+
+            // Close the channel so the next iteration opens a cleanly aligned stream
+            closeContentChannel();
+          }
         } catch (Exception e) {
           GoogleCloudStorageEventBus.postOnException();
           int partialBytes = partiallyReadBytes(remainingBeforeRead, dst);

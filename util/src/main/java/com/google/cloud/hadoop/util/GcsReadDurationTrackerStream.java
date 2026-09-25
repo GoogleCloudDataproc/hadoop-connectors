@@ -30,14 +30,14 @@ public class GcsReadDurationTrackerStream extends FilterInputStream {
   private static final String UPLOAD_ID_HEADER = "x-guploader-uploadid";
 
   private final URI streamPath;
-  private final Object responseHeaders;
+  private final HttpHeaders responseHeaders;
   private final long latencyLoggingThresholdMs;
   private long cumulativeTransferDurationMs;
 
   public GcsReadDurationTrackerStream(
       InputStream delegate,
       URI streamPath,
-      Object responseHeaders,
+      HttpHeaders responseHeaders,
       long latencyLoggingThresholdMs) {
     super(delegate);
     this.streamPath = streamPath;
@@ -73,13 +73,15 @@ public class GcsReadDurationTrackerStream extends FilterInputStream {
     } finally {
       boolean latencyThresholdBreached = cumulativeTransferDurationMs > latencyLoggingThresholdMs;
       if (latencyThresholdBreached) {
-        String uploadId =
-            responseHeaders instanceof HttpHeaders
-                ? ((HttpHeaders) responseHeaders).getFirstHeaderStringValue(UPLOAD_ID_HEADER)
-                : String.valueOf(responseHeaders);
+        String uploadId = null;
+        String range = null;
+        if (responseHeaders != null) {
+          uploadId = responseHeaders.getFirstHeaderStringValue(UPLOAD_ID_HEADER);
+          range = responseHeaders.getContentRange();
+        }
         logger.atInfo().atMostEvery(10, TimeUnit.SECONDS).log(
-            "Detected high latency for %s. durationMs=%d; upload_id=%s",
-            streamPath, cumulativeTransferDurationMs, uploadId);
+            "Detected high latency for %s. durationMs=%d; upload_id=%s; range=%s",
+            streamPath, cumulativeTransferDurationMs, uploadId, range);
       }
       GoogleCloudStorageEventBus.postReadMetricEvent(
           GcsReadMetricEvent.ofDataTransfer(

@@ -71,7 +71,8 @@ public abstract class GoogleCloudStorageOptions {
         .setStorageClientCachingEnabled(false)
         .setBidiEnabled(false)
         .setFinalizeBeforeClose(false)
-        .setHnOptimizationEnabled(false);
+        .setHnOptimizationEnabled(false)
+        .setComposeDeleteSourceEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -89,6 +90,13 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getStorageRootUrl();
 
   public abstract String getStorageServicePath();
+
+  /**
+   * Universe domain to target (e.g. for Trusted Partner Cloud / multi-universe deployments). When
+   * {@code null} or empty the client uses the default Google universe ({@code googleapis.com}).
+   */
+  @Nullable
+  public abstract String getUniverseDomain();
 
   public abstract boolean isGrpcWriteEnabled();
 
@@ -160,6 +168,8 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isHnOptimizationEnabled();
 
+  public abstract boolean isComposeDeleteSourceEnabled();
+
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
         .setDefaultUserAgent(getAppName())
@@ -187,6 +197,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setStorageRootUrl(String rootUrl);
 
     public abstract Builder setStorageServicePath(String servicePath);
+
+    public abstract Builder setUniverseDomain(@Nullable String universeDomain);
 
     public abstract Builder setProjectId(String projectId);
 
@@ -257,6 +269,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setBidiEnabled(boolean bidiEnabled);
 
     public abstract Builder setFinalizeBeforeClose(boolean finalizeBeforeClose);
+
+    public abstract Builder setComposeDeleteSourceEnabled(boolean composeDeleteSourceEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

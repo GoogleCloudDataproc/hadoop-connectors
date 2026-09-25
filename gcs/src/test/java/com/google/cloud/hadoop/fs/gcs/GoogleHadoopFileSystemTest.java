@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
@@ -475,6 +476,18 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(instrumentationField.get(ghfs)).isNull();
   }
 
+  @Test
+  public void blockSize_sizeSuffix() throws Exception {
+    Configuration config = new Configuration();
+    config.set(BLOCK_SIZE.getKey(), "128m");
+    config.setBoolean("fs.gs.lazy.init.enable", true);
+    config.setEnum(GCS_CLIENT_TYPE.toString(), storageClientType);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(new URI("gs://test-bucket/"), config);
+    assertThat(fs.getDefaultBlockSize()).isEqualTo(128 * 1024 * 1024L);
+    fs.close();
+  }
+
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.
@@ -633,6 +646,63 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testGetFileStatusWithHint() {}
+
+  @Test
+  public void hasPathCapability_listStatusStartingFrom_onStandardBucket_returnsTrue()
+      throws Exception {
+    Path standardPath = new Path("gs://" + ghfs.getUri().getAuthority() + "/dir");
+    assertThat(ghfs.hasPathCapability(standardPath, "fs.gs.capability.liststatus.starting.from"))
+        .isTrue();
+  }
+
+  @Test
+  public void hasPathCapability_listStatusStartingFrom_onHnsBucket_returnsFalse() throws Exception {
+    URI initUri = new Path("gs://hns-bucket").toUri();
+    GoogleCloudStorageFileSystem fakeGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            (gcsOptions) ->
+                new InMemoryGoogleCloudStorage(gcsOptions) {
+                  @Override
+                  public boolean isHnBucket(URI src) {
+                    return true;
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
+    try (GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs)) {
+      fs.initialize(initUri, new Configuration());
+
+      Path hnsPath = new Path("gs://hns-bucket/dir");
+      assertThat(fs.hasPathCapability(hnsPath, "fs.gs.capability.liststatus.starting.from"))
+          .isFalse();
+    }
+  }
+
+  @Test
+  public void hasPathCapability_listStatusStartingFrom_fsClosed_returnsFalse() throws Exception {
+    URI initUri = new Path("gs://hns-bucket").toUri();
+    GoogleCloudStorageFileSystem fakeGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            (gcsOptions) ->
+                new InMemoryGoogleCloudStorage(gcsOptions) {
+                  @Override
+                  public boolean isHnBucket(URI src) {
+                    return false;
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
+    fs.initialize(initUri, new Configuration());
+    Path hnsPath = new Path("gs://non-hns-bucket/dir");
+    fs.close();
+
+    // even on non hns bucket, if file system is closed capability is disabled.
+    assertThat(fs.hasPathCapability(hnsPath, "fs.gs.capability.liststatus.starting.from"))
+        .isFalse();
+  }
 
   @Test
   public void close_canBeCalledMultipleTimes() throws Exception {

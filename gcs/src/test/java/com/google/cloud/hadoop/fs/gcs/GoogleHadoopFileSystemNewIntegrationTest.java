@@ -45,6 +45,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IOUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -195,5 +196,51 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
             new StorageResourceId(testBucketName), /* allowEmptyObjectName= */ true),
         GoogleHadoopFileSystemTestBase.loadConfig(storageClientType));
     return ghfs;
+  }
+
+  @Test
+  public void testSpecialCharacters() throws Exception {
+    // GCS path containing a wide variety of special characters.
+    // Includes: spaces, +, #, %, &, $, =, ,, ;, ', ", @, !, ~, ^, `, (, ), [, ], {, }, *, ?
+    String specialChars = " + # % & $ = , ; ' \" @ ! ~ ^ ` ( ) [ ] { } * ? à";
+    String dirWithSpecialChars = "dir" + specialChars;
+    String fileWithSpecialChars = "file" + specialChars + ".txt";
+
+    Path rootDir = new Path("/test-comprehensive-special-chars");
+    Path specialDirPath = new Path(rootDir, dirWithSpecialChars);
+    Path specialFilePath = new Path(specialDirPath, fileWithSpecialChars);
+
+    String content = "GCS comprehensive special characters test content";
+    byte[] contentBytes = content.getBytes(UTF_8);
+
+    // 1. Create/Write
+    try (FSDataOutputStream out = ghfsIHelper.ghfs.create(specialFilePath)) {
+      out.write(contentBytes);
+    }
+
+    // 2. List the specialDirPath (contains the file)
+    FileStatus[] statuses = ghfsIHelper.ghfs.listStatus(specialDirPath);
+    assertThat(statuses).hasLength(1);
+    assertThat(statuses[0].getPath().getName()).isEqualTo(fileWithSpecialChars);
+
+    // 3. List the rootDir (contains the specialDirPath)
+    statuses = ghfsIHelper.ghfs.listStatus(rootDir);
+    assertThat(statuses).hasLength(1);
+    assertThat(statuses[0].getPath().getName()).isEqualTo(dirWithSpecialChars);
+
+    // 4. Read
+    try (FSDataInputStream in = ghfsIHelper.ghfs.open(specialFilePath)) {
+      byte[] readBytes = new byte[contentBytes.length];
+      IOUtils.readFully(in, readBytes, 0, readBytes.length);
+      assertThat(new String(readBytes, UTF_8)).isEqualTo(content);
+    }
+
+    // 5. Delete
+    assertThat(ghfsIHelper.ghfs.delete(specialFilePath, false)).isTrue();
+    assertThat(ghfsIHelper.ghfs.exists(specialFilePath)).isFalse();
+
+    // 6. Delete the directory
+    assertThat(ghfsIHelper.ghfs.delete(specialDirPath, true)).isTrue();
+    assertThat(ghfsIHelper.ghfs.exists(specialDirPath)).isFalse();
   }
 }
