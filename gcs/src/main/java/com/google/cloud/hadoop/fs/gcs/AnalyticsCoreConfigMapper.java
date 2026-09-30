@@ -15,6 +15,7 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -44,6 +45,7 @@ final class AnalyticsCoreConfigMapper {
   static final String PCU_PART_FILE_CLEANUP_TYPE_KEY = "channel.write.pcu.part-file.cleanup-type";
   static final String PCU_PART_FILE_NAME_PREFIX_KEY = "channel.write.pcu.part-file.name-prefix";
   static final String ENCRYPTION_KEY_KEY = "encryption-key";
+  static final String DECRYPTION_KEY_KEY = "decryption-key";
   static final String CHECKSUM_VALIDATION_ENABLED_KEY = "channel.write.checksum-validation.enabled";
 
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
@@ -87,7 +89,6 @@ final class AnalyticsCoreConfigMapper {
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_NAME_PREFIX.getKey(),
               PCU_PART_FILE_NAME_PREFIX_KEY)
-          .put(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), ENCRYPTION_KEY_KEY)
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(),
               CHECKSUM_VALIDATION_ENABLED_KEY)
@@ -151,7 +152,24 @@ final class AnalyticsCoreConfigMapper {
     // Ensure client.type is explicitly removed from mapped properties to prevent crashes
     mappedProperties.remove(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey());
 
+    mapEncryptionKey(config, mappedProperties, prefix);
+
     return mappedProperties;
+  }
+
+  /**
+   * Maps {@code fs.gs.encryption.key} via {@code getPassword} so JCEKS secrets are resolved for
+   * both CSEK reads and writes.
+   */
+  private static void mapEncryptionKey(
+      Configuration config, Map<String, String> map, String prefix) {
+    map.remove(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey());
+    RedactedString encryptionKey =
+        GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getPassword(config);
+    if (encryptionKey != null) {
+      map.putIfAbsent(prefix + ENCRYPTION_KEY_KEY, encryptionKey.value());
+      map.putIfAbsent(prefix + DECRYPTION_KEY_KEY, encryptionKey.value());
+    }
   }
 
   private static void mapAndRemoveSource(
