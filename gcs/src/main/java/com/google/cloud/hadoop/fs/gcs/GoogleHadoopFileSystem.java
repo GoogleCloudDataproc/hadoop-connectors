@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_WRITE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPLICATION_NAME_SUFFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLOUD_LOGGING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -43,7 +44,10 @@ import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemImpl;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FeatureHeaderGenerator;
@@ -393,6 +397,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private synchronized void initializeGcsFs(Configuration config) throws IOException {
     if (gcsFsSupplier == null) {
+      // TODO(user): Initialize analyticsCoreGcsFs lazily when GCS_LAZY_INITIALIZATION_ENABLE is
+      // true, to avoid eager initialization.
+      if (isAnalyticsCoreEnabled() || isAnalyticsCoreWriteEnabled()) {
+        analyticsCoreGcsFs = createAnalyticsGcsFs(config);
+      }
       if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
         gcsFsSupplier =
             Suppliers.memoize(
@@ -408,9 +417,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 });
       } else {
         initializeGcsFs(createGcsFs(config));
-      }
-      if (isAnalyticsCoreEnabled()) {
-        analyticsCoreGcsFs = createAnalyticsGcsFs(config);
       }
     }
   }
@@ -463,7 +469,43 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         AnalyticsCoreConfigMapper.mapConfigs(config, GCS_CONFIG_PREFIX + ".");
     GcsFileSystemOptions options =
         GcsFileSystemOptions.createFromOptions(mappedProperties, GCS_CONFIG_PREFIX + ".");
-    return new GcsFileSystemImpl(getCredentials(config), options);
+    GoogleCredentials credentials = getCredentials(config);
+    rejectDownscopedTokens(credentials);
+    return new GcsFileSystemImpl(credentials, options);
+  }
+
+  /**
+   * Rejects credentials that issue downscoped, per-request access tokens.
+   *
+   * <p>Analytics Core accepts a single credential for the lifetime of the filesystem, so the
+   * per-request Credential Access Boundary tokens that {@link #createGcsFs} installs have no
+   * equivalent here. Downscoping is rejected rather than ignored: falling back to the provider's
+   * broad token would widen the access boundary the operator configured, on reads that look
+   * identical to every other read.
+   *
+   * @param credentials The credentials resolved for this filesystem.
+   * @throws IOException If the configured {@link AccessTokenProvider} issues downscoped tokens,
+   *     which Analytics Core cannot honor.
+   */
+  private static void rejectDownscopedTokens(GoogleCredentials credentials) throws IOException {
+    if (!(credentials instanceof AccessTokenProviderCredentials)) {
+      return;
+    }
+    AccessTokenProvider accessTokenProvider =
+        ((AccessTokenProviderCredentials) credentials).getAccessTokenProvider();
+    if (accessTokenProvider.getAccessTokenType() != AccessTokenType.DOWNSCOPED) {
+      return;
+    }
+    throw new IOException(
+        String.format(
+            "Analytics Core (%s / %s) does not support %s access tokens, which would be silently"
+                + " broadened to the provider's full scope. Disable Analytics Core or configure an"
+                + " %s that issues %s tokens.",
+            GCS_ANALYTICS_CORE_ENABLE.getKey(),
+            GCS_ANALYTICS_CORE_WRITE_ENABLE.getKey(),
+            AccessTokenType.DOWNSCOPED,
+            AccessTokenProvider.class.getSimpleName(),
+            AccessTokenType.GENERIC));
   }
 
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
@@ -1859,9 +1901,19 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsFileInfo);
   }
 
+  GoogleCloudStorageOutputStream createAnalyticsCoreOutputStream(
+      GcsItemId gcsItemId, GcsWriteOptions writeOptions) throws IOException {
+    return GoogleCloudStorageOutputStream.create(analyticsCoreGcsFs, gcsItemId, writeOptions);
+  }
+
   /** Checks if Analytics Core is enabled. */
   boolean isAnalyticsCoreEnabled() {
     return GCS_ANALYTICS_CORE_ENABLE.get(getConf(), getConf()::getBoolean);
+  }
+
+  /** Checks if Analytics Core write path is enabled. */
+  boolean isAnalyticsCoreWriteEnabled() {
+    return GCS_ANALYTICS_CORE_WRITE_ENABLE.get(getConf(), getConf()::getBoolean);
   }
 
   public Supplier<VectoredIOImpl> getVectoredIOSupplier() {
