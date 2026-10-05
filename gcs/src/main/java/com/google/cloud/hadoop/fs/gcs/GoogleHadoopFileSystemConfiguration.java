@@ -434,6 +434,14 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.enable", GoogleCloudStorageOptions.DEFAULT.isGrpcEnabled());
 
+  /** Configuration key for idle timeout (TTL) for cached connections. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_EXPIRE_SEC =
+      new HadoopConfigurationProperty<>("fs.gs.bidi.cache.expire.sec", 600);
+
+  /** Configuration key for maximum unique objects cached in the pool. */
+  public static final HadoopConfigurationProperty<Integer> GCS_BIDI_CACHE_MAX_SIZE =
+      new HadoopConfigurationProperty<>("fs.gs.bidi.cache.max.size", 100);
+
   /** Configuration key for enabling checksum validation for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
       new HadoopConfigurationProperty<>(
@@ -661,6 +669,20 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.analytics.core.enable", false);
 
+  /** Configuration key for enabling GCS Analytics Core write path. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_ANALYTICS_CORE_WRITE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.analytics.core.write.enable", false);
+  /**
+   * Configuration key to delete intermediate temporary source objects during compose operations in
+   * Hadoop stream writes (e.g. workflows calling {@code hsync()}), bypassing soft-delete retention.
+   * Does not affect regular compose operations such as concat, nor does it apply to {@code
+   * UploadType.PARALLEL_COMPOSITE_UPLOAD}.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_COMPOSE_DELETE_SOURCE_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.operation.compose.delete-source.enable",
+          GoogleCloudStorageOptions.DEFAULT.isComposeDeleteSourceEnabled());
+
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -673,7 +695,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
         .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean))
-        .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean));
+        .setAnalyticsCoreEnabled(GCS_ANALYTICS_CORE_ENABLE.get(config, config::getBoolean))
+        .setAnalyticsCoreWriteEnabled(
+            GCS_ANALYTICS_CORE_WRITE_ENABLE.get(config, config::getBoolean));
   }
 
   static VectoredReadOptions.Builder getVectoredReadOptionBuilder(Configuration config) {
@@ -747,7 +771,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBidiEnabled(GCS_OPERATION_BIDI_API_ENABLE.get(config, config::getBoolean))
         .setFinalizeBeforeClose(
             GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.get(config, config::getBoolean))
-        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean));
+        .setHnOptimizationEnabled(GCS_HNS_OPTIMIZATION_ENABLE.get(config, config::getBoolean))
+        .setComposeDeleteSourceEnabled(
+            GCS_COMPOSE_DELETE_SOURCE_ENABLE.get(config, config::getBoolean));
   }
 
   /**
@@ -811,6 +837,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBidiClientTimeout(GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.get(config, config::getInt))
         .setLatencyLoggingThreshold(
             GCS_INPUT_STREAM_LATENCY_LOGGING_THRESHOLD_MS.get(config, config::getLong))
+        .setBidiCacheExpireSec(GCS_BIDI_CACHE_EXPIRE_SEC.get(config, config::getInt))
+        .setBidiCacheMaxSize(GCS_BIDI_CACHE_MAX_SIZE.get(config, config::getInt))
         .build();
   }
 

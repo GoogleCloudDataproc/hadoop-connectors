@@ -201,6 +201,35 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
+   * Prewarms channels for reading multiple GCS objects. This call is speculative and returns
+   * immediately, spawning background prewarming tasks.
+   *
+   * <p>This is an experimental API and can change without notice.
+   *
+   * @param resourcesAndSizes Map of GCS resources to prewarm with their expected sizes.
+   * @throws IOException on IO error
+   */
+  default void multiOpen(Map<StorageResourceId, Long> resourcesAndSizes) throws IOException {
+    multiOpen(resourcesAndSizes, GoogleCloudStorageReadOptions.DEFAULT);
+  }
+
+  /**
+   * Prewarms channels for reading multiple GCS objects with specific read options. This call is
+   * speculative and returns immediately, spawning background prewarming tasks.
+   *
+   * <p>This is an experimental API and can change without notice.
+   *
+   * @param resourcesAndSizes Map of GCS resources to prewarm with their expected sizes.
+   * @param readOptions Options to use when creating channels.
+   * @throws IOException on IO error
+   */
+  default void multiOpen(
+      Map<StorageResourceId, Long> resourcesAndSizes, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    // Default implementation is a no-op
+  }
+
+  /**
    * Deletes a list of buckets. Does not throw any exception for "bucket not found" errors.
    *
    * @param bucketNames name of the buckets to delete

@@ -294,6 +294,20 @@ public class FeatureHeaderGeneratorTest {
               "Fast Fail Disabled",
               buildOptionsWithFastFail(false),
               createBitSet(fadviseAuto, hnsEnabled)
+            },
+            {
+              "Compose Delete Source Enabled",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setCloudStorageOptions(
+                      GoogleCloudStorageOptions.DEFAULT.toBuilder()
+                          .setComposeDeleteSourceEnabled(true)
+                          .build())
+                  .build(),
+              createBitSet(
+                  fadviseAuto,
+                  hnsEnabled,
+                  fastFailEnabled,
+                  TrackedFeatures.COMPOSE_DELETE_SOURCE_ENABLED)
             }
           });
     }

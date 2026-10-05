@@ -34,6 +34,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -101,6 +102,14 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   private void makeDirectory() throws IOException {
+    if (ghfsHelper.isRealGcs()) {
+      String initBucket = ghfsHelper.ghfs.getUri().getAuthority();
+      if (initBucket != null
+          && ghfsHelper.getStorage().getItemInfo(new StorageResourceId(initBucket)).exists()) {
+        ghfsHelper.clearRealGcsBucket(initBucket);
+        return;
+      }
+    }
     int maxRetries = 5;
     int retry = 0;
     while (true) {

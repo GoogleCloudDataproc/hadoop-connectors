@@ -45,6 +45,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 
@@ -53,12 +55,12 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private static final int EOF = -1;
   private StorageResourceId resourceId;
   private BlobId blobId;
-  private final ApiFuture<BlobReadSession> sessionFuture;
+  private volatile ApiFuture<BlobReadSession> sessionFuture;
   private volatile BlobReadSession blobReadSession;
   private final ExecutorService boundedThreadPool;
   private static final String GZIP_ENCODING = "gzip";
   private volatile long objectSize = -1;
-  private boolean open = true;
+  private volatile boolean open = true;
   private volatile boolean metadataInitialized = false;
 
   private final Storage storage;
@@ -70,6 +72,14 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   private ByteBuffer internalBuffer;
   private long bufferStartPosition = -1;
 
+  private final boolean isSpeculativeMetadata;
+  private final BidiChannelCallback callback;
+  private volatile long lastAccessTimeNs;
+  private volatile boolean failed = false;
+  private final AtomicBoolean closeTriggered = new AtomicBoolean(false);
+  private final AtomicInteger pendingReads = new AtomicInteger(0);
+  private final AtomicBoolean returnTriggered = new AtomicBoolean(false);
+
   public GoogleCloudStorageBidiReadChannel(
       Storage storage,
       StorageResourceId resourceId,
@@ -77,16 +87,36 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       GoogleCloudStorageReadOptions readOptions,
       ExecutorService boundedThreadPool)
       throws IOException {
+    this(storage, resourceId, itemInfo, readOptions, boundedThreadPool, false, null);
+  }
+
+  public GoogleCloudStorageBidiReadChannel(
+      Storage storage,
+      StorageResourceId resourceId,
+      @Nullable GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions,
+      ExecutorService boundedThreadPool,
+      boolean isSpeculativeMetadata,
+      @Nullable BidiChannelCallback callback)
+      throws IOException {
     this.storage = storage;
     this.resourceId = resourceId;
     this.readOptions = readOptions;
     this.boundedThreadPool = boundedThreadPool;
     this.readTimeout = readOptions.getGrpcReadTimeout();
+    this.isSpeculativeMetadata = isSpeculativeMetadata;
+    this.callback = callback;
+    this.lastAccessTimeNs = System.nanoTime();
 
     if (itemInfo != null) {
-      validate(itemInfo);
-      initMetadata(
-          itemInfo.getContentEncoding(), itemInfo.getSize(), itemInfo.getContentGeneration());
+      if (isSpeculativeMetadata) {
+        this.objectSize = itemInfo.getSize();
+        this.gzipEncoded = false;
+      } else {
+        validate(itemInfo);
+        initMetadata(
+            itemInfo.getContentEncoding(), itemInfo.getSize(), itemInfo.getContentGeneration());
+      }
     } else if (readOptions.isFastFailOnNotFoundEnabled()) {
       fetchMetadata();
     }
@@ -107,6 +137,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       try {
         readSession = sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
       } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        failed = true;
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Failed to get BlobReadSession", e);
       }
@@ -117,40 +148,67 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
-    throwIfNotOpen();
-    if (!dst.hasRemaining()) {
-      return 0;
+    lastAccessTimeNs = System.nanoTime();
+    pendingReads.incrementAndGet();
+    try {
+      throwIfNotOpen();
+    } catch (IOException e) {
+      decrementPendingReads(1);
+      throw e;
     }
-    ensureMetadataInitialized();
+    try {
+      if (!dst.hasRemaining()) {
+        return 0;
+      }
+      ensureMetadataInitialized();
 
-    if (position >= objectSize) {
-      return EOF;
+      if (position >= objectSize) {
+        return EOF;
+      }
+
+      // Attempt to service the read from the footer cache logic.
+      // This method will handle both reading from an existing cache and populating it if necessary.
+      // It returns an Optional<Integer>:
+      //  - If present, the read was handled by the cache, and the value is the bytes read.
+      //  - If empty, the read is not in the footer range, and a standard read should be performed.
+      Optional<Integer> bytesReadFromCache = tryReadFromFooter(dst);
+      if (bytesReadFromCache.isPresent()) {
+        int bytesRead = bytesReadFromCache.get();
+        failed = false;
+        return bytesRead;
+      }
+
+      if (isBufferValid()) {
+        int bytesRead = readBytesFromInternalBuffer(dst);
+        failed = false;
+        return bytesRead;
+      }
+
+      if (dst.remaining() >= readOptions.getMinRangeRequestSize()) {
+        int bytesRead = performStandardRead(dst);
+        failed = false;
+        return bytesRead;
+      }
+
+      // For small requests, refill the buffer using the same consistent chunk size.
+      refillInternalBuffer();
+
+      // Tried to refill buffer but buffer is still invalid, it means there was no data left to get.
+      // Therefore, we have reached the end of the file and must return -1.
+      if (!isBufferValid()) {
+        failed = false;
+        return -1;
+      }
+
+      int bytesRead = readBytesFromInternalBuffer(dst);
+      failed = false;
+      return bytesRead;
+    } catch (IOException e) {
+      failed = true;
+      throw e;
+    } finally {
+      decrementPendingReads(1);
     }
-
-    // Attempt to service the read from the footer cache logic.
-    // This method will handle both reading from an existing cache and populating it if necessary.
-    // It returns an Optional<Integer>:
-    //  - If present, the read was handled by the cache, and the value is the bytes read.
-    //  - If empty, the read is not in the footer range, and a standard read should be performed.
-    Optional<Integer> bytesReadFromCache = tryReadFromFooter(dst);
-    if (bytesReadFromCache.isPresent()) {
-      return bytesReadFromCache.get();
-    }
-
-    if (isBufferValid()) return readBytesFromInternalBuffer(dst);
-
-    if (dst.remaining() >= readOptions.getMinRangeRequestSize()) {
-      return performStandardRead(dst);
-    }
-
-    // For small requests, refill the buffer using the same consistent chunk size.
-    refillInternalBuffer();
-
-    // Tried to refill buffer but buffer is still invalid, it means there was no data left to get.
-    // Therefore, we have reached the end of the file and must return -1.
-    if (!isBufferValid()) return -1;
-
-    return readBytesFromInternalBuffer(dst);
   }
 
   public long position() throws IOException {
@@ -208,27 +266,39 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
   @Override
   public void close() throws IOException {
+    if (!closeTriggered.compareAndSet(false, true)) {
+      return;
+    }
+    if (pendingReads.get() != 0) {
+      return;
+    }
+    if (returnTriggered.compareAndSet(false, true)) {
+      if (callback != null && !failed) {
+        callback.returnChannel(resourceId, this);
+      } else {
+        actualClose();
+      }
+    }
+  }
+
+  void actualClose() {
+    closeTriggered.set(true);
     if (open) {
       logger.atFinest().log("Closing channel for '%s'", resourceId);
       try {
         if (blobReadSession != null) {
           blobReadSession.close();
         } else if (sessionFuture != null) {
-          try (BlobReadSession readSession =
-              sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS)) {
-            // The try-with-resources statement ensures the readSession is automatically closed.
-          } catch (InterruptedException
-              | ExecutionException
-              | TimeoutException
-              | java.util.concurrent.CancellationException e) {
-            logger.atFine().withCause(e).log(
-                "Failed to get/close BlobReadSession during close() for '%s'", resourceId);
+          if (sessionFuture.isDone()) {
+            closeCompletedSessionFuture();
+          } else {
+            sessionFuture.cancel(true);
           }
         }
       } catch (Exception e) {
         GoogleCloudStorageEventBus.postOnException();
-        throw new IOException(
-            String.format("Exception occurred while closing channel '%s'", resourceId), e);
+        logger.atWarning().withCause(e).log(
+            "Exception occurred while closing channel '%s'", resourceId);
       } finally {
         blobReadSession = null;
         open = false;
@@ -236,52 +306,106 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     }
   }
 
+  private void closeCompletedSessionFuture() {
+    try {
+      BlobReadSession readSession = sessionFuture.get();
+      if (readSession != null) {
+        readSession.close();
+      }
+    } catch (Exception e) {
+      logger.atFine().withCause(e).log(
+          "Failed to get/close completed BlobReadSession during close() for '%s'", resourceId);
+    }
+  }
+
+  private void decrementPendingReads(int count) {
+    if (pendingReads.addAndGet(-count) != 0 || !closeTriggered.get()) {
+      return;
+    }
+    if (returnTriggered.compareAndSet(false, true)) {
+      if (callback != null && !failed) {
+        callback.returnChannel(resourceId, this);
+      } else {
+        actualClose();
+      }
+    }
+  }
+
+  private void decrementAndCheckClose() {
+    decrementPendingReads(1);
+  }
+
   @Override
   public void readVectored(List<VectoredIORange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
+    lastAccessTimeNs = System.nanoTime();
     logger.atFiner().log("readVectored() called for BlobId=%s", blobId.toString());
-    throwIfNotOpen();
-    ensureMetadataInitialized();
-    long vectoredReadStartTime = System.currentTimeMillis();
-    BlobReadSession session = getBlobReadSession();
-    ranges.forEach(
-        range -> {
-          ApiFuture<DisposableByteString> futureBytes =
-              session.readAs(
-                  ReadProjectionConfigs.asFutureByteString()
-                      .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
-          ApiFutures.addCallback(
-              futureBytes,
-              new ApiFutureCallback<>() {
-                @Override
-                public void onFailure(Throwable t) {
+    pendingReads.addAndGet(ranges.size());
+    try {
+      throwIfNotOpen();
+    } catch (IOException e) {
+      decrementPendingReads(ranges.size());
+      throw e;
+    }
+    int queuedRangesCount = 0;
+    try {
+      ensureMetadataInitialized();
+      long vectoredReadStartTime = System.currentTimeMillis();
+      BlobReadSession session = getBlobReadSession();
+      for (VectoredIORange range : ranges) {
+        ApiFuture<DisposableByteString> futureBytes =
+            session.readAs(
+                ReadProjectionConfigs.asFutureByteString()
+                    .withRangeSpec(RangeSpec.of(range.getOffset(), range.getLength())));
+        ApiFutures.addCallback(
+            futureBytes,
+            new ApiFutureCallback<>() {
+              @Override
+              public void onFailure(Throwable t) {
+                failed = true;
+                range.getData().completeExceptionally(t);
+                logger.atFiner().log(
+                    "Vectored Read failed for range starting from %d with length %d",
+                    range.getOffset(), range.getLength());
+                decrementAndCheckClose();
+              }
+
+              @Override
+              public void onSuccess(DisposableByteString disposableByteString) {
+                try {
+                  long bytesRead =
+                      processBytesAndCompleteRange(disposableByteString, range, allocate);
+                  logger.atFiner().log(
+                      "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
+                      range.getOffset(),
+                      range.getLength(),
+                      bytesRead,
+                      System.currentTimeMillis() - vectoredReadStartTime);
+                } catch (Throwable t) {
+                  failed = true;
                   range.getData().completeExceptionally(t);
                   logger.atFiner().log(
                       "Vectored Read failed for range starting from %d with length %d",
                       range.getOffset(), range.getLength());
+                } finally {
+                  decrementAndCheckClose();
                 }
-
-                @Override
-                public void onSuccess(DisposableByteString disposableByteString) {
-                  try {
-                    long bytesRead =
-                        processBytesAndCompleteRange(disposableByteString, range, allocate);
-                    logger.atFiner().log(
-                        "Vectored Read successful for range starting from %d with length %d.Total Bytes Read are: %d within %d ms",
-                        range.getOffset(),
-                        range.getLength(),
-                        bytesRead,
-                        System.currentTimeMillis() - vectoredReadStartTime);
-                  } catch (Throwable t) {
-                    range.getData().completeExceptionally(t);
-                    logger.atFiner().log(
-                        "Vectored Read failed for range starting from %d with length %d",
-                        range.getOffset(), range.getLength());
-                  }
-                }
-              },
-              boundedThreadPool);
-        });
+              }
+            },
+            boundedThreadPool);
+        queuedRangesCount++;
+      }
+    } catch (Throwable t) {
+      failed = true;
+      int unqueued = ranges.size() - queuedRangesCount;
+      if (unqueued > 0) {
+        decrementPendingReads(unqueued);
+      }
+      if (t instanceof IOException) {
+        throw (IOException) t;
+      }
+      throw new IOException(t);
+    }
   }
 
   private long processBytesAndCompleteRange(
@@ -306,7 +430,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
   }
 
   private void throwIfNotOpen() throws IOException {
-    if (!isOpen()) {
+    if (!isOpen() || closeTriggered.get()) {
       GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();
     }
@@ -545,7 +669,11 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
         byteString.copyTo(dst);
         position += bytesRead;
       }
+    } catch (IOException e) {
+      failed = true;
+      throw e;
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      failed = true;
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException(
           String.format("Read failed on %s at position %d", resourceId, position), e);
@@ -568,7 +696,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
     return futureBytes.get(readTimeout.toNanos(), TimeUnit.NANOSECONDS);
   }
 
-  private void ensureMetadataInitialized() throws IOException {
+  void ensureMetadataInitialized() throws IOException {
     // First check (lock-free fast path)
     if (metadataInitialized) {
       return;
@@ -590,8 +718,13 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
 
           BlobInfo blobInfo = session.getBlobInfo();
           if (blobInfo != null) {
-            initMetadata(
-                blobInfo.getContentEncoding(), blobInfo.getSize(), blobInfo.getGeneration());
+            long realSize = blobInfo.getSize();
+            if (isSpeculativeMetadata && this.objectSize >= 0 && realSize != this.objectSize) {
+              blobInfo = handleSizeMismatch(session, realSize);
+              realSize = blobInfo.getSize();
+            }
+
+            initMetadata(blobInfo.getContentEncoding(), realSize, blobInfo.getGeneration());
             return;
           }
         }
@@ -624,6 +757,37 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       logger.atInfo().log("Fallback to explicit metadata fetch for '%s'", resourceId);
       fetchMetadata();
     }
+  }
+
+  private BlobInfo handleSizeMismatch(BlobReadSession staleSession, long realSize)
+      throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    logger.atWarning().log(
+        "Size mismatch detected for '%s' (speculative: %d, real: %d). Triggering recovery.",
+        resourceId, this.objectSize, realSize);
+
+    if (callback != null) {
+      callback.invalidate(resourceId);
+    }
+
+    try {
+      staleSession.close();
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log(
+          "Failed to close stale session during recovery for '%s'", resourceId);
+    }
+
+    this.blobReadSession = null;
+    this.blobId = BlobId.of(resourceId.getBucketName(), resourceId.getObjectName(), null);
+    this.sessionFuture = storage.blobReadSession(blobId);
+
+    // Block on new session
+    BlobReadSession newSession =
+        this.sessionFuture.get(readOptions.getBidiClientTimeout(), TimeUnit.SECONDS);
+    BlobInfo newBlobInfo = newSession.getBlobInfo();
+    if (newBlobInfo == null) {
+      throw new IOException("Failed to resolve metadata after silent re-open");
+    }
+    return newBlobInfo;
   }
 
   private void fetchMetadata() throws IOException {
@@ -660,5 +824,24 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
       GoogleCloudStorageEventBus.postOnException();
       throw new FileNotFoundException(String.format("Item not found: %s", resourceId));
     }
+  }
+
+  long getLastAccessTimeNs() {
+    return lastAccessTimeNs;
+  }
+
+  long getGeneration() {
+    return resourceId.getGenerationId();
+  }
+
+  void resetState() {
+    this.position = 0;
+    this.bufferStartPosition = -1;
+    this.internalBuffer = null;
+    this.footerContent = null;
+    this.closeTriggered.set(false);
+    this.returnTriggered.set(false);
+    this.pendingReads.set(0);
+    this.lastAccessTimeNs = System.nanoTime();
   }
 }

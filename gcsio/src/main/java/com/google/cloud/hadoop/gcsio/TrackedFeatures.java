@@ -60,7 +60,11 @@ public enum TrackedFeatures {
 
   ANALYTICS_CORE_ENABLED(13),
 
-  FAST_FAIL_ON_NOT_FOUND_ENABLED(14);
+  FAST_FAIL_ON_NOT_FOUND_ENABLED(14),
+
+  MULTI_OPEN_API(15),
+
+  COMPOSE_DELETE_SOURCE_ENABLED(16);
 
   private final int bitPosition;
 

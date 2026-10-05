@@ -165,6 +165,7 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
+    gcsImpl.close();
 
     // Verify number of calls
     assertingHandler.assertLogCount(1);

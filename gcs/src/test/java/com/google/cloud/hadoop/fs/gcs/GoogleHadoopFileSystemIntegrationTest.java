@@ -124,6 +124,7 @@ import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -141,6 +142,8 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   private static final long BUCKET_DELETION_TIMEOUT_MS = 30_000;
   private static final long RETRY_INTERVAL_MS = 1_000;
 
+  private static String sharedInitBucketName;
+
   @Before
   public void before() throws Exception {
 
@@ -151,7 +154,10 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     // postCreateInit. Create one here for it to use.
     ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
-    URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
+    if (sharedInitBucketName == null) {
+      sharedInitBucketName = ghfsHelper.getUniqueBucketName("init");
+    }
+    URI initUri = new URI("gs://" + sharedInitBucketName);
     ghfs.initialize(initUri, loadConfig(storageClientType));
 
     if (GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE.get(
@@ -164,8 +170,15 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
 
   @After
   public void after() throws IOException {
-    ghfsHelper.afterAllTests();
+    if (ghfsHelper != null && !ghfsHelper.isRealGcs()) {
+      ghfsHelper.afterAllTests();
+    }
     super.after();
+  }
+
+  @AfterClass
+  public static void resetSharedInitBucket() {
+    sharedInitBucketName = null;
   }
 
   @Before

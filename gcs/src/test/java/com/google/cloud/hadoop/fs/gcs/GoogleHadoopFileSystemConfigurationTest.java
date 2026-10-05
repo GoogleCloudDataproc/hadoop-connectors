@@ -57,6 +57,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
       new HashMap<>() {
         {
           put("fs.gs.analytics.core.enable", false);
+          put("fs.gs.analytics.core.write.enable", false);
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
@@ -142,6 +143,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.bidi.client.timeout", 30);
           put("fs.gs.bidi.finalize.on.close", false);
           put("fs.gs.storage.client.cache.enable", false);
+          put("fs.gs.bidi.cache.max.size", 100);
+          put("fs.gs.bidi.cache.expire.sec", 600);
+          put("fs.gs.operation.compose.delete-source.enable", false);
         }
       };
 
@@ -562,5 +566,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+  }
+
+  @Test
+  public void composeDeleteSourceProperties() {
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.operation.compose.delete-source.enable", true);
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.isComposeDeleteSourceEnabled()).isTrue();
   }
 }

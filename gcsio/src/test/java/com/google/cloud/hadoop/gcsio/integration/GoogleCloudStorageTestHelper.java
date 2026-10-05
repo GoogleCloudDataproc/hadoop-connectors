@@ -64,7 +64,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /** Helper methods for GCS integration tests. */
@@ -313,6 +316,8 @@ public class GoogleCloudStorageTestHelper {
 
     private final String bucketPrefix;
     private final String uniqueBucketPrefix;
+    private final Set<String> usedSuffixes = ConcurrentHashMap.newKeySet();
+    private final AtomicInteger suffixCounter = new AtomicInteger(0);
 
     /**
      * Create a Helper to handle bucket with specified prefix. <br>
@@ -349,10 +354,12 @@ public class GoogleCloudStorageTestHelper {
      * @return An unique bucket name with specified prefix and suffix.
      */
     public String getUniqueBucketName(String suffix) {
+      String effectiveSuffix =
+          usedSuffixes.add(suffix) ? suffix : suffix + "-" + suffixCounter.incrementAndGet();
       checkArgument(
-          bucketPrefix.length() + suffix.length() <= 48,
+          bucketPrefix.length() + effectiveSuffix.length() <= 48,
           "bucketPrefix and suffix can have cumulative length upto 48 chars to limit bucket name to 63 chars");
-      return uniqueBucketPrefix + DELIMITER + suffix;
+      return uniqueBucketPrefix + DELIMITER + effectiveSuffix;
     }
 
     public String getUniqueBucketPrefix() {

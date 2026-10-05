@@ -26,17 +26,43 @@ import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
+import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.ClosedChannelException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -52,11 +78,15 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleHadoopOutputStreamTest {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   private GoogleHadoopFileSystem ghfs;
+  private GcsItemId lastCreatedAnalyticsItemId;
 
   @Before
   public void setUp() throws IOException {
     ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
+    lastCreatedAnalyticsItemId = null;
   }
 
   @After
@@ -327,15 +357,331 @@ public class GoogleHadoopOutputStreamTest {
   }
 
   private byte[] readFile(Path objectPath) throws IOException {
-    FileStatus status = ghfs.getFileStatus(objectPath);
+    return readFile(ghfs, objectPath);
+  }
+
+  private static byte[] readFile(FileSystem fs, Path objectPath) throws IOException {
+    FileStatus status = fs.getFileStatus(objectPath);
     ByteArrayOutputStream allReadBytes = new ByteArrayOutputStream(toIntExact(status.getLen()));
     byte[] readBuffer = new byte[1024 * 1024];
-    try (FSDataInputStream in = ghfs.open(objectPath)) {
+    try (FSDataInputStream in = fs.open(objectPath)) {
       int readBytes;
       while ((readBytes = in.read(readBuffer)) > 0) {
         allReadBytes.write(readBuffer, 0, readBytes);
       }
     }
     return allReadBytes.toByteArray();
+  }
+
+  @Test
+  public void write_withAnalyticsWriteEnabled_delegatesToAnalyticsOutputStream() throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_write.txt"));
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            analyticsGhfs,
+            analyticsGhfs.getGcsPath(objectPath),
+            CreateFileOptions.DEFAULT,
+            new FileSystem.Statistics(analyticsGhfs.getScheme()));
+    byte[] data = {0x0f, 0x0e, 0x0e, 0x0d};
+
+    fout.write(data, 0, data.length);
+    fout.close();
+
+    // Verify that write was called on the GoogleCloudStorageOutputStream with the same arguments
+    verify(mockStream)
+        .write(
+            argThat(buf -> Arrays.equals(Arrays.copyOfRange(buf, 0, data.length), data)),
+            eq(0),
+            eq(data.length));
+  }
+
+  @Test
+  public void close_withAnalyticsWriteEnabled_closesAnalyticsOutputStream() throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_close.txt"));
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            analyticsGhfs,
+            analyticsGhfs.getGcsPath(objectPath),
+            CreateFileOptions.DEFAULT,
+            new FileSystem.Statistics(analyticsGhfs.getScheme()));
+
+    fout.close();
+
+    verify(mockStream, atLeastOnce()).close();
+  }
+
+  @Test
+  public void write_withAnalyticsWriteEnabledButFsNull_throwsException() throws Exception {
+    GoogleHadoopFileSystem analyticsGhfs =
+        new GoogleHadoopFileSystem(ghfs.getGcsFs()) {
+          @Override
+          boolean isAnalyticsCoreWriteEnabled() {
+            return true;
+          }
+
+          @Override
+          GcsFileSystem getAnalyticsCoreGcsFs() {
+            return null;
+          }
+        };
+    analyticsGhfs.initialize(ghfs.getUri(), ghfs.getConf());
+
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_null_fs.txt"));
+
+    IOException exception =
+        assertThrows(
+            IOException.class,
+            () ->
+                new GoogleHadoopOutputStream(
+                    analyticsGhfs,
+                    analyticsGhfs.getGcsPath(objectPath),
+                    CreateFileOptions.DEFAULT,
+                    new FileSystem.Statistics(analyticsGhfs.getScheme())));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Analytics write path is enabled, but the analytics filesystem is not initialized");
+  }
+
+  @Test
+  public void create_withAnalyticsWriteEnabled_overwriteFalse_fileAlreadyExists_throwsException()
+      throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+    GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
+    // Stub getFileInfo to return a valid GcsFileInfo (simulating file exists)
+    GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
+    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_exists_error.txt"));
+
+    assertThrows(
+        FileAlreadyExistsException.class,
+        () ->
+            new GoogleHadoopOutputStream(
+                analyticsGhfs,
+                analyticsGhfs.getGcsPath(objectPath),
+                CreateFileOptions.DEFAULT, // overwrite is false by default
+                new FileSystem.Statistics(analyticsGhfs.getScheme())));
+  }
+
+  @Test
+  public void create_withAnalyticsWriteEnabled_overwriteTrue_fileAlreadyExists_resolvesGeneration()
+      throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+    GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
+    // Stub getFileInfo to return info with generation 123L
+    GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
+    when(mockFileInfo.getItemInfo().getContentGeneration()).thenReturn(Optional.of(123L));
+    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_overwrite_gen.txt"));
+    CreateFileOptions overwriteOptions =
+        CreateFileOptions.builder().setWriteMode(CreateFileOptions.WriteMode.OVERWRITE).build();
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            analyticsGhfs,
+            analyticsGhfs.getGcsPath(objectPath),
+            overwriteOptions,
+            new FileSystem.Statistics(analyticsGhfs.getScheme()));
+
+    fout.close();
+
+    assertThat(lastCreatedAnalyticsItemId).isNotNull();
+    assertThat(lastCreatedAnalyticsItemId.getContentGeneration().isPresent()).isTrue();
+    assertThat(lastCreatedAnalyticsItemId.getContentGeneration().get()).isEqualTo(123L);
+  }
+
+  @Test
+  public void create_withAnalyticsWriteEnabled_otherIOException_propagatesException()
+      throws Exception {
+    GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
+    GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+    GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
+    // Stub getFileInfo to throw some other IOException (e.g. Permission Denied)
+    when(mockFs.getFileInfo(any(GcsItemId.class)))
+        .thenThrow(new IOException("Permission denied (mocked)"));
+    Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_other_io_error.txt"));
+
+    IOException exception =
+        assertThrows(
+            IOException.class,
+            () ->
+                new GoogleHadoopOutputStream(
+                    analyticsGhfs,
+                    analyticsGhfs.getGcsPath(objectPath),
+                    CreateFileOptions.DEFAULT,
+                    new FileSystem.Statistics(analyticsGhfs.getScheme())));
+    assertThat(exception).hasMessageThat().contains("Permission denied (mocked)");
+  }
+
+  private GoogleHadoopFileSystem createAnalyticsEnabledGhfs(
+      GoogleCloudStorageOutputStream mockStream) throws IOException {
+    GcsFileSystem mockFs = mock(GcsFileSystem.class, RETURNS_DEEP_STUBS);
+    when(mockFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions())
+        .thenReturn(GcsWriteOptions.builder().build());
+    try {
+      when(mockFs.getFileInfo(any(GcsItemId.class)))
+          .thenThrow(new IOException("Object not found: (mocked)"));
+    } catch (IOException e) {
+      logger.atWarning().withCause(e).log("Failed to stub getFileInfo");
+    }
+
+    GoogleHadoopFileSystem analyticsGhfs =
+        new GoogleHadoopFileSystem(ghfs.getGcsFs()) {
+          @Override
+          boolean isAnalyticsCoreWriteEnabled() {
+            return true;
+          }
+
+          @Override
+          GcsFileSystem getAnalyticsCoreGcsFs() {
+            return mockFs;
+          }
+
+          @Override
+          GoogleCloudStorageOutputStream createAnalyticsCoreOutputStream(
+              GcsItemId gcsItemId, GcsWriteOptions writeOptions) {
+            lastCreatedAnalyticsItemId = gcsItemId;
+            return mockStream;
+          }
+        };
+    analyticsGhfs.initialize(ghfs.getUri(), ghfs.getConf());
+    return analyticsGhfs;
+  }
+
+  @Test
+  public void composeDeleteSource_disabled_byDefault() throws Exception {
+    List<CreateObjectOptions> capturedOptions = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+
+    try (GoogleHadoopFileSystem trackingGhfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    capturedOptions.add(createOptions);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    if (Thread.currentThread()
+                        .getName()
+                        .startsWith("ghfs-output-stream-sync-cleanup-")) {
+                      backgroundDeletedObjects.addAll(fullObjectNames);
+                    }
+                    super.deleteObjects(fullObjectNames);
+                  }
+                })) {
+      Path objectPath = new Path(trackingGhfs.getUri().resolve("/compose_default.txt"));
+      try (FSDataOutputStream fout = trackingGhfs.create(objectPath)) {
+        byte[] data1 = {0x01, 0x02};
+        byte[] data2 = {0x03, 0x04};
+        fout.write(data1, 0, data1.length);
+        fout.hsync();
+
+        fout.write(data2, 0, data2.length);
+        fout.hsync();
+      }
+
+      // Verify both compose requests (from hsync and close) did not request deleteSourceObjects
+      assertThat(capturedOptions).hasSize(2);
+      assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isFalse();
+      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isFalse();
+
+      // Verify that temporary tail files from both hsync and close were deleted via the
+      // background cleanup thread pool
+      assertThat(backgroundDeletedObjects).hasSize(2);
+      assertThat(backgroundDeletedObjects.get(0).getObjectName())
+          .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+      assertThat(backgroundDeletedObjects.get(1).getObjectName())
+          .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+
+      // Verify file content is fully intact
+      assertThat(readFile(trackingGhfs, objectPath)).isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04});
+    }
+  }
+
+  @Test
+  public void composeDeleteSource_enabled_writesAndSyncsSuccessfully() throws Exception {
+    List<CreateObjectOptions> capturedOptions = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+
+    GoogleCloudStorageOptions gcsOptions =
+        InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions().toBuilder()
+            .setComposeDeleteSourceEnabled(true)
+            .build();
+    GoogleCloudStorageFileSystem memoryGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    capturedOptions.add(createOptions);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    if (Thread.currentThread()
+                        .getName()
+                        .startsWith("ghfs-output-stream-sync-cleanup-")) {
+                      backgroundDeletedObjects.addAll(fullObjectNames);
+                    }
+                    super.deleteObjects(fullObjectNames);
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(gcsOptions)
+                .build());
+    try (GoogleHadoopFileSystem ghfsDeleteSource = new GoogleHadoopFileSystem(memoryGcsFs)) {
+      URI initUri = new URI(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET);
+      Configuration config = new Configuration();
+      config.setBoolean("fs.gs.operation.compose.delete-source.enable", true);
+      ghfsDeleteSource.initialize(initUri, config);
+      ghfsDeleteSource.mkdirs(new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET));
+
+      Path objectPath = new Path(ghfsDeleteSource.getUri().resolve("/compose_delete_source.txt"));
+      try (FSDataOutputStream fout = ghfsDeleteSource.create(objectPath)) {
+        byte[] data1 = {0x01, 0x02};
+        byte[] data2 = {0x03, 0x04};
+        byte[] data3 = {0x05, 0x06};
+
+        fout.write(data1, 0, data1.length);
+        fout.hsync();
+
+        fout.write(data2, 0, data2.length);
+        fout.hsync();
+
+        fout.write(data3, 0, data3.length);
+      }
+
+      // Verify both compose requests (from hsync and close) requested deleteSourceObjects
+      assertThat(capturedOptions).hasSize(2);
+      assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isTrue();
+      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isTrue();
+
+      // Verify that no cleanup tasks were submitted to the background deletion thread pool
+      assertThat(backgroundDeletedObjects).isEmpty();
+
+      // Verify file content is fully intact
+      assertThat(readFile(ghfsDeleteSource, objectPath))
+          .isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+    }
   }
 }

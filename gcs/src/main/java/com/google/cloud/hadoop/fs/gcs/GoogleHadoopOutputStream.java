@@ -21,6 +21,11 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
+import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
+import com.google.cloud.gcs.analyticscore.client.GcsItemId;
+import com.google.cloud.gcs.analyticscore.client.GcsWriteOptions;
+import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageOutputStream;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -123,6 +128,8 @@ class GoogleHadoopOutputStream extends OutputStream
   // List of temporary file-deletion futures accrued during the lifetime of this output stream.
   private final List<Future<Void>> tmpDeletionFutures = new ArrayList<>();
 
+  private final boolean composeDeleteSourceEnabled;
+
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
@@ -166,13 +173,19 @@ class GoogleHadoopOutputStream extends OutputStream
         minSyncInterval.isNegative() || minSyncInterval.isZero()
             ? null
             : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
+    this.composeDeleteSourceEnabled =
+        ghfs.getGcsFs().getOptions().getCloudStorageOptions().isComposeDeleteSourceEnabled();
     this.composeObjectOptions =
         GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
-            createFileOptions.toBuilder()
-                // Set write mode to OVERWRITE because we use compose operation to append new data
-                // to an existing object
-                .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
-                .build());
+                createFileOptions.toBuilder()
+                    // Set write mode to OVERWRITE because we use compose operation to append new
+                    // data
+                    // to an existing object
+                    .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+                    .build())
+            .toBuilder()
+            .setDeleteSourceObjects(this.composeDeleteSourceEnabled)
+            .build();
 
     if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
       // When appending first component has to go to new temporary file.
@@ -188,16 +201,78 @@ class GoogleHadoopOutputStream extends OutputStream
 
     this.tmpOut =
         createOutputStream(
-            ghfs.getGcsFs(),
-            tmpGcsPath,
-            tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
+            ghfs, tmpGcsPath, tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
     this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
     this.traceFactory = ghfs.getTraceFactory();
   }
 
   private static OutputStream createOutputStream(
-      GoogleCloudStorageFileSystem gcsfs, URI gcsPath, CreateFileOptions options)
-      throws IOException {
+      GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+    OutputStream outputStream =
+        ghfs.isAnalyticsCoreWriteEnabled()
+            ? createAnalyticsCoreOutputStream(ghfs, gcsPath, options)
+            : createLegacyOutputStream(ghfs, gcsPath, options);
+    return maybeWrapInBufferedOutputStream(ghfs, outputStream);
+  }
+
+  private static OutputStream createAnalyticsCoreOutputStream(
+      GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+    GcsFileSystem analyticsGcsFs = ghfs.getAnalyticsCoreGcsFs();
+    if (analyticsGcsFs == null) {
+      throw new IOException(
+          String.format(
+              "Analytics write path is enabled, but the analytics filesystem is not initialized"
+                  + " (getAnalyticsCoreGcsFs() returned null). Cannot write to %s",
+              gcsPath));
+    }
+    GcsWriteOptions baseWriteOptions =
+        analyticsGcsFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions();
+    boolean overwrite = options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE;
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
+    GcsItemId.Builder itemIdBuilder =
+        GcsItemId.builder()
+            .setBucketName(resourceId.getBucketName())
+            .setObjectName(resourceId.getObjectName());
+    long generation = StorageResourceId.UNKNOWN_GENERATION_ID;
+    // TODO(user): Check if FileAlreadyExistsException can be thrown during stream creation in
+    // Analytics Core rather than doing an explicit getFileInfo check here.
+    try {
+      GcsFileInfo fileInfo = analyticsGcsFs.getFileInfo(itemIdBuilder.build());
+      // If we reach here, the file exists.
+      if (!overwrite) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
+      }
+      generation = fileInfo.getItemInfo().getContentGeneration().orElse(0L);
+    } catch (IOException e) {
+      // TODO(user): Remove this exception message check once analytics-core throws a specific
+      // FileNotFoundException / NoSuchFileException for non-existent objects.
+      if (e.getMessage() != null && e.getMessage().startsWith("Object not found:")) {
+        // If file does not exist, set the generation as 0.
+        generation = 0L;
+      } else {
+        throw e;
+      }
+    }
+    GcsItemId itemId;
+    if (generation == StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemId = itemIdBuilder.build();
+    } else {
+      itemId = itemIdBuilder.setContentGeneration(generation).build();
+    }
+
+    GcsWriteOptions writeOptions =
+        baseWriteOptions.toBuilder().setOverwriteExisting(overwrite).build();
+
+    GoogleCloudStorageOutputStream rawStream =
+        ghfs.createAnalyticsCoreOutputStream(itemId, writeOptions);
+    return new GcsAnalyticsCoreOutputStreamWrapper(rawStream);
+  }
+
+  private static OutputStream createLegacyOutputStream(
+      GoogleHadoopFileSystem ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+    GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
     WritableByteChannel channel;
     try {
       channel = gcsfs.create(gcsPath, options);
@@ -207,9 +282,17 @@ class GoogleHadoopOutputStream extends OutputStream
           new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
               .initCause(e);
     }
-    OutputStream outputStream = Channels.newOutputStream(channel);
+    return Channels.newOutputStream(channel);
+  }
+
+  private static OutputStream maybeWrapInBufferedOutputStream(
+      GoogleHadoopFileSystem ghfs, OutputStream outputStream) {
     int bufferSize =
-        gcsfs.getOptions().getCloudStorageOptions().getWriteChannelOptions().getBufferSize();
+        ghfs.getGcsFs()
+            .getOptions()
+            .getCloudStorageOptions()
+            .getWriteChannelOptions()
+            .getBufferSize();
     return bufferSize > 0 ? new BufferedOutputStream(outputStream, bufferSize) : outputStream;
   }
 
@@ -339,7 +422,7 @@ class GoogleHadoopOutputStream extends OutputStream
 
     logger.atFiner().log(
         "hsync(): Opening next temporary tail file %s at %d index", tmpGcsPath, tmpIndex);
-    tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
+    tmpOut = createOutputStream(ghfs, tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
 
     long finishMs = System.currentTimeMillis();
     logger.atFiner().log("Took %dms to sync() for %s", finishMs - startMs, dstGcsPath);
@@ -349,6 +432,8 @@ class GoogleHadoopOutputStream extends OutputStream
     // TODO(user): return early when 0 bytes have been written in the temp files
     tmpOut.close();
 
+    // TODO(user): Support generation ID retrieval for GcsAnalyticsCoreOutputStreamWrapper once
+    // gcs-analytics-core exposes it. Currently falls back to UNKNOWN_GENERATION_ID.
     long tmpGenerationId =
         tmpOut instanceof GoogleCloudStorageItemInfo.Provider
             ? ((GoogleCloudStorageItemInfo.Provider) tmpOut).getItemInfo().getContentGeneration()
@@ -380,12 +465,14 @@ class GoogleHadoopOutputStream extends OutputStream
       GoogleCloudStorageItemInfo composedObject =
           gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
       dstGenerationId = composedObject.getContentGeneration();
-      tmpDeletionFutures.add(
-          TMP_FILE_CLEANUP_THREADPOOL.submit(
-              () -> {
-                gcs.deleteObjects(ImmutableList.of(tmpId));
-                return null;
-              }));
+      if (!composeDeleteSourceEnabled) {
+        tmpDeletionFutures.add(
+            TMP_FILE_CLEANUP_THREADPOOL.submit(
+                () -> {
+                  gcs.deleteObjects(ImmutableList.of(tmpId));
+                  return null;
+                }));
+      }
     }
   }
 
