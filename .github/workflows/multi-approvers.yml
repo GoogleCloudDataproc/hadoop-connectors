@@ -11,10 +11,6 @@ on:
       - 'ready_for_review'
       - 'review_requested'
       - 'review_request_removed'
-  pull_request_review:
-    types:
-      - 'submitted'
-      - 'dismissed'
 
 # Ensure only one run per PR is active to reduce API consumption
 concurrency:
