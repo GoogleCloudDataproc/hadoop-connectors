@@ -350,6 +350,11 @@ public class VectoredIOImpl implements Closeable {
         // complete exception all the underlying ranges which have not already
         // finished.
         completeExceptionally(combinedFileRange, e);
+      } finally {
+        // try-with-resources closes the read channel before this block runs. Metrics that are
+        // emitted only on channel close, such as the data transfer duration, are therefore
+        // recorded on this thread after the captures above, so capture once more to collect them.
+        captureAndResetThreadLocalStats();
       }
     }
 
@@ -402,6 +407,11 @@ public class VectoredIOImpl implements Closeable {
             "Exception while reading range:%s for path: %s", range, channelProvider.gcsPath);
         captureAndResetThreadLocalStats();
         range.getData().completeExceptionally(e);
+      } finally {
+        // try-with-resources closes the read channel before this block runs. Metrics that are
+        // emitted only on channel close, such as the data transfer duration, are therefore
+        // recorded on this thread after the captures above, so capture once more to collect them.
+        captureAndResetThreadLocalStats();
       }
     }
 

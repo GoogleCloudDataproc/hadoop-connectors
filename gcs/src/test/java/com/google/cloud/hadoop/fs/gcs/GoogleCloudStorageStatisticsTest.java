@@ -30,17 +30,20 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SERVICE_UNAVAILABLE_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_SIDE_ERROR_COUNT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_SERVER_TIMEOUT_COUNT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_API_TIME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.GCS_METADATA_REQUEST;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.WRITE_CHECKSUM_FAILURE_COUNT;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.cloud.hadoop.util.GcsJsonApiEvent;
+import com.google.cloud.hadoop.util.GcsReadMetricEvent;
 import com.google.cloud.hadoop.util.GcsRequestExecutionEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.IGcsJsonApiEvent;
 import com.google.common.flogger.GoogleLogger;
 import io.grpc.Status;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Iterator;
 import org.apache.hadoop.fs.StorageStatistics.LongStatistic;
 import org.junit.After;
@@ -172,6 +175,18 @@ public class GoogleCloudStorageStatisticsTest {
     GoogleCloudStorageEventBus.postOnException();
     GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
     verifyCounterStats.incrementCounter(EXCEPTION_COUNT, 1);
+    verifyStatistics(verifyCounterStats);
+  }
+
+  @Test
+  public void gcs_dataTransferTime() {
+    GoogleCloudStorageEventBus.postReadMetricEvent(
+        GcsReadMetricEvent.ofDataTransfer(
+            200, URI.create("gs://bucket/object"), /* latencyThresholdBreached= */ false));
+    GhfsGlobalStorageStatistics verifyCounterStats = new GhfsGlobalStorageStatistics();
+    verifyCounterStats.updateStats(
+        GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION, 200, URI.create("gs://bucket/object"));
+    verifyCounterStats.incrementCounter(GCS_API_TIME, 200);
     verifyStatistics(verifyCounterStats);
   }
 
