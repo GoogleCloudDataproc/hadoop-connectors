@@ -1116,6 +1116,133 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(buffer3.array()).isEqualTo(Arrays.copyOfRange(testData, 12, 17));
   }
 
+  @Test
+  public void fadviseAuto_parquetReadPattern_recoversToSequentialAfterFooterRead()
+      throws IOException {
+    byte[] testData = new byte[100];
+    for (int i = 0; i < testData.length; i++) {
+      testData[i] = (byte) i;
+    }
+
+    int footerSize = 10;
+    int footerStart = testData.length - footerSize;
+    int rowGroupSize = 5;
+    int trackCount = 3;
+
+    MockHttpTransport transport =
+        mockTransport(
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, footerStart, testData.length),
+                footerStart,
+                testData.length),
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, 0, rowGroupSize), 0, testData.length),
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, rowGroupSize, rowGroupSize * 2),
+                rowGroupSize,
+                testData.length),
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, rowGroupSize * 2, rowGroupSize * 3),
+                rowGroupSize * 2,
+                testData.length),
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, rowGroupSize * 3, testData.length),
+                rowGroupSize * 3,
+                testData.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(rowGroupSize)
+            .setInplaceSeekLimit(2)
+            .setFadviseRequestTrackCount(trackCount)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    readChannel.position(footerStart);
+    byte[] footerBytes = new byte[footerSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(footerBytes))).isEqualTo(footerSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    readChannel.position(0);
+    byte[] buf = new byte[rowGroupSize];
+    readChannel.read(ByteBuffer.wrap(buf));
+    assertThat(readChannel.randomAccessStatus()).isTrue();
+
+    for (int i = 1; i < trackCount; i++) {
+      readChannel.position(rowGroupSize * i);
+      readChannel.read(ByteBuffer.wrap(buf));
+      assertThat(readChannel.randomAccessStatus()).isTrue();
+    }
+
+    readChannel.position(rowGroupSize * trackCount);
+    readChannel.read(ByteBuffer.wrap(buf));
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    assertThat(rangeHeaders)
+        .containsExactly("bytes=90-", "bytes=0-4", "bytes=5-9", "bytes=10-14", "bytes=15-")
+        .inOrder();
+  }
+
+  @Test
+  public void fadviseSequential_parquetReadPattern_neverSwitchesToRandom() throws IOException {
+    byte[] testData = new byte[100];
+    for (int i = 0; i < testData.length; i++) {
+      testData[i] = (byte) i;
+    }
+
+    int footerSize = 10;
+    int footerStart = testData.length - footerSize;
+    int rowGroupSize = 5;
+
+    MockHttpTransport transport =
+        mockTransport(
+            dataRangeResponse(
+                Arrays.copyOfRange(testData, footerStart, testData.length),
+                footerStart,
+                testData.length),
+            dataRangeResponse(testData, 0, testData.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder()
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .setMinRangeRequestSize(rowGroupSize)
+            .setInplaceSeekLimit(2)
+            .build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    readChannel.position(footerStart);
+    byte[] footerBytes = new byte[footerSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(footerBytes))).isEqualTo(footerSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    readChannel.position(0);
+    byte[] rowGroup1 = new byte[rowGroupSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(rowGroup1))).isEqualTo(rowGroupSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    readChannel.position(rowGroupSize);
+    byte[] rowGroup2 = new byte[rowGroupSize];
+    assertThat(readChannel.read(ByteBuffer.wrap(rowGroup2))).isEqualTo(rowGroupSize);
+    assertThat(readChannel.randomAccessStatus()).isFalse();
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+
+    assertThat(rangeHeaders).containsExactly("bytes=90-", "bytes=0-").inOrder();
+  }
+
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
     return GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false);
   }
