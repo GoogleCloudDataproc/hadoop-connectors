@@ -1,6 +1,10 @@
 # Release Notes
 
 ## Next
+1. Do not compose an empty tail component on `hsync()`/`close()`. This removes two requests per
+   file for the `write, hsync, close` sequence and the spurious `412 Precondition Failed` that a
+   retried compose could produce.
+
 1. Add listStatusStartingFrom API.
 
 1. Add AUTO_RANDOM as new fadvise mode.

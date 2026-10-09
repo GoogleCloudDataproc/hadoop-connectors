@@ -51,6 +51,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
@@ -594,10 +595,10 @@ public class GoogleHadoopOutputStreamTest {
         fout.hsync();
       }
 
-      // Verify both compose requests (from hsync and close) did not request deleteSourceObjects
-      assertThat(capturedOptions).hasSize(2);
+      // Verify the compose request (from the second hsync) did not request deleteSourceObjects.
+      // close() does not compose, because its tail is empty.
+      assertThat(capturedOptions).hasSize(1);
       assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isFalse();
-      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isFalse();
 
       // Verify that temporary tail files from both hsync and close were deleted via the
       // background cleanup thread pool
@@ -682,6 +683,252 @@ public class GoogleHadoopOutputStreamTest {
       // Verify file content is fully intact
       assertThat(readFile(ghfsDeleteSource, objectPath))
           .isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+    }
+  }
+
+  @Test
+  public void close_afterHsyncWithoutFurtherWrites_doesNotCompose() throws Exception {
+    List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    composedDestinations.add(destination);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    backgroundDeletedObjects.addAll(fullObjectNames);
+                    super.deleteObjects(fullObjectNames);
+                  }
+                });
+
+    // write, hsync, close: the tail opened by hsync() stays empty.
+    Path objectPath = new Path(ghfs.getUri().resolve("/empty_tail_close.txt"));
+    byte[] data = {0x01, 0x02, 0x03};
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data, 0, data.length);
+      fout.hsync();
+    }
+
+    assertThat(composedDestinations).isEmpty();
+    assertThat(backgroundDeletedObjects).hasSize(1);
+    assertThat(backgroundDeletedObjects.get(0).getObjectName())
+        .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+    assertThat(ghfs.getGcsFs().getGcs().getItemInfo(backgroundDeletedObjects.get(0)).exists())
+        .isFalse();
+    assertThat(ghfs.getFileStatus(objectPath).getLen()).isEqualTo(data.length);
+    assertThat(readFile(objectPath)).isEqualTo(data);
+  }
+
+  @Test
+  public void hsync_withoutWritesSinceLastCommit_doesNotCompose() throws Exception {
+    List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    composedDestinations.add(destination);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    backgroundDeletedObjects.addAll(fullObjectNames);
+                    super.deleteObjects(fullObjectNames);
+                  }
+                });
+
+    Path objectPath = new Path(ghfs.getUri().resolve("/empty_tail_hsync.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04, 0x05};
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data1, 0, data1.length);
+      fout.hsync(); // Direct commit of the first component; no compose.
+      fout.hsync(); // Empty tail: no compose.
+      fout.write(data2, 0, data2.length);
+      fout.hsync(); // Non-empty tail: compose.
+    } // Empty tail: no compose.
+
+    assertThat(composedDestinations).hasSize(1);
+    // Three tails were opened and all three were deleted: two empty ones and the composed one.
+    assertThat(backgroundDeletedObjects).hasSize(3);
+    assertThat(readFile(objectPath)).isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05});
+  }
+
+  @Test
+  public void append_withoutWrites_doesNotCompose() throws Exception {
+    List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    composedDestinations.add(destination);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+                });
+
+    Path objectPath = new Path(ghfs.getUri().resolve("/empty_tail_append.txt"));
+    byte[] data = {0x01, 0x02};
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data, 0, data.length);
+    }
+    // In append mode the first component is a tail. With no writes it is empty.
+    try (FSDataOutputStream fout = ghfs.append(objectPath)) {
+      fout.hsync();
+    }
+
+    assertThat(composedDestinations).isEmpty();
+    assertThat(readFile(objectPath)).isEqualTo(data);
+  }
+
+  @Test
+  public void append_emptyHsyncThenWrite_composesWithGenerationFromExistenceCheck()
+      throws Exception {
+    List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    composedDestinations.add(destination);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+                });
+
+    Path objectPath = new Path(ghfs.getUri().resolve("/empty_tail_append_then_write.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04};
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data1, 0, data1.length);
+    }
+    try (FSDataOutputStream fout = ghfs.append(objectPath)) {
+      fout.hsync(); // Empty tail: no compose, but the existence check reads the generation.
+      fout.write(data2, 0, data2.length);
+    } // Non-empty tail: compose.
+
+    // The compose reuses the generation from the existence check instead of looking it up again.
+    assertThat(composedDestinations).hasSize(1);
+    assertThat(composedDestinations.get(0).hasGenerationId()).isTrue();
+    assertThat(readFile(objectPath)).isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04});
+  }
+
+  @Test
+  public void append_toMissingFileWithoutWrites_throwsFileNotFound() throws Exception {
+    List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    composedDestinations.add(destination);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+                });
+
+    // The Hadoop contract: append() to a missing file fails, at append() or at close(). Before, the
+    // compose of the empty tail onto the missing destination failed. Now the stream checks itself.
+    Path objectPath = new Path(ghfs.getUri().resolve("/empty_tail_append_missing.txt"));
+    FSDataOutputStream fout = ghfs.append(objectPath);
+
+    assertThrows(FileNotFoundException.class, fout::close);
+    assertThat(composedDestinations).isEmpty();
+    assertThat(ghfs.exists(objectPath)).isFalse();
+  }
+
+  @Test
+  public void composeDeleteSource_enabled_emptyTailIsDeletedWithoutCompose() throws Exception {
+    List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+
+    GoogleCloudStorageOptions gcsOptions =
+        InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions().toBuilder()
+            .setComposeDeleteSourceEnabled(true)
+            .build();
+    GoogleCloudStorageFileSystem memoryGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    composedDestinations.add(destination);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    if (Thread.currentThread()
+                        .getName()
+                        .startsWith("ghfs-output-stream-sync-cleanup-")) {
+                      backgroundDeletedObjects.addAll(fullObjectNames);
+                    }
+                    super.deleteObjects(fullObjectNames);
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(gcsOptions)
+                .build());
+    try (GoogleHadoopFileSystem ghfsDeleteSource = new GoogleHadoopFileSystem(memoryGcsFs)) {
+      URI initUri = new URI(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET);
+      Configuration config = new Configuration();
+      config.setBoolean("fs.gs.operation.compose.delete-source.enable", true);
+      ghfsDeleteSource.initialize(initUri, config);
+      ghfsDeleteSource.mkdirs(new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET));
+
+      Path objectPath =
+          new Path(ghfsDeleteSource.getUri().resolve("/empty_tail_delete_source.txt"));
+      byte[] data = {0x01, 0x02};
+      try (FSDataOutputStream fout = ghfsDeleteSource.create(objectPath)) {
+        fout.write(data, 0, data.length);
+        fout.hsync();
+      }
+
+      // No compose ran, so the compose could not delete the tail. The stream must delete it.
+      assertThat(composedDestinations).isEmpty();
+      assertThat(backgroundDeletedObjects).hasSize(1);
+      assertThat(backgroundDeletedObjects.get(0).getObjectName())
+          .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+      assertThat(memoryGcsFs.getGcs().getItemInfo(backgroundDeletedObjects.get(0)).exists())
+          .isFalse();
+      assertThat(readFile(ghfsDeleteSource, objectPath)).isEqualTo(data);
     }
   }
 }
