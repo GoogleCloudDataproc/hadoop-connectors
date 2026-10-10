@@ -28,13 +28,22 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.channels.ClosedChannelException;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -327,15 +336,151 @@ public class GoogleHadoopOutputStreamTest {
   }
 
   private byte[] readFile(Path objectPath) throws IOException {
-    FileStatus status = ghfs.getFileStatus(objectPath);
+    return readFile(ghfs, objectPath);
+  }
+
+  private static byte[] readFile(FileSystem fs, Path objectPath) throws IOException {
+    FileStatus status = fs.getFileStatus(objectPath);
     ByteArrayOutputStream allReadBytes = new ByteArrayOutputStream(toIntExact(status.getLen()));
     byte[] readBuffer = new byte[1024 * 1024];
-    try (FSDataInputStream in = ghfs.open(objectPath)) {
+    try (FSDataInputStream in = fs.open(objectPath)) {
       int readBytes;
       while ((readBytes = in.read(readBuffer)) > 0) {
         allReadBytes.write(readBuffer, 0, readBytes);
       }
     }
     return allReadBytes.toByteArray();
+  }
+
+  @Test
+  public void composeDeleteSource_disabled_byDefault() throws Exception {
+    List<CreateObjectOptions> capturedOptions = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+
+    try (GoogleHadoopFileSystem trackingGhfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    capturedOptions.add(createOptions);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    if (Thread.currentThread()
+                        .getName()
+                        .startsWith("ghfs-output-stream-sync-cleanup-")) {
+                      backgroundDeletedObjects.addAll(fullObjectNames);
+                    }
+                    super.deleteObjects(fullObjectNames);
+                  }
+                })) {
+      Path objectPath = new Path(trackingGhfs.getUri().resolve("/compose_default.txt"));
+      try (FSDataOutputStream fout = trackingGhfs.create(objectPath)) {
+        byte[] data1 = {0x01, 0x02};
+        byte[] data2 = {0x03, 0x04};
+        fout.write(data1, 0, data1.length);
+        fout.hsync();
+
+        fout.write(data2, 0, data2.length);
+        fout.hsync();
+      }
+
+      // Verify both compose requests (from hsync and close) did not request deleteSourceObjects
+      assertThat(capturedOptions).hasSize(2);
+      assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isFalse();
+      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isFalse();
+
+      // Verify that temporary tail files from both hsync and close were deleted via the
+      // background cleanup thread pool
+      assertThat(backgroundDeletedObjects).hasSize(2);
+      assertThat(backgroundDeletedObjects.get(0).getObjectName())
+          .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+      assertThat(backgroundDeletedObjects.get(1).getObjectName())
+          .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+
+      // Verify file content is fully intact
+      assertThat(readFile(trackingGhfs, objectPath)).isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04});
+    }
+  }
+
+  @Test
+  public void composeDeleteSource_enabled_writesAndSyncsSuccessfully() throws Exception {
+    List<CreateObjectOptions> capturedOptions = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> backgroundDeletedObjects = new CopyOnWriteArrayList<>();
+
+    GoogleCloudStorageOptions gcsOptions =
+        InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions().toBuilder()
+            .setComposeDeleteSourceEnabled(true)
+            .build();
+    GoogleCloudStorageFileSystem memoryGcsFs =
+        new GoogleCloudStorageFileSystemImpl(
+            options ->
+                new InMemoryGoogleCloudStorage(options) {
+                  @Override
+                  public synchronized GoogleCloudStorageItemInfo composeObjects(
+                      List<StorageResourceId> sources,
+                      StorageResourceId destination,
+                      CreateObjectOptions createOptions)
+                      throws IOException {
+                    capturedOptions.add(createOptions);
+                    return super.composeObjects(sources, destination, createOptions);
+                  }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    if (Thread.currentThread()
+                        .getName()
+                        .startsWith("ghfs-output-stream-sync-cleanup-")) {
+                      backgroundDeletedObjects.addAll(fullObjectNames);
+                    }
+                    super.deleteObjects(fullObjectNames);
+                  }
+                },
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(gcsOptions)
+                .build());
+    try (GoogleHadoopFileSystem ghfsDeleteSource = new GoogleHadoopFileSystem(memoryGcsFs)) {
+      URI initUri = new URI(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET);
+      Configuration config = new Configuration();
+      config.setBoolean("fs.gs.operation.compose.delete-source.enable", true);
+      ghfsDeleteSource.initialize(initUri, config);
+      ghfsDeleteSource.mkdirs(new Path(GoogleHadoopFileSystemTestHelper.IN_MEMORY_TEST_BUCKET));
+
+      Path objectPath = new Path(ghfsDeleteSource.getUri().resolve("/compose_delete_source.txt"));
+      try (FSDataOutputStream fout = ghfsDeleteSource.create(objectPath)) {
+        byte[] data1 = {0x01, 0x02};
+        byte[] data2 = {0x03, 0x04};
+        byte[] data3 = {0x05, 0x06};
+
+        fout.write(data1, 0, data1.length);
+        fout.hsync();
+
+        fout.write(data2, 0, data2.length);
+        fout.hsync();
+
+        fout.write(data3, 0, data3.length);
+      }
+
+      // Verify both compose requests (from hsync and close) requested deleteSourceObjects
+      assertThat(capturedOptions).hasSize(2);
+      assertThat(capturedOptions.get(0).isDeleteSourceObjects()).isTrue();
+      assertThat(capturedOptions.get(1).isDeleteSourceObjects()).isTrue();
+
+      // Verify that no cleanup tasks were submitted to the background deletion thread pool
+      assertThat(backgroundDeletedObjects).isEmpty();
+
+      // Verify file content is fully intact
+      assertThat(readFile(ghfsDeleteSource, objectPath))
+          .isEqualTo(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+    }
   }
 }

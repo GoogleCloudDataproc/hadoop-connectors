@@ -123,6 +123,8 @@ class GoogleHadoopOutputStream extends OutputStream
   // List of temporary file-deletion futures accrued during the lifetime of this output stream.
   private final List<Future<Void>> tmpDeletionFutures = new ArrayList<>();
 
+  private final boolean composeDeleteSourceEnabled;
+
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
@@ -166,13 +168,19 @@ class GoogleHadoopOutputStream extends OutputStream
         minSyncInterval.isNegative() || minSyncInterval.isZero()
             ? null
             : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
+    this.composeDeleteSourceEnabled =
+        ghfs.getGcsFs().getOptions().getCloudStorageOptions().isComposeDeleteSourceEnabled();
     this.composeObjectOptions =
         GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
-            createFileOptions.toBuilder()
-                // Set write mode to OVERWRITE because we use compose operation to append new data
-                // to an existing object
-                .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
-                .build());
+                createFileOptions.toBuilder()
+                    // Set write mode to OVERWRITE because we use compose operation to append new
+                    // data
+                    // to an existing object
+                    .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+                    .build())
+            .toBuilder()
+            .setDeleteSourceObjects(this.composeDeleteSourceEnabled)
+            .build();
 
     if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
       // When appending first component has to go to new temporary file.
@@ -380,12 +388,14 @@ class GoogleHadoopOutputStream extends OutputStream
       GoogleCloudStorageItemInfo composedObject =
           gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
       dstGenerationId = composedObject.getContentGeneration();
-      tmpDeletionFutures.add(
-          TMP_FILE_CLEANUP_THREADPOOL.submit(
-              () -> {
-                gcs.deleteObjects(ImmutableList.of(tmpId));
-                return null;
-              }));
+      if (!composeDeleteSourceEnabled) {
+        tmpDeletionFutures.add(
+            TMP_FILE_CLEANUP_THREADPOOL.submit(
+                () -> {
+                  gcs.deleteObjects(ImmutableList.of(tmpId));
+                  return null;
+                }));
+      }
     }
   }
 

@@ -135,6 +135,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.operation.move.enable", true);
           put("fs.gs.write.rolling.checksum.enable", true);
           put("fs.gs.storage.client.cache.enable", false);
+          put("fs.gs.operation.compose.delete-source.enable", false);
         }
       };
 
@@ -469,5 +470,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
     assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
+  }
+
+  @Test
+  public void composeDeleteSourceProperties() {
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.operation.compose.delete-source.enable", true);
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.isComposeDeleteSourceEnabled()).isTrue();
   }
 }
