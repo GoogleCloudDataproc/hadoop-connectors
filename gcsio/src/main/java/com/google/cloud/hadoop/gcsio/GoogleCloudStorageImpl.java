@@ -64,6 +64,7 @@ import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ITraceOperation;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
@@ -248,11 +249,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
-      Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder()
-              .setNameFormat("gcs-async-channel-pool-%d")
-              .setDaemon(true)
-              .build());
+      InvocationIdPropagatingExecutorService.wrap(
+          Executors.newCachedThreadPool(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("gcs-async-channel-pool-%d")
+                  .setDaemon(true)
+                  .build()));
 
   // Thread-pool for manual matching of metadata tasks.
   // TODO(user): Wire out GoogleCloudStorageOptions for these.
@@ -437,7 +439,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 .build());
     // allowCoreThreadTimeOut needs to be enabled for cases where the encapsulating class does not
     service.allowCoreThreadTimeOut(true);
-    return service;
+    return InvocationIdPropagatingExecutorService.wrap(service);
   }
 
   @VisibleForTesting

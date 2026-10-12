@@ -71,6 +71,7 @@ import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.TraceFactory;
@@ -230,7 +231,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private GhfsStorageStatistics storageStatistics;
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
-      Executors.newCachedThreadPool(DAEMON_THREAD_FACTORY);
+      InvocationIdPropagatingExecutorService.wrap(
+          Executors.newCachedThreadPool(DAEMON_THREAD_FACTORY));
   private GcsFileChecksumType checksumType = GCS_FILE_CHECKSUM_TYPE.getDefault();
   /** Underlying GCS file system object. */
   private Supplier<GoogleCloudStorageFileSystem> gcsFsSupplier;

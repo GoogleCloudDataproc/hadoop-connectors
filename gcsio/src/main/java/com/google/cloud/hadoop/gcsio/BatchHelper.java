@@ -32,6 +32,7 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ITraceOperation;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
 import com.google.common.flogger.GoogleLogger;
@@ -164,7 +165,7 @@ public class BatchHelper {
     // Prevents memory leaks in case flush() method was not called.
     requestsExecutor.allowCoreThreadTimeOut(true);
     requestsExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-    return requestsExecutor;
+    return InvocationIdPropagatingExecutorService.wrap(requestsExecutor);
   }
 
   /**
