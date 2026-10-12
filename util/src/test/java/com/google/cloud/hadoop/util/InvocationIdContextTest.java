@@ -16,9 +16,13 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 
 import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -97,4 +101,53 @@ public class InvocationIdContextTest {
     // Ensure the parent thread's invocation ID remains unchanged
     assertEquals(parentThreadId, InvocationIdContext.getInvocationId());
   }
+
+  @Test
+  public void newInvocationId_hasPrefixAndEightHexChars_andDoesNotSetContext() {
+    String invocationId = InvocationIdContext.newInvocationId();
+
+    assertThat(invocationId)
+        .matches("^" + Pattern.quote(GCCL_INVOCATION_ID_PREFIX) + "[0-9a-f]{8}$");
+    assertThat(InvocationIdContext.newInvocationId()).isNotEqualTo(invocationId);
+    // Generating an ID does not activate it.
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void newRequestInvocationId_withoutOperation_isFullUuidAndDoesNotSetContext() {
+    String requestId = InvocationIdContext.newRequestInvocationId();
+
+    assertThat(requestId).matches(REQUEST_ID_REGEX);
+    assertThat(requestId).hasLength(GCCL_INVOCATION_ID_PREFIX.length() + 36);
+    // Must be parseable as a UUID.
+    assertThat(UUID.fromString(requestId.substring(GCCL_INVOCATION_ID_PREFIX.length())))
+        .isNotNull();
+    // Generating a request ID must never activate an operation ID on the thread.
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    assertThat(InvocationIdContext.newRequestInvocationId()).isNotEqualTo(requestId);
+  }
+
+  @Test
+  public void newRequestInvocationId_withOperation_sharesOperationPrefixAndIsUnique() {
+    InvocationIdContext.setInvocationId();
+    String operationId = InvocationIdContext.getInvocationId();
+
+    String requestId1 = InvocationIdContext.newRequestInvocationId();
+    String requestId2 = InvocationIdContext.newRequestInvocationId();
+
+    assertThat(requestId1).matches(REQUEST_ID_REGEX);
+    assertThat(requestId2).matches(REQUEST_ID_REGEX);
+    assertThat(requestId1).startsWith(operationId + "-");
+    assertThat(requestId2).startsWith(operationId + "-");
+    assertThat(requestId1).isNotEqualTo(requestId2);
+    assertThat(UUID.fromString(requestId1.substring(GCCL_INVOCATION_ID_PREFIX.length())))
+        .isNotNull();
+    // The operation ID is left untouched.
+    assertThat(InvocationIdContext.getInvocationId()).isEqualTo(operationId);
+  }
+
+  private static final String REQUEST_ID_REGEX =
+      "^"
+          + Pattern.quote(GCCL_INVOCATION_ID_PREFIX)
+          + "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
 }

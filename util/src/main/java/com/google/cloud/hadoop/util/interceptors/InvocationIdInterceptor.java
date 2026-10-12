@@ -65,12 +65,9 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
     final String signatureKey = "Signature="; // For V2 and V4 signedURLs
     final String builtURL = request.getUrl().build();
     if (!builtURL.contains(signatureKey)) {
-      // Thread-safe: InvocationIdContext uses thread-local storage, so each thread has its own
-      // invocationId.
-      if (InvocationIdContext.getInvocationId().isEmpty()) {
-        InvocationIdContext.setInvocationId();
-      }
-      String invocationEntry = InvocationIdContext.getInvocationId();
+      // New token for every HttpRequest (retries of this request keep it, see above); it shares
+      // the thread's invocation ID prefix so the request can be correlated with connector logs.
+      String invocationEntry = InvocationIdContext.newRequestInvocationId();
       final String newValue;
       if (existing != null && !existing.isEmpty()) {
         newValue = existing + " " + invocationEntry;
