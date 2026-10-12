@@ -884,7 +884,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   /**
    * Tracks the duration of the operation {@code operation}. Also setup operation tracking using
-   * {@code ThreadTrace}.
+   * {@code ThreadTrace} and activates an invocation ID for the duration of the operation.
    */
   private <B> B trackDurationWithTracing(
       DurationTrackerFactory factory,
@@ -894,9 +894,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-    InvocationIdContext.setInvocationId();
-    return GhfsGlobalStorageStatistics.trackDuration(
-        factory, stats, statistic, context, traceFactory, operation);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      return GhfsGlobalStorageStatistics.trackDuration(
+          factory, stats, statistic, context, traceFactory, operation);
+    }
   }
 
   /**
@@ -1154,88 +1155,93 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
-    checkOpen();
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
+      checkOpen();
 
-    logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
-    // URI does not handle glob expressions nicely, for the purpose of
-    // fully-qualifying a path we can URI-encode them.
-    // Using toString() to avoid Path(URI) constructor.
-    Path encodedPath = new Path(pathPattern.toUri().toString());
-    // We convert pathPattern to GCS path and then to Hadoop path to ensure that it ends up in
-    // the correct format. See note in getHadoopPath for more information.
-    Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
-    // Decode URI-encoded path back into a glob path.
-    Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
-    logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
+      logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
+      // URI does not handle glob expressions nicely, for the purpose of
+      // fully-qualifying a path we can URI-encode them.
+      // Using toString() to avoid Path(URI) constructor.
+      Path encodedPath = new Path(pathPattern.toUri().toString());
+      // We convert pathPattern to GCS path and then to Hadoop path to ensure that it ends up in
+      // the correct format. See note in getHadoopPath for more information.
+      Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
+      // Decode URI-encoded path back into a glob path.
+      Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
+      logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
-    if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
-      return concurrentGlobInternal(fixedPath, filter);
+      if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
+        return concurrentGlobInternal(fixedPath, filter);
+      }
+
+      if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
+        return flatGlobInternal(fixedPath, filter);
+      }
+
+      return super.globStatus(fixedPath, filter);
     }
-
-    if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
-      return flatGlobInternal(fixedPath, filter);
-    }
-
-    return super.globStatus(fixedPath, filter);
   }
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
-    Token<?> result = null;
-    if (delegationTokens != null) {
-      result = delegationTokens.getBoundOrNewDT(renewer);
-    }
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
+      Token<?> result = null;
+      if (delegationTokens != null) {
+        result = delegationTokens.getBoundOrNewDT(renewer);
+      }
 
-    logger.atFiner().log("getDelegationToken(renewer: %s): %s", renewer, result);
-    return result;
+      logger.atFiner().log("getDelegationToken(renewer: %s): %s", renewer, result);
+      return result;
+    }
   }
 
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
-    logger.atFiner().log(
-        "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
-        delSrc, overwrite, srcs.length, dst);
-    super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+      logger.atFiner().log(
+          "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
+          delSrc, overwrite, srcs.length, dst);
+      super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
+    }
   }
 
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
 
-    logger.atFiner().log(
-        "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
-        delSrc, overwrite, src, dst);
-    super.copyFromLocalFile(delSrc, overwrite, src, dst);
+      logger.atFiner().log(
+          "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
+          delSrc, overwrite, src, dst);
+      super.copyFromLocalFile(delSrc, overwrite, src, dst);
+    }
   }
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
+      checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    this.checkOpen();
+      this.checkOpen();
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
-    if (!fileInfo.exists()) {
-      throw new FileNotFoundException(
-          String.format(
-              "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+      URI gcsPath = getGcsPath(hadoopPath);
+      FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+      if (!fileInfo.exists()) {
+        throw new FileNotFoundException(
+            String.format(
+                "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+      }
+      FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
+      logger.atFiner().log(
+          "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
+      return checksum;
     }
-    FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
-    logger.atFiner().log(
-        "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
-    return checksum;
   }
 
   @Override
@@ -1246,9 +1252,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
-    return super.listLocatedStatus(f);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
+      return super.listLocatedStatus(f);
+    }
   }
 
   @Override
@@ -1524,34 +1531,36 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       Path hadoopPath, OpenFileParameters parameters) throws IOException {
-    checkNotNull(hadoopPath, "hadoopPath should not be null");
-    checkOpen();
-    logger.atFiner().log("Path to be opened: %s, parameters: %s ", hadoopPath, parameters);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      checkNotNull(hadoopPath, "hadoopPath should not be null");
+      checkOpen();
+      logger.atFiner().log("Path to be opened: %s, parameters: %s ", hadoopPath, parameters);
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
-        parameters.getMandatoryKeys(),
-        Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS,
-        "for " + gcsPath);
+      URI gcsPath = getGcsPath(hadoopPath);
+      AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
+          parameters.getMandatoryKeys(),
+          Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS,
+          "for " + gcsPath);
 
-    FileStatus fileStatus = parameters.getStatus();
-    FileInfo fileInfo =
-        fileStatus instanceof GoogleHadoopFileStatus
-            ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
-            : null;
-    if (fileInfo == null) {
-      return super.openFileWithOptions(hadoopPath, parameters);
+      FileStatus fileStatus = parameters.getStatus();
+      FileInfo fileInfo =
+          fileStatus instanceof GoogleHadoopFileStatus
+              ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
+              : null;
+      if (fileInfo == null) {
+        return super.openFileWithOptions(hadoopPath, parameters);
+      }
+
+      CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
+      backgroundTasksThreadPool.submit(
+          () ->
+              LambdaUtils.eval(
+                  result,
+                  () ->
+                      new FSDataInputStream(
+                          GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
+      return result;
     }
-
-    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
-    backgroundTasksThreadPool.submit(
-        () ->
-            LambdaUtils.eval(
-                result,
-                () ->
-                    new FSDataInputStream(
-                        GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
-    return result;
   }
 
   /**

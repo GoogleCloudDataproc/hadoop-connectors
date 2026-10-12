@@ -37,6 +37,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.InvocationIdContext;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -101,6 +102,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private final GhfsInputStreamStatistics streamStatistics;
   private final Supplier<VectoredIOImpl> vectoredIOSupplier;
   private final GoogleCloudStorageFileSystem gcsFs;
+
+  // Invocation ID of the operation that opened this stream; activated during stream operations.
+  private final String invocationId;
 
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
@@ -207,6 +211,15 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
     this.traceFactory = ghfs.getTraceFactory();
     this.vectoredIOSupplier = ghfs.getVectoredIOSupplier();
+
+    String currentInvocationId = InvocationIdContext.getInvocationId();
+    this.invocationId =
+        currentInvocationId.isEmpty() ? InvocationIdContext.newInvocationId() : currentInvocationId;
+  }
+
+  /** Activates this stream's invocation ID on the current thread until the scope is closed. */
+  private InvocationIdContext.Scope openInvocationIdScope() {
+    return InvocationIdContext.openScopeWithId(invocationId);
   }
 
   /**
@@ -225,7 +238,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     long startTimeNs = System.nanoTime();
     DurationTracker tracker =
         streamStatistics.trackDuration(STREAM_READ_VECTORED_OPERATIONS.getSymbol(), 1);
-    try {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
       readVectoredRouted(ranges, allocate);
     } catch (IOException e) {
       tracker.failed();
@@ -344,7 +357,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      return readInternal(buf, offset, length);
+    }
+  }
 
+  private int readInternal(byte[] buf, int offset, int length) throws IOException {
     return trackDuration(
         streamStatistics,
         STREAM_READ_OPERATIONS.getSymbol(),
@@ -389,33 +407,40 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (length == 0) {
       return;
     }
-    if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
-      // TODO(user): Differentiate between STREAM_READ_OPERATIONS and STREAM_READ_FULLY_OPERATIONS
-      // as a follow-up task.
-      trackDuration(
-          streamStatistics,
-          STREAM_READ_OPERATIONS.getSymbol(),
-          () -> {
-            long startTimeNs = System.nanoTime();
-            checkNotClosed();
-            ((GcsAnalyticsCoreInputStreamWrapper) channel)
-                .readFully(position, buffer, offset, length);
-            totalBytesRead += length;
-            statistics.incrementReadOps(1);
-            streamStats.updateReadStreamStats(length, startTimeNs);
-            storageStatistics.streamReadOperationInComplete(length, length);
-            streamStatistics.bytesRead(length);
-            streamStatistics.readOperationCompleted(length, length);
-            return null;
-          });
-      return;
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      if (channel instanceof GcsAnalyticsCoreInputStreamWrapper) {
+        // TODO(user): Differentiate between STREAM_READ_OPERATIONS and
+        // STREAM_READ_FULLY_OPERATIONS as a follow-up task.
+        trackDuration(
+            streamStatistics,
+            STREAM_READ_OPERATIONS.getSymbol(),
+            () -> {
+              long startTimeNs = System.nanoTime();
+              checkNotClosed();
+              ((GcsAnalyticsCoreInputStreamWrapper) channel)
+                  .readFully(position, buffer, offset, length);
+              totalBytesRead += length;
+              statistics.incrementReadOps(1);
+              streamStats.updateReadStreamStats(length, startTimeNs);
+              storageStatistics.streamReadOperationInComplete(length, length);
+              streamStatistics.bytesRead(length);
+              streamStatistics.readOperationCompleted(length, length);
+              return null;
+            });
+        return;
+      }
+      super.readFully(position, buffer, offset, length);
     }
-    super.readFully(position, buffer, offset, length);
   }
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      seekInternal(pos);
+    }
+  }
 
+  private void seekInternal(long pos) throws IOException {
     trackDuration(
         streamStatistics,
         STREAM_READ_SEEK_OPERATIONS.getSymbol(),
@@ -502,7 +527,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   /**
    * Tracks the duration of the operation {@code operation}. Also setup operation tracking using
-   * {@code ThreadTrace}.
+   * {@code ThreadTrace} and activates this stream's invocation ID for the duration of the
+   * operation.
    */
   private <B> B trackDurationWithTracing(
       DurationTrackerFactory durationTracker,
@@ -512,9 +538,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-
-    return GhfsGlobalStorageStatistics.trackDuration(
-        durationTracker, stats, statistic, context, traceFactory, operation);
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      return GhfsGlobalStorageStatistics.trackDuration(
+          durationTracker, stats, statistic, context, traceFactory, operation);
+    }
   }
 
   /**

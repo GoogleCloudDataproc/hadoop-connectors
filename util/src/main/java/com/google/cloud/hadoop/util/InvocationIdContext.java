@@ -19,26 +19,71 @@ package com.google.cloud.hadoop.util;
 import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.util.UUID;
 
 /**
- * A utility class to manage a unique invocation ID for each thread using {@link
- * InheritableThreadLocal}. The invocation ID is used to track and identify requests across
- * different components.
+ * A utility class to manage a unique invocation ID for each thread. The invocation ID is used to
+ * track and identify requests of a connector operation across different components. It is stored in
+ * a plain {@link ThreadLocal} and should be set through an {@link AutoCloseable} {@link Scope}, so
+ * that it never outlives the operation or leaks into other threads.
  */
 public class InvocationIdContext {
 
   /** Number of hex characters of the operation ID (the first group of a UUID). */
   @VisibleForTesting static final int OPERATION_ID_LENGTH = 8;
 
-  /** Thread-local storage for the invocation ID. The ID is inherited by child threads. */
-  private static final InheritableThreadLocal<String> INVOCATION_ID =
-      new InheritableThreadLocal<>() {
-        @Override
-        protected String initialValue() {
-          return "";
+  /** Thread-local storage for the invocation ID. The ID is not inherited by child threads. */
+  private static final ThreadLocal<String> INVOCATION_ID = ThreadLocal.withInitial(() -> "");
+
+  /** Number of open scopes on the current thread. Nested scopes reuse the enclosing scope's ID. */
+  private static final ThreadLocal<Integer> SCOPE_DEPTH = ThreadLocal.withInitial(() -> 0);
+
+  /** Scope returned when an enclosing scope already owns the ID. */
+  private static final Scope NOOP_SCOPE = () -> {};
+
+  /** A scope during which an invocation ID is active on the current thread. */
+  public interface Scope extends AutoCloseable {
+    /** Ends the scope and restores the invocation ID that was active before it was opened. */
+    @Override
+    void close();
+  }
+
+  /**
+   * Marks the beginning of a connector operation on the current thread. If a scope with an ID is
+   * already open (nested call), its ID is reused and the returned scope is a no-op; otherwise a new
+   * ID is set until the returned scope is closed. Use with try-with-resources.
+   */
+  public static Scope openScope() {
+    if (SCOPE_DEPTH.get() > 0 && !INVOCATION_ID.get().isEmpty()) {
+      return NOOP_SCOPE;
+    }
+    return openScopeWithId(newInvocationId());
+  }
+
+  /**
+   * Activates the given invocation ID on the current thread until the returned scope is closed,
+   * which restores the previously active ID. A {@code null} or empty ID deactivates the ID.
+   */
+  public static Scope openScopeWithId(String invocationId) {
+    String previous = INVOCATION_ID.get();
+    boolean activatesId = !Strings.isNullOrEmpty(invocationId);
+    setOrRemove(invocationId);
+    if (activatesId) {
+      SCOPE_DEPTH.set(SCOPE_DEPTH.get() + 1);
+    }
+    return () -> {
+      if (activatesId) {
+        int depth = SCOPE_DEPTH.get() - 1;
+        if (depth > 0) {
+          SCOPE_DEPTH.set(depth);
+        } else {
+          SCOPE_DEPTH.remove();
         }
-      };
+      }
+      setOrRemove(previous);
+    };
+  }
 
   /**
    * Retrieves the current thread's invocation ID.
@@ -52,7 +97,11 @@ public class InvocationIdContext {
   /**
    * Generates and sets a new unique invocation ID for the current thread. The ID is prefixed with
    * {@code GCCL_INVOCATION_ID_PREFIX}.
+   *
+   * @deprecated The ID set by this method is never cleared, so it stays on the thread after the
+   *     operation has finished. Use {@link #openScope()} with try-with-resources instead.
    */
+  @Deprecated
   public static void setInvocationId() {
     INVOCATION_ID.set(newInvocationId());
   }
@@ -91,9 +140,18 @@ public class InvocationIdContext {
         : "";
   }
 
-  /** Clears the invocation ID for the current thread. */
+  private static void setOrRemove(String invocationId) {
+    if (Strings.isNullOrEmpty(invocationId)) {
+      INVOCATION_ID.remove();
+    } else {
+      INVOCATION_ID.set(invocationId);
+    }
+  }
+
+  /** Clears the invocation ID and any open scopes for the current thread. */
   @VisibleForTesting
   static void clear() {
     INVOCATION_ID.remove();
+    SCOPE_DEPTH.remove();
   }
 }
