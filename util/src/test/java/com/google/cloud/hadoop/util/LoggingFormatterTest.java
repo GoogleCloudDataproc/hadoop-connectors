@@ -85,6 +85,31 @@ public class LoggingFormatterTest {
   }
 
   @Test
+  public void format_withJsonArrayMessage_doesNotPrefixMessage() {
+    LogRecord record = new LogRecord(java.util.logging.Level.INFO, "[{\"key\":\"value\"}]");
+    record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+
+    String formattedMessage = formatter.format(record);
+
+    assertEquals("[{\"key\":\"value\"}]\n", formattedMessage);
+  }
+
+  @Test
+  public void format_withSingleTokenMessage_prefixesMessageWithId() {
+    // Gson leniently parses bare tokens like these as JSON strings; they are regular log messages
+    // and must still get the invocation ID prefix.
+    String invocationId = InvocationIdContext.getInvocationId();
+    for (String message : new String[] {"seek(2)", "close()", "123", "true", "null"}) {
+      LogRecord record = new LogRecord(java.util.logging.Level.INFO, message);
+      record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+
+      String formattedMessage = formatter.format(record);
+
+      assertEquals("[" + invocationId + "]: " + message + "\n", formattedMessage);
+    }
+  }
+
+  @Test
   public void format_withEmptyInvocationId_doesNotPrefixMessage() {
     InvocationIdContext.clear();
     LogRecord record = new LogRecord(java.util.logging.Level.INFO, "Test log message");

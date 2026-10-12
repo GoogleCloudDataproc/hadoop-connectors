@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import java.util.Objects;
@@ -102,19 +103,24 @@ public class LoggingFormatter extends Formatter {
   }
 
   /**
-   * Checks if the given message is in JSON format.
+   * Checks if the given message is a JSON object or array.
    *
    * @param message the log message to check
-   * @return true if the message is in JSON format, false otherwise
+   * @return true if the message is a JSON object or array, false otherwise
    */
   private boolean isJson(String message) {
-    // Check if the message is a JSON string.
     if (message == null) {
       return false;
     }
+    // Gson leniently parses any bare token (e.g. "seek(2)") as a JSON string, so require a
+    // JSON object or array.
+    String trimmed = message.trim();
+    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+      return false;
+    }
     try {
-      var unused = JsonParser.parseString(message);
-      return true; // If parsing succeeds, it's valid JSON.
+      JsonElement element = JsonParser.parseString(trimmed);
+      return element.isJsonObject() || element.isJsonArray();
     } catch (JsonSyntaxException e) {
       return false;
     }
