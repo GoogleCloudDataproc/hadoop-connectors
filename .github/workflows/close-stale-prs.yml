@@ -1,0 +1,54 @@
+# Automatically marks pull requests that have had no activity for 350 days as
+# stale, and closes them 15 days later (365 days total) if there is still no
+# activity. Issues are intentionally left untouched.
+#
+# See https://github.com/actions/stale for configuration details.
+name: Close stale pull requests
+
+on:
+  schedule:
+    # Runs daily at 00:00 UTC.
+    - cron: '0 0 * * *'
+  # Allows manual triggering from the GitHub Actions UI for testing.
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # Pull request timing: 350 days to stale + 15 days grace = 365 days.
+          days-before-pr-stale: 350
+          days-before-pr-close: 15
+
+          # Explicitly disable stale triaging and closing for issues.
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
+
+          # Labels and exemptions.
+          stale-pr-label: 'stale'
+          exempt-pr-labels: 'pinned,keep-open,work-in-progress'
+          exempt-draft-pr: true
+
+          # Messages.
+          stale-pr-message: >-
+            This pull request has been automatically marked as stale because it
+            has had no activity for approximately 350 days. It will be closed in
+            15 days if no further activity occurs. If this pull request is still
+            relevant, please leave a comment or push an update to keep it open.
+            Thank you for your contribution!
+          close-pr-message: >-
+            This pull request has been automatically closed because it has had
+            no activity for over 1 year. If this change is still needed, please
+            feel free to reopen it, or submit an updated pull request against
+            the `master` branch. Thank you for your contribution!
+
+          # Operational safeguards: limit API calls per run to avoid rate limits
+          # and notification floods, and process the oldest PRs first.
+          operations-per-run: 30
+          ascending: true
