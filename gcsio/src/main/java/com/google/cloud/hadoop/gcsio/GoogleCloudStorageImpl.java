@@ -77,7 +77,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -2626,15 +2625,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @VisibleForTesting
-  StorageControlClient lazyGetStorageControlClient() throws IOException {
+  synchronized StorageControlClient lazyGetStorageControlClient() throws IOException {
     if (this.storageControlClient == null) {
-      final ImmutableMap<String, String> headers =
-          getUpdatedHeaders(this.storageOptions, this.featureHeaderGenerator);
       this.storageControlClient =
           StorageControlClient.create(
               StorageControlSettings.newBuilder()
                   .setCredentialsProvider(FixedCredentialsProvider.create(this.credential))
-                  .setHeaderProvider(() -> headers)
+                  .setHeaderProvider(
+                      () -> getUpdatedHeaders(this.storageOptions, this.featureHeaderGenerator))
                   .build());
     }
 
