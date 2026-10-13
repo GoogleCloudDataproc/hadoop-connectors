@@ -39,13 +39,13 @@ import com.google.auth.Retryable;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LogContext;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.net.ConnectException;
-import java.net.SocketTimeoutException;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -67,28 +67,21 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           // 30 minutes
           .setMaxElapsedTimeMillis(1_800_000);
 
-  /**
-   * HTTP status codes of a token request that are retried when fetching credentials: 503 (Service
-   * Unavailable) and 429 (Too Many Requests), i.e. the responses the GCE metadata server sends when
-   * it is temporarily overloaded or rate limiting the client.
-   */
+  // Cap credentials retries below the default maxRequestRetries (10) to avoid excessive nested
+  // retries with google-auth-library and ResilientOperation.
+  @VisibleForTesting static final int MAX_CREDENTIALS_RETRIES = 5;
+
+  // Transient HTTP status codes to retry when fetching credentials (503 and 429 per GCE metadata
+  // server guidance; OAuth2 token endpoints already retry 500/408 internally).
   private static final ImmutableSet<Integer> RETRYABLE_CREDENTIALS_STATUS_CODES =
       ImmutableSet.of(
           HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE,
           UnsuccessfulResponseHandler.HTTP_SC_TOO_MANY_REQUESTS);
 
-  /**
-   * Matches the message of the {@link IOException} thrown by {@code ComputeEngineCredentials} when
-   * the GCE metadata server responds with an unexpected status code, e.g. {@code "Unexpected Error
-   * code 500 trying to get security access token from Compute Engine metadata for the default
-   * service account: ..."}.
-   *
-   * <p>google-auth-library wraps only 503 metadata server responses into a {@link Retryable}
-   * exception; every other status code is reported as a plain {@link IOException} without a cause,
-   * so the status code can only be recovered from the message.
-   */
+  // ComputeEngineCredentials surfaces non-503 metadata server errors as an IOException with the
+  // status code only in the message.
   private static final Pattern METADATA_SERVER_ERROR_PATTERN =
-      Pattern.compile("^Unexpected Error code (\\d{3}) trying to get security access token");
+      Pattern.compile("(?:Unexpected )?Error code (\\d{3}) trying to get .+ from Compute Engine");
 
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credentials must refresh
@@ -158,16 +151,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     return credentials == null ? null : credentials.getCredentials();
   }
 
-  /**
-   * Initializes the request with credentials, retrying transient failures with backoff.
-   *
-   * <p>Credentials fetch/refresh their access token while the request is being initialized (e.g.
-   * {@code ComputeEngineCredentials} calls the GCE metadata server). This happens before the
-   * request is executed, i.e. outside the retry loop configured for the request itself, so
-   * transient failures (e.g. 503 from the metadata server, which clients are expected to retry)
-   * must be retried here.
-   */
+  // Credentials fetch/refresh their token during initialize(), before the request's own retry
+  // handlers are attached, so retry transient credential errors here.
   private void initializeCredentialsWithRetries(HttpRequest request) throws IOException {
+    int maxRetries = Math.min(MAX_CREDENTIALS_RETRIES, options.getMaxRequestRetries());
     BackOff backOff = BACKOFF_BUILDER.build();
     int retries = 0;
     while (true) {
@@ -175,7 +162,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         credentials.initialize(request);
         return;
       } catch (IOException e) {
-        if (retries >= options.getMaxRequestRetries() || !isRetryableCredentialsError(e)) {
+        if (retries >= maxRetries || !isRetryableCredentialsError(e)) {
           throw e;
         }
         long backOffMillis = backOff.nextBackOffMillis();
@@ -185,7 +172,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         retries++;
         logger.atWarning().withCause(e).atMostEvery(10, SECONDS).log(
             "Failed to get credentials for request to '%s', retrying in %d ms (retry %d/%d)",
-            request.getUrl(), backOffMillis, retries, options.getMaxRequestRetries());
+            request.getUrl(), backOffMillis, retries, maxRetries);
         try {
           sleeper.sleep(backOffMillis);
         } catch (InterruptedException ie) {
@@ -200,43 +187,22 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
   }
 
-  /**
-   * Returns {@code true} if the credentials error is transient and the operation can be retried.
-   *
-   * <p>If the token request failed with an HTTP status code, the operation is retried only for
-   * {@link #RETRYABLE_CREDENTIALS_STATUS_CODES}. The status code is taken from the first exception
-   * in the cause chain that carries one:
-   *
-   * <ul>
-   *   <li>{@link HttpResponseException}s, which are the cause of {@code GoogleAuthException}s
-   *       thrown for OAuth2 token endpoint and 503 metadata server responses, and of IAM {@code
-   *       generateAccessToken} failures surfaced by {@code ImpersonatedCredentials};
-   *   <li>plain {@link IOException}s thrown by {@code ComputeEngineCredentials} for non-503
-   *       metadata server responses, which carry the status code only in their message.
-   * </ul>
-   *
-   * <p>Failures without a status code are retried only if they are connection errors: timeouts,
-   * refused connections and {@link Retryable} exceptions that google-auth-library marks as such.
-   */
   @VisibleForTesting
   static boolean isRetryableCredentialsError(Throwable e) {
-    for (Throwable t = e; t != null; t = t.getCause()) {
+    boolean retryableConnectionError = false;
+    for (Throwable t : Throwables.getCausalChain(e)) {
       OptionalInt statusCode = getTokenRequestStatusCode(t);
       if (statusCode.isPresent()) {
         return RETRYABLE_CREDENTIALS_STATUS_CODES.contains(statusCode.getAsInt());
       }
+      retryableConnectionError |=
+          (t instanceof Retryable && ((Retryable) t).isRetryable())
+              || t instanceof EOFException
+              || IoExceptionHelper.isSocketError(t);
     }
-    for (Throwable t = e; t != null; t = t.getCause()) {
-      if ((t instanceof Retryable && ((Retryable) t).isRetryable())
-          || t instanceof SocketTimeoutException
-          || t instanceof ConnectException) {
-        return true;
-      }
-    }
-    return false;
+    return retryableConnectionError;
   }
 
-  /** Returns the HTTP status code of the failed token request carried by {@code t}, if any. */
   private static OptionalInt getTokenRequestStatusCode(Throwable t) {
     if (t instanceof HttpResponseException) {
       return OptionalInt.of(((HttpResponseException) t).getStatusCode());

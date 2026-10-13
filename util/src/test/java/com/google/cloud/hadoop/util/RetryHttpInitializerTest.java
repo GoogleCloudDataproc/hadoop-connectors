@@ -54,9 +54,12 @@ import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import com.google.common.primitives.Ints;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -67,6 +70,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import javax.net.ssl.SSLException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -288,10 +292,6 @@ public class RetryHttpInitializerTest {
             "access_token", "test-access-token", "expires_in", 3600, "token_type", "Bearer"));
   }
 
-  /**
-   * Fake GCE metadata server: serves the queued responses for the token endpoint and records the
-   * URLs it was asked for. Any other path fails the test.
-   */
   private static MockHttpTransport fakeMetadataServer(
       List<String> requestedUrls, MockLowLevelHttpResponse... responses) {
     Deque<MockLowLevelHttpResponse> queue = new ArrayDeque<>(Arrays.asList(responses));
@@ -310,10 +310,6 @@ public class RetryHttpInitializerTest {
     };
   }
 
-  /**
-   * Reproduces b/505801454 with the real {@link ComputeEngineCredentials}: the GCE metadata server
-   * returns 503 for the token request. Before the fix this failed the GCS request immediately.
-   */
   @Test
   public void computeEngineCredentials_metadataServer503_retriedAndRequestSucceeds()
       throws IOException {
@@ -352,21 +348,13 @@ public class RetryHttpInitializerTest {
     IOException thrown =
         assertThrows(IOException.class, () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
 
-    // Same failure signature as in the customer logs: retryable auth error caused by a 503 from
-    // MDS.
     assertThat(isRetryableCredentialsError(thrown)).isTrue();
     assertThat(thrown).hasCauseThat().isInstanceOf(HttpResponseException.class);
     assertThat(((HttpResponseException) thrown.getCause()).getStatusCode()).isEqualTo(503);
-    // 1 initial attempt + 5 retries (maxRequestRetries)
     assertThat(mdsRequests).hasSize(6);
     assertThat(sleeps).hasSize(5);
   }
 
-  /**
-   * Only 503 is surfaced by {@link ComputeEngineCredentials} as a {@code Retryable} exception; 429
-   * is a plain {@link IOException} that carries the status code in its message only, so this test
-   * also guards the message matching against google-auth-library upgrades.
-   */
   @Test
   public void computeEngineCredentials_metadataServerRetryableErrors_retried() throws IOException {
     for (int statusCode : RETRYABLE_STATUS_CODES) {
@@ -406,10 +394,6 @@ public class RetryHttpInitializerTest {
     }
   }
 
-  /**
-   * Request factory authenticated with real {@link ComputeEngineCredentials} against a fake
-   * metadata server that fails the token request twice with {@code statusCode} and then succeeds.
-   */
   private HttpRequestFactory computeEngineRequestFactory(
       int statusCode, List<String> mdsRequests, List<Long> sleeps) throws IOException {
     MockHttpTransport metadataServer =
@@ -459,9 +443,69 @@ public class RetryHttpInitializerTest {
         assertThrows(IOException.class, () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
 
     assertThat(thrown).isSameInstanceAs(errors[5]);
-    // 1 initial attempt + 5 retries (maxRequestRetries)
     assertThat(credentials.getRequestMetadataCalls).isEqualTo(6);
     assertThat(sleeps).hasSize(5);
+  }
+
+  @Test
+  public void credentialsRetryableError_retriesCappedBelowMaxRequestRetries() {
+    assertThat(RetryHttpInitializer.MAX_CREDENTIALS_RETRIES).isEqualTo(5);
+    IOException[] errors = new IOException[20];
+    for (int i = 0; i < errors.length; i++) {
+      errors[i] = metadataServerError(503);
+    }
+    FlakyCredentials credentials = new FlakyCredentials("Bearer: token", errors);
+    List<Long> sleeps = new ArrayList<>();
+    HttpRequestFactory requestFactory =
+        mockTransport(emptyResponse(200))
+            .createRequestFactory(
+                createRetryHttpInitializer(credentials, sleeps::add, /* maxRequestRetries= */ 10));
+
+    IOException thrown =
+        assertThrows(IOException.class, () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
+
+    assertThat(thrown).isSameInstanceAs(errors[5]);
+    assertThat(credentials.getRequestMetadataCalls).isEqualTo(6);
+    assertThat(sleeps).hasSize(5);
+  }
+
+  @Test
+  public void credentialsRetryableError_lowerMaxRequestRetriesHonored() {
+    IOException[] errors = new IOException[10];
+    for (int i = 0; i < errors.length; i++) {
+      errors[i] = metadataServerError(503);
+    }
+    FlakyCredentials credentials = new FlakyCredentials("Bearer: token", errors);
+    List<Long> sleeps = new ArrayList<>();
+    HttpRequestFactory requestFactory =
+        mockTransport(emptyResponse(200))
+            .createRequestFactory(
+                createRetryHttpInitializer(credentials, sleeps::add, /* maxRequestRetries= */ 2));
+
+    IOException thrown =
+        assertThrows(IOException.class, () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
+
+    assertThat(thrown).isSameInstanceAs(errors[2]);
+    assertThat(credentials.getRequestMetadataCalls).isEqualTo(3);
+    assertThat(sleeps).hasSize(2);
+  }
+
+  @Test
+  public void credentialsRetryableError_zeroMaxRequestRetries_failsWithoutRetries() {
+    IOException error = metadataServerError(503);
+    FlakyCredentials credentials = new FlakyCredentials("Bearer: token", error);
+    List<Long> sleeps = new ArrayList<>();
+    HttpRequestFactory requestFactory =
+        mockTransport(emptyResponse(200))
+            .createRequestFactory(
+                createRetryHttpInitializer(credentials, sleeps::add, /* maxRequestRetries= */ 0));
+
+    IOException thrown =
+        assertThrows(IOException.class, () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
+
+    assertThat(thrown).isSameInstanceAs(error);
+    assertThat(credentials.getRequestMetadataCalls).isEqualTo(1);
+    assertThat(sleeps).isEmpty();
   }
 
   @Test
@@ -483,37 +527,39 @@ public class RetryHttpInitializerTest {
 
   @Test
   public void credentialsRetryableError_interruptedDuringBackoff() {
-    FlakyCredentials credentials = new FlakyCredentials("Bearer: token", metadataServerError(503));
+    IOException error = metadataServerError(503);
+    FlakyCredentials credentials = new FlakyCredentials("Bearer: token", error);
+    InterruptedException interrupt = new InterruptedException("test interrupt");
     HttpRequestFactory requestFactory =
         mockTransport(emptyResponse(200))
             .createRequestFactory(
                 createRetryHttpInitializer(
                     credentials,
                     millis -> {
-                      throw new InterruptedException("test interrupt");
+                      throw interrupt;
                     }));
 
+    InterruptedIOException thrown;
     try {
-      assertThrows(
-          InterruptedIOException.class, () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
+      thrown =
+          assertThrows(
+              InterruptedIOException.class,
+              () -> requestFactory.buildGetRequest(new GenericUrl(URL)));
       assertThat(Thread.currentThread().isInterrupted()).isTrue();
     } finally {
       // Clear interrupted flag
       Thread.interrupted();
     }
+    assertThat(thrown).hasCauseThat().isSameInstanceAs(interrupt);
+    assertThat(thrown.getSuppressed()).asList().containsExactly(error);
     assertThat(credentials.getRequestMetadataCalls).isEqualTo(1);
   }
 
-  /** Status codes of a failed token request that the connector retries. */
   private static final ImmutableSet<Integer> RETRYABLE_STATUS_CODES = ImmutableSet.of(503, 429);
 
   private static final ImmutableSet<Integer> NON_RETRYABLE_STATUS_CODES =
       ImmutableSet.of(400, 401, 403, 404, 408, 500, 502, 504);
 
-  /**
-   * Status codes that google-auth-library marks as retryable for OAuth2 token endpoint requests;
-   * the connector deliberately retries a narrower set.
-   */
   private static final ImmutableSet<Integer> SDK_RETRYABLE_STATUS_CODES =
       ImmutableSet.of(500, 503, 408, 429);
 
@@ -522,6 +568,12 @@ public class RetryHttpInitializerTest {
     for (int statusCode : RETRYABLE_STATUS_CODES) {
       assertWithMessage("metadata server %s", statusCode)
           .that(isRetryableCredentialsError(metadataServerError(statusCode)))
+          .isTrue();
+      assertWithMessage("metadata server universe domain %s", statusCode)
+          .that(isRetryableCredentialsError(metadataServerUniverseDomainError(statusCode)))
+          .isTrue();
+      assertWithMessage("metadata server identity token %s", statusCode)
+          .that(isRetryableCredentialsError(metadataServerIdentityTokenError(statusCode)))
           .isTrue();
       assertWithMessage("token endpoint %s", statusCode)
           .that(isRetryableCredentialsError(tokenEndpointError(statusCode)))
@@ -534,7 +586,12 @@ public class RetryHttpInitializerTest {
       assertWithMessage("metadata server %s", statusCode)
           .that(isRetryableCredentialsError(metadataServerError(statusCode)))
           .isFalse();
-      // 500 and 408 are marked as retryable by google-auth-library but not retried by the connector
+      assertWithMessage("metadata server universe domain %s", statusCode)
+          .that(isRetryableCredentialsError(metadataServerUniverseDomainError(statusCode)))
+          .isFalse();
+      assertWithMessage("metadata server identity token %s", statusCode)
+          .that(isRetryableCredentialsError(metadataServerIdentityTokenError(statusCode)))
+          .isFalse();
       assertWithMessage("token endpoint %s", statusCode)
           .that(isRetryableCredentialsError(tokenEndpointError(statusCode)))
           .isFalse();
@@ -543,7 +600,6 @@ public class RetryHttpInitializerTest {
           .isFalse();
     }
 
-    // ImpersonatedCredentials wrap source credentials errors
     assertThat(
             isRetryableCredentialsError(
                 new IOException("Unable to refresh sourceCredentials", metadataServerError(503))))
@@ -553,7 +609,6 @@ public class RetryHttpInitializerTest {
                 new IOException("Unable to refresh sourceCredentials", metadataServerError(404))))
         .isFalse();
 
-    // Connection errors without a status code
     assertThat(isRetryableCredentialsError(new RetryableIOException(/* retryable= */ true)))
         .isTrue();
     assertThat(isRetryableCredentialsError(new RetryableIOException(/* retryable= */ false)))
@@ -563,10 +618,22 @@ public class RetryHttpInitializerTest {
                 new RetryableIOException(
                     /* retryable= */ true, new SocketTimeoutException("timeout"))))
         .isTrue();
-    assertThat(isRetryableCredentialsError(new IOException(new SocketTimeoutException("timeout"))))
-        .isTrue();
+    assertThat(isRetryableCredentialsError(new SocketTimeoutException("Read timed out"))).isTrue();
     assertThat(isRetryableCredentialsError(new IOException(new ConnectException("refused"))))
         .isTrue();
+    assertThat(
+            isRetryableCredentialsError(
+                new IOException("Error requesting access token", new SocketException("reset"))))
+        .isTrue();
+    assertThat(
+            isRetryableCredentialsError(
+                new IOException(new NoRouteToHostException("No route to host"))))
+        .isTrue();
+    assertThat(
+            isRetryableCredentialsError(
+                new SSLException("Connection closed", new EOFException("SSL peer shut down"))))
+        .isTrue();
+    assertThat(isRetryableCredentialsError(new EOFException("Premature EOF"))).isTrue();
     assertThat(
             isRetryableCredentialsError(
                 new IOException(
@@ -574,13 +641,10 @@ public class RetryHttpInitializerTest {
                     new UnknownHostException("metadata.google.internal"))))
         .isFalse();
     assertThat(isRetryableCredentialsError(new IOException("unknown"))).isFalse();
+    assertThat(isRetryableCredentialsError(new IllegalStateException("not an IOException")))
+        .isFalse();
   }
 
-  /**
-   * Mimics the error thrown by {@code ComputeEngineCredentials} when the metadata server returns an
-   * error: only 503 is wrapped into a retryable {@code GoogleAuthException}, any other status code
-   * is reported as a plain {@link IOException} with the status code in the message only.
-   */
   private static IOException metadataServerError(int statusCode) {
     if (statusCode == 503) {
       return new RetryableIOException(/* retryable= */ true, httpResponseException(statusCode));
@@ -589,7 +653,9 @@ public class RetryHttpInitializerTest {
       return new IOException(
           "Error code 404 trying to get security access token from Compute Engine metadata for"
               + " the default service account. This may be because the virtual machine instance"
-              + " does not have permission scopes specified.");
+              + " does not have permission scopes specified. It is possible to skip checking for"
+              + " Compute Engine metadata by specifying the environment  variable"
+              + " NO_GCE_CHECK=true.");
     }
     return new IOException(
         String.format(
@@ -598,18 +664,41 @@ public class RetryHttpInitializerTest {
             statusCode));
   }
 
-  /**
-   * Mimics the {@code GoogleAuthException} thrown by {@code ServiceAccountCredentials} and {@code
-   * UserCredentials} when the OAuth2 token endpoint returns an error.
-   */
+  private static IOException metadataServerUniverseDomainError(int statusCode) {
+    if (statusCode == 503) {
+      return new RetryableIOException(/* retryable= */ true, httpResponseException(statusCode));
+    }
+    return new RetryableIOException(
+        /* retryable= */ true,
+        new IOException(
+            String.format(
+                "Unexpected Error code %s trying to get universe domain from Compute Engine"
+                    + " metadata for the default service account: ",
+                statusCode)));
+  }
+
+  private static IOException metadataServerIdentityTokenError(int statusCode) {
+    if (statusCode == 503) {
+      return new RetryableIOException(/* retryable= */ true, httpResponseException(statusCode));
+    }
+    if (statusCode == 404) {
+      return new IOException(
+          "Error code 404 trying to get identity token from Compute Engine metadata. This may be"
+              + " because the virtual machine instance does not have permission scopes"
+              + " specified.");
+    }
+    return new IOException(
+        String.format(
+            "Unexpected Error code %s trying to get identity token from Compute Engine"
+                + " metadata: ",
+            statusCode));
+  }
+
   private static IOException tokenEndpointError(int statusCode) {
     return new RetryableIOException(
         SDK_RETRYABLE_STATUS_CODES.contains(statusCode), httpResponseException(statusCode));
   }
 
-  /**
-   * Mimics the error thrown by {@code ImpersonatedCredentials} when the IAM API returns an error.
-   */
   private static IOException iamCredentialsError(int statusCode) {
     return new IOException("Error requesting access token", httpResponseException(statusCode));
   }
@@ -620,16 +709,20 @@ public class RetryHttpInitializerTest {
 
   private RetryHttpInitializer createRetryHttpInitializer(
       Credentials credentials, Sleeper sleeper) {
+    return createRetryHttpInitializer(credentials, sleeper, /* maxRequestRetries= */ 5);
+  }
+
+  private RetryHttpInitializer createRetryHttpInitializer(
+      Credentials credentials, Sleeper sleeper, int maxRequestRetries) {
     return new RetryHttpInitializer(
         credentials,
         RetryHttpInitializerOptions.builder()
             .setDefaultUserAgent("foo-user-agent")
-            .setMaxRequestRetries(5)
+            .setMaxRequestRetries(maxRequestRetries)
             .build(),
         sleeper);
   }
 
-  /** Mimics {@code com.google.auth.oauth2.GoogleAuthException}, which is package-private. */
   private static class RetryableIOException extends IOException implements Retryable {
     private final boolean retryable;
 
