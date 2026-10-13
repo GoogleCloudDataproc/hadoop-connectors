@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.FolderInfo.BUCKET_PREFIX;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl.getUpdatedHeaders;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
@@ -76,6 +77,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -2623,12 +2625,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  private StorageControlClient lazyGetStorageControlClient() throws IOException {
+  @VisibleForTesting
+  StorageControlClient lazyGetStorageControlClient() throws IOException {
     if (this.storageControlClient == null) {
+      final ImmutableMap<String, String> headers =
+          getUpdatedHeaders(this.storageOptions, this.featureHeaderGenerator);
       this.storageControlClient =
           StorageControlClient.create(
               StorageControlSettings.newBuilder()
                   .setCredentialsProvider(FixedCredentialsProvider.create(this.credential))
+                  .setHeaderProvider(() -> headers)
                   .build());
     }
 
