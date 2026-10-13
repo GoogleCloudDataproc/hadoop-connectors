@@ -7,8 +7,8 @@ name: Close stale pull requests
 
 on:
   schedule:
-    # Runs daily at 00:00 UTC.
-    - cron: '0 0 * * *'
+    # Runs daily at 06:30 UTC (12:00 PM IST).
+    - cron: '30 6 * * *'
   # Allows manual triggering from the GitHub Actions UI for testing.
   workflow_dispatch:
 
