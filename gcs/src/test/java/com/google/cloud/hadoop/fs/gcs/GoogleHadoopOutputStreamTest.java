@@ -51,6 +51,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
@@ -525,7 +526,7 @@ public class GoogleHadoopOutputStreamTest {
         .thenReturn(GcsWriteOptions.builder().build());
     try {
       when(mockFs.getFileInfo(any(GcsItemId.class)))
-          .thenThrow(new IOException("Object not found: (mocked)"));
+          .thenThrow(new FileNotFoundException("Object not found: (mocked)"));
     } catch (IOException e) {
       logger.atWarning().withCause(e).log("Failed to stub getFileInfo");
     }
