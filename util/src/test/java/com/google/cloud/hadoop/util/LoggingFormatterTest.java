@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 
 import java.util.UUID;
@@ -91,7 +92,7 @@ public class LoggingFormatterTest {
 
     String formattedMessage = formatter.format(record);
 
-    assertEquals("[{\"key\":\"value\"}]\n", formattedMessage);
+    assertThat(formattedMessage).isEqualTo("[{\"key\":\"value\"}]\n");
   }
 
   @Test
@@ -105,7 +106,23 @@ public class LoggingFormatterTest {
 
       String formattedMessage = formatter.format(record);
 
-      assertEquals("[" + invocationId + "]: " + message + "\n", formattedMessage);
+      assertThat(formattedMessage).isEqualTo("[" + invocationId + "]: " + message + "\n");
+    }
+  }
+
+  @Test
+  public void format_withBracketedPlainTextMessage_prefixesMessageWithId() {
+    String invocationId = InvocationIdContext.getInvocationId();
+    String[] messages = {
+      "[main]", "[tag]", "[200]", "[]", "[main] Starting connector", "[INFO] Read 4096 bytes",
+    };
+    for (String message : messages) {
+      LogRecord record = new LogRecord(java.util.logging.Level.INFO, message);
+      record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+
+      String formattedMessage = formatter.format(record);
+
+      assertThat(formattedMessage).isEqualTo("[" + invocationId + "]: " + message + "\n");
     }
   }
 
