@@ -87,10 +87,10 @@ public class LoggingFormatterTest {
 
   @Test
   public void format_withJsonArrayMessage_doesNotPrefixMessage() {
-    LogRecord record = new LogRecord(java.util.logging.Level.INFO, "[{\"key\":\"value\"}]");
-    record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+    LogRecord logRecord = new LogRecord(java.util.logging.Level.INFO, "[{\"key\":\"value\"}]");
+    logRecord.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
 
-    String formattedMessage = formatter.format(record);
+    String formattedMessage = formatter.format(logRecord);
 
     assertThat(formattedMessage).isEqualTo("[{\"key\":\"value\"}]\n");
   }
@@ -101,10 +101,10 @@ public class LoggingFormatterTest {
     // and must still get the invocation ID prefix.
     String invocationId = InvocationIdContext.getInvocationId();
     for (String message : new String[] {"seek(2)", "close()", "123", "true", "null"}) {
-      LogRecord record = new LogRecord(java.util.logging.Level.INFO, message);
-      record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+      LogRecord logRecord = new LogRecord(java.util.logging.Level.INFO, message);
+      logRecord.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
 
-      String formattedMessage = formatter.format(record);
+      String formattedMessage = formatter.format(logRecord);
 
       assertThat(formattedMessage).isEqualTo("[" + invocationId + "]: " + message + "\n");
     }
@@ -117,10 +117,10 @@ public class LoggingFormatterTest {
       "[main]", "[tag]", "[200]", "[]", "[main] Starting connector", "[INFO] Read 4096 bytes",
     };
     for (String message : messages) {
-      LogRecord record = new LogRecord(java.util.logging.Level.INFO, message);
-      record.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+      LogRecord logRecord = new LogRecord(java.util.logging.Level.INFO, message);
+      logRecord.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
 
-      String formattedMessage = formatter.format(record);
+      String formattedMessage = formatter.format(logRecord);
 
       assertThat(formattedMessage).isEqualTo("[" + invocationId + "]: " + message + "\n");
     }

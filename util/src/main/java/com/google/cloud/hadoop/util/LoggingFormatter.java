@@ -122,8 +122,7 @@ public class LoggingFormatter extends Formatter {
       return false;
     }
     String trimmed = message.trim();
-    if (!((trimmed.startsWith("{") && trimmed.endsWith("}"))
-        || (trimmed.startsWith("[") && trimmed.endsWith("]")))) {
+    if (!hasJsonDelimiters(trimmed)) {
       return false;
     }
     try (JsonReader reader = new JsonReader(new StringReader(trimmed))) {
@@ -132,24 +131,30 @@ public class LoggingFormatter extends Formatter {
       if (reader.peek() != JsonToken.END_DOCUMENT) {
         return false;
       }
-      if (element.isJsonObject()) {
-        return true;
-      }
-      if (element.isJsonArray()) {
-        JsonArray array = element.getAsJsonArray();
-        if (array.isEmpty()) {
-          return false;
-        }
-        for (JsonElement item : array) {
-          if (!item.isJsonObject()) {
-            return false;
-          }
-        }
-        return true;
-      }
-      return false;
+      return element.isJsonObject() || isJsonObjectArray(element);
     } catch (IOException | JsonParseException | NumberFormatException e) {
       return false;
     }
+  }
+
+  private static boolean hasJsonDelimiters(String trimmed) {
+    return (trimmed.startsWith("{") && trimmed.endsWith("}"))
+        || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+  }
+
+  private static boolean isJsonObjectArray(JsonElement element) {
+    if (!element.isJsonArray()) {
+      return false;
+    }
+    JsonArray array = element.getAsJsonArray();
+    if (array.isEmpty()) {
+      return false;
+    }
+    for (JsonElement item : array) {
+      if (!item.isJsonObject()) {
+        return false;
+      }
+    }
+    return true;
   }
 }
