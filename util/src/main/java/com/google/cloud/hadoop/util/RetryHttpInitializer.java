@@ -156,8 +156,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   private void initializeCredentialsWithRetries(HttpRequest request) throws IOException {
     int maxRetries = Math.min(MAX_CREDENTIALS_RETRIES, options.getMaxRequestRetries());
     BackOff backOff = BACKOFF_BUILDER.build();
-    int retries = 0;
-    while (true) {
+
+    for (int retries = 0; ; retries++) {
       try {
         credentials.initialize(request);
         return;
@@ -165,25 +165,32 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         if (retries >= maxRetries || !isRetryableCredentialsError(e)) {
           throw e;
         }
+
         long backOffMillis = backOff.nextBackOffMillis();
         if (backOffMillis == BackOff.STOP) {
           throw e;
         }
-        retries++;
+
         logger.atWarning().withCause(e).atMostEvery(10, SECONDS).log(
             "Failed to get credentials for request to '%s', retrying in %d ms (retry %d/%d)",
-            request.getUrl(), backOffMillis, retries, maxRetries);
-        try {
-          sleeper.sleep(backOffMillis);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-          InterruptedIOException interruptedException =
-              new InterruptedIOException("Interrupted while retrying to get credentials");
-          interruptedException.initCause(ie);
-          interruptedException.addSuppressed(e);
-          throw interruptedException;
-        }
+            request.getUrl(), backOffMillis, retries + 1, maxRetries);
+
+        sleepWithBackoff(backOffMillis, e);
       }
+    }
+  }
+
+  private void sleepWithBackoff(long backOffMillis, IOException originalException)
+      throws InterruptedIOException {
+    try {
+      sleeper.sleep(backOffMillis);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      InterruptedIOException interruptedException =
+          new InterruptedIOException("Interrupted while retrying to get credentials");
+      interruptedException.initCause(ie);
+      interruptedException.addSuppressed(originalException);
+      throw interruptedException;
     }
   }
 
