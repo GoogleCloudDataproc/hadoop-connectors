@@ -32,10 +32,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
@@ -779,6 +782,61 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     fs.initialize(new URI("gs://foobar/"), config);
 
     assertThat(fs.isAnalyticsCoreEnabled()).isTrue();
+  }
+
+  @Test
+  public void initialize_analyticsCoreEnabled_defaultClientType_usesHttpProtocol()
+      throws Exception {
+    Configuration config = accessTokenProviderConfig(TestingAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    assertThat(analyticsCoreClientOptions(fs).getProtocol()).isEqualTo(Protocol.HTTP);
+    fs.close();
+  }
+
+  @Test
+  public void initialize_analyticsCoreEnabled_storageClient_usesGrpcProtocol() throws Exception {
+    Configuration config = accessTokenProviderConfig(TestingAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    config.setEnum(GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    GcsClientOptions clientOptions = analyticsCoreClientOptions(fs);
+    assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.GRPC);
+    assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isFalse();
+    fs.close();
+  }
+
+  @Test
+  public void initialize_analyticsCoreEnabled_storageClientWithBidi_usesBidiProtocol()
+      throws Exception {
+    Configuration config = accessTokenProviderConfig(TestingAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.write.enable", true);
+    config.setEnum(GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
+    config.setBoolean("fs.gs.bidi.enable", true);
+    config.setBoolean("fs.gs.grpc.write.enable", true);
+    config.setInt("fs.gs.bidi.client.timeout", 45);
+    config.setBoolean("fs.gs.bidi.finalize.on.close", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    GcsClientOptions clientOptions = analyticsCoreClientOptions(fs);
+    assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.BIDI);
+    assertThat(clientOptions.getGcsReadOptions().getBidiTimeout()).isEqualTo(45);
+    assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isTrue();
+    assertThat(clientOptions.getGcsWriteOptions().isBidiFinalizeOnClose()).isTrue();
+    fs.close();
+  }
+
+  private static GcsClientOptions analyticsCoreClientOptions(GoogleHadoopFileSystem fs) {
+    assertThat(fs.getAnalyticsCoreGcsFs()).isNotNull();
+    return fs.getAnalyticsCoreGcsFs().getFileSystemOptions().getGcsClientOptions();
   }
 
   private static Configuration accessTokenProviderConfig(
