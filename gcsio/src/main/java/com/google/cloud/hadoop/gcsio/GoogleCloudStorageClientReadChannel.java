@@ -314,7 +314,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             // actual read starts to avoid read discrepancies.
             checkState(
                 contentChannelCurrentPosition == currentPosition,
-                "position of read offset isn't in alignment with channel's read offset");
+                "position of read offset isn't in alignment with channel's read offset:"
+                    + " currentPosition (%s), contentChannelCurrentPosition (%s),"
+                    + " contentChannelEnd (%s), objectSize (%s) for '%s'",
+                currentPosition,
+                contentChannelCurrentPosition,
+                contentChannelEnd,
+                objectSize,
+                resourceId);
           }
           int bytesRead = byteChannel.read(dst);
 
@@ -652,6 +659,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return 0;
       }
 
+      if (readOptions.isReadExactRequestedBytesEnabled()) {
+        return currentPosition;
+      }
+
       // Guess the start boundary if the size is unknown
       if (objectSize == -1) {
         if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
@@ -666,9 +677,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return Math.max(0, currentPosition - (readOptions.getMinRangeRequestSize() - bytesToRead));
       }
 
-      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
-          && isFooterRead()
-          && !readOptions.isReadExactRequestedBytesEnabled()) {
+      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
