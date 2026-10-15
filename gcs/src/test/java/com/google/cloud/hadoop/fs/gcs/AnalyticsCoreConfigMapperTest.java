@@ -18,8 +18,10 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 
+import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.junit.Rule;
@@ -35,7 +37,11 @@ public class AnalyticsCoreConfigMapperTest {
   @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
   private static final Map<String, String> EXPECTED_MANDATORY_MAPPINGS =
-      Map.of("fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY, GoogleHadoopFileSystem.GHFS_ID);
+      Map.of(
+          "fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY,
+          GoogleHadoopFileSystem.GHFS_ID,
+          "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+          "COMPUTE_ENGINE");
 
   @Test
   public void mapConfigs_mapsConnectorPropertiesToAnalyticsCore() {
@@ -292,6 +298,290 @@ public class AnalyticsCoreConfigMapperTest {
 
     assertThat(mapped).doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.ENCRYPTION_KEY_KEY);
     assertThat(mapped).doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.DECRYPTION_KEY_KEY);
+  }
+
+  @Test
+  public void mapConfigs_mapsUniverseDomainAndProxySettings() {
+    Configuration config = createTransportConfiguration();
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.UNIVERSE_DOMAIN_KEY,
+            "my-universe.test",
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
+            "proxy-host:1234",
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_USERNAME_KEY,
+            "proxy-user",
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_PASSWORD_KEY,
+            "proxy-password");
+  }
+
+  @Test
+  public void mapConfigs_resolvesProxyPasswordFromCredentialProvider() throws Exception {
+    Configuration config = new Configuration();
+    config.set(
+        HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH,
+        "jceks://file"
+            + tempFolder.getRoot().toPath().resolve("proxy-secrets.jceks").toUri().getPath());
+    CredentialProvider credentialProvider = CredentialProviderFactory.getProviders(config).get(0);
+    credentialProvider.createCredentialEntry(
+        "fs.gs.proxy.password", "jceks-proxy-password".toCharArray());
+    credentialProvider.flush();
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PROXY_PASSWORD_KEY))
+        .isEqualTo("jceks-proxy-password");
+  }
+
+  @Test
+  public void mapConfigs_transportSettingsUnset_omitsAnalyticsCoreKeys() {
+    Configuration config = new Configuration();
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            "fs.gs." + AnalyticsCoreConfigMapper.SERVICE_HOST_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.UNIVERSE_DOMAIN_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_USERNAME_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_PASSWORD_KEY);
+  }
+
+  @Test
+  public void mapConfigs_removesConnectorSpelledAuthAndProxyKeys() {
+    Configuration config = createTransportConfiguration();
+    config.set("fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE");
+    config.set("fs.gs.auth.service.account.json.keyfile", "/path/to/key.json");
+    config.set("fs.gs.auth.impersonation.service.account", "sa@proj.iam.gserviceaccount.com");
+    config.set("fs.gs.token.server.url", "https://token.example/token");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            GoogleHadoopFileSystemConfiguration.GCS_UNIVERSE_DOMAIN.getKey(),
+            "fs.gs.proxy.address",
+            "fs.gs.proxy.username",
+            "fs.gs.proxy.password",
+            "fs.gs.auth.type",
+            "fs.gs.auth.service.account.json.keyfile",
+            "fs.gs.auth.impersonation.service.account",
+            "fs.gs.token.server.url");
+  }
+
+  @Test
+  public void mapConfigs_mapsServiceAccountKeyfileAuth() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE");
+    config.set("fs.gs.auth.service.account.json.keyfile", "/path/to/sa.json");
+    config.set("fs.gs.token.server.url", "https://token.example/token");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "SERVICE_ACCOUNT_JSON_KEYFILE",
+            "fs.gs." + AnalyticsCoreConfigMapper.SERVICE_ACCOUNT_JSON_KEYFILE_KEY,
+            "/path/to/sa.json",
+            "fs.gs." + AnalyticsCoreConfigMapper.TOKEN_SERVER_URI_KEY,
+            "https://token.example/token");
+  }
+
+  @Test
+  public void mapConfigs_mapsWorkloadIdentityFederationAuthAndRenamesEnumValue() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE");
+    config.set("fs.gs.auth.workload.identity.federation.credential.config.file", "/path/wif.json");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "WORKLOAD_IDENTITY_FEDERATION",
+            "fs.gs." + AnalyticsCoreConfigMapper.WORKLOAD_IDENTITY_CREDENTIAL_CONFIG_FILE_KEY,
+            "/path/wif.json");
+  }
+
+  @Test
+  public void mapConfigs_mapsUserCredentialsFromCredentialProvider() throws Exception {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "USER_CREDENTIALS");
+    config.set("fs.gs.auth.client.id", "my-client-id");
+    config.set("fs.gs.token.server.url", "https://token.example/token");
+    config.set(
+        HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH,
+        "jceks://file"
+            + tempFolder.getRoot().toPath().resolve("user-creds.jceks").toUri().getPath());
+    CredentialProvider credentialProvider = CredentialProviderFactory.getProviders(config).get(0);
+    credentialProvider.createCredentialEntry(
+        "fs.gs.auth.client.secret", "jceks-client-secret".toCharArray());
+    credentialProvider.createCredentialEntry(
+        "fs.gs.auth.refresh.token", "jceks-refresh-token".toCharArray());
+    credentialProvider.flush();
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "USER_CREDENTIALS",
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_ID_KEY,
+            "my-client-id",
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_SECRET_KEY,
+            "jceks-client-secret",
+            "fs.gs." + AnalyticsCoreConfigMapper.REFRESH_TOKEN_KEY,
+            "jceks-refresh-token",
+            "fs.gs." + AnalyticsCoreConfigMapper.TOKEN_SERVER_URI_KEY,
+            "https://token.example/token");
+  }
+
+  @Test
+  public void mapConfigs_mapsTokenServerUrlForApplicationDefault() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "APPLICATION_DEFAULT");
+    config.set("fs.gs.token.server.url", "https://token.example/token");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.TOKEN_SERVER_URI_KEY))
+        .isEqualTo("https://token.example/token");
+  }
+
+  @Test
+  public void mapConfigs_inactiveAuthTypeKeys_areNotForwarded() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "COMPUTE_ENGINE");
+    config.set("fs.gs.auth.service.account.json.keyfile", "/path/to/sa.json");
+    config.set("fs.gs.auth.client.id", "my-client-id");
+    config.set("fs.gs.auth.client.secret", "my-client-secret");
+    config.set("fs.gs.auth.refresh.token", "my-refresh-token");
+    config.set("fs.gs.token.server.url", "https://token.example/token");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            "fs.gs." + AnalyticsCoreConfigMapper.SERVICE_ACCOUNT_JSON_KEYFILE_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_ID_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_SECRET_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.REFRESH_TOKEN_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.TOKEN_SERVER_URI_KEY);
+  }
+
+  @Test
+  public void mapConfigs_resolvesPerUserImpersonationIntoTargetPrincipal() throws Exception {
+    Configuration config = new Configuration();
+    String currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    config.set(
+        "fs.gs.auth.impersonation.service.account.for.user." + currentUser,
+        "user-sa@proj.iam.gserviceaccount.com");
+    config.set(
+        "fs.gs.auth.impersonation.service.account", "static-sa@proj.iam.gserviceaccount.com");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.IMPERSONATION_SERVICE_ACCOUNT_KEY))
+        .isEqualTo("user-sa@proj.iam.gserviceaccount.com");
+  }
+
+  @Test
+  public void mapConfigs_fallsBackToGoogleCloudPrefixWhenFsGsUnset() {
+    Configuration config = new Configuration();
+    config.set("google.cloud.auth.type", "APPLICATION_DEFAULT");
+    config.set("google.cloud.proxy.address", "base-proxy:8080");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "APPLICATION_DEFAULT",
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
+            "base-proxy:8080");
+  }
+
+  @Test
+  public void mapConfigs_connectorKeySet_overridesAnalyticsCoreSpelledKeys() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "UNAUTHENTICATED");
+    config.set("fs.gs.proxy.address", "connector-proxy:3128");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY, "SERVICE_ACCOUNT_JSON_KEYFILE");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY, "analytics-core-proxy:9090");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "UNAUTHENTICATED",
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
+            "connector-proxy:3128");
+  }
+
+  @Test
+  public void mapConfigs_analyticsCoreSpelledAuthKeysSetDirectly_areDropped() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "ACCESS_TOKEN_PROVIDER");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY, "SERVICE_ACCOUNT_JSON_KEYFILE");
+    config.set(
+        "fs.gs." + AnalyticsCoreConfigMapper.SERVICE_ACCOUNT_JSON_KEYFILE_KEY, "/path/to/sa.json");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.PROXY_PASSWORD_KEY, "raw-proxy-password");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.SERVICE_ACCOUNT_JSON_KEYFILE_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.PROXY_PASSWORD_KEY);
+  }
+
+  @Test
+  public void mapConfigs_accessTokenProvider_omitsAnalyticsCoreIdentityKeys() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "ACCESS_TOKEN_PROVIDER");
+    config.set("fs.gs.auth.impersonation.service.account", "sa@proj.iam.gserviceaccount.com");
+    config.set("fs.gs.token.server.url", "https://token.example/token");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.IMPERSONATION_SERVICE_ACCOUNT_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.TOKEN_SERVER_URI_KEY);
+  }
+
+  @Test
+  public void mapConfigs_delegationTokenBindingSet_omitsAnalyticsCoreIdentityKeys() {
+    Configuration config = new Configuration();
+    config.set(
+        GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS.getKey(),
+        TestDelegationTokenBindingImpl.class.getName());
+    config.set("fs.gs.auth.impersonation.service.account", "sa@proj.iam.gserviceaccount.com");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
+            "fs.gs." + AnalyticsCoreConfigMapper.IMPERSONATION_SERVICE_ACCOUNT_KEY);
+  }
+
+  private static Configuration createTransportConfiguration() {
+    Configuration config = new Configuration();
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_UNIVERSE_DOMAIN.getKey(), "my-universe.test");
+    config.set("fs.gs.proxy.address", "proxy-host:1234");
+    config.set("fs.gs.proxy.username", "proxy-user");
+    config.set("fs.gs.proxy.password", "proxy-password");
+    return config;
   }
 
   private Configuration createTestConfiguration() {
