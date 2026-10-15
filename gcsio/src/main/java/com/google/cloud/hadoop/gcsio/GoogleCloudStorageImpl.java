@@ -2631,6 +2631,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       synchronized (this) {
         result = this.storageControlClient;
         if (result == null) {
+          // TODO: Support setting universeDomain for HNS API's.
           this.storageControlClient =
               result =
                   StorageControlClient.create(
