@@ -41,6 +41,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.BufferedOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -245,15 +246,9 @@ class GoogleHadoopOutputStream extends OutputStream
         throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
       }
       generation = fileInfo.getItemInfo().getContentGeneration().orElse(0L);
-    } catch (IOException e) {
-      // TODO(user): Remove this exception message check once analytics-core throws a specific
-      // FileNotFoundException / NoSuchFileException for non-existent objects.
-      if (e.getMessage() != null && e.getMessage().startsWith("Object not found:")) {
-        // If file does not exist, set the generation as 0.
-        generation = 0L;
-      } else {
-        throw e;
-      }
+    } catch (FileNotFoundException e) {
+      // If file does not exist, set the generation as 0.
+      generation = 0L;
     }
     GcsItemId itemId;
     if (generation == StorageResourceId.UNKNOWN_GENERATION_ID) {
