@@ -262,11 +262,12 @@ public class HadoopCredentialsConfiguration {
   }
 
   /**
-   * Create a {@link ImpersonatedCredentials} based on service account to impersonate configuration
+   * Resolves the target service account email to impersonate for the current {@link
+   * UserGroupInformation} user, evaluating per-user mappings, per-group mappings, and the static
+   * impersonation service account in order.
    */
-  public static GoogleCredentials getImpersonatedCredentials(
-      Configuration config, GoogleCredentials sourceCredentials, String... keyPrefixesVararg)
-      throws IOException {
+  public static Optional<String> getImpersonationServiceAccount(
+      Configuration config, String... keyPrefixesVararg) throws IOException {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
     Map<String, String> userImpersonationServiceAccounts =
         USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
@@ -283,29 +284,38 @@ public class HadoopCredentialsConfiguration {
     if (userImpersonationServiceAccounts.isEmpty()
         && groupImpersonationServiceAccounts.isEmpty()
         && isNullOrEmpty(impersonationServiceAccount)) {
-      return null;
+      return Optional.empty();
     }
 
-    checkNotNull(sourceCredentials, "credentials can not be null");
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-    Optional<String> serviceAccountToImpersonate =
-        Stream.of(
-                () ->
-                    getServiceAccountToImpersonateForUserGroup(
-                        userImpersonationServiceAccounts,
-                        ImmutableList.of(currentUser.getShortUserName())),
-                () ->
-                    getServiceAccountToImpersonateForUserGroup(
-                        groupImpersonationServiceAccounts,
-                        ImmutableList.copyOf(currentUser.getGroupNames())),
-                (Supplier<Optional<String>>) () -> Optional.ofNullable(impersonationServiceAccount))
-            .map(Supplier::get)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .filter(sa -> !isNullOrEmpty(sa))
-            .findFirst();
+    return Stream.of(
+            () ->
+                getServiceAccountToImpersonateForUserGroup(
+                    userImpersonationServiceAccounts,
+                    ImmutableList.of(currentUser.getShortUserName())),
+            () ->
+                getServiceAccountToImpersonateForUserGroup(
+                    groupImpersonationServiceAccounts,
+                    ImmutableList.copyOf(currentUser.getGroupNames())),
+            (Supplier<Optional<String>>) () -> Optional.ofNullable(impersonationServiceAccount))
+        .map(Supplier::get)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .filter(sa -> !isNullOrEmpty(sa))
+        .findFirst();
+  }
 
+  /**
+   * Create a {@link ImpersonatedCredentials} based on service account to impersonate configuration
+   */
+  public static GoogleCredentials getImpersonatedCredentials(
+      Configuration config, GoogleCredentials sourceCredentials, String... keyPrefixesVararg)
+      throws IOException {
+    Optional<String> serviceAccountToImpersonate =
+        getImpersonationServiceAccount(config, keyPrefixesVararg);
     if (serviceAccountToImpersonate.isPresent()) {
+      checkNotNull(sourceCredentials, "credentials can not be null");
+      List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
       Supplier<HttpTransport> transport = getHttpTransport(config, keyPrefixes);
       ImpersonatedCredentials impersonatedCredentials =
           ImpersonatedCredentials.newBuilder()
@@ -316,7 +326,7 @@ public class HadoopCredentialsConfiguration {
               .build();
       logger.atFine().log(
           "Impersonating '%s' service account for '%s' user",
-          serviceAccountToImpersonate.get(), currentUser);
+          serviceAccountToImpersonate.get(), UserGroupInformation.getCurrentUser());
       return impersonatedCredentials;
     }
 

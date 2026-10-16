@@ -57,7 +57,9 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -285,6 +287,39 @@ public class HadoopCredentialsConfigurationTest {
   public void defaultPropertiesValues() {
     assertThat(getDefaultProperties(HadoopCredentialsConfiguration.class))
         .containsExactlyEntriesIn(expectedDefaultConfiguration);
+  }
+
+  @Test
+  public void getImpersonationServiceAccount_userMatchOverridesGroupAndStatic() throws Exception {
+    String currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    configuration.set(
+        "fs.gs.auth.impersonation.service.account.for.user." + currentUser,
+        "user-sa@proj.iam.gserviceaccount.com");
+    configuration.set(
+        "fs.gs.auth.impersonation.service.account", "static-sa@proj.iam.gserviceaccount.com");
+
+    assertThat(
+            HadoopCredentialsConfiguration.getImpersonationServiceAccount(configuration, "fs.gs"))
+        .isEqualTo(Optional.of("user-sa@proj.iam.gserviceaccount.com"));
+  }
+
+  @Test
+  public void getImpersonationServiceAccount_prefixOverrideWinsOverBasePrefix() throws Exception {
+    configuration.set(
+        "google.cloud.auth.impersonation.service.account", "base-sa@proj.iam.gserviceaccount.com");
+    configuration.set(
+        "fs.gs.auth.impersonation.service.account", "override-sa@proj.iam.gserviceaccount.com");
+
+    assertThat(
+            HadoopCredentialsConfiguration.getImpersonationServiceAccount(configuration, "fs.gs"))
+        .isEqualTo(Optional.of("override-sa@proj.iam.gserviceaccount.com"));
+  }
+
+  @Test
+  public void getImpersonationServiceAccount_unconfigured_returnsEmpty() throws Exception {
+    assertThat(
+            HadoopCredentialsConfiguration.getImpersonationServiceAccount(configuration, "fs.gs"))
+        .isEqualTo(Optional.empty());
   }
 
   private static String getStringPath(String resource) {
