@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -27,17 +28,28 @@ import com.google.api.client.http.HttpIOExceptionHandler;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
+import com.google.api.client.util.BackOff;
 import com.google.api.client.util.ExponentialBackOff;
+import com.google.api.client.util.Sleeper;
 import com.google.auth.Credentials;
+import com.google.auth.Retryable;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LogContext;
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.util.OptionalInt;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** An implementation of {@link HttpRequestInitializer} with retries. */
 public class RetryHttpInitializer implements HttpRequestInitializer {
@@ -55,6 +67,22 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           // 30 minutes
           .setMaxElapsedTimeMillis(1_800_000);
 
+  // Cap credentials retries below the default maxRequestRetries (10) to avoid excessive nested
+  // retries with google-auth-library and ResilientOperation.
+  @VisibleForTesting static final int MAX_CREDENTIALS_RETRIES = 5;
+
+  // Transient HTTP status codes to retry when fetching credentials (503 and 429 per GCE metadata
+  // server guidance; OAuth2 token endpoints already retry 500/408 internally).
+  private static final ImmutableSet<Integer> RETRYABLE_CREDENTIALS_STATUS_CODES =
+      ImmutableSet.of(
+          HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE,
+          UnsuccessfulResponseHandler.HTTP_SC_TOO_MANY_REQUESTS);
+
+  // ComputeEngineCredentials surfaces non-503 metadata server errors as an IOException with the
+  // status code only in the message.
+  private static final Pattern METADATA_SERVER_ERROR_PATTERN =
+      Pattern.compile("(?:Unexpected )?Error code (\\d{3}) trying to get .+ from Compute Engine");
+
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credentials must refresh
   // its token for a retry.
@@ -62,14 +90,23 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
+  private final Sleeper sleeper;
+
   /**
    * @param credentials A credentials which will be used to initialize on HttpRequests and as the
    *     delegate for a {@link UnsuccessfulResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
   public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
+    this(credentials, options, Sleeper.DEFAULT);
+  }
+
+  @VisibleForTesting
+  RetryHttpInitializer(
+      Credentials credentials, RetryHttpInitializerOptions options, Sleeper sleeper) {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
+    this.sleeper = sleeper;
   }
 
   @Override
@@ -77,7 +114,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
     // to refresh credentials later if necessary
     if (credentials != null) {
-      credentials.initialize(request);
+      initializeCredentialsWithRetries(request);
     }
 
     RequestTracker tracker = getRequestTracker(request);
@@ -112,6 +149,76 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   public Credentials getCredentials() {
     return credentials == null ? null : credentials.getCredentials();
+  }
+
+  // Credentials fetch/refresh their token during initialize(), before the request's own retry
+  // handlers are attached, so retry transient credential errors here.
+  private void initializeCredentialsWithRetries(HttpRequest request) throws IOException {
+    int maxRetries = Math.min(MAX_CREDENTIALS_RETRIES, options.getMaxRequestRetries());
+    BackOff backOff = BACKOFF_BUILDER.build();
+
+    for (int retries = 0; ; retries++) {
+      try {
+        credentials.initialize(request);
+        return;
+      } catch (IOException e) {
+        if (retries >= maxRetries || !isRetryableCredentialsError(e)) {
+          throw e;
+        }
+
+        long backOffMillis = backOff.nextBackOffMillis();
+        if (backOffMillis == BackOff.STOP) {
+          throw e;
+        }
+
+        logger.atWarning().withCause(e).atMostEvery(10, SECONDS).log(
+            "Failed to get credentials for request to '%s', retrying in %d ms (retry %d/%d)",
+            request.getUrl(), backOffMillis, retries + 1, maxRetries);
+
+        sleepWithBackoff(backOffMillis, e);
+      }
+    }
+  }
+
+  private void sleepWithBackoff(long backOffMillis, IOException originalException)
+      throws InterruptedIOException {
+    try {
+      sleeper.sleep(backOffMillis);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      InterruptedIOException interruptedException =
+          new InterruptedIOException("Interrupted while retrying to get credentials");
+      interruptedException.initCause(ie);
+      interruptedException.addSuppressed(originalException);
+      throw interruptedException;
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isRetryableCredentialsError(Throwable e) {
+    boolean retryableConnectionError = false;
+    for (Throwable t : Throwables.getCausalChain(e)) {
+      OptionalInt statusCode = getTokenRequestStatusCode(t);
+      if (statusCode.isPresent()) {
+        return RETRYABLE_CREDENTIALS_STATUS_CODES.contains(statusCode.getAsInt());
+      }
+      retryableConnectionError |=
+          (t instanceof Retryable && ((Retryable) t).isRetryable())
+              || t instanceof EOFException
+              || IoExceptionHelper.isSocketError(t);
+    }
+    return retryableConnectionError;
+  }
+
+  private static OptionalInt getTokenRequestStatusCode(Throwable t) {
+    if (t instanceof HttpResponseException) {
+      return OptionalInt.of(((HttpResponseException) t).getStatusCode());
+    }
+    Matcher metadataServerError =
+        METADATA_SERVER_ERROR_PATTERN.matcher(nullToEmpty(t.getMessage()));
+    return metadataServerError.find()
+        ? OptionalInt.of(Integer.parseInt(metadataServerError.group(1)))
+        : OptionalInt.empty();
   }
 
   /**

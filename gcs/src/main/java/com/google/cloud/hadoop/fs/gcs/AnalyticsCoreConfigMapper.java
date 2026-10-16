@@ -15,10 +15,23 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.common.base.Strings.isNullOrEmpty;
+
+import com.google.cloud.hadoop.util.HadoopConfigurationProperty;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 
 /** Maps GCS Hadoop Connector configurations to GCS Analytics Core configurations. */
@@ -47,6 +60,93 @@ final class AnalyticsCoreConfigMapper {
   static final String ENCRYPTION_KEY_KEY = "encryption-key";
   static final String DECRYPTION_KEY_KEY = "decryption-key";
   static final String CHECKSUM_VALIDATION_ENABLED_KEY = "channel.write.checksum-validation.enabled";
+  static final String UNIVERSE_DOMAIN_KEY = "universe-domain";
+  static final String AUTH_TYPE_KEY = "analytics-core.auth.type";
+  static final String SERVICE_ACCOUNT_JSON_KEYFILE_KEY =
+      "analytics-core.auth.service-account-json-keyfile";
+  static final String WORKLOAD_IDENTITY_CREDENTIAL_CONFIG_FILE_KEY =
+      "analytics-core.auth.workload-identity-federation.credential-config-file";
+  static final String CLIENT_ID_KEY = "analytics-core.auth.client-id";
+  static final String CLIENT_SECRET_KEY = "analytics-core.auth.client-secret";
+  static final String REFRESH_TOKEN_KEY = "analytics-core.auth.refresh-token";
+  static final String IMPERSONATION_SERVICE_ACCOUNT_KEY =
+      "analytics-core.auth.impersonation-service-account";
+  static final String TOKEN_SERVER_URI_KEY = "analytics-core.auth.token-server-uri";
+  static final String PROXY_ADDRESS_KEY = "analytics-core.auth.proxy.address";
+  static final String PROXY_USERNAME_KEY = "analytics-core.auth.proxy.username";
+  static final String PROXY_PASSWORD_KEY = "analytics-core.auth.proxy.password";
+
+  private static final String WORKLOAD_IDENTITY_FEDERATION_VALUE = "WORKLOAD_IDENTITY_FEDERATION";
+
+  /** Auth types whose credentials can use a custom token server URL. */
+  private static final ImmutableSet<AuthenticationType> TOKEN_SERVER_URL_AUTH_TYPES =
+      Sets.immutableEnumSet(
+          AuthenticationType.APPLICATION_DEFAULT,
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE,
+          AuthenticationType.USER_CREDENTIALS);
+
+  private static final ImmutableList<String> KEY_PREFIXES =
+      ImmutableList.copyOf(HadoopCredentialsConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX));
+
+  /**
+   * Connector-spelled auth and proxy properties bound to {@code ["fs.gs", "google.cloud"]}.
+   *
+   * <p>Constructed as fresh instances rather than reusing the shared suffix constants in {@link
+   * HadoopCredentialsConfiguration}, because {@code withPrefixes} mutates those shared instances.
+   */
+  private static final HadoopConfigurationProperty<AuthenticationType> AUTHENTICATION_TYPE =
+      new HadoopConfigurationProperty<>(
+              HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX.getKey(),
+              HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX.getDefault())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_JSON_KEYFILE =
+      new HadoopConfigurationProperty<String>(
+              HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<String>
+      WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE =
+          new HadoopConfigurationProperty<String>(
+                  HadoopCredentialsConfiguration
+                      .WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE_SUFFIX
+                      .getKey())
+              .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID =
+      new HadoopConfigurationProperty<String>(
+              HadoopCredentialsConfiguration.AUTH_CLIENT_ID_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<RedactedString> AUTH_CLIENT_SECRET =
+      new HadoopConfigurationProperty<RedactedString>(
+              HadoopCredentialsConfiguration.AUTH_CLIENT_SECRET_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<RedactedString> AUTH_REFRESH_TOKEN =
+      new HadoopConfigurationProperty<RedactedString>(
+              HadoopCredentialsConfiguration.AUTH_REFRESH_TOKEN_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL =
+      new HadoopConfigurationProperty<String>(
+              HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<String> PROXY_ADDRESS =
+      new HadoopConfigurationProperty<String>(
+              HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<RedactedString> PROXY_USERNAME =
+      new HadoopConfigurationProperty<RedactedString>(
+              HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<RedactedString> PROXY_PASSWORD =
+      new HadoopConfigurationProperty<RedactedString>(
+              HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
 
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
@@ -92,6 +192,8 @@ final class AnalyticsCoreConfigMapper {
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(),
               CHECKSUM_VALIDATION_ENABLED_KEY)
+          .put(
+              GoogleHadoopFileSystemConfiguration.GCS_UNIVERSE_DOMAIN.getKey(), UNIVERSE_DOMAIN_KEY)
           .build();
 
   private AnalyticsCoreConfigMapper() {
@@ -101,6 +203,11 @@ final class AnalyticsCoreConfigMapper {
   /**
    * Maps configurations from Hadoop Configuration to a map suitable for Analytics Core. If a
    * configuration flag is not set by the user, Analytics Core defaults will be used.
+   *
+   * <p>Auth and proxy settings are translated from their connector spelling ({@code fs.gs.auth.*},
+   * {@code fs.gs.proxy.*}, {@code fs.gs.token.server.url}) to the {@code analytics-core.auth.*}
+   * keys, resolving JCEKS secrets and impersonation the same way the connector does. Auth keys set
+   * directly in the Analytics Core spelling are ignored.
    *
    * @param config The Hadoop configuration.
    * @param prefix The prefix used for Analytics Core properties (e.g., "fs.gs.").
@@ -154,6 +261,10 @@ final class AnalyticsCoreConfigMapper {
 
     mapEncryptionKey(config, mappedProperties, prefix);
 
+    removeSweptAuthKeys(mappedProperties, prefix);
+    mapProxyConfigs(config, prefix, mappedProperties);
+    mapAuthIdentityConfigs(config, prefix, mappedProperties);
+
     return mappedProperties;
   }
 
@@ -169,6 +280,116 @@ final class AnalyticsCoreConfigMapper {
     if (encryptionKey != null) {
       map.put(prefix + ENCRYPTION_KEY_KEY, encryptionKey.value());
       map.put(prefix + DECRYPTION_KEY_KEY, encryptionKey.value());
+    }
+  }
+
+  private static void mapProxyConfigs(
+      Configuration config, String prefix, Map<String, String> map) {
+    mapStringProperty(config, map, PROXY_ADDRESS, prefix + PROXY_ADDRESS_KEY);
+    mapSecretProperty(config, map, PROXY_USERNAME, prefix + PROXY_USERNAME_KEY);
+    mapSecretProperty(config, map, PROXY_PASSWORD, prefix + PROXY_PASSWORD_KEY);
+  }
+
+  /**
+   * Maps the auth type and only the keys that type uses, so secrets of other auth types left in a
+   * shared cluster config are not forwarded. {@code ACCESS_TOKEN_PROVIDER} and delegation tokens
+   * are Hadoop-only plugins and map to nothing; the connector keeps building those credentials
+   * itself.
+   */
+  private static void mapAuthIdentityConfigs(
+      Configuration config, String prefix, Map<String, String> map) {
+    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
+    if (authType == AuthenticationType.ACCESS_TOKEN_PROVIDER
+        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+      return;
+    }
+    map.put(prefix + AUTH_TYPE_KEY, toAnalyticsCoreAuthType(authType));
+
+    switch (authType) {
+      case SERVICE_ACCOUNT_JSON_KEYFILE:
+        mapStringProperty(
+            config, map, SERVICE_ACCOUNT_JSON_KEYFILE, prefix + SERVICE_ACCOUNT_JSON_KEYFILE_KEY);
+        break;
+      case WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE:
+        mapStringProperty(
+            config,
+            map,
+            WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE,
+            prefix + WORKLOAD_IDENTITY_CREDENTIAL_CONFIG_FILE_KEY);
+        break;
+      case USER_CREDENTIALS:
+        mapStringProperty(config, map, AUTH_CLIENT_ID, prefix + CLIENT_ID_KEY);
+        mapSecretProperty(config, map, AUTH_CLIENT_SECRET, prefix + CLIENT_SECRET_KEY);
+        mapSecretProperty(config, map, AUTH_REFRESH_TOKEN, prefix + REFRESH_TOKEN_KEY);
+        break;
+      default:
+        break;
+    }
+
+    mapImpersonationServiceAccount(config, prefix, map);
+    if (TOKEN_SERVER_URL_AUTH_TYPES.contains(authType)) {
+      mapStringProperty(config, map, TOKEN_SERVER_URL, prefix + TOKEN_SERVER_URI_KEY);
+    }
+  }
+
+  private static void mapImpersonationServiceAccount(
+      Configuration config, String prefix, Map<String, String> map) {
+    try {
+      Optional<String> impersonationServiceAccount =
+          HadoopCredentialsConfiguration.getImpersonationServiceAccount(config, GCS_CONFIG_PREFIX);
+      impersonationServiceAccount.ifPresent(
+          account -> map.put(prefix + IMPERSONATION_SERVICE_ACCOUNT_KEY, account));
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to resolve impersonation service account", e);
+    }
+  }
+
+  /**
+   * Removes the auth and proxy keys swept in from the Hadoop configuration, in both the connector
+   * and the Analytics Core spelling, so that only the keys mapped from connector config remain.
+   */
+  private static void removeSweptAuthKeys(Map<String, String> map, String prefix) {
+    String connectorAuthPrefix = prefix + "auth.";
+    String connectorProxyPrefix = prefix + "proxy.";
+    String connectorTokenServerUrlKey = prefix + "token.server.url";
+    String analyticsCoreAuthPrefix = prefix + "analytics-core.auth.";
+    map.keySet()
+        .removeIf(
+            key ->
+                key.startsWith(connectorAuthPrefix)
+                    || key.startsWith(connectorProxyPrefix)
+                    || key.equals(connectorTokenServerUrlKey)
+                    || key.startsWith(analyticsCoreAuthPrefix));
+  }
+
+  private static String toAnalyticsCoreAuthType(AuthenticationType authType) {
+    if (authType == AuthenticationType.WORKLOAD_IDENTITY_FEDERATION_CREDENTIAL_CONFIG_FILE) {
+      return WORKLOAD_IDENTITY_FEDERATION_VALUE;
+    }
+    return authType.name();
+  }
+
+  /** Maps a plain property when it is set to a non-empty value, as the connector treats it. */
+  private static void mapStringProperty(
+      Configuration config,
+      Map<String, String> map,
+      HadoopConfigurationProperty<String> property,
+      String analyticsCoreKey) {
+    String value = property.get(config, config::get);
+    if (value != null && !value.isEmpty()) {
+      map.put(analyticsCoreKey, value);
+    }
+  }
+
+  /** Maps a secret via {@code getPassword}, so values held in a JCEKS provider are resolved. */
+  private static void mapSecretProperty(
+      Configuration config,
+      Map<String, String> map,
+      HadoopConfigurationProperty<RedactedString> property,
+      String analyticsCoreKey) {
+    RedactedString secret = property.getPassword(config);
+    if (secret != null) {
+      map.put(analyticsCoreKey, secret.value());
     }
   }
 
