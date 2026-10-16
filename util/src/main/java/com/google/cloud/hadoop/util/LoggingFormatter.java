@@ -17,8 +17,15 @@
 package com.google.cloud.hadoop.util;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParseException;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Formatter;
@@ -34,6 +41,9 @@ public class LoggingFormatter extends Formatter {
 
   /** The base package for all loggers in this repository that should be formatted. */
   private static final String GCS_CONNECTOR_LOGGER_PREFIX = "com.google.cloud.hadoop";
+
+  private static final TypeAdapter<JsonElement> JSON_ELEMENT_ADAPTER =
+      new Gson().getAdapter(JsonElement.class);
 
   private final Formatter existingFormatter;
 
@@ -102,21 +112,49 @@ public class LoggingFormatter extends Formatter {
   }
 
   /**
-   * Checks if the given message is in JSON format.
+   * Checks if the given message is a JSON object or non-empty array of JSON objects.
    *
    * @param message the log message to check
-   * @return true if the message is in JSON format, false otherwise
+   * @return true if the message is a JSON object or array of JSON objects, false otherwise
    */
   private boolean isJson(String message) {
-    // Check if the message is a JSON string.
     if (message == null) {
       return false;
     }
-    try {
-      var unused = JsonParser.parseString(message);
-      return true; // If parsing succeeds, it's valid JSON.
-    } catch (JsonSyntaxException e) {
+    String trimmed = message.trim();
+    if (!hasJsonDelimiters(trimmed)) {
       return false;
     }
+    try (JsonReader reader = new JsonReader(new StringReader(trimmed))) {
+      reader.setLenient(false);
+      JsonElement element = JSON_ELEMENT_ADAPTER.read(reader);
+      if (reader.peek() != JsonToken.END_DOCUMENT) {
+        return false;
+      }
+      return element.isJsonObject() || isJsonObjectArray(element);
+    } catch (IOException | JsonParseException | NumberFormatException e) {
+      return false;
+    }
+  }
+
+  private static boolean hasJsonDelimiters(String trimmed) {
+    return (trimmed.startsWith("{") && trimmed.endsWith("}"))
+        || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+  }
+
+  private static boolean isJsonObjectArray(JsonElement element) {
+    if (!element.isJsonArray()) {
+      return false;
+    }
+    JsonArray array = element.getAsJsonArray();
+    if (array.isEmpty()) {
+      return false;
+    }
+    for (JsonElement item : array) {
+      if (!item.isJsonObject()) {
+        return false;
+      }
+    }
+    return true;
   }
 }
