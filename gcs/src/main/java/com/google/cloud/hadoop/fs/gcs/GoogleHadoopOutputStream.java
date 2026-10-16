@@ -41,6 +41,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.BufferedOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -123,6 +124,13 @@ class GoogleHadoopOutputStream extends OutputStream
   // on hflush()/hsync() call.
   private OutputStream tmpOut;
 
+  // Number of bytes written to the current component. An empty tail component is not composed
+  // onto the destination, because that would only create a new generation of identical content.
+  private long tmpBytesWritten;
+
+  // Whether the stream appends to an existing object.
+  private final boolean appendMode;
+
   private final RateLimiter syncRateLimiter;
 
   // List of temporary file-deletion futures accrued during the lifetime of this output stream.
@@ -187,7 +195,8 @@ class GoogleHadoopOutputStream extends OutputStream
             .setDeleteSourceObjects(this.composeDeleteSourceEnabled)
             .build();
 
-    if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
+    this.appendMode = createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND;
+    if (appendMode) {
       // When appending first component has to go to new temporary file.
       this.tmpGcsPath = getNextTmpPath();
       this.tmpIndex = 1;
@@ -305,6 +314,7 @@ class GoogleHadoopOutputStream extends OutputStream
           long start = System.nanoTime();
           throwIfNotOpen();
           tmpOut.write(b);
+          tmpBytesWritten++;
           streamStatistics.writeBytes(1);
           // Using a lightweight implementation to update instrumentation. This method can be called
           // quite
@@ -342,6 +352,7 @@ class GoogleHadoopOutputStream extends OutputStream
           long start = System.nanoTime();
           throwIfNotOpen();
           tmpOut.write(b, offset, len);
+          tmpBytesWritten += len;
           statistics.incrementBytesWritten(len);
           statistics.incrementWriteOps(1);
           streamStats.updateWriteStreamStats(len, start);
@@ -423,13 +434,13 @@ class GoogleHadoopOutputStream extends OutputStream
     logger.atFiner().log(
         "hsync(): Opening next temporary tail file %s at %d index", tmpGcsPath, tmpIndex);
     tmpOut = createOutputStream(ghfs, tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
+    tmpBytesWritten = 0;
 
     long finishMs = System.currentTimeMillis();
     logger.atFiner().log("Took %dms to sync() for %s", finishMs - startMs, dstGcsPath);
   }
 
   private void commitTempFile() throws IOException {
-    // TODO(user): return early when 0 bytes have been written in the temp files
     tmpOut.close();
 
     // TODO(user): Support generation ID retrieval for GcsAnalyticsCoreOutputStreamWrapper once
@@ -462,18 +473,46 @@ class GoogleHadoopOutputStream extends OutputStream
           dstGcsPath,
           tmpGcsPath);
       GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
+      if (tmpBytesWritten == 0) {
+        // Nothing was written since the previous commit, so the tail is empty. A compose would
+        // only replace the destination with a new generation of the same content. Skip the
+        // compose and only remove the empty tail.
+        if (appendMode && dstGenerationId == StorageResourceId.UNKNOWN_GENERATION_ID) {
+          // Hadoop requires append() on a file that does not exist to fail. A compose fails on a
+          // missing destination, but an empty tail is not composed, so check here.
+          StorageResourceId plainDstId =
+              StorageResourceId.fromUriPath(dstGcsPath, /* allowEmptyObjectName= */ false);
+          GoogleCloudStorageItemInfo dstInfo = gcs.getItemInfo(plainDstId);
+          if (!dstInfo.exists()) {
+            GoogleCloudStorageEventBus.postOnException();
+            throw new FileNotFoundException(
+                String.format("Cannot append to nonexistent file '%s'", dstGcsPath));
+          }
+          // Keep the generation, so the next compose does not have to look it up again.
+          dstGenerationId = dstInfo.getContentGeneration();
+        }
+        logger.atFiner().log(
+            "commitTempFile(): tail %s is empty, not composing it onto %s", tmpGcsPath, dstGcsPath);
+        scheduleTempFileDeletion(gcs, tmpId);
+        return;
+      }
       GoogleCloudStorageItemInfo composedObject =
           gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
       dstGenerationId = composedObject.getContentGeneration();
       if (!composeDeleteSourceEnabled) {
-        tmpDeletionFutures.add(
-            TMP_FILE_CLEANUP_THREADPOOL.submit(
-                () -> {
-                  gcs.deleteObjects(ImmutableList.of(tmpId));
-                  return null;
-                }));
+        scheduleTempFileDeletion(gcs, tmpId);
       }
     }
+  }
+
+  /** Deletes a committed tail component in the background; {@link #close()} awaits the result. */
+  private void scheduleTempFileDeletion(GoogleCloudStorage gcs, StorageResourceId tmpId) {
+    tmpDeletionFutures.add(
+        TMP_FILE_CLEANUP_THREADPOOL.submit(
+            () -> {
+              gcs.deleteObjects(ImmutableList.of(tmpId));
+              return null;
+            }));
   }
 
   /** Returns URI to be used for the next temp "tail" file in the series. */
