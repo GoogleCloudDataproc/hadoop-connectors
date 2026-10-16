@@ -652,6 +652,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return 0;
       }
 
+      if (readOptions.isReadExactRequestedBytesEnabled()) {
+        return currentPosition;
+      }
+
       // Guess the start boundary if the size is unknown
       if (objectSize == -1) {
         if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
@@ -666,9 +670,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         return Math.max(0, currentPosition - (readOptions.getMinRangeRequestSize() - bytesToRead));
       }
 
-      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL
-          && isFooterRead()
-          && !readOptions.isReadExactRequestedBytesEnabled()) {
+      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
         // Prefetch footer and adjust start position to footerStart.
         return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
