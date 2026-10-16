@@ -34,6 +34,9 @@ import static org.mockito.Mockito.verify;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
+import com.google.cloud.gcs.analyticscore.client.auth.AuthType;
+import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
+import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
@@ -62,6 +65,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -829,6 +833,59 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isTrue();
     assertThat(clientOptions.getGcsWriteOptions().isBidiFinalizeOnClose()).isTrue();
     fs.close();
+  }
+
+  @Test
+  public void initialize_unauthenticatedAndAnalyticsCoreEnabled_succeeds() throws Exception {
+    Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.UNAUTHENTICATED);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    assertThat(fs.getAnalyticsCoreGcsFs().getFileSystemOptions().getGcsAuthOptions().getAuthType())
+        .isEqualTo(Optional.of(AuthType.UNAUTHENTICATED));
+    fs.close();
+  }
+
+  @Test
+  public void initialize_delegationTokenBindingAndAnalyticsCoreEnabled_usesBindingCredentials()
+      throws Exception {
+    Configuration config = new Configuration();
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
+    config.set(
+        TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
+        "test-token");
+    // Analytics Core would fail on this keyfile if it built the credentials itself.
+    config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+    config.set("fs.gs.auth.service.account.json.keyfile", "/missing/dir/missing-key.json");
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    assertThat(fs.getAnalyticsCoreGcsFs().getFileSystemOptions().getGcsAuthOptions().getAuthType())
+        .isEqualTo(Optional.empty());
+    fs.close();
+  }
+
+  @Test
+  public void initialize_missingKeyfileAndAnalyticsCoreEnabled_throwsIOException()
+      throws Exception {
+    Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+    config.set("fs.gs.auth.service.account.json.keyfile", "/missing/dir/missing-key.json");
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    IOException exception =
+        assertThrows(IOException.class, () -> fs.initialize(new URI("gs://foobar/"), config));
+
+    assertThat(exception).hasMessageThat().contains("missing-key.json");
   }
 
   private static GcsClientOptions analyticsCoreClientOptions(GoogleHadoopFileSystem fs) {
