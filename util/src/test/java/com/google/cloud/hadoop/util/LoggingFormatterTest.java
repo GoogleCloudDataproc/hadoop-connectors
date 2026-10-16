@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 
 import java.util.UUID;
@@ -82,6 +83,47 @@ public class LoggingFormatterTest {
 
     // Should not be prefixed because the message is JSON
     assertEquals("{\"key\":\"value\"}\n", formattedMessage);
+  }
+
+  @Test
+  public void format_withJsonArrayMessage_doesNotPrefixMessage() {
+    LogRecord logRecord = new LogRecord(java.util.logging.Level.INFO, "[{\"key\":\"value\"}]");
+    logRecord.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+
+    String formattedMessage = formatter.format(logRecord);
+
+    assertThat(formattedMessage).isEqualTo("[{\"key\":\"value\"}]\n");
+  }
+
+  @Test
+  public void format_withSingleTokenMessage_prefixesMessageWithId() {
+    // Gson leniently parses bare tokens like these as JSON strings; they are regular log messages
+    // and must still get the invocation ID prefix.
+    String invocationId = InvocationIdContext.getInvocationId();
+    for (String message : new String[] {"seek(2)", "close()", "123", "true", "null"}) {
+      LogRecord logRecord = new LogRecord(java.util.logging.Level.INFO, message);
+      logRecord.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+
+      String formattedMessage = formatter.format(logRecord);
+
+      assertThat(formattedMessage).isEqualTo("[" + invocationId + "]: " + message + "\n");
+    }
+  }
+
+  @Test
+  public void format_withBracketedPlainTextMessage_prefixesMessageWithId() {
+    String invocationId = InvocationIdContext.getInvocationId();
+    String[] messages = {
+      "[main]", "[tag]", "[200]", "[]", "[main] Starting connector", "[INFO] Read 4096 bytes",
+    };
+    for (String message : messages) {
+      LogRecord logRecord = new LogRecord(java.util.logging.Level.INFO, message);
+      logRecord.setLoggerName(GCS_CONNECTOR_LOGGER_NAME);
+
+      String formattedMessage = formatter.format(logRecord);
+
+      assertThat(formattedMessage).isEqualTo("[" + invocationId + "]: " + message + "\n");
+    }
   }
 
   @Test
