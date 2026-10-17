@@ -125,6 +125,24 @@ public class FileAccessPatternManagerTest {
   }
 
   @Test
+  public void testAutoMode_staysSequentialAfterRecovery_untilNewSeek() {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.DEFAULT.toBuilder()
+            .setFadvise(Fadvise.AUTO)
+            .setFadviseRequestTrackCount(3)
+            .setInplaceSeekLimit(10)
+            .build();
+    FileAccessPatternManager fileAccessPattern =
+        new FileAccessPatternManager(RESOURCE_ID, readOptions);
+
+    long[] readIndexes = new long[] {5, 0, 1, 2, 3, 4, 5, 6, 0};
+    boolean[] expectedRandomAccess =
+        new boolean[] {false, true, true, true, false, false, false, false, true};
+
+    verifyAccessPattern(fileAccessPattern, readIndexes, expectedRandomAccess);
+  }
+
+  @Test
   public void testAutoRandomMode() {
 
     GoogleCloudStorageReadOptions readOptions =

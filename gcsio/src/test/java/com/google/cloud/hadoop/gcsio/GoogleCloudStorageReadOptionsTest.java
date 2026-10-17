@@ -38,4 +38,16 @@ public class GoogleCloudStorageReadOptionsTest {
         .hasMessageThat()
         .isEqualTo("inplaceSeekLimit must be non-negative! Got " + inplaceSeekLimit);
   }
+
+  @Test
+  public void build_throwsException_whenFadviseRequestTrackCountNotPositive() {
+    GoogleCloudStorageReadOptions.Builder builder =
+        GoogleCloudStorageReadOptions.builder().setFadviseRequestTrackCount(0);
+
+    IllegalStateException e = assertThrows(IllegalStateException.class, builder::build);
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("fadviseRequestTrackCount must be greater than 0! Got 0");
+  }
 }
