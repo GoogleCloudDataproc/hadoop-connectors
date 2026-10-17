@@ -722,13 +722,16 @@ public class VectoredIOImplTest {
 
     long connectionTime = 0;
     long dataTransferTime = 0;
+    long vectoredGcsApiTime = 0;
     for (int i = 0; i < 100; i++) {
       connectionTime =
           ghfsStorageStatistics.getMax(GhfsStatistic.STREAM_READ_CONNECTION_DURATION.getSymbol());
       dataTransferTime =
           ghfsStorageStatistics.getMax(
               GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION.getSymbol());
-      if (connectionTime == 100L && dataTransferTime == 200L) {
+      // Captured only after the read channel is closed, so it lags the range future completing.
+      vectoredGcsApiTime = rangeReadThreadStats.getOrDefault("gcsApiTime", 0L);
+      if (connectionTime == 100L && dataTransferTime == 200L && vectoredGcsApiTime == 200L) {
         break;
       }
       Thread.sleep(50);
@@ -736,6 +739,9 @@ public class VectoredIOImplTest {
 
     assertThat(connectionTime).isEqualTo(100L);
     assertThat(dataTransferTime).isEqualTo(200L);
+    // The data transfer duration must reach the caller-visible accumulator, not just the shared
+    // sink; this is what the thread local gcsApiTime reported to the caller is built from.
+    assertThat(vectoredGcsApiTime).isEqualTo(200L);
     assertThat(
             ghfsStorageStatistics.getMax(
                 GhfsStatistic.STREAM_READ_VECTORED_THREAD_WAIT_DURATION.getSymbol()))
