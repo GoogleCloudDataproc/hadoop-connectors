@@ -2626,27 +2626,22 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @VisibleForTesting
   StorageControlClient lazyGetStorageControlClient() throws IOException {
-    StorageControlClient result = this.storageControlClient;
-    if (result == null) {
+    if (this.storageControlClient == null) {
       synchronized (this) {
-        result = this.storageControlClient;
-        if (result == null) {
+        if (this.storageControlClient == null) {
           // TODO: Support setting universeDomain for HNS API's.
           this.storageControlClient =
-              result =
-                  StorageControlClient.create(
-                      StorageControlSettings.newBuilder()
-                          .setCredentialsProvider(FixedCredentialsProvider.create(this.credential))
-                          .setHeaderProvider(
-                              () ->
-                                  getUpdatedHeaders(
-                                      this.storageOptions, this.featureHeaderGenerator))
-                          .build());
+              StorageControlClient.create(
+                  StorageControlSettings.newBuilder()
+                      .setCredentialsProvider(FixedCredentialsProvider.create(this.credential))
+                      .setHeaderProvider(
+                          () -> getUpdatedHeaders(this.storageOptions, this.featureHeaderGenerator))
+                      .build());
         }
       }
     }
 
-    return result;
+    return this.storageControlClient;
   }
 
   /**
