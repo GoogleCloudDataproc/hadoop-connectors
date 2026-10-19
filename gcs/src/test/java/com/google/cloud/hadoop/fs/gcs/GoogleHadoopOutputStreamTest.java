@@ -844,6 +844,7 @@ public class GoogleHadoopOutputStreamTest {
   @Test
   public void append_toMissingFileWithoutWrites_throwsFileNotFound() throws Exception {
     List<StorageResourceId> composedDestinations = new CopyOnWriteArrayList<>();
+    List<StorageResourceId> deletedObjects = new CopyOnWriteArrayList<>();
     ghfs =
         GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
             options ->
@@ -857,6 +858,13 @@ public class GoogleHadoopOutputStreamTest {
                     composedDestinations.add(destination);
                     return super.composeObjects(sources, destination, createOptions);
                   }
+
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    deletedObjects.addAll(fullObjectNames);
+                    super.deleteObjects(fullObjectNames);
+                  }
                 });
 
     // The Hadoop contract: append() to a missing file fails, at append() or at close(). Before, the
@@ -867,6 +875,12 @@ public class GoogleHadoopOutputStreamTest {
     assertThrows(FileNotFoundException.class, fout::close);
     assertThat(composedDestinations).isEmpty();
     assertThat(ghfs.exists(objectPath)).isFalse();
+    // The empty tail that close() uploaded was removed before the exception was thrown.
+    assertThat(deletedObjects).hasSize(1);
+    assertThat(deletedObjects.get(0).getObjectName())
+        .contains(GoogleHadoopOutputStream.TMP_FILE_PREFIX);
+    assertThat(ghfs.getGcsFs().getGcs().getItemInfo(deletedObjects.get(0)).exists()).isFalse();
+    assertThat(ghfs.listStatus(new Path(ghfs.getUri().resolve("/")))).isEmpty();
   }
 
   @Test
