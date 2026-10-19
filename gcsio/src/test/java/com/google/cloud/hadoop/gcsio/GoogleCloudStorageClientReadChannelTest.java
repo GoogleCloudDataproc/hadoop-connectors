@@ -1048,24 +1048,40 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void read_readExactLazyMetadata_rangeShorterThanPrefetchShift_readsExactRange()
       throws Exception {
     assertLazyReadExactServedBySingleRequest(2 * CHUNK_SIZE, 100);
+    verify(fakeReadChannel, times(0)).close();
   }
 
   @Test
   public void read_readExactLazyMetadata_rangeEqualToPrefetchShift_usesSingleRequest()
       throws Exception {
     assertLazyReadExactServedBySingleRequest(2 * CHUNK_SIZE, CHUNK_SIZE / 2);
+    verify(fakeReadChannel, times(0)).close();
   }
 
   @Test
   public void read_readExactLazyMetadata_rangeLongerThanPrefetchShift_usesSingleRequest()
       throws Exception {
     assertLazyReadExactServedBySingleRequest(2 * CHUNK_SIZE, 768);
+    verify(fakeReadChannel, times(0)).close();
   }
 
   @Test
   public void read_readExactLazyMetadata_rangeEndingAtObjectEnd_servedFromCachedFooter()
       throws Exception {
     assertLazyReadExactServedBySingleRequest(OBJECT_SIZE - 100, 100);
+    verify(fakeReadChannel, times(1)).close();
+
+    int cachedPosition = OBJECT_SIZE - 50;
+    int cachedLength = 50;
+    readChannel.position(cachedPosition);
+    ByteBuffer buffer = ByteBuffer.allocate(cachedLength);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(cachedLength);
+    verifyContent(buffer, cachedPosition, cachedLength);
+    verify(mockedStorage, times(1)).reader(any(), any());
+    verify(fakeReadChannel, times(1)).close();
   }
 
   @Test
@@ -1183,7 +1199,6 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(mockedStorage, times(1)).get(any(BlobId.class), any());
     verify(fakeReadChannel).seek(position);
     verify(fakeReadChannel).limit((long) position + length);
-    verify(fakeReadChannel, times(position + length == OBJECT_SIZE ? 1 : 0)).close();
   }
 
   private GoogleCloudStorageClientReadChannel newLazyMetadataChannel(
