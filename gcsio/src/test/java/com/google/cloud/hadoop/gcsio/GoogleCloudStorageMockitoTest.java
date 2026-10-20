@@ -522,4 +522,17 @@ public class GoogleCloudStorageMockitoTest {
     // Verify that the folder-specific API was not called
     verify(mockStorageControlStub, never()).getFolderCallable();
   }
+
+  @Test
+  public void testLazyGetStorageControlClient_setsUserAgentHeader() throws IOException {
+    gcs.setStorageControlClient(null);
+    StorageControlClient client = gcs.lazyGetStorageControlClient();
+    try {
+      assertThat(client.getSettings().getHeaderProvider().getHeaders())
+          .containsEntry("user-agent", "gcsio-unit-test");
+    } finally {
+      // Closes the lazily created client and resets gcs.storageControlClient to null.
+      gcs.close();
+    }
+  }
 }
