@@ -125,6 +125,9 @@ public class GoogleCloudStorageEventSubscriber {
   private void subscriberOnGcsReadMetricEvent(@Nonnull GcsReadMetricEvent event) {
     switch (event.getType()) {
       case CONNECTION:
+        // Deliberately not added to GCS_API_TIME. This measures the same span as the HTTP
+        // response event handled above, which already contributes the time to first byte to
+        // GCS_API_TIME, so counting it here as well would double count it.
         storageStatistics.updateStats(
             GhfsStatistic.STREAM_READ_CONNECTION_DURATION,
             event.getDurationMs(),
@@ -135,6 +138,11 @@ public class GoogleCloudStorageEventSubscriber {
             GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION,
             event.getDurationMs(),
             event.getStreamPath());
+        // The request stopwatch stops once the response is returned, so the time spent reading
+        // the response body is not part of the time to first byte. Add it here so that
+        // GCS_API_TIME accounts for the whole read and not just the connection.
+        storageStatistics.incrementCounter(
+            GoogleCloudStorageStatistics.GCS_API_TIME, event.getDurationMs());
         if (event.isLatencyThresholdBreached()) {
           storageStatistics.incrementCounter(
               GoogleCloudStorageStatistics.GCS_READ_DATA_TRANSFER_LATENCY_BREACHED_COUNT, 1);
