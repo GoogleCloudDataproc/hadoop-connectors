@@ -489,34 +489,7 @@ class GoogleHadoopOutputStream extends OutputStream
           tmpGcsPath);
       GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
       if (tmpBytesWritten == 0) {
-        // Nothing was written since the previous commit, so the tail is empty. A compose would
-        // only replace the destination with a new generation of the same content. Skip the
-        // compose and only remove the empty tail.
-        if (appendMode && dstGenerationId == StorageResourceId.UNKNOWN_GENERATION_ID) {
-          // Hadoop requires append() on a file that does not exist to fail. A compose fails on a
-          // missing destination, but an empty tail is not composed, so check here.
-          GoogleCloudStorageItemInfo dstInfo = gcs.getItemInfo(dstId);
-          if (!dstInfo.exists()) {
-            FileNotFoundException notFound =
-                new FileNotFoundException(
-                    String.format("Cannot append to nonexistent file '%s'", dstGcsPath));
-            // Remove the empty tail that tmpOut.close() created, so the failed append leaves no
-            // object behind. Synchronous, because close() does not await the deletion futures
-            // when commitTempFile() throws.
-            try {
-              gcs.deleteObjects(ImmutableList.of(tmpId));
-            } catch (IOException e) {
-              notFound.addSuppressed(e);
-            }
-            GoogleCloudStorageEventBus.postOnException();
-            throw notFound;
-          }
-          // Keep the generation, so the next compose does not have to look it up again.
-          dstGenerationId = dstInfo.getContentGeneration();
-        }
-        logger.atFiner().log(
-            "commitTempFile(): tail %s is empty, not composing it onto %s", tmpGcsPath, dstGcsPath);
-        scheduleTempFileDeletion(gcs, tmpId);
+        discardEmptyTail(gcs, dstId, tmpId);
         return;
       }
       GoogleCloudStorageItemInfo composedObject =
@@ -526,6 +499,42 @@ class GoogleHadoopOutputStream extends OutputStream
         scheduleTempFileDeletion(gcs, tmpId);
       }
     }
+  }
+
+  /**
+   * Removes an empty tail component without composing it onto the destination. Nothing was written
+   * since the previous commit, so a compose would only replace the destination with a new
+   * generation of the same content.
+   *
+   * <p>Hadoop requires {@code append()} on a file that does not exist to fail. A compose fails on a
+   * missing destination, but an empty tail is not composed, so in append mode this method checks
+   * the destination exists directly.
+   */
+  private void discardEmptyTail(
+      GoogleCloudStorage gcs, StorageResourceId dstId, StorageResourceId tmpId) throws IOException {
+    if (appendMode && dstGenerationId == StorageResourceId.UNKNOWN_GENERATION_ID) {
+      GoogleCloudStorageItemInfo dstInfo = gcs.getItemInfo(dstId);
+      if (!dstInfo.exists()) {
+        FileNotFoundException notFound =
+            new FileNotFoundException(
+                String.format("Cannot append to nonexistent file '%s'", dstGcsPath));
+        // Remove the empty tail that tmpOut.close() created, so the failed append leaves no
+        // object behind. Synchronous, because close() does not await the deletion futures when
+        // commitTempFile() throws.
+        try {
+          gcs.deleteObjects(ImmutableList.of(tmpId));
+        } catch (IOException e) {
+          notFound.addSuppressed(e);
+        }
+        GoogleCloudStorageEventBus.postOnException();
+        throw notFound;
+      }
+      // Keep the generation, so the next compose does not have to look it up again.
+      dstGenerationId = dstInfo.getContentGeneration();
+    }
+    logger.atFiner().log(
+        "discardEmptyTail(): tail %s is empty, not composing it onto %s", tmpGcsPath, dstGcsPath);
+    scheduleTempFileDeletion(gcs, tmpId);
   }
 
   /** Deletes a committed tail component in the background; {@link #close()} awaits the result. */
