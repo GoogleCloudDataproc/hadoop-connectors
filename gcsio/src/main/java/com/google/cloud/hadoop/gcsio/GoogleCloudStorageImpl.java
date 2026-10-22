@@ -1551,8 +1551,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listOptions.getDelimiter() == null,
         "Delimiter shouldn't be used while listing objects starting from an offset");
 
+    // startOffset is inclusive, and callers usually pass the last file they already listed and
+    // drop it from the result. A result holding only that file gives them nothing new, which looks
+    // like the end of the listing. So request, and list, at least 2 files: the start object plus
+    // at least one file after it.
+    int minListedFiles = 2;
     long maxResults =
-        listOptions.getMaxResults() > 0 ? listOptions.getMaxResults() : LIST_MAX_RESULTS;
+        Math.max(
+            listOptions.getMaxResults() > 0 ? listOptions.getMaxResults() : LIST_MAX_RESULTS,
+            minListedFiles);
 
     Storage.Objects.List listObject =
         createListRequest(
@@ -1565,8 +1572,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             listOptions.isIncludeFoldersAsPrefixes());
     String pageToken = null;
     LinkedList<StorageObject> listedObjects = new LinkedList<>();
-    // paginated call is required because we may filter all the items, if they are "directory"
-    // Avoid calling another list API as soon as we have some files listed.
+    // Paginated call is required because "directory" objects are filtered out, but GCS counts them
+    // toward the page size, so a page may hold only the start object followed by directories.
+    // Keep listing until at least minListedFiles files are collected or there are no more pages.
+    // Avoid more list calls than that: callers can ask for the next batch.
     int page = 0;
     do {
       page += 1;
@@ -1578,7 +1587,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       pageToken =
           listStorageObjectsFilteredPage(
               listObject, listOptions, listedObjects, Integer.toString(page));
-    } while (pageToken != null && listedObjects.size() == 0);
+    } while (pageToken != null && listedObjects.size() < minListedFiles);
 
     return listedObjects;
   }
