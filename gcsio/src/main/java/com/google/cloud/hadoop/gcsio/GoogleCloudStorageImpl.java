@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.FolderInfo.BUCKET_PREFIX;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl.getUpdatedHeaders;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
@@ -167,7 +168,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final Credentials credential;
 
   // Lazily created since HN folders may not be enabled.
-  private StorageControlClient storageControlClient;
+  private volatile StorageControlClient storageControlClient;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -2623,13 +2624,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  private StorageControlClient lazyGetStorageControlClient() throws IOException {
+  @VisibleForTesting
+  StorageControlClient lazyGetStorageControlClient() throws IOException {
     if (this.storageControlClient == null) {
-      this.storageControlClient =
-          StorageControlClient.create(
-              StorageControlSettings.newBuilder()
-                  .setCredentialsProvider(FixedCredentialsProvider.create(this.credential))
-                  .build());
+      synchronized (this) {
+        if (this.storageControlClient == null) {
+          // TODO: Support setting universeDomain for HNS API's.
+          this.storageControlClient =
+              StorageControlClient.create(
+                  StorageControlSettings.newBuilder()
+                      .setCredentialsProvider(FixedCredentialsProvider.create(this.credential))
+                      .setHeaderProvider(
+                          () -> getUpdatedHeaders(this.storageOptions, this.featureHeaderGenerator))
+                      .build());
+        }
+      }
     }
 
     return this.storageControlClient;
