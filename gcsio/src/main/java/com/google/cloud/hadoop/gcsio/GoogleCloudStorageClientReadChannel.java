@@ -354,6 +354,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               closeContentChannel();
               continue;
             } else {
+              // TODO: If EOF is reached before anything was read (a first read at
+              // currentPosition == objectSize), return -1 instead of 0, and don't cache an empty
+              // footer in openByteChannel. See the review of #1835.
               break;
             }
           }
@@ -467,6 +470,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Metadata not initialized. Forcing lazy channel connection with 0-byte read for '%s'",
               resourceId);
 
+          // TODO: If the request starts past the end of the object, GCS answers OUT_OF_RANGE and
+          // this read never returns: GzipReadableByteChannel (enabled by
+          // shouldReturnRawInputStream(false)) waits for metadata that java-storage never
+          // publishes. Fix in java-storage, and here by reading non-gzip objects as raw streams
+          // and probing with 1 byte (a 0-byte read on a raw stream sends no request). See the
+          // review of #1835.
           // The 0-byte read triggers the actual ReadObjectRequest over the network
           readableByteChannel.read(ByteBuffer.allocate(0));
           // Extract the headers to populate objectSize
@@ -486,6 +495,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           }
         }
 
+        // TODO: Also clamp when contentChannelEnd > objectSize. RANDOM and AUTO_RANDOM pick a
+        // finite end while the size is unknown, so it is never clamped here and the footer cache
+        // in openByteChannel is skipped. See the review of #1835.
         if (contentChannelEnd == Long.MAX_VALUE && objectSize != -1) {
           contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
           logger.atFiner().log(

@@ -318,9 +318,14 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
     assertingHandler.assertLogCount(3 * 3 + 1);
     assertingHandler.flush();
 
+    // Warm-up read with the default options (fastFailOnNotFound=true): one log for the get object
+    // request, plus the request, response and status of the read stream.
     assertObjectContent(gcsImpl, resourceId, partition, partitionsCount);
+    assertingHandler.assertLogCount(1 + 3);
+    assertingHandler.flush();
 
-    // One for get object request for setting write generation.
+    // The read under test. With fastFailOnNotFound=false there is no get object request; the
+    // metadata comes from the first ReadObject response.
     // One for Read Request
     // One for Read Response ( it can vary, request can be split into two chunks as well).
     // One for status
@@ -328,34 +333,44 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     assertObjectContent(gcsImpl, resourceId, readOptions, partition, partitionsCount);
-    assertingHandler.assertLogCount(6 + 1);
+    assertingHandler.assertLogCount(3);
+    long getObjectCount =
+        assertingHandler.getAllLogRecords().stream()
+            .filter(
+                log ->
+                    "GetObject"
+                        .equals(
+                            String.valueOf(
+                                log.get(GoogleCloudStorageTracingFields.RPC_METHOD.name))))
+            .count();
+    assertThat(getObjectCount).isEqualTo(0);
 
     StorageResourceId derivedResourceId = derivedResourceId(resourceId);
 
-    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(1);
+    Map<String, Object> readObjectRequestRecord = assertingHandler.getLogRecordAtIndex(0);
     assertThat(
             readObjectRequestRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
-    // With fastFailOnNotFound=false, object size is unknown, so read_limit is
-    // 2MB (default minRangeRequestSize)
+    // With fastFailOnNotFound=false the object size is unknown when the stream is opened, so the
+    // default (AUTO) fadvise reads to the end of the object and no read_limit is sent.
     assertThat(readObjectRequestRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
-        .isEqualTo(2 * 1024 * 1024);
+        .isEqualTo(0);
 
-    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(2);
+    Map<String, Object> readObjectResponseRecord = assertingHandler.getLogRecordAtIndex(1);
     assertThat(
             readObjectResponseRecord.get(GoogleCloudStorageTracingFields.RESOURCE.name).toString())
         .contains(derivedResourceId.toString());
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_OFFSET.name))
         .isEqualTo(0);
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.READ_LIMIT.name))
-        .isEqualTo(partition.length);
+        .isEqualTo(0);
     assertThat(readObjectResponseRecord.get(GoogleCloudStorageTracingFields.BYTES_READ.name))
         .isEqualTo(partition.length);
 
-    Map<String, Object> writeObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(3);
-    verifyCloseStatus(writeObjectCloseStatusRecord, "ReadObject", Status.OK);
+    Map<String, Object> readObjectCloseStatusRecord = assertingHandler.getLogRecordAtIndex(2);
+    verifyCloseStatus(readObjectCloseStatusRecord, "ReadObject", Status.OK);
   }
 
   public static GoogleCloudStorage getGCSClientImpl(GoogleCloudStorageOptions options) {
