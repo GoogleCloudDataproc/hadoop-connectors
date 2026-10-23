@@ -28,6 +28,9 @@ import java.util.UUID;
  */
 public class InvocationIdContext {
 
+  /** Number of hex characters of the operation ID (the first group of a UUID). */
+  private static final int OPERATION_ID_LENGTH = 8;
+
   /** Thread-local storage for the invocation ID. The ID is inherited by child threads. */
   private static final InheritableThreadLocal<String> INVOCATION_ID =
       new InheritableThreadLocal<>() {
@@ -51,8 +54,40 @@ public class InvocationIdContext {
    * {@code GCCL_INVOCATION_ID_PREFIX}.
    */
   public static void setInvocationId() {
-    String uuid = UUID.randomUUID().toString().substring(0, 8);
-    INVOCATION_ID.set(GCCL_INVOCATION_ID_PREFIX + uuid);
+    INVOCATION_ID.set(newInvocationId());
+  }
+
+  /** Generates a new operation ID, prefixed with {@code gccl-invocation-id/}. */
+  public static String newInvocationId() {
+    return GCCL_INVOCATION_ID_PREFIX
+        + UUID.randomUUID().toString().substring(0, OPERATION_ID_LENGTH);
+  }
+
+  /**
+   * Generates a unique {@code gccl-invocation-id/<uuid>} token for a single HTTP request. If the
+   * current thread has an invocation ID, its 8 hex characters replace the first UUID group so the
+   * request can be correlated with the connector operation, e.g. {@code
+   * gccl-invocation-id/a1b2c3d4-4907-4e6f-829f-eb303246e83b} for {@code
+   * gccl-invocation-id/a1b2c3d4}. Does not modify the thread's invocation ID.
+   */
+  public static String newRequestInvocationId() {
+    String requestUuid = UUID.randomUUID().toString();
+    String operationId = getOperationId();
+    if (operationId.isEmpty()) {
+      return GCCL_INVOCATION_ID_PREFIX + requestUuid;
+    }
+    return GCCL_INVOCATION_ID_PREFIX + operationId + requestUuid.substring(OPERATION_ID_LENGTH);
+  }
+
+  /** Returns the current thread's operation ID without the prefix, or an empty string. */
+  private static String getOperationId() {
+    String invocationId = INVOCATION_ID.get();
+    if (invocationId.startsWith(GCCL_INVOCATION_ID_PREFIX)) {
+      invocationId = invocationId.substring(GCCL_INVOCATION_ID_PREFIX.length());
+    }
+    return invocationId.length() >= OPERATION_ID_LENGTH
+        ? invocationId.substring(0, OPERATION_ID_LENGTH)
+        : "";
   }
 
   /** Clears the invocation ID for the current thread. */
