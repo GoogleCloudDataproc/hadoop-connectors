@@ -90,6 +90,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.util.ArrayList;
@@ -464,14 +465,26 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return new LoggingInterceptor(credentials, suffix);
   }
 
+  /**
+   * Creates the Analytics Core filesystem. Analytics Core builds the credentials from the mapped
+   * auth config, unless a Hadoop token plugin supplies the identity, in which case the connector
+   * builds the credentials and injects them.
+   */
   private GcsFileSystem createAnalyticsGcsFs(Configuration config) throws IOException {
     Map<String, String> mappedProperties =
         AnalyticsCoreConfigMapper.mapConfigs(config, GCS_CONFIG_PREFIX + ".");
     GcsFileSystemOptions options =
         GcsFileSystemOptions.createFromOptions(mappedProperties, GCS_CONFIG_PREFIX + ".");
-    GoogleCredentials credentials = getCredentials(config);
-    rejectDownscopedTokens(credentials);
-    return new GcsFileSystemImpl(credentials, options);
+    if (AnalyticsCoreConfigMapper.usesHadoopTokenProvider(config)) {
+      GoogleCredentials credentials = getCredentials(config);
+      rejectDownscopedTokens(credentials);
+      return new GcsFileSystemImpl(credentials, options);
+    }
+    try {
+      return new GcsFileSystemImpl(options);
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
   }
 
   /**
