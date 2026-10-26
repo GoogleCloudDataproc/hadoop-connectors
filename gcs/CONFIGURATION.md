@@ -131,6 +131,12 @@
     Maximum number of items to return in response for list Cloud Storage
     requests.
 
+    When listing files from a start offset (`listStatusStartingFrom`), the
+    connector lists at least `2` files per call, even if this property is set
+    to a smaller value, making more list requests if needed (the listing ends
+    earlier only if there are no more objects). Directory objects are not
+    counted. A call may return more files than this property's value.
+
 *   `fs.gs.max.wait.for.empty.object.creation` (default: `3s`)
 
     Maximum amount of time to wait after exception during empty object creation.
