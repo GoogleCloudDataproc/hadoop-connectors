@@ -894,9 +894,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-    InvocationIdContext.setInvocationId();
-    return GhfsGlobalStorageStatistics.trackDuration(
-        factory, stats, statistic, context, traceFactory, operation);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      return GhfsGlobalStorageStatistics.trackDuration(
+          factory, stats, statistic, context, traceFactory, operation);
+    }
   }
 
   /**
@@ -1154,88 +1155,93 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
-    checkOpen();
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
+      checkOpen();
 
-    logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
-    // URI does not handle glob expressions nicely, for the purpose of
-    // fully-qualifying a path we can URI-encode them.
-    // Using toString() to avoid Path(URI) constructor.
-    Path encodedPath = new Path(pathPattern.toUri().toString());
-    // We convert pathPattern to GCS path and then to Hadoop path to ensure that it ends up in
-    // the correct format. See note in getHadoopPath for more information.
-    Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
-    // Decode URI-encoded path back into a glob path.
-    Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
-    logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
+      logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
+      // URI does not handle glob expressions nicely, for the purpose of
+      // fully-qualifying a path we can URI-encode them.
+      // Using toString() to avoid Path(URI) constructor.
+      Path encodedPath = new Path(pathPattern.toUri().toString());
+      // We convert pathPattern to GCS path and then to Hadoop path to ensure that it ends up in
+      // the correct format. See note in getHadoopPath for more information.
+      Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
+      // Decode URI-encoded path back into a glob path.
+      Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
+      logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
-    if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
-      return concurrentGlobInternal(fixedPath, filter);
+      if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
+        return concurrentGlobInternal(fixedPath, filter);
+      }
+
+      if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
+        return flatGlobInternal(fixedPath, filter);
+      }
+
+      return super.globStatus(fixedPath, filter);
     }
-
-    if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
-      return flatGlobInternal(fixedPath, filter);
-    }
-
-    return super.globStatus(fixedPath, filter);
   }
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
-    Token<?> result = null;
-    if (delegationTokens != null) {
-      result = delegationTokens.getBoundOrNewDT(renewer);
-    }
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
+      Token<?> result = null;
+      if (delegationTokens != null) {
+        result = delegationTokens.getBoundOrNewDT(renewer);
+      }
 
-    logger.atFiner().log("getDelegationToken(renewer: %s): %s", renewer, result);
-    return result;
+      logger.atFiner().log("getDelegationToken(renewer: %s): %s", renewer, result);
+      return result;
+    }
   }
 
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
-    logger.atFiner().log(
-        "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
-        delSrc, overwrite, srcs.length, dst);
-    super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+      logger.atFiner().log(
+          "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
+          delSrc, overwrite, srcs.length, dst);
+      super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
+    }
   }
 
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
 
-    logger.atFiner().log(
-        "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
-        delSrc, overwrite, src, dst);
-    super.copyFromLocalFile(delSrc, overwrite, src, dst);
+      logger.atFiner().log(
+          "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
+          delSrc, overwrite, src, dst);
+      super.copyFromLocalFile(delSrc, overwrite, src, dst);
+    }
   }
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
+      checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-    this.checkOpen();
+      this.checkOpen();
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
-    if (!fileInfo.exists()) {
-      throw new FileNotFoundException(
-          String.format(
-              "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+      URI gcsPath = getGcsPath(hadoopPath);
+      FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+      if (!fileInfo.exists()) {
+        throw new FileNotFoundException(
+            String.format(
+                "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
+      }
+      FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
+      logger.atFiner().log(
+          "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
+      return checksum;
     }
-    FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
-    logger.atFiner().log(
-        "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
-    return checksum;
   }
 
   @Override
@@ -1246,9 +1252,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
-    InvocationIdContext.setInvocationId();
-    incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
-    return super.listLocatedStatus(f);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
+      return super.listLocatedStatus(f);
+    }
   }
 
   @Override
@@ -1524,34 +1531,41 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       Path hadoopPath, OpenFileParameters parameters) throws IOException {
-    checkNotNull(hadoopPath, "hadoopPath should not be null");
-    checkOpen();
-    logger.atFiner().log("Path to be opened: %s, parameters: %s ", hadoopPath, parameters);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      checkNotNull(hadoopPath, "hadoopPath should not be null");
+      checkOpen();
+      logger.atFiner().log("Path to be opened: %s, parameters: %s ", hadoopPath, parameters);
 
-    URI gcsPath = getGcsPath(hadoopPath);
-    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
-        parameters.getMandatoryKeys(),
-        Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS,
-        "for " + gcsPath);
+      URI gcsPath = getGcsPath(hadoopPath);
+      AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
+          parameters.getMandatoryKeys(),
+          Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS,
+          "for " + gcsPath);
 
-    FileStatus fileStatus = parameters.getStatus();
-    FileInfo fileInfo =
-        fileStatus instanceof GoogleHadoopFileStatus
-            ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
-            : null;
-    if (fileInfo == null) {
-      return super.openFileWithOptions(hadoopPath, parameters);
+      FileStatus fileStatus = parameters.getStatus();
+      FileInfo fileInfo =
+          fileStatus instanceof GoogleHadoopFileStatus
+              ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
+              : null;
+      if (fileInfo == null) {
+        return super.openFileWithOptions(hadoopPath, parameters);
+      }
+
+      String invocationId = InvocationIdContext.getInvocationId();
+      CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
+      backgroundTasksThreadPool.submit(
+          () -> {
+            try (InvocationIdContext.Scope taskScope =
+                InvocationIdContext.openScopeWithId(invocationId)) {
+              LambdaUtils.eval(
+                  result,
+                  () ->
+                      new FSDataInputStream(
+                          GoogleHadoopFSInputStream.create(this, fileInfo, statistics)));
+            }
+          });
+      return result;
     }
-
-    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
-    backgroundTasksThreadPool.submit(
-        () ->
-            LambdaUtils.eval(
-                result,
-                () ->
-                    new FSDataInputStream(
-                        GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
-    return result;
   }
 
   /**
@@ -1566,20 +1580,23 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public FSDataOutputStream append(Path hadoopPath, int bufferSize, Progressable progress)
       throws IOException {
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
-    logger.atFiner().log(
-        "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
-    URI filePath = getGcsPath(hadoopPath);
-    return new FSDataOutputStream(
-        new GoogleHadoopOutputStream(
-            this,
-            filePath,
-            CreateFileOptions.builder()
-                .setWriteMode(CreateFileOptions.WriteMode.APPEND)
-                .setMinSyncInterval(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getTimeDuration(getConf()))
-                .build(),
-            statistics),
-        statistics);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      checkArgument(hadoopPath != null, "hadoopPath must not be null");
+      logger.atFiner().log(
+          "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
+      URI filePath = getGcsPath(hadoopPath);
+      return new FSDataOutputStream(
+          new GoogleHadoopOutputStream(
+              this,
+              filePath,
+              CreateFileOptions.builder()
+                  .setWriteMode(CreateFileOptions.WriteMode.APPEND)
+                  .setMinSyncInterval(
+                      GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getTimeDuration(getConf()))
+                  .build(),
+              statistics),
+          statistics);
+    }
   }
 
   /**
@@ -1591,25 +1608,28 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   @Override
   public void concat(Path tgt, Path[] srcs) throws IOException {
-    logger.atFiner().log("concat(tgt: %s, srcs: %s)", tgt, lazy(() -> Arrays.toString(srcs)));
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      logger.atFiner().log("concat(tgt: %s, srcs: %s)", tgt, lazy(() -> Arrays.toString(srcs)));
 
-    checkArgument(srcs.length > 0, "srcs must have at least one source");
+      checkArgument(srcs.length > 0, "srcs must have at least one source");
 
-    URI tgtPath = getGcsPath(tgt);
-    List<URI> srcPaths = Arrays.stream(srcs).map(this::getGcsPath).collect(toImmutableList());
+      URI tgtPath = getGcsPath(tgt);
+      List<URI> srcPaths = Arrays.stream(srcs).map(this::getGcsPath).collect(toImmutableList());
 
-    checkArgument(!srcPaths.contains(tgtPath), "target must not be contained in sources");
+      checkArgument(!srcPaths.contains(tgtPath), "target must not be contained in sources");
 
-    List<List<URI>> partitions =
-        Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
-    logger.atFiner().log("concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
-    for (List<URI> partition : partitions) {
-      // We need to include the target in the list of sources to compose since
-      // the GCS FS compose operation will overwrite the target, whereas the Hadoop
-      // concat operation appends to the target.
-      List<URI> sources = Lists.newArrayList(tgtPath);
-      sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT.getContentType());
+      List<List<URI>> partitions =
+          Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
+      logger.atFiner().log(
+          "concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
+      for (List<URI> partition : partitions) {
+        // We need to include the target in the list of sources to compose since
+        // the GCS FS compose operation will overwrite the target, whereas the Hadoop
+        // concat operation appends to the target.
+        List<URI> sources = Lists.newArrayList(tgtPath);
+        sources.addAll(partition);
+        getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT.getContentType());
+      }
     }
   }
 
@@ -1750,11 +1770,22 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter)
       throws IOException {
+    String invocationId = InvocationIdContext.getInvocationId();
     try {
       return backgroundTasksThreadPool.invokeAny(
           ImmutableList.of(
-              () -> flatGlobInternal(fixedPath, filter),
-              () -> super.globStatus(fixedPath, filter)));
+              () -> {
+                try (InvocationIdContext.Scope taskScope =
+                    InvocationIdContext.openScopeWithId(invocationId)) {
+                  return flatGlobInternal(fixedPath, filter);
+                }
+              },
+              () -> {
+                try (InvocationIdContext.Scope taskScope =
+                    InvocationIdContext.openScopeWithId(invocationId)) {
+                  return super.globStatus(fixedPath, filter);
+                }
+              }));
     } catch (InterruptedException e) {
       GoogleCloudStorageEventBus.postOnException();
       Thread.currentThread().interrupt();
@@ -2107,54 +2138,58 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public void setXAttr(Path path, String name, byte[] value, EnumSet<XAttrSetFlag> flags)
       throws IOException {
-    logger.atFiner().log(
-        "setXAttr(path: %s, name: %s, value %s, flags %s",
-        path, name, lazy(() -> new String(value, UTF_8)), flags);
-    checkNotNull(path, "path should not be null");
-    checkNotNull(name, "name should not be null");
-    checkArgument(flags != null && !flags.isEmpty(), "flags should not be null or empty");
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      logger.atFiner().log(
+          "setXAttr(path: %s, name: %s, value %s, flags %s",
+          path, name, lazy(() -> new String(value, UTF_8)), flags);
+      checkNotNull(path, "path should not be null");
+      checkNotNull(name, "name should not be null");
+      checkArgument(flags != null && !flags.isEmpty(), "flags should not be null or empty");
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
-    String xAttrKey = getXAttrKey(name);
-    Map<String, byte[]> attributes = fileInfo.getAttributes();
+      FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+      String xAttrKey = getXAttrKey(name);
+      Map<String, byte[]> attributes = fileInfo.getAttributes();
 
-    if (attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.REPLACE)) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new IOException(
-          String.format(
-              "REPLACE flag must be set to update XAttr (name='%s', value='%s') for '%s'",
-              name, new String(value, UTF_8), path));
+      if (attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.REPLACE)) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IOException(
+            String.format(
+                "REPLACE flag must be set to update XAttr (name='%s', value='%s') for '%s'",
+                name, new String(value, UTF_8), path));
+      }
+      if (!attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.CREATE)) {
+        GoogleCloudStorageEventBus.postOnException();
+        throw new IOException(
+            String.format(
+                "CREATE flag must be set to create XAttr (name='%s', value='%s') for '%s'",
+                name, new String(value, UTF_8), path));
+      }
+
+      UpdatableItemInfo updateInfo =
+          new UpdatableItemInfo(
+              StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+              ImmutableMap.of(xAttrKey, getXAttrValue(value)));
+      getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
     }
-    if (!attributes.containsKey(xAttrKey) && !flags.contains(XAttrSetFlag.CREATE)) {
-      GoogleCloudStorageEventBus.postOnException();
-      throw new IOException(
-          String.format(
-              "CREATE flag must be set to create XAttr (name='%s', value='%s') for '%s'",
-              name, new String(value, UTF_8), path));
-    }
-
-    UpdatableItemInfo updateInfo =
-        new UpdatableItemInfo(
-            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
-            ImmutableMap.of(xAttrKey, getXAttrValue(value)));
-    getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
   }
 
   /** {@inheritDoc} */
   @Override
   public void removeXAttr(Path path, String name) throws IOException {
-    logger.atFiner().log("removeXAttr(path: %s, name: %s)", path, name);
-    checkNotNull(path, "path should not be null");
-    checkNotNull(name, "name should not be null");
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      logger.atFiner().log("removeXAttr(path: %s, name: %s)", path, name);
+      checkNotNull(path, "path should not be null");
+      checkNotNull(name, "name should not be null");
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
-    Map<String, byte[]> xAttrToRemove = new HashMap<>();
-    xAttrToRemove.put(getXAttrKey(name), null);
-    UpdatableItemInfo updateInfo =
-        new UpdatableItemInfo(
-            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
-            xAttrToRemove);
-    getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+      FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+      Map<String, byte[]> xAttrToRemove = new HashMap<>();
+      xAttrToRemove.put(getXAttrKey(name), null);
+      UpdatableItemInfo updateInfo =
+          new UpdatableItemInfo(
+              StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+              xAttrToRemove);
+      getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
+    }
   }
 
   private boolean isXAttr(String key) {

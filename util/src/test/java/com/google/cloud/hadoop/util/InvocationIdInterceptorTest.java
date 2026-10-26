@@ -73,10 +73,11 @@ public class InvocationIdInterceptorTest {
   public void separateRequestsShouldNotShareInvocationId() throws IOException {
     HttpRequest req1 = buildRequest(OBJECT_URL_1);
     HttpRequest req2 = buildRequest(OBJECT_URL_2);
-    InvocationIdContext.setInvocationId();
 
-    newInterceptor(req1).intercept(req1);
-    newInterceptor(req2).intercept(req2);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      newInterceptor(req1).intercept(req1);
+      newInterceptor(req2).intercept(req2);
+    }
 
     assertThat(req1.getHeaders().get(GOOG_API_CLIENT))
         .isNotEqualTo(req2.getHeaders().get(GOOG_API_CLIENT));
@@ -102,11 +103,13 @@ public class InvocationIdInterceptorTest {
     HttpRequest req1 = buildRequest(OBJECT_URL_1);
     HttpRequest req2 = buildRequest(OBJECT_URL_2);
 
-    InvocationIdContext.setInvocationId();
-    String operationPrefix =
-        InvocationIdContext.getInvocationId().substring(GCCL_INVOCATION_ID_PREFIX.length());
-    newInterceptor(req1).intercept(req1);
-    newInterceptor(req2).intercept(req2);
+    String operationPrefix;
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      operationPrefix =
+          InvocationIdContext.getInvocationId().substring(GCCL_INVOCATION_ID_PREFIX.length());
+      newInterceptor(req1).intercept(req1);
+      newInterceptor(req2).intercept(req2);
+    }
 
     String id1 = getInvocationId(req1);
     String id2 = getInvocationId(req2);
@@ -121,15 +124,16 @@ public class InvocationIdInterceptorTest {
   public void intercept_retriedRequest_keepsInvocationId() throws IOException {
     HttpRequest request = buildRequest(OBJECT_URL_1);
     InvocationIdInterceptor interceptor = newInterceptor(request);
-    InvocationIdContext.setInvocationId();
 
-    interceptor.intercept(request);
-    String firstAttemptHeader = (String) request.getHeaders().get(GOOG_API_CLIENT);
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      interceptor.intercept(request);
+      String firstAttemptHeader = (String) request.getHeaders().get(GOOG_API_CLIENT);
 
-    interceptor.intercept(request);
-    interceptor.intercept(request);
+      interceptor.intercept(request);
+      interceptor.intercept(request);
 
-    assertThat(request.getHeaders().get(GOOG_API_CLIENT)).isEqualTo(firstAttemptHeader);
+      assertThat(request.getHeaders().get(GOOG_API_CLIENT)).isEqualTo(firstAttemptHeader);
+    }
   }
 
   @Test
