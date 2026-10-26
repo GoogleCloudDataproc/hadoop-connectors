@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 4.0.7 - 2026-10-26
 1. Fix listStatusStartingFrom returning too few files when directory objects follow the start offset
 
