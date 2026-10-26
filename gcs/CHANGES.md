@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.1.20 - 2026-10-26
 1. Optimize integration tests by enabling shared bucket reuse
 
