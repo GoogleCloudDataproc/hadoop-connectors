@@ -41,7 +41,11 @@ public class AnalyticsCoreConfigMapperTest {
           "fs.gs." + AnalyticsCoreConfigMapper.USER_AGENT_KEY,
           GoogleHadoopFileSystem.GHFS_ID,
           "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
-          "COMPUTE_ENGINE");
+          "COMPUTE_ENGINE",
+          "fs.gs." + AnalyticsCoreConfigMapper.HTTP_CONNECT_TIMEOUT_KEY,
+          "5000",
+          "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+          "5000");
 
   @Test
   public void mapConfigs_mapsConnectorPropertiesToAnalyticsCore() {
@@ -337,6 +341,22 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
+  public void mapConfigs_mapsHttpTimeoutsInMillis() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.http.connect-timeout", "30s");
+    config.set("fs.gs.http.read-timeout", "0");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_CONNECT_TIMEOUT_KEY,
+            "30000",
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+            "0");
+  }
+
+  @Test
   public void mapConfigs_transportSettingsUnset_omitsAnalyticsCoreKeys() {
     Configuration config = new Configuration();
 
@@ -495,6 +515,7 @@ public class AnalyticsCoreConfigMapperTest {
     Configuration config = new Configuration();
     config.set("google.cloud.auth.type", "APPLICATION_DEFAULT");
     config.set("google.cloud.proxy.address", "base-proxy:8080");
+    config.set("google.cloud.http.read-timeout", "20s");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -503,7 +524,9 @@ public class AnalyticsCoreConfigMapperTest {
             "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
             "APPLICATION_DEFAULT",
             "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
-            "base-proxy:8080");
+            "base-proxy:8080",
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+            "20000");
   }
 
   @Test
@@ -511,8 +534,10 @@ public class AnalyticsCoreConfigMapperTest {
     Configuration config = new Configuration();
     config.set("fs.gs.auth.type", "UNAUTHENTICATED");
     config.set("fs.gs.proxy.address", "connector-proxy:3128");
+    config.set("fs.gs.http.read-timeout", "10s");
     config.set("fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY, "SERVICE_ACCOUNT_JSON_KEYFILE");
     config.set("fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY, "analytics-core-proxy:9090");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY, "1");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -521,7 +546,9 @@ public class AnalyticsCoreConfigMapperTest {
             "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
             "UNAUTHENTICATED",
             "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
-            "connector-proxy:3128");
+            "connector-proxy:3128",
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+            "10000");
   }
 
   @Test

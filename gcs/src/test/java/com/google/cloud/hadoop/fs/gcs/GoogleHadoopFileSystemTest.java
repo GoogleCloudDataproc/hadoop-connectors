@@ -774,6 +774,33 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(fs.isAnalyticsCoreEnabled()).isTrue();
   }
 
+  @Test
+  public void initialize_unauthenticatedAndAnalyticsCoreEnabled_succeeds() throws Exception {
+    Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.UNAUTHENTICATED);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    assertThat(fs.getAnalyticsCoreGcsFs()).isNotNull();
+  }
+
+  @Test
+  public void initialize_missingKeyfileAndAnalyticsCoreEnabled_throwsIOException()
+      throws Exception {
+    Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+    config.set("fs.gs.auth.service.account.json.keyfile", "/missing/dir/missing-key.json");
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    IOException exception =
+        assertThrows(IOException.class, () -> fs.initialize(new URI("gs://foobar/"), config));
+
+    assertThat(exception).hasMessageThat().contains("missing-key.json");
+  }
+
   private static Configuration accessTokenProviderConfig(
       Class<? extends AccessTokenProvider> provider) {
     Configuration config = new Configuration();

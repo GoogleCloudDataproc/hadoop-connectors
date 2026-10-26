@@ -75,6 +75,8 @@ final class AnalyticsCoreConfigMapper {
   static final String PROXY_ADDRESS_KEY = "analytics-core.auth.proxy.address";
   static final String PROXY_USERNAME_KEY = "analytics-core.auth.proxy.username";
   static final String PROXY_PASSWORD_KEY = "analytics-core.auth.proxy.password";
+  static final String HTTP_CONNECT_TIMEOUT_KEY = "analytics-core.auth.http.connect-timeout-ms";
+  static final String HTTP_READ_TIMEOUT_KEY = "analytics-core.auth.http.read-timeout-ms";
 
   private static final String WORKLOAD_IDENTITY_FEDERATION_VALUE = "WORKLOAD_IDENTITY_FEDERATION";
 
@@ -148,6 +150,12 @@ final class AnalyticsCoreConfigMapper {
               HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX.getKey())
           .withPrefixes(KEY_PREFIXES);
 
+  private static final HadoopConfigurationProperty<Long> HTTP_READ_TIMEOUT =
+      new HadoopConfigurationProperty<>(
+              HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX.getKey(),
+              HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX.getDefault())
+          .withPrefixes(KEY_PREFIXES);
+
   private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
           .put(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), PROJECT_ID_KEY)
@@ -207,7 +215,8 @@ final class AnalyticsCoreConfigMapper {
    * <p>Auth and proxy settings are translated from their connector spelling ({@code fs.gs.auth.*},
    * {@code fs.gs.proxy.*}, {@code fs.gs.token.server.url}) to the {@code analytics-core.auth.*}
    * keys, resolving JCEKS secrets and impersonation the same way the connector does. Auth keys set
-   * directly in the Analytics Core spelling are ignored.
+   * directly in the Analytics Core spelling are ignored. The HTTP timeouts are always mapped, so
+   * Analytics Core uses the same timeouts as the connector.
    *
    * @param config The Hadoop configuration.
    * @param prefix The prefix used for Analytics Core properties (e.g., "fs.gs.").
@@ -263,9 +272,20 @@ final class AnalyticsCoreConfigMapper {
 
     removeSweptAuthKeys(mappedProperties, prefix);
     mapProxyConfigs(config, prefix, mappedProperties);
+    mapHttpTimeouts(config, prefix, mappedProperties);
     mapAuthIdentityConfigs(config, prefix, mappedProperties);
 
     return mappedProperties;
+  }
+
+  /**
+   * Returns whether a Hadoop token plugin ({@code ACCESS_TOKEN_PROVIDER} or a delegation token
+   * binding) supplies the identity, in which case the connector builds the credentials itself.
+   */
+  static boolean usesHadoopTokenProvider(Configuration config) {
+    return AUTHENTICATION_TYPE.get(config, config::getEnum)
+            == AuthenticationType.ACCESS_TOKEN_PROVIDER
+        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get));
   }
 
   /**
@@ -291,6 +311,23 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
+   * Maps the HTTP timeouts in milliseconds. {@code 0} means no timeout in both the connector and
+   * Analytics Core.
+   */
+  private static void mapHttpTimeouts(
+      Configuration config, String prefix, Map<String, String> map) {
+    map.put(
+        prefix + HTTP_CONNECT_TIMEOUT_KEY,
+        Long.toString(
+            GoogleHadoopFileSystemConfiguration.GCS_HTTP_CONNECT_TIMEOUT
+                .getTimeDuration(config)
+                .toMillis()));
+    map.put(
+        prefix + HTTP_READ_TIMEOUT_KEY,
+        Long.toString(HTTP_READ_TIMEOUT.getTimeDuration(config).toMillis()));
+  }
+
+  /**
    * Maps the auth type and only the keys that type uses, so secrets of other auth types left in a
    * shared cluster config are not forwarded. {@code ACCESS_TOKEN_PROVIDER} and delegation tokens
    * are Hadoop-only plugins and map to nothing; the connector keeps building those credentials
@@ -298,11 +335,10 @@ final class AnalyticsCoreConfigMapper {
    */
   private static void mapAuthIdentityConfigs(
       Configuration config, String prefix, Map<String, String> map) {
-    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
-    if (authType == AuthenticationType.ACCESS_TOKEN_PROVIDER
-        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+    if (usesHadoopTokenProvider(config)) {
       return;
     }
+    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
     map.put(prefix + AUTH_TYPE_KEY, toAnalyticsCoreAuthType(authType));
 
     switch (authType) {
