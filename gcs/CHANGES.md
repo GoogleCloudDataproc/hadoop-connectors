@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Fix listStatusStartingFrom returning too few files when directory objects follow the start offset
 
 ## 4.0.6 - 2026-09-24
 1. Skip soft delete for compose operations using deleteSourceObjects
