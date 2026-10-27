@@ -22,7 +22,9 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
+import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
 import static com.google.common.truth.Truth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -42,6 +44,8 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
+import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.interceptors.LoggingInterceptor;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableMap;
@@ -60,8 +64,11 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.logging.StreamHandler;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -780,6 +787,167 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass("fs.gs.auth.access.token.provider", provider, AccessTokenProvider.class);
     return config;
+  }
+
+  @Test
+  public void invocationId_isClearedAfterEveryFileSystemOperation() throws Exception {
+    Path dir = new Path(ghfs.getWorkingDirectory(), "invocationId_isCleared");
+    Path file = new Path(dir, "file");
+
+    ghfs.mkdirs(dir);
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    try (FSDataOutputStream out = ghfs.create(file)) {
+      out.write(new byte[] {1, 2, 3});
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    ghfs.getFileStatus(file);
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    ghfs.listStatus(dir);
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    ghfs.globStatus(new Path(dir, "*"));
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    try (FSDataInputStream in = ghfs.open(file)) {
+      assertThat(in.read()).isEqualTo(1);
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    try (FSDataOutputStream out = ghfs.append(file)) {
+      out.write(new byte[] {4});
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    Path otherFile = new Path(dir, "other");
+    createFile(otherFile, new byte[] {5});
+    ghfs.concat(file, new Path[] {otherFile});
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    ghfs.delete(dir, /* recursive= */ true);
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void inputStreamOperations_useInvocationIdOfOpenCall() throws Exception {
+    Path dir = new Path(ghfs.getWorkingDirectory(), "inputStream_invocationId");
+    Path file = new Path(dir, "file");
+    Path otherFile = new Path(dir, "other");
+    ghfs.mkdirs(dir);
+    createFile(file, new byte[] {1, 2, 3, 4, 5});
+    createFile(otherFile, new byte[] {9});
+
+    try (LogCapture logs = new LogCapture(GoogleHadoopFSInputStream.class)) {
+      FSDataInputStream in = ghfs.open(file);
+      String openId = logs.invocationIdOf("GoogleHadoopFSInputStream(gcsPath:");
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+      ghfs.getFileStatus(otherFile);
+
+      in.seek(2);
+      assertThat(logs.invocationIdOf("seek(2)")).isEqualTo(openId);
+      assertThat(in.read()).isEqualTo(3);
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+      in.close();
+      assertThat(logs.invocationIdOf("close(): ")).isEqualTo(openId);
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
+  }
+
+  @Test
+  public void openFileWithStatus_streamCreatedOnPoolThread_usesInvocationIdOfOpenCall()
+      throws Exception {
+    Path dir = new Path(ghfs.getWorkingDirectory(), "openFileWithStatus_invocationId");
+    Path file = new Path(dir, "file");
+    ghfs.mkdirs(dir);
+    createFile(file, new byte[] {1, 2, 3});
+    FileStatus status = ghfs.getFileStatus(file);
+
+    try (LogCapture fsLogs = new LogCapture(GoogleHadoopFileSystem.class);
+        LogCapture streamLogs = new LogCapture(GoogleHadoopFSInputStream.class)) {
+      FSDataInputStream in = ghfs.openFile(file).withFileStatus(status).build().get();
+      String openId = fsLogs.invocationIdOf("Path to be opened:");
+
+      assertThat(streamLogs.invocationIdOf("GoogleHadoopFSInputStream(gcsPath:")).isEqualTo(openId);
+      assertThat(in.read()).isEqualTo(1);
+      in.close();
+      assertThat(streamLogs.invocationIdOf("close(): ")).isEqualTo(openId);
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
+  }
+
+  @Test
+  public void outputStreamOperations_useInvocationIdOfCreateCall() throws Exception {
+    Path dir = new Path(ghfs.getWorkingDirectory(), "outputStream_invocationId");
+    Path file = new Path(dir, "file");
+    Path otherFile = new Path(dir, "other");
+    ghfs.mkdirs(dir);
+    createFile(otherFile, new byte[] {9});
+
+    try (LogCapture logs = new LogCapture(GoogleHadoopOutputStream.class)) {
+      FSDataOutputStream out = ghfs.create(file);
+      String createId = logs.invocationIdOf("GoogleHadoopOutputStream(gcsPath:");
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+      ghfs.getFileStatus(otherFile);
+
+      out.write(new byte[] {1, 2, 3});
+      out.close();
+      assertThat(logs.invocationIdOf("close(): temp tail file")).isEqualTo(createId);
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
+    assertThat(ghfs.getFileStatus(file).getLen()).isEqualTo(3);
+  }
+
+  private static final class LogCapture implements AutoCloseable {
+    private static final Pattern INVOCATION_ID_LOG_LINE =
+        Pattern.compile(
+            "^\\[(" + Pattern.quote(GCCL_INVOCATION_ID_PREFIX) + "[0-9a-f]{8})\\]: (.*)$");
+
+    private final Logger logger;
+    private final Level previousLevel;
+    private final ByteArrayOutputStream output = new ByteArrayOutputStream();
+    private final StreamHandler handler;
+
+    LogCapture(Class<?> loggingClass) {
+      this.logger = Logger.getLogger(loggingClass.getName());
+      this.previousLevel = logger.getLevel();
+      this.handler =
+          new StreamHandler(
+              output,
+              new LoggingFormatter(
+                  new Formatter() {
+                    @Override
+                    public String format(LogRecord logRecord) {
+                      return logRecord.getMessage() + "\n";
+                    }
+                  }));
+      handler.setLevel(Level.ALL);
+      logger.setLevel(Level.ALL);
+      logger.addHandler(handler);
+    }
+
+    String invocationIdOf(String part) {
+      handler.flush();
+      for (String line : output.toString(UTF_8).split("\n")) {
+        Matcher matcher = INVOCATION_ID_LOG_LINE.matcher(line);
+        if (matcher.matches() && matcher.group(2).contains(part)) {
+          return matcher.group(1);
+        }
+      }
+      throw new AssertionError(
+          String.format("No log line with an invocation ID contains '%s':%n%s", part, output));
+    }
+
+    @Override
+    public void close() {
+      logger.removeHandler(handler);
+      logger.setLevel(previousLevel);
+    }
   }
 
   /** An {@link AccessTokenProvider} that reports issuing downscoped, per-request tokens. */
