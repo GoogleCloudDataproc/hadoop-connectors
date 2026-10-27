@@ -135,17 +135,17 @@ public class TraceFactoryTest {
   public void multithreaded_trace_operations() throws ExecutionException, InterruptedException {
     ITraceFactory traceFactory = TraceFactory.get(true);
     int threadPoolSize = 2;
-    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
+    List<ExecutorService> executors = newSingleThreadExecutors(threadPoolSize);
     try {
       assertThreadTraceIsNull();
-      List<String> expectedSubEventNames = runMultithreaded(traceFactory, threadPool, 10);
+      List<String> expectedSubEventNames = runMultithreaded(traceFactory, executors, 10);
 
       assertThreadTraceIsNull();
       assertThat(this.assertingHandler.logs).hasSize(1);
       assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
       validateSubEvents(0, threadPoolSize, expectedSubEventNames);
     } finally {
-      threadPool.shutdown();
+      executors.forEach(ExecutorService::shutdown);
     }
   }
 
@@ -200,18 +200,32 @@ public class TraceFactoryTest {
   public void max_subevents_test() throws ExecutionException, InterruptedException {
     ITraceFactory traceFactory = TraceFactory.get(true);
     int threadPoolSize = 2;
-    ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
+    List<ExecutorService> executors = newSingleThreadExecutors(threadPoolSize);
     try {
       assertThreadTraceIsNull();
-      runMultithreaded(traceFactory, threadPool, 100);
+      // Each thread runs 50 operations, more than MAX_EVENTS_SIZE, so each thread's sub-events
+      // must be capped.
+      runMultithreaded(traceFactory, executors, 100);
 
       assertThreadTraceIsNull();
       assertThat(this.assertingHandler.logs).hasSize(1);
       assertThat(this.getEventAtLogIndex(0).size()).isEqualTo(1);
       validateSubEventsSize(0, threadPoolSize, threadPoolSize * ThreadTrace.MAX_EVENTS_SIZE);
     } finally {
-      threadPool.shutdown();
+      executors.forEach(ExecutorService::shutdown);
     }
+  }
+
+  /**
+   * Creates single-thread executors so that tests control exactly which thread runs each task. A
+   * shared fixed thread pool gives no guarantee on how tasks are distributed across its threads.
+   */
+  private static List<ExecutorService> newSingleThreadExecutors(int count) {
+    List<ExecutorService> executors = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      executors.add(Executors.newSingleThreadExecutor());
+    }
+    return executors;
   }
 
   @Test
@@ -228,21 +242,24 @@ public class TraceFactoryTest {
   }
 
   private List<String> runMultithreaded(
-      ITraceFactory traceFactory, ExecutorService threadPool, int numOperations) {
+      ITraceFactory traceFactory, List<ExecutorService> executors, int numOperations) {
     List<String> subEventNames = new ArrayList<>();
     List<Future<Object>> futures = new ArrayList<>();
     try (ITraceOperation to = traceFactory.createRootWithLogging(name, context)) {
       for (int i = 0; i < numOperations; i++) {
         final String eventName = String.format("op_%d", i);
         subEventNames.add(eventName);
+        // Distribute operations round-robin so every thread deterministically gets an equal share.
         Future<Object> future =
-            threadPool.submit(
-                () -> {
-                  try (ITraceOperation child =
-                      TraceOperation.getChildTrace(to.getTrace(), eventName)) {
-                    return null;
-                  }
-                });
+            executors
+                .get(i % executors.size())
+                .submit(
+                    () -> {
+                      try (ITraceOperation child =
+                          TraceOperation.getChildTrace(to.getTrace(), eventName)) {
+                        return null;
+                      }
+                    });
 
         futures.add(future);
       }
