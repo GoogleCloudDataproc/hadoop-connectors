@@ -90,35 +90,6 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
-  public void setInvocationId_deprecated_setsIdUntilCleared() {
-    InvocationIdContext.setInvocationId();
-    String invocationId = InvocationIdContext.getInvocationId();
-
-    assertThat(invocationId).matches(OPERATION_ID_PATTERN);
-
-    InvocationIdContext.setInvocationId();
-    assertThat(InvocationIdContext.getInvocationId()).isNotEqualTo(invocationId);
-
-    InvocationIdContext.clear();
-    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  public void openScope_afterDeprecatedSetInvocationId_usesNewIdAndRestoresOldOnClose() {
-    InvocationIdContext.setInvocationId();
-    String unscopedId = InvocationIdContext.getInvocationId();
-
-    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
-      assertThat(InvocationIdContext.getInvocationId()).matches(OPERATION_ID_PATTERN);
-      assertThat(InvocationIdContext.getInvocationId()).isNotEqualTo(unscopedId);
-    }
-
-    assertThat(InvocationIdContext.getInvocationId()).isEqualTo(unscopedId);
-  }
-
-  @Test
   public void openScope_nestedInScopeWithId_reusesThatId() {
     String streamId = InvocationIdContext.newInvocationId();
 
@@ -127,18 +98,6 @@ public class InvocationIdContextTest {
         assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
       }
       assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
-    }
-
-    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
-  }
-
-  @Test
-  public void openScope_nestedInEmptyScopeWithId_setsNewId() {
-    try (InvocationIdContext.Scope outer = InvocationIdContext.openScopeWithId("")) {
-      try (InvocationIdContext.Scope inner = InvocationIdContext.openScope()) {
-        assertThat(InvocationIdContext.getInvocationId()).matches(OPERATION_ID_PATTERN);
-      }
-      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
     }
 
     assertThat(InvocationIdContext.getInvocationId()).isEmpty();
@@ -202,19 +161,25 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  public void openScopeWithId_emptyId_deactivatesIdForScope() {
-    try (InvocationIdContext.Scope outer = InvocationIdContext.openScope()) {
-      String outerId = InvocationIdContext.getInvocationId();
+  public void openScopeWithId_nullOrEmptyId_throws() {
+    assertThrows(IllegalArgumentException.class, () -> InvocationIdContext.openScopeWithId(""));
+    assertThrows(IllegalArgumentException.class, () -> InvocationIdContext.openScopeWithId(null));
 
-      try (InvocationIdContext.Scope inner = InvocationIdContext.openScopeWithId("")) {
-        assertThat(InvocationIdContext.getInvocationId()).isEmpty();
-      }
-      try (InvocationIdContext.Scope inner = InvocationIdContext.openScopeWithId(null)) {
-        assertThat(InvocationIdContext.getInvocationId()).isEmpty();
-      }
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
 
-      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
-    }
+  @Test
+  public void scopeClose_calledTwice_doesNotRestoreStaleId() {
+    InvocationIdContext.Scope outer = InvocationIdContext.openScope();
+    InvocationIdContext.Scope inner =
+        InvocationIdContext.openScopeWithId(InvocationIdContext.newInvocationId());
+
+    inner.close();
+    outer.close();
+    inner.close();
+    outer.close();
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
   }
 
   @Test
