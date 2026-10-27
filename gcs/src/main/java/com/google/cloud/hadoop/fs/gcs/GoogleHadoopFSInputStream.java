@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.gcsio.ReadVectoredSeekableByteChannel;
 import com.google.cloud.hadoop.gcsio.VectoredIORange;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.InvocationIdContext;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -94,6 +95,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private final GhfsInputStreamStatistics streamStatistics;
   private final Supplier<VectoredIOImpl> vectoredIOSupplier;
   private final GoogleCloudStorageFileSystem gcsFs;
+  private final String invocationId;
 
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
@@ -165,6 +167,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
     this.traceFactory = ghfs.getTraceFactory();
     this.vectoredIOSupplier = ghfs.getVectoredIOSupplier();
+
+    String currentInvocationId = InvocationIdContext.getInvocationId();
+    this.invocationId =
+        currentInvocationId.isEmpty() ? InvocationIdContext.newInvocationId() : currentInvocationId;
+  }
+
+  private InvocationIdContext.Scope openInvocationIdScope() {
+    return InvocationIdContext.openScopeWithId(invocationId);
   }
 
   /**
@@ -177,7 +187,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public void readVectored(List<? extends FileRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
-    try {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
       trackDuration(
           streamStatistics,
           STREAM_READ_VECTORED_OPERATIONS.getSymbol(),
@@ -241,7 +251,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      return readInternal(buf, offset, length);
+    }
+  }
 
+  private int readInternal(byte[] buf, int offset, int length) throws IOException {
     return trackDuration(
         streamStatistics,
         STREAM_READ_OPERATIONS.getSymbol(),
@@ -281,8 +296,21 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   @Override
-  public synchronized void seek(long pos) throws IOException {
+  public synchronized void readFully(long position, byte[] buffer, int offset, int length)
+      throws IOException {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      super.readFully(position, buffer, offset, length);
+    }
+  }
 
+  @Override
+  public synchronized void seek(long pos) throws IOException {
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      seekInternal(pos);
+    }
+  }
+
+  private void seekInternal(long pos) throws IOException {
     trackDuration(
         streamStatistics,
         STREAM_READ_SEEK_OPERATIONS.getSymbol(),
@@ -380,9 +408,10 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-
-    return GhfsGlobalStorageStatistics.trackDuration(
-        durationTracker, stats, statistic, context, traceFactory, operation);
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      return GhfsGlobalStorageStatistics.trackDuration(
+          durationTracker, stats, statistic, context, traceFactory, operation);
+    }
   }
 
   /**

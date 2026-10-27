@@ -31,6 +31,7 @@ public class LoggingFormatterTest {
   private static final String OTHER_LOGGER_NAME = "org.apache.hadoop.test.logger";
 
   private LoggingFormatter formatter;
+  private InvocationIdContext.Scope invocationIdScope;
 
   @Before
   public void setUp() {
@@ -42,13 +43,12 @@ public class LoggingFormatterTest {
                 return String.format("%s%n", record.getMessage());
               }
             });
-    // Ensure a fresh Invocation ID is set for each test
-    InvocationIdContext.setInvocationId();
+    invocationIdScope = InvocationIdContext.openScope();
   }
 
   @After
   public void tearDown() {
-    // Clean up the ThreadLocal after each test
+    invocationIdScope.close();
     InvocationIdContext.clear();
   }
 

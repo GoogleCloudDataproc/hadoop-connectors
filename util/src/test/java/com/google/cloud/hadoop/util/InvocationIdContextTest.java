@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,62 +53,159 @@ public class InvocationIdContextTest {
   }
 
   @Test
-  public void setInvocationId_noExistingId_generatesValidId() {
-    InvocationIdContext.setInvocationId();
-
-    assertThat(InvocationIdContext.getInvocationId()).matches(OPERATION_ID_PATTERN);
-  }
-
-  @Test
-  public void clear_whenIdExists_resetsToEmptyString() {
-    InvocationIdContext.setInvocationId();
-
-    InvocationIdContext.clear();
-
-    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
-  }
-
-  @Test
-  public void setInvocationId_inNewThread_doesNotAffectParentThreadId()
-      throws InterruptedException {
-    InvocationIdContext.setInvocationId();
-    String mainThreadId = InvocationIdContext.getInvocationId();
-    AtomicReference<String> childThreadId = new AtomicReference<>();
-
-    Thread thread =
-        new Thread(
-            () -> {
-              InvocationIdContext.setInvocationId();
-              childThreadId.set(InvocationIdContext.getInvocationId());
-            });
-    thread.start();
-    thread.join();
-
-    assertThat(childThreadId.get()).isNotEqualTo(mainThreadId);
-    assertThat(InvocationIdContext.getInvocationId()).isEqualTo(mainThreadId);
-  }
-
-  @Test
-  public void getInvocationId_inChildThread_inheritsParentId() throws InterruptedException {
-    InvocationIdContext.setInvocationId();
-    String parentThreadId = InvocationIdContext.getInvocationId();
-    AtomicReference<String> childThreadId = new AtomicReference<>();
-
-    Thread childThread = new Thread(() -> childThreadId.set(InvocationIdContext.getInvocationId()));
-    childThread.start();
-    childThread.join();
-
-    assertThat(childThreadId.get()).isEqualTo(parentThreadId);
-    assertThat(InvocationIdContext.getInvocationId()).isEqualTo(parentThreadId);
-  }
-
-  @Test
   public void newInvocationId_hasPrefixAndEightHexChars_andDoesNotSetContext() {
     String invocationId = InvocationIdContext.newInvocationId();
 
     assertThat(invocationId).matches(OPERATION_ID_PATTERN);
     assertThat(InvocationIdContext.newInvocationId()).isNotEqualTo(invocationId);
     assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScope_setsIdInsideAndClearsOnClose() {
+    String invocationId;
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      invocationId = InvocationIdContext.getInvocationId();
+      assertThat(invocationId).matches(OPERATION_ID_PATTERN);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      assertThat(InvocationIdContext.getInvocationId()).isNotEqualTo(invocationId);
+    }
+  }
+
+  @Test
+  public void openScope_clearsIdWhenOperationThrows() {
+    assertThrows(
+        IllegalStateException.class,
+        () -> {
+          try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+            throw new IllegalStateException("operation failed");
+          }
+        });
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScope_nestedInScopeWithId_reusesThatId() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScopeWithId(streamId)) {
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScope()) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+      }
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScope_nested_reusesOuterIdAndKeepsItUntilOuterCloses() {
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScope()) {
+      String outerId = InvocationIdContext.getInvocationId();
+
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScope()) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
+      }
+
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_overridesAndRestoresPreviousId() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScope()) {
+      String outerId = InvocationIdContext.getInvocationId();
+
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScopeWithId(streamId)) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+      }
+
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_withoutPreviousId_clearsOnClose() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScopeWithId(streamId)) {
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_sameIdAlreadyActive_keepsIdUntilOuterCloses() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScopeWithId(streamId)) {
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScopeWithId(streamId)) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+      }
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_nullOrEmptyId_throws() {
+    assertThrows(IllegalArgumentException.class, () -> InvocationIdContext.openScopeWithId(""));
+    assertThrows(IllegalArgumentException.class, () -> InvocationIdContext.openScopeWithId(null));
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void scopeClose_calledTwice_doesNotRestoreStaleId() {
+    InvocationIdContext.Scope outer = InvocationIdContext.openScope();
+    InvocationIdContext.Scope inner =
+        InvocationIdContext.openScopeWithId(InvocationIdContext.newInvocationId());
+
+    inner.close();
+    outer.close();
+    inner.close();
+    outer.close();
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScope_inChildThread_doesNotInheritParentId() throws InterruptedException {
+    AtomicReference<String> childInitialId = new AtomicReference<>();
+    AtomicReference<String> childScopedId = new AtomicReference<>();
+
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      String parentId = InvocationIdContext.getInvocationId();
+
+      Thread child =
+          new Thread(
+              () -> {
+                childInitialId.set(InvocationIdContext.getInvocationId());
+                try (InvocationIdContext.Scope childScope = InvocationIdContext.openScope()) {
+                  childScopedId.set(InvocationIdContext.getInvocationId());
+                }
+              });
+      child.start();
+      child.join();
+
+      assertThat(childInitialId.get()).isEmpty();
+      assertThat(childScopedId.get()).matches(OPERATION_ID_PATTERN);
+      assertThat(childScopedId.get()).isNotEqualTo(parentId);
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(parentId);
+    }
   }
 
   @Test
@@ -122,19 +220,20 @@ public class InvocationIdContextTest {
 
   @Test
   public void newRequestInvocationId_withOperation_sharesOperationPrefixAndIsUnique() {
-    InvocationIdContext.setInvocationId();
-    String operationId = InvocationIdContext.getInvocationId();
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      String operationId = InvocationIdContext.getInvocationId();
 
-    String requestId1 = InvocationIdContext.newRequestInvocationId();
-    String requestId2 = InvocationIdContext.newRequestInvocationId();
+      String requestId1 = InvocationIdContext.newRequestInvocationId();
+      String requestId2 = InvocationIdContext.newRequestInvocationId();
 
-    assertThat(requestId1).matches(REQUEST_ID_PATTERN);
-    assertThat(requestId2).matches(REQUEST_ID_PATTERN);
-    assertThat(requestId1).startsWith(operationId + "-");
-    assertThat(requestId2).startsWith(operationId + "-");
-    assertThat(requestId1).isNotEqualTo(requestId2);
-    assertThat(uuidOf(requestId1).toString()).isEqualTo(uuidPartOf(requestId1));
-    assertThat(InvocationIdContext.getInvocationId()).isEqualTo(operationId);
+      assertThat(requestId1).matches(REQUEST_ID_PATTERN);
+      assertThat(requestId2).matches(REQUEST_ID_PATTERN);
+      assertThat(requestId1).startsWith(operationId + "-");
+      assertThat(requestId2).startsWith(operationId + "-");
+      assertThat(requestId1).isNotEqualTo(requestId2);
+      assertThat(uuidOf(requestId1).toString()).isEqualTo(uuidPartOf(requestId1));
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(operationId);
+    }
   }
 
   private static String uuidPartOf(String requestId) {
