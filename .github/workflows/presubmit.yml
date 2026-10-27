@@ -1,0 +1,58 @@
+# Unit tests for every PR commit. Integration tests run in Cloud Build
+# (cloudbuild/cloudbuild.yaml), started by a `/gcbrun` comment on the PR.
+name: presubmits
+
+on:
+  pull_request:
+    # Not a default type; a draft promoted to "Ready for review" needs a fresh run.
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# PRs: a newer commit cancels the in-flight run. Pushes to master: one group per
+# commit, so post-merge runs are never cancelled or coalesced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Referenced by branch protection; keep the workflow and job names stable.
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+      # setup-java's Maven cache does not include the distribution ./mvnw downloads.
+      - name: Cache Maven wrapper distribution
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ runner.os }}-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
+      - name: Run unit tests
+        run: ./mvnw -B -e -Pcoverage clean verify
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: surefire-reports
+          path: '**/target/surefire-reports/'
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload unit test coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          # Unset on fork PRs; the action then uploads tokenless, which Codecov allows for public repos.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittest
+          fail_ci_if_error: false
