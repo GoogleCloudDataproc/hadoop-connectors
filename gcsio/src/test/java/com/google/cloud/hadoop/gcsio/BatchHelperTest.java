@@ -194,16 +194,14 @@ public class BatchHelperTest {
     // 5. Validate that no requests were sent after 1st request were queued
     assertThat(httpRequestInitializer.getAllRequestStrings()).isEmpty();
 
-    // 6. Queue 2nd GET request to BatchHelper
+    // 6. Queue 2nd GET request to BatchHelper. This fills the batch, which is then sent
+    // asynchronously on the executor thread, so the requests may or may not be sent yet.
     batchHelper.queue(storage.objects().get(BUCKET_NAME, objectName2), assertCallback(object2));
 
-    // 7. Validate that no requests were sent after 2nd request were queued
-    assertThat(httpRequestInitializer.getAllRequestStrings()).isEmpty();
-
-    // 8. Call `flush` at the end.
+    // 7. Call `flush` at the end.
     batchHelper.flush();
 
-    // 9. Validate that 1 batch request consisting of 2 GET requests was sent
+    // 8. Validate that 1 batch request consisting of 2 GET requests was sent
     assertThat(httpRequestInitializer.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),

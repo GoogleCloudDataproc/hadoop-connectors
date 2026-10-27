@@ -70,7 +70,7 @@ public class MockGoogleCloudStorageImplFactory {
         .build();
   }
 
-  private static GoogleCloudStorageOptions getDefaultOptions() {
+  static GoogleCloudStorageOptions getDefaultOptions() {
     return GoogleCloudStorageOptions.builder()
         .setAppName("gcsio-unit-test")
         .setProjectId("google.com:foo-project")

@@ -39,22 +39,25 @@ import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 final class MockStorage extends StorageImplBase {
 
-  private List<AbstractMessage> requests;
-  private Queue<java.lang.Object> responses;
+  // gRPC server handlers run concurrently on server threads, so both collections must be
+  // thread-safe.
+  private final List<AbstractMessage> requests = Collections.synchronizedList(new ArrayList<>());
+  private final Queue<java.lang.Object> responses = new ConcurrentLinkedQueue<>();
 
-  public MockStorage() {
-    requests = new ArrayList<>();
-    responses = new LinkedList<>();
-  }
+  public MockStorage() {}
 
+  /** Returns a snapshot of the requests received so far. */
   public List<AbstractMessage> getRequests() {
-    return requests;
+    synchronized (requests) {
+      return new ArrayList<>(requests);
+    }
   }
 
   public void addResponse(AbstractMessage response) {
@@ -66,8 +69,8 @@ final class MockStorage extends StorageImplBase {
   }
 
   public void reset() {
-    requests = new ArrayList<>();
-    responses = new LinkedList<>();
+    requests.clear();
+    responses.clear();
   }
 
   @Override
@@ -259,7 +262,7 @@ final class MockStorage extends StorageImplBase {
       @Override
       public void onNext(WriteObjectRequest value) {
         requests.add(value);
-        final java.lang.Object response = responses.remove();
+        final java.lang.Object response = responses.poll();
         if (response instanceof WriteObjectResponse) {
           responseObserver.onNext(((WriteObjectResponse) response));
         } else if (response instanceof Exception) {

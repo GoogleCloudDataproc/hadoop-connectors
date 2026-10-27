@@ -158,6 +158,11 @@ public class GoogleCloudStorageClientTest {
 
   private static final MockStorage mockStorage = new MockStorage();
 
+  // Runs batch operations on the calling thread, so requests reach MockStorage in a deterministic
+  // order. Use it for tests that queue responses of different types.
+  private static final GoogleCloudStorageOptions SEQUENTIAL_OPTIONS =
+      MockGoogleCloudStorageImplFactory.getDefaultOptions().toBuilder().setBatchThreads(0).build();
+
   @Before
   public void setUp() {
     mockStorage.reset();
@@ -480,19 +485,19 @@ public class GoogleCloudStorageClientTest {
   @Test
   public void createEmptyObjects_ignoresExceptions() throws Exception {
     Bucket mockBucket = mockBucket("STANDARD");
-    mockStorage.addResponse(mockBucket);
-    mockStorage.addResponse(mockBucket);
-    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
-    mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
-    // Mock for getItemInfo in case the object already exists.
-    mockStorage.addResponse(
-        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
-    mockStorage.addResponse(
-        TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+    // Responses are consumed in order, so queue them per object: getBucket, write (fails),
+    // getItemInfo in case the object already exists.
+    for (int i = 0; i < 2; i++) {
+      mockStorage.addResponse(mockBucket);
+      mockStorage.addException(new StatusRuntimeException(Status.RESOURCE_EXHAUSTED));
+      mockStorage.addResponse(
+          TEST_OBJECT.toBuilder().setSize(0L).putAllMetadata(ImmutableMap.of()).build());
+    }
 
     try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
       GoogleCloudStorage gcs =
-          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+          mockedGcsClientImpl(
+              SEQUENTIAL_OPTIONS, transport, fakeServer.getGrpcStorageOptions().getService());
 
       gcs.createEmptyObjects(ImmutableList.of(TEST_RESOURCE_ID, TEST_RESOURCE_ID));
     }
@@ -502,14 +507,15 @@ public class GoogleCloudStorageClientTest {
   @Test
   public void createEmptyObjects_doesNotIgnoreExceptions() throws Exception {
     Bucket mockBucket = mockBucket("STANDARD");
-    mockStorage.addResponse(mockBucket);
-    mockStorage.addResponse(mockBucket);
-    mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
-    mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
+    for (int i = 0; i < 2; i++) {
+      mockStorage.addResponse(mockBucket);
+      mockStorage.addException(new StatusRuntimeException(Status.UNAVAILABLE));
+    }
 
     try (FakeServer fakeServer = FakeServer.of(mockStorage)) {
       GoogleCloudStorage gcs =
-          mockedGcsClientImpl(transport, fakeServer.getGrpcStorageOptions().getService());
+          mockedGcsClientImpl(
+              SEQUENTIAL_OPTIONS, transport, fakeServer.getGrpcStorageOptions().getService());
 
       IOException thrown =
           assertThrows(
