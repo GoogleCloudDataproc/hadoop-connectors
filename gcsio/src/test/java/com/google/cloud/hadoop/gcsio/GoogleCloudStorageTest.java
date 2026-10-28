@@ -33,6 +33,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBu
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listBucketsRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithStartOffset;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.moveRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
@@ -2582,6 +2583,142 @@ public class GoogleCloudStorageTest {
             listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, pageToken))
         .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_skipsPagesWithOnlyDirectories() throws IOException {
+    String startOffset = "t/p1/f1";
+    StorageObject start = newStorageObject(BUCKET_NAME, startOffset);
+    StorageObject p2 = newStorageObject(BUCKET_NAME, "t/p2/f1");
+    StorageObject p3 = newStorageObject(BUCKET_NAME, "t/p3/f1");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(start, newStorageObject(BUCKET_NAME, "t/p10/")))
+                    .setNextPageToken("token_1")),
+            jsonDataResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            newStorageObject(BUCKET_NAME, "t/p11/"),
+                            newStorageObject(BUCKET_NAME, "t/p12/")))
+                    .setNextPageToken("token_2")),
+            jsonDataResponse(new Objects().setItems(ImmutableList.of(p2, p3))));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfoStartingFrom(BUCKET_NAME, startOffset, startOffsetListOptions(2));
+
+    // Overshooting maxResults is allowed.
+    assertThat(objects)
+        .containsExactly(
+            createItemInfoForStorageObject(start),
+            createItemInfoForStorageObject(p2),
+            createItemInfoForStorageObject(p3))
+        .inOrder();
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, /* pageToken= */ null, 2),
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, "token_1", 2),
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, "token_2", 2))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_maxResultsOne_listsPastStartObject() throws IOException {
+    String startOffset = "a";
+    StorageObject start = newStorageObject(BUCKET_NAME, startOffset);
+    StorageObject b = newStorageObject(BUCKET_NAME, "b");
+    StorageObject c = newStorageObject(BUCKET_NAME, "c");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(start, newStorageObject(BUCKET_NAME, "a/")))
+                    .setNextPageToken("token_1")),
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(b, c)).setNextPageToken("token_2")));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfoStartingFrom(BUCKET_NAME, startOffset, startOffsetListOptions(1));
+
+    assertThat(objects)
+        .containsExactly(
+            createItemInfoForStorageObject(start),
+            createItemInfoForStorageObject(b),
+            createItemInfoForStorageObject(c))
+        .inOrder();
+    // At least 2 items are requested per page, and listing stops once enough files are listed.
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, /* pageToken= */ null, 2),
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, "token_1", 2))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_stopsWhenListingExhausted() throws IOException {
+    String startOffset = "a";
+    StorageObject start = newStorageObject(BUCKET_NAME, startOffset);
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(start, newStorageObject(BUCKET_NAME, "a/")))));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfoStartingFrom(BUCKET_NAME, startOffset, startOffsetListOptions(5));
+
+    assertThat(objects).containsExactly(createItemInfoForStorageObject(start));
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, /* pageToken= */ null, 5));
+  }
+
+  @Test
+  public void listObjectInfoStartingFrom_stopsOnceTwoFilesListed() throws IOException {
+    String startOffset = "a";
+    StorageObject start = newStorageObject(BUCKET_NAME, startOffset);
+    StorageObject b = newStorageObject(BUCKET_NAME, "b");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(start, newStorageObject(BUCKET_NAME, "a/"), b))
+                    .setNextPageToken("token_1")));
+
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfoStartingFrom(BUCKET_NAME, startOffset, startOffsetListOptions(5));
+
+    // Fewer than maxResults files are returned, but no more list calls are made.
+    assertThat(objects)
+        .containsExactly(createItemInfoForStorageObject(start), createItemInfoForStorageObject(b))
+        .inOrder();
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithStartOffset(BUCKET_NAME, startOffset, /* pageToken= */ null, 5));
+  }
+
+  private static ListObjectOptions startOffsetListOptions(long maxResults) {
+    return ListObjectOptions.DEFAULT_USING_START_OFFSET.toBuilder()
+        .setMaxResults(maxResults)
+        .build();
   }
 
   @Test
