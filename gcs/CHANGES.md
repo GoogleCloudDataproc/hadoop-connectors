@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade google.api-client.version to 2.9.2
 
 ## 3.0.21 - 2026-10-27
 1. Fix listStatusStartingFrom returning too few files when directory objects follow the start offset
