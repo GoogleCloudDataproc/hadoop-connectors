@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Upgrade google.api-client.version to 2.9.2
 
 ## 2.2.33 - 2026-03-26
 1. Add Integration test for chained Downscoping Interceptors
