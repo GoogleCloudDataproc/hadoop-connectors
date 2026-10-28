@@ -17,28 +17,78 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
+import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.util.UUID;
 
 /**
- * A utility class to manage a unique invocation ID for each thread using {@link
- * InheritableThreadLocal}. The invocation ID is used to track and identify requests across
- * different components.
+ * A utility class to manage a unique invocation ID for each thread. The invocation ID is used to
+ * track and identify requests of a connector operation across different components. It is stored in
+ * a plain {@link ThreadLocal} and is set only through an {@link AutoCloseable} {@link Scope}, so
+ * that it never outlives the operation or leaks into other threads.
  */
 public class InvocationIdContext {
 
   /** Number of hex characters of the operation ID (the first group of a UUID). */
   private static final int OPERATION_ID_LENGTH = 8;
 
-  /** Thread-local storage for the invocation ID. The ID is inherited by child threads. */
-  private static final InheritableThreadLocal<String> INVOCATION_ID =
-      new InheritableThreadLocal<>() {
-        @Override
-        protected String initialValue() {
-          return "";
+  private static final ThreadLocal<String> INVOCATION_ID = ThreadLocal.withInitial(() -> "");
+
+  private static final Scope NOOP_SCOPE = () -> {};
+
+  /**
+   * A scope during which an invocation ID is active on the current thread. Scopes must be closed in
+   * reverse order of opening, on the thread that opened them. Closing a scope more than once has no
+   * further effect.
+   */
+  public interface Scope extends AutoCloseable {
+    /** Ends the scope and restores the invocation ID that was active before it was opened. */
+    @Override
+    void close();
+  }
+
+  /**
+   * Marks the beginning of a connector operation on the current thread. If an ID is already active
+   * (nested call), it is reused and the returned scope is a no-op; otherwise a new ID is set until
+   * the returned scope is closed. Use with try-with-resources.
+   */
+  public static Scope openScope() {
+    return INVOCATION_ID.get().isEmpty() ? openScopeWithId(newInvocationId()) : NOOP_SCOPE;
+  }
+
+  /**
+   * Activates the given invocation ID on the current thread until the returned scope is closed,
+   * which restores the previously active ID. If the given ID is already active, the returned scope
+   * is a no-op.
+   *
+   * @throws IllegalArgumentException if {@code invocationId} is null or empty
+   */
+  public static Scope openScopeWithId(String invocationId) {
+    checkArgument(!Strings.isNullOrEmpty(invocationId), "invocationId must not be empty");
+    String previousId = INVOCATION_ID.get();
+    if (invocationId.equals(previousId)) {
+      return NOOP_SCOPE;
+    }
+    INVOCATION_ID.set(invocationId);
+    return new Scope() {
+      private boolean closed;
+
+      @Override
+      public void close() {
+        if (closed) {
+          return;
         }
-      };
+        closed = true;
+        if (previousId.isEmpty()) {
+          INVOCATION_ID.remove();
+        } else {
+          INVOCATION_ID.set(previousId);
+        }
+      }
+    };
+  }
 
   /**
    * Retrieves the current thread's invocation ID.
@@ -47,14 +97,6 @@ public class InvocationIdContext {
    */
   public static String getInvocationId() {
     return INVOCATION_ID.get();
-  }
-
-  /**
-   * Generates and sets a new unique invocation ID for the current thread. The ID is prefixed with
-   * {@code GCCL_INVOCATION_ID_PREFIX}.
-   */
-  public static void setInvocationId() {
-    INVOCATION_ID.set(newInvocationId());
   }
 
   /** Generates a new operation ID, prefixed with {@code gccl-invocation-id/}. */
