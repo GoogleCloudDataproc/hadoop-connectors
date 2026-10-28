@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 3.1.21 - 2026-10-28
 1. Upgrade google.api-client-libraries.version to 2.9.2
 
