@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 4.0.8 - 2026-10-27
 1. Gating listStatusStartingFrom for HNS buckets.
 
 ## 4.0.7 - 2026-10-26
