@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 2.2.34 - 2026-10-28
 1. Upgrade google.api-client.version to 2.9.2
 
 ## 2.2.33 - 2026-03-26
