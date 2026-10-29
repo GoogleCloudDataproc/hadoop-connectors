@@ -1932,6 +1932,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsFileInfo);
   }
 
+  GoogleCloudStorageInputStream createAnalyticsCoreInputStream(GcsItemId gcsItemId)
+      throws IOException {
+    return GoogleCloudStorageInputStream.create(analyticsCoreGcsFs, gcsItemId);
+  }
+
   GoogleCloudStorageOutputStream createAnalyticsCoreOutputStream(
       GcsItemId gcsItemId, GcsWriteOptions writeOptions) throws IOException {
     return GoogleCloudStorageOutputStream.create(analyticsCoreGcsFs, gcsItemId, writeOptions);

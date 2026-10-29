@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.assertByteBuffers;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -23,6 +24,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemIntegrationHelper.TestFixture;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -58,13 +60,25 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
   }
 
   private TestFixture setupFixture(String tag, String content) throws Exception {
+    return setupFixture(tag, content, /* fastFailOnNotFoundEnabled= */ true);
+  }
+
+  private TestFixture setupFixture(String tag, String content, boolean fastFailOnNotFoundEnabled)
+      throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), tag);
-    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    config.setBoolean("fs.gs.analytics.core.enable", true);
+    Configuration config = getAnalyticsCoreConfig(fastFailOnNotFoundEnabled);
 
     GoogleHadoopFileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
     gcsFsIHelper.writeTextFile(path, content);
     return new TestFixture(ghfs, path, content);
+  }
+
+  private static Configuration getAnalyticsCoreConfig(boolean fastFailOnNotFoundEnabled) {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    config.setBoolean(
+        GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE.getKey(), fastFailOnNotFoundEnabled);
+    return config;
   }
 
   @Test
@@ -215,6 +229,83 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
     }
 
     assertThat(bytesRead).isEqualTo(-1);
+  }
+
+  @Test
+  public void open_fastFailEnabled_missingObject_throwsFileNotFoundException() throws Exception {
+    URI missingPath = gcsFsIHelper.getUniqueObjectUri(getClass(), "open_fastFail_missing");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            missingPath, getAnalyticsCoreConfig(/* fastFailOnNotFoundEnabled= */ true));
+
+    FileNotFoundException thrown =
+        assertThrows(FileNotFoundException.class, () -> createGhfsInputStream(ghfs, missingPath));
+
+    assertThat(thrown).hasMessageThat().contains(missingPath.toString());
+  }
+
+  @Test
+  public void open_fastFailDisabled_missingObject_failsOnFirstRead() throws Exception {
+    URI missingPath = gcsFsIHelper.getUniqueObjectUri(getClass(), "open_noFastFail_missing");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            missingPath, getAnalyticsCoreConfig(/* fastFailOnNotFoundEnabled= */ false));
+    byte[] value = new byte[2];
+
+    // Opening doesn't request the object metadata, so it succeeds even for a missing object.
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, missingPath)) {
+      assertThrows(FileNotFoundException.class, () -> in.read(value, 0, 2));
+    }
+  }
+
+  @Test
+  public void seekAndRead_fastFailDisabled_returnsData() throws Exception {
+    String testContent = "test content";
+    TestFixture fixture =
+        setupFixture("seekAndRead_noFastFail", testContent, /* fastFailOnNotFoundEnabled= */ false);
+    byte[] value = new byte[7];
+    byte[] expected = "content".getBytes(StandardCharsets.UTF_8); // "content" starts at index 5
+
+    int bytesRead;
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      in.seek(5);
+      bytesRead = in.read(value, 0, 7);
+    }
+
+    assertThat(bytesRead).isEqualTo(7);
+    assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
+  public void readFully_fastFailDisabled_readsDataIntoBuffer() throws Exception {
+    String testContent = "test content";
+    TestFixture fixture =
+        setupFixture("readFully_noFastFail", testContent, /* fastFailOnNotFoundEnabled= */ false);
+    byte[] value = new byte[4];
+    byte[] expected = {'c', 'o', 'n', 't'}; // "content" starts at index 5
+
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      in.readFully(5, value);
+    }
+
+    assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
+  public void readVectored_fastFailDisabled_returnsExpectedRanges() throws Exception {
+    String testContent = "verify vectored read ranges are getting"; // length = 40
+    TestFixture fixture =
+        setupFixture(
+            "readVectored_noFastFail", testContent, /* fastFailOnNotFoundEnabled= */ false);
+    List<FileRange> fileRanges = new ArrayList<>();
+    fileRanges.add(FileRange.createFileRange(0, 5));
+    fileRanges.add(FileRange.createFileRange(10, 5));
+
+    try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
+      in.readVectored(fileRanges, ByteBuffer::allocate);
+    }
+
+    validateVectoredReadResult(fileRanges, fixture.path);
   }
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(
