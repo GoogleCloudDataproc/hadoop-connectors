@@ -816,7 +816,6 @@ public class AnalyticsCoreConfigMapperTest {
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.HTTP_API_CLIENT);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), true);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -846,33 +845,34 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
-  public void mapConfigs_storageClientWithBidi_mapsToBidiProtocol() {
+  public void mapConfigs_storageClient_grpcWriteFlagDoesNotAffectProtocol() {
     Configuration config = new Configuration();
     config.setEnum(
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
-    config.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
+    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), false);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY))
-        .isEqualTo(Protocol.BIDI.name());
-    // Appendable writes additionally require fs.gs.grpc.write.enable, as in the legacy client.
-    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY))
-        .isEqualTo("false");
+    // Analytics Core has a single transport per client; fs.gs.grpc.write.enable is legacy-only.
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
+            Protocol.GRPC.name(),
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
+            "false");
   }
 
   @Test
-  public void mapConfigs_storageClientWithBidiAndGrpcWrite_enablesBidiWrites() {
+  public void mapConfigs_storageClientWithBidi_mapsToBidiProtocolAndEnablesBidiWrites() {
     Configuration config = new Configuration();
     config.setEnum(
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), true);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
+    // Appendable writes are gated on the BIDI protocol alone, as for legacy zonal buckets.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
@@ -882,15 +882,12 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
-  public void mapConfigs_mapsBidiTimeoutAndFinalizeOnClose() {
+  public void mapConfigs_bidiProtocol_mapsFinalizeOnClose() {
     Configuration config = new Configuration();
     config.setEnum(
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), true);
-    config.setInt(
-        GoogleHadoopFileSystemConfiguration.GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.getKey(), 45);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.getKey(),
         true);
@@ -898,18 +895,28 @@ public class AnalyticsCoreConfigMapperTest {
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
     assertThat(mapped)
-        .containsAtLeast(
-            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_READ_TIMEOUT_SECONDS_KEY,
-            "45",
-            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_FINALIZE_ON_CLOSE_KEY,
-            "true");
-    assertThat(mapped)
-        .doesNotContainKey(
-            GoogleHadoopFileSystemConfiguration.GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.getKey());
+        .containsEntry(
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_FINALIZE_ON_CLOSE_KEY, "true");
     assertThat(mapped)
         .doesNotContainKey(
             GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE
                 .getKey());
+  }
+
+  @Test
+  public void mapConfigs_bidiClientTimeout_isNotMappedToAnalyticsCoreReadTimeout() {
+    Configuration config = new Configuration();
+    config.setEnum(
+        GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
+    config.setBoolean(
+        GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
+    config.setInt(
+        GoogleHadoopFileSystemConfiguration.GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.getKey(), 45);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    // Legacy key only bounded session setup; the Analytics Core key bounds every range read.
+    assertThat(mapped).doesNotContainKey("fs.gs.analytics-core.read.bidi.timeout-seconds");
   }
 
   @Test
@@ -919,12 +926,10 @@ public class AnalyticsCoreConfigMapperTest {
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), true);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    assertThat(mapped)
-        .doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.BIDI_READ_TIMEOUT_SECONDS_KEY);
+    assertThat(mapped).doesNotContainKey("fs.gs.analytics-core.read.bidi.timeout-seconds");
     assertThat(mapped)
         .doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_FINALIZE_ON_CLOSE_KEY);
   }
@@ -953,7 +958,6 @@ public class AnalyticsCoreConfigMapperTest {
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), true);
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -962,23 +966,76 @@ public class AnalyticsCoreConfigMapperTest {
     assertThat(mapped)
         .doesNotContainKey(
             GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey());
-    assertThat(mapped)
-        .doesNotContainKey(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey());
   }
 
   @Test
   public void mapConfigs_connectorTransportOverridesPassedThroughProtocol() {
     Configuration config = new Configuration();
+    config.setEnum(
+        GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.HTTP_API_CLIENT);
     config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, "GRPC");
     config.set("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, "true");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // fs.gs.client.type / fs.gs.bidi.enable are the single source of truth for the transport.
+    // When set, fs.gs.client.type / fs.gs.bidi.enable are the source of truth for the transport.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
             Protocol.HTTP.name(),
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
+            "false");
+  }
+
+  @Test
+  public void mapConfigs_connectorTransportUnset_honorsPassedThroughProtocol() {
+    Configuration config = new Configuration();
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, "BIDI");
+    config.setBoolean(
+        GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.getKey(),
+        true);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    // Pass-through protocol is kept and drives bidi writes.
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
+            Protocol.BIDI.name(),
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
+            "true",
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_FINALIZE_ON_CLOSE_KEY,
+            "true");
+  }
+
+  @Test
+  public void mapConfigs_connectorTransportUnset_honorsPassedThroughBidiWriteFlag() {
+    Configuration config = new Configuration();
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, "bidi");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, "false");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
+            "bidi",
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
+            "false");
+  }
+
+  @Test
+  public void mapConfigs_connectorTransportUnset_keepsUnknownPassedThroughProtocol() {
+    Configuration config = new Configuration();
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, "CARRIER_PIGEON");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    // Left for Analytics Core to reject; bidi writes stay disabled.
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
+            "CARRIER_PIGEON",
             "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
             "false");
   }
@@ -990,9 +1047,6 @@ public class AnalyticsCoreConfigMapperTest {
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey(), true);
-    config.setInt(
-        GoogleHadoopFileSystemConfiguration.GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.getKey(), 45);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.getKey(),
         true);
@@ -1003,7 +1057,6 @@ public class AnalyticsCoreConfigMapperTest {
 
     GcsClientOptions clientOptions = options.getGcsClientOptions();
     assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.BIDI);
-    assertThat(clientOptions.getGcsReadOptions().getBidiTimeout()).isEqualTo(45);
     assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isTrue();
     assertThat(clientOptions.getGcsWriteOptions().isBidiFinalizeOnClose()).isTrue();
   }

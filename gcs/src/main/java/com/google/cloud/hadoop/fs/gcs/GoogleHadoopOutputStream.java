@@ -252,18 +252,23 @@ class GoogleHadoopOutputStream extends OutputStream
     // Analytics Core rather than doing an explicit getFileInfo check here.
     try {
       GcsFileInfo fileInfo = analyticsGcsFs.getFileInfo(itemIdBuilder.build());
-      // If we reach here, the file exists.
-      if (!overwrite) {
-        GoogleCloudStorageEventBus.postOnException();
-        throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
+      if (fileInfo.exists()) {
+        if (!overwrite) {
+          GoogleCloudStorageEventBus.postOnException();
+          throw new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath));
+        }
+        generation = fileInfo.getItemInfo().getContentGeneration().orElse(0L);
+      } else {
+        generation = 0L;
       }
-      generation = fileInfo.getItemInfo().getContentGeneration().orElse(0L);
     } catch (FileNotFoundException e) {
       // If file does not exist, set the generation as 0.
       generation = 0L;
     }
     GcsItemId itemId;
-    if (generation == StorageResourceId.UNKNOWN_GENERATION_ID) {
+    if (generation == StorageResourceId.UNKNOWN_GENERATION_ID
+        || baseWriteOptions.isBidiWriteEnabled()) {
+      // Appendable uploads treat a generation as a takeover of an existing object; omit it.
       itemId = itemIdBuilder.build();
     } else {
       itemId = itemIdBuilder.setContentGeneration(generation).build();

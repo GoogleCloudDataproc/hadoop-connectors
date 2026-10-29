@@ -819,8 +819,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     config.setBoolean("fs.gs.analytics.core.write.enable", true);
     config.setEnum(GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     config.setBoolean("fs.gs.bidi.enable", true);
-    config.setBoolean("fs.gs.grpc.write.enable", true);
-    config.setInt("fs.gs.bidi.client.timeout", 45);
     config.setBoolean("fs.gs.bidi.finalize.on.close", true);
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
 
@@ -828,7 +826,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
     GcsClientOptions clientOptions = analyticsCoreClientOptions(fs);
     assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.BIDI);
-    assertThat(clientOptions.getGcsReadOptions().getBidiTimeout()).isEqualTo(45);
     assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isTrue();
     assertThat(clientOptions.getGcsWriteOptions().isBidiFinalizeOnClose()).isTrue();
     fs.close();

@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
@@ -54,7 +55,6 @@ final class AnalyticsCoreConfigMapper {
   static final String RANDOM_READ_MIN_REQ_SIZE_KEY = "analytics-core.random-read.min-request-size";
   static final String ADAPTIVE_READ_SEQ_THRESHOLD_KEY =
       "analytics-core.adaptive-read.sequential-read-threshold";
-  static final String BIDI_READ_TIMEOUT_SECONDS_KEY = "analytics-core.read.bidi.timeout-seconds";
   static final String UPLOAD_CHUNK_SIZE_KEY = "channel.write.chunk-size-bytes";
   static final String UPLOAD_TYPE_KEY = "channel.write.upload-type";
   static final String TEMPORARY_PATHS_KEY = "channel.write.temporary-paths";
@@ -181,9 +181,6 @@ final class AnalyticsCoreConfigMapper {
               GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey(),
               FILE_ACCESS_PATTERN_KEY)
           .put(
-              GoogleHadoopFileSystemConfiguration.GCS_BIDI_CLIENT_INITIALIZATION_TIMEOUT.getKey(),
-              BIDI_READ_TIMEOUT_SECONDS_KEY)
-          .put(
               GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(),
               UPLOAD_CHUNK_SIZE_KEY)
           .put(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey(), UPLOAD_TYPE_KEY)
@@ -282,39 +279,48 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
-   * Maps the connector's transport selection to Analytics Core's {@code client.protocol}, which
-   * selects a single transport for every operation issued through Analytics Core:
+   * Maps the connector's transport selection to Analytics Core's {@code client.protocol}, a single
+   * transport for every operation issued through Analytics Core:
    *
    * <ul>
    *   <li>{@code fs.gs.client.type=HTTP_API_CLIENT} (default) maps to {@link Protocol#HTTP}.
    *   <li>{@code fs.gs.client.type=STORAGE_CLIENT} maps to {@link Protocol#GRPC}.
    *   <li>{@code fs.gs.client.type=STORAGE_CLIENT} with {@code fs.gs.bidi.enable=true} maps to
-   *       {@link Protocol#BIDI}, which reads over bidirectional gRPC streams.
+   *       {@link Protocol#BIDI} (bidi reads and appendable writes).
    * </ul>
    *
-   * <p>Mirroring the legacy client, appendable (bidi) writes are only requested when {@code
-   * fs.gs.bidi.enable} and {@code fs.gs.grpc.write.enable} are both set; Analytics Core rejects
-   * {@code channel.write.bidi.enabled} on any protocol other than {@link Protocol#BIDI}.
+   * <p>{@code fs.gs.grpc.write.enable} is legacy-only: Analytics Core has no per-operation
+   * fallback, so appendable writes are enabled iff the protocol is {@link Protocol#BIDI}.
    *
-   * <p>The derived values always win over Analytics Core keys that were passed through verbatim, so
-   * the Analytics Core path and the legacy path never disagree on the transport in use.
+   * <p>Pass-through {@code client.protocol} / {@code channel.write.bidi.enabled} values are kept
+   * only when neither {@code fs.gs.client.type} nor {@code fs.gs.bidi.enable} is set.
    */
   private static void mapTransportProtocol(
       Configuration config, Map<String, String> map, String prefix) {
+    boolean transportConfigured =
+        config.get(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey()) != null
+            || config.get(
+                    GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey())
+                != null;
+
     // Consumed here rather than passed through: the connector's ClientType values are not valid
-    // Analytics Core values, and the remaining keys are folded into client.protocol.
+    // Analytics Core values, and fs.gs.bidi.enable is folded into client.protocol.
     map.remove(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey());
     map.remove(GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey());
-    map.remove(GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.getKey());
 
+    String protocolKey = prefix + CLIENT_PROTOCOL_KEY;
     Protocol protocol = toProtocol(config);
-    map.put(prefix + CLIENT_PROTOCOL_KEY, protocol.name());
-    boolean bidiWriteEnabled =
-        protocol == Protocol.BIDI
-            && GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE.get(
-                config, config::getBoolean);
-    map.put(prefix + BIDI_WRITE_ENABLED_KEY, String.valueOf(bidiWriteEnabled));
-    if (!bidiWriteEnabled) {
+    if (transportConfigured || !map.containsKey(protocolKey)) {
+      map.put(protocolKey, protocol.name());
+    } else {
+      protocol = parseProtocol(map.get(protocolKey)).orElse(protocol);
+    }
+
+    String bidiWriteKey = prefix + BIDI_WRITE_ENABLED_KEY;
+    if (transportConfigured || !map.containsKey(bidiWriteKey)) {
+      map.put(bidiWriteKey, String.valueOf(protocol == Protocol.BIDI));
+    }
+    if (!Boolean.parseBoolean(map.get(bidiWriteKey))) {
       // Only meaningful for appendable writes; drop it so Analytics Core never sees a dangling
       // finalize option for a transport that cannot honor it.
       map.remove(prefix + BIDI_WRITE_FINALIZE_ON_CLOSE_KEY);
@@ -333,6 +339,18 @@ final class AnalyticsCoreConfigMapper {
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.get(
             config, config::getBoolean);
     return bidiEnabled ? Protocol.BIDI : Protocol.GRPC;
+  }
+
+  /** Parses a pass-through {@code client.protocol}; unknown values are left for Analytics Core. */
+  private static Optional<Protocol> parseProtocol(String value) {
+    if (isNullOrEmpty(value)) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(Protocol.valueOf(value.trim().toUpperCase(Locale.ROOT)));
+    } catch (IllegalArgumentException e) {
+      return Optional.empty();
+    }
   }
 
   /**

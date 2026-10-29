@@ -20,7 +20,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ANALYTICS_CORE_WRITE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -60,6 +59,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest {
 
+  private static GoogleCloudStorageFileSystem zonalCapableGcsFs;
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
   private static String zonalBucketName;
   private static GoogleHadoopFileSystem ghfs;
@@ -67,7 +67,7 @@ public class GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest {
   @BeforeClass
   public static void beforeClass() throws Exception {
     // Zonal buckets can only be created through the gRPC storage client.
-    GoogleCloudStorageFileSystem zonalCapableGcsFs =
+    zonalCapableGcsFs =
         new GoogleCloudStorageFileSystemImpl(
             GoogleCloudStorageTestHelper.getCredentials(),
             GoogleCloudStorageFileSystemOptions.builder()
@@ -92,6 +92,9 @@ public class GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest {
     if (gcsFsIHelper != null) {
       gcsFsIHelper.afterAllTests();
     }
+    if (zonalCapableGcsFs != null) {
+      zonalCapableGcsFs.close();
+    }
   }
 
   private static Configuration getTestConfig() {
@@ -100,7 +103,6 @@ public class GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest {
     conf.setBoolean(GCS_ANALYTICS_CORE_WRITE_ENABLE.getKey(), true);
     conf.setEnum(GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
     conf.setBoolean(GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
-    conf.setBoolean(GCS_GRPC_WRITE_ENABLE.getKey(), true);
     // Finalize on close so that readers observe the final object size right away.
     conf.setBoolean(GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.getKey(), true);
     return conf;
