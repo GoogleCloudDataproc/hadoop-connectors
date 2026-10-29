@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Fix vectored-read binary compatibility across Hadoop 3.3 and 3.4.
 
 ## 3.1.21 - 2026-10-28
 1. Upgrade google.api-client-libraries.version to 2.9.2

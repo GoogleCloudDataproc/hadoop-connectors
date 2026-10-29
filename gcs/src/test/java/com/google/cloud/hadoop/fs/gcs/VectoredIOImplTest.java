@@ -40,6 +40,7 @@ import com.google.cloud.hadoop.util.GcsReadMetricEvent;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SeekableByteChannel;
@@ -126,36 +127,58 @@ public class VectoredIOImplTest {
   @Test
   public void testInvalidRangeRequest() throws IOException {
     List<FileRange> fileRanges = new ArrayList<>();
+    URI gcsPath = fileInfo.getPath();
     // valid range
     fileRanges.add(FileRange.createFileRange(/* offset */ 0, /* length */ 10));
     // invalid length
     fileRanges.add(FileRange.createFileRange(/* offset */ 11, /* length */ -50));
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            vectoredIO.readVectored(
-                fileRanges,
-                allocate,
-                gcsFs,
-                fileInfo,
-                fileInfo.getPath(),
-                streamStatistics,
-                rangeReadThreadStats));
+    IllegalArgumentException invalidLength =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                vectoredIO.readVectored(
+                    fileRanges,
+                    allocate,
+                    gcsFs,
+                    fileInfo,
+                    gcsPath,
+                    streamStatistics,
+                    rangeReadThreadStats));
+    assertThat(invalidLength).hasMessageThat().isEqualTo("length is negative");
     fileRanges.clear();
 
     // invalid offset
     fileRanges.add(FileRange.createFileRange(/* offset */ -1, /* length */ 50));
-    assertThrows(
-        EOFException.class,
-        () ->
-            vectoredIO.readVectored(
-                fileRanges,
-                allocate,
-                gcsFs,
-                fileInfo,
-                fileInfo.getPath(),
-                streamStatistics,
-                rangeReadThreadStats));
+    EOFException invalidOffset =
+        assertThrows(
+            EOFException.class,
+            () ->
+                vectoredIO.readVectored(
+                    fileRanges,
+                    allocate,
+                    gcsFs,
+                    fileInfo,
+                    gcsPath,
+                    streamStatistics,
+                    rangeReadThreadStats));
+    assertThat(invalidOffset).hasMessageThat().isEqualTo("position is negative");
+    fileRanges.clear();
+
+    // null range
+    fileRanges.add(null);
+    NullPointerException nullRange =
+        assertThrows(
+            NullPointerException.class,
+            () ->
+                vectoredIO.readVectored(
+                    fileRanges,
+                    allocate,
+                    gcsFs,
+                    fileInfo,
+                    gcsPath,
+                    streamStatistics,
+                    rangeReadThreadStats));
+    assertThat(nullRange).hasMessageThat().isEqualTo("range is null");
   }
 
   @Test

@@ -16,10 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.VectoredReadUtils.isOrderedDisjoint;
 import static org.apache.hadoop.fs.VectoredReadUtils.mergeSortedRanges;
 import static org.apache.hadoop.fs.VectoredReadUtils.sliceTo;
-import static org.apache.hadoop.fs.VectoredReadUtils.validateRangeRequest;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -136,8 +137,12 @@ public class VectoredIOImpl implements Closeable {
         throws IOException {
       List<? extends FileRange> sortedRanges = validateNonOverlappingAndReturnSortedRanges(ranges);
       for (FileRange range : ranges) {
-        // TODO(user): upgrade to use validateAndSortRanges
-        validateRangeRequest(range);
+        // Hadoop changed validateRangeRequest's return type in 3.4, breaking binary linkage.
+        checkNotNull(range, "range is null");
+        checkArgument(range.getLength() >= 0, "length is negative");
+        if (range.getOffset() < 0) {
+          throw new EOFException("position is negative");
+        }
         CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
         range.setData(result);
       }
