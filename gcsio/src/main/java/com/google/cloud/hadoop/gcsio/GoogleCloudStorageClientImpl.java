@@ -43,6 +43,7 @@ import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor.ErrorType;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobAppendableUpload;
 import com.google.cloud.storage.BlobAppendableUpload.AppendableUploadWriteableByteChannel;
@@ -163,11 +164,12 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
   // Thread-pool used for background tasks.
   @VisibleForTesting
   ExecutorService backgroundTasksThreadPool =
-      Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder()
-              .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
-              .setDaemon(true)
-              .build());
+      InvocationIdPropagatingExecutorService.wrap(
+          Executors.newCachedThreadPool(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
+                  .setDaemon(true)
+                  .build()));
 
   @VisibleForTesting ExecutorService boundedThreadPool;
 
@@ -1497,16 +1499,17 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage
     }
     if (boundedThreadPool == null) {
       boundedThreadPool =
-          new ThreadPoolExecutor(
-              bidiThreadCount,
-              bidiThreadCount,
-              0L,
-              TimeUnit.MILLISECONDS,
-              taskQueue,
-              new ThreadFactoryBuilder()
-                  .setNameFormat("bidiRead-range-pool-%d")
-                  .setDaemon(true)
-                  .build());
+          InvocationIdPropagatingExecutorService.wrap(
+              new ThreadPoolExecutor(
+                  bidiThreadCount,
+                  bidiThreadCount,
+                  0L,
+                  TimeUnit.MILLISECONDS,
+                  taskQueue,
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("bidiRead-range-pool-%d")
+                      .setDaemon(true)
+                      .build()));
     }
     return boundedThreadPool;
   }
