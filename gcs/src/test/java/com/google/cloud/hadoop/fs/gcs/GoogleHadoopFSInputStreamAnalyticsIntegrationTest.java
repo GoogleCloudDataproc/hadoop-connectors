@@ -20,8 +20,10 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.as
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemIntegrationHelper.TestFixture;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
@@ -38,11 +40,22 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
-/** Integration tests for GoogleHadoopFSInputStream with Analytics Core enabled. */
-@RunWith(JUnit4.class)
+/**
+ * Integration tests for GoogleHadoopFSInputStream with Analytics Core enabled, exercised over each
+ * transport the connector can map to Analytics Core: JSON over HTTP, gRPC, and gRPC with
+ * bidirectional streaming reads.
+ */
+@RunWith(Parameterized.class)
 public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
+
+  @Parameterized.Parameter public Protocol protocol;
+
+  @Parameterized.Parameters(name = "protocol={0}")
+  public static Iterable<Protocol> getProtocols() {
+    return List.of(Protocol.HTTP, Protocol.GRPC, Protocol.BIDI);
+  }
 
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
 
@@ -58,13 +71,33 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
   }
 
   private TestFixture setupFixture(String tag, String content) throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), tag);
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), tag + "_" + protocol);
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
     config.setBoolean("fs.gs.analytics.core.enable", true);
+    configureTransport(config, protocol);
 
     GoogleHadoopFileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
+    assertThat(
+            ghfs.getAnalyticsCoreGcsFs().getFileSystemOptions().getGcsClientOptions().getProtocol())
+        .isEqualTo(protocol);
     gcsFsIHelper.writeTextFile(path, content);
     return new TestFixture(ghfs, path, content);
+  }
+
+  /** Sets the connector properties that the config mapper resolves to {@code protocol}. */
+  static void configureTransport(Configuration config, Protocol protocol) {
+    switch (protocol) {
+      case HTTP:
+        config.setEnum("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
+        break;
+      case GRPC:
+        config.setEnum("fs.gs.client.type", ClientType.STORAGE_CLIENT);
+        break;
+      case BIDI:
+        config.setEnum("fs.gs.client.type", ClientType.STORAGE_CLIENT);
+        config.setBoolean("fs.gs.bidi.enable", true);
+        break;
+    }
   }
 
   @Test
@@ -135,9 +168,9 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
 
     try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
+      // Validate before close: closing a bidi stream cancels pending ranges.
+      validateVectoredReadResult(fileRanges, fixture.path);
     }
-
-    validateVectoredReadResult(fileRanges, fixture.path);
   }
 
   @Test
