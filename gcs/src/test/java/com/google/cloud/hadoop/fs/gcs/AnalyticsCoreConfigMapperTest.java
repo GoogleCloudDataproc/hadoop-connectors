@@ -853,7 +853,6 @@ public class AnalyticsCoreConfigMapperTest {
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // Analytics Core has a single transport per client; fs.gs.grpc.write.enable is legacy-only.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
@@ -872,7 +871,6 @@ public class AnalyticsCoreConfigMapperTest {
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // Appendable writes are gated on the BIDI protocol alone, as for legacy zonal buckets.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
@@ -915,7 +913,6 @@ public class AnalyticsCoreConfigMapperTest {
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // Legacy key only bounded session setup; the Analytics Core key bounds every range read.
     assertThat(mapped).doesNotContainKey("fs.gs.analytics-core.read.bidi.timeout-seconds");
   }
 
@@ -974,17 +971,39 @@ public class AnalyticsCoreConfigMapperTest {
     config.setEnum(
         GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.HTTP_API_CLIENT);
     config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, "GRPC");
-    config.set("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, "true");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // When set, fs.gs.client.type / fs.gs.bidi.enable are the source of truth for the transport.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
             Protocol.HTTP.name(),
             "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
             "false");
+  }
+
+  @Test
+  public void mapConfigs_bidiProtocol_explicitBidiWriteDisabled_isHonored() {
+    Configuration config = new Configuration();
+    config.setEnum(
+        GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
+    config.setBoolean(
+        GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, "false");
+    config.setBoolean(
+        GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE.getKey(),
+        true);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
+            Protocol.BIDI.name(),
+            "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
+            "false");
+    assertThat(mapped)
+        .doesNotContainKey("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_FINALIZE_ON_CLOSE_KEY);
   }
 
   @Test
@@ -997,7 +1016,6 @@ public class AnalyticsCoreConfigMapperTest {
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // Pass-through protocol is kept and drives bidi writes.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
@@ -1009,19 +1027,18 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
-  public void mapConfigs_connectorTransportUnset_honorsPassedThroughBidiWriteFlag() {
+  public void mapConfigs_connectorTransportUnset_parsesPassedThroughProtocolCaseInsensitively() {
     Configuration config = new Configuration();
-    config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, "bidi");
-    config.set("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, "false");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, " bidi ");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
-            "bidi",
+            " bidi ",
             "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
-            "false");
+            "true");
   }
 
   @Test
@@ -1031,7 +1048,6 @@ public class AnalyticsCoreConfigMapperTest {
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
-    // Left for Analytics Core to reject; bidi writes stay disabled.
     assertThat(mapped)
         .containsAtLeast(
             "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,

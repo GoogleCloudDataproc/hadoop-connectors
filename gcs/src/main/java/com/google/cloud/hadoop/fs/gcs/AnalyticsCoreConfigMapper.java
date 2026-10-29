@@ -279,21 +279,9 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
-   * Maps the connector's transport selection to Analytics Core's {@code client.protocol}, a single
-   * transport for every operation issued through Analytics Core:
-   *
-   * <ul>
-   *   <li>{@code fs.gs.client.type=HTTP_API_CLIENT} (default) maps to {@link Protocol#HTTP}.
-   *   <li>{@code fs.gs.client.type=STORAGE_CLIENT} maps to {@link Protocol#GRPC}.
-   *   <li>{@code fs.gs.client.type=STORAGE_CLIENT} with {@code fs.gs.bidi.enable=true} maps to
-   *       {@link Protocol#BIDI} (bidi reads and appendable writes).
-   * </ul>
-   *
-   * <p>{@code fs.gs.grpc.write.enable} is legacy-only: Analytics Core has no per-operation
-   * fallback, so appendable writes are enabled iff the protocol is {@link Protocol#BIDI}.
-   *
-   * <p>Pass-through {@code client.protocol} / {@code channel.write.bidi.enabled} values are kept
-   * only when neither {@code fs.gs.client.type} nor {@code fs.gs.bidi.enable} is set.
+   * Maps {@code fs.gs.client.type} / {@code fs.gs.bidi.enable} to Analytics Core's {@code
+   * client.protocol}. Appendable writes are enabled for {@link Protocol#BIDI} unless {@code
+   * channel.write.bidi.enabled} is set explicitly.
    */
   private static void mapTransportProtocol(
       Configuration config, Map<String, String> map, String prefix) {
@@ -303,8 +291,7 @@ final class AnalyticsCoreConfigMapper {
                     GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey())
                 != null;
 
-    // Consumed here rather than passed through: the connector's ClientType values are not valid
-    // Analytics Core values, and fs.gs.bidi.enable is folded into client.protocol.
+    // Connector transport keys are not valid Analytics Core properties.
     map.remove(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey());
     map.remove(GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey());
 
@@ -317,12 +304,12 @@ final class AnalyticsCoreConfigMapper {
     }
 
     String bidiWriteKey = prefix + BIDI_WRITE_ENABLED_KEY;
-    if (transportConfigured || !map.containsKey(bidiWriteKey)) {
+    // Explicit channel.write.bidi.enabled wins (opt-out for non-zonal buckets).
+    if (!map.containsKey(bidiWriteKey)) {
       map.put(bidiWriteKey, String.valueOf(protocol == Protocol.BIDI));
     }
     if (!Boolean.parseBoolean(map.get(bidiWriteKey))) {
-      // Only meaningful for appendable writes; drop it so Analytics Core never sees a dangling
-      // finalize option for a transport that cannot honor it.
+      // Only meaningful for appendable writes.
       map.remove(prefix + BIDI_WRITE_FINALIZE_ON_CLOSE_KEY);
     }
   }
@@ -341,7 +328,7 @@ final class AnalyticsCoreConfigMapper {
     return bidiEnabled ? Protocol.BIDI : Protocol.GRPC;
   }
 
-  /** Parses a pass-through {@code client.protocol}; unknown values are left for Analytics Core. */
+  /** Parses a pass-through {@code client.protocol}; unknown values are left to Analytics Core. */
   private static Optional<Protocol> parseProtocol(String value) {
     if (isNullOrEmpty(value)) {
       return Optional.empty();

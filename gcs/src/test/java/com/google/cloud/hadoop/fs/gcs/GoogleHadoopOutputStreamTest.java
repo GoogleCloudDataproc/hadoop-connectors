@@ -501,7 +501,6 @@ public class GoogleHadoopOutputStreamTest {
   @Test
   public void create_withAnalyticsWriteEnabled_fileNotFound_usesGenerationZero() throws Exception {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
-    // createAnalyticsEnabledGhfs stubs getFileInfo to throw FileNotFoundException.
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_not_found.txt"));
 
@@ -522,7 +521,6 @@ public class GoogleHadoopOutputStreamTest {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
     GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
-    // A not-found GcsFileInfo (exists() == false) instead of a FileNotFoundException.
     GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
     when(mockFileInfo.exists()).thenReturn(false);
     when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
@@ -555,7 +553,6 @@ public class GoogleHadoopOutputStreamTest {
             new FileSystem.Statistics(analyticsGhfs.getScheme()));
     fout.close();
 
-    // Appendable uploads must not carry a generation.
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration().isPresent()).isFalse();
   }
 

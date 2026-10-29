@@ -51,8 +51,8 @@ import org.junit.runners.Parameterized;
  * over each transport the connector can map to Analytics Core.
  *
  * <p>With {@link Protocol#BIDI} these tests cover regular (non-appendable) writes on a regional
- * bucket; appendable writes to Rapid Storage are covered by {@link
- * GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest}.
+ * bucket via {@code channel.write.bidi.enabled=false}; appendable writes to Rapid Storage are
+ * covered by {@link GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest}.
  *
  * <p>TODO: In a follow-up task, consolidate this suite with GoogleHadoopOutputStreamIntegrationTest
  * by parameterizing the test matrix to cover both default and analytics core write paths.
@@ -108,6 +108,8 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
     conf.setBoolean(GCS_ANALYTICS_CORE_ENABLE.getKey(), true);
     conf.setBoolean(GCS_ANALYTICS_CORE_WRITE_ENABLE.getKey(), true);
     GoogleHadoopFSInputStreamAnalyticsIntegrationTest.configureTransport(conf, protocol);
+    // Appendable writes require a zonal bucket.
+    conf.setBoolean("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, false);
     return conf;
   }
 

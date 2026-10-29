@@ -168,9 +168,9 @@ public class GoogleHadoopFSInputStreamAnalyticsIntegrationTest {
 
     try (GoogleHadoopFSInputStream in = createGhfsInputStream(fixture.ghfs, fixture.path)) {
       in.readVectored(fileRanges, ByteBuffer::allocate);
+      // Validate before close: closing a bidi stream cancels pending ranges.
+      validateVectoredReadResult(fileRanges, fixture.path);
     }
-
-    validateVectoredReadResult(fileRanges, fixture.path);
   }
 
   @Test

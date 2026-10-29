@@ -268,7 +268,7 @@ class GoogleHadoopOutputStream extends OutputStream
     GcsItemId itemId;
     if (generation == StorageResourceId.UNKNOWN_GENERATION_ID
         || baseWriteOptions.isBidiWriteEnabled()) {
-      // Appendable uploads treat a generation as a takeover of an existing object; omit it.
+      // A generation on an appendable upload means takeover of an existing object.
       itemId = itemIdBuilder.build();
     } else {
       itemId = itemIdBuilder.setContentGeneration(generation).build();
