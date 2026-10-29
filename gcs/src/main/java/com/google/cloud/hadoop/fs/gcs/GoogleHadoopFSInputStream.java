@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_VECTORED_OPERATIONS;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
@@ -40,6 +41,7 @@ import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.InvocationIdContext;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.common.flogger.GoogleLogger;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -109,14 +111,22 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throws IOException {
     logger.atFiner().log("create(gcsPath: %s)", gcsPath);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
+    boolean preFetchFileInfo = shouldPreFetchFileInfo(gcsFs.getOptions());
     if (ghfs.isAnalyticsCoreEnabled()) {
-      FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
+      if (!preFetchFileInfo) {
+        // fast-fail disabled: open without a metadata request, a missing object fails on first
+        // read.
+        SeekableByteChannel channel = createAnalyticsCoreReadChannel(ghfs, gcsPath);
+        return new GoogleHadoopFSInputStream(
+            ghfs, gcsPath, /* fileInfo= */ null, channel, statistics);
+      }
+      FileInfo fileInfo = getExistingFileInfo(gcsFs, gcsPath);
       SeekableByteChannel channel = createAnalyticsCoreReadChannel(ghfs, fileInfo, gcsPath);
       return new GoogleHadoopFSInputStream(ghfs, gcsPath, fileInfo, channel, statistics);
     }
     FileInfo fileInfo = null;
     SeekableByteChannel channel;
-    if (shouldPreFetchFileInfo(gcsFs.getOptions())) {
+    if (preFetchFileInfo) {
       // ingest the fileInfo extracted while creating gcsio channel to avoid duplicate call.
       fileInfo = gcsFs.getFileInfoObject(gcsPath);
       channel =
@@ -141,6 +151,15 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     return false;
   }
 
+  private static FileInfo getExistingFileInfo(GoogleCloudStorageFileSystem gcsFs, URI gcsPath)
+      throws IOException {
+    FileInfo fileInfo = gcsFs.getFileInfoObject(gcsPath);
+    if (!fileInfo.exists()) {
+      throw new FileNotFoundException(String.format("Item not found: %s", gcsPath));
+    }
+    return fileInfo;
+  }
+
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
@@ -160,19 +179,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       GoogleHadoopFileSystem ghfs, FileInfo fileInfo, URI gcsPath) throws IOException {
     checkNotNull(fileInfo, "fileInfo must not be null");
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
-    GcsItemId.Builder itemIdBuilder =
-        GcsItemId.builder()
-            .setBucketName(resourceId.getBucketName())
-            .setObjectName(resourceId.getObjectName());
-    boolean hasGenerationId = fileInfo.getGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID;
-    if (hasGenerationId) {
-      itemIdBuilder.setContentGeneration(fileInfo.getGenerationId());
-    }
-    GcsItemId itemId = itemIdBuilder.build();
+    long generationId = fileInfo.getGenerationId();
+    GcsItemId itemId = createGcsItemId(resourceId, generationId);
     GcsItemInfo.Builder itemInfoBuilder =
         GcsItemInfo.builder().setItemId(itemId).setSize(fileInfo.getSize());
-    if (hasGenerationId) {
-      itemInfoBuilder.setContentGeneration(fileInfo.getGenerationId());
+    if (generationId != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemInfoBuilder.setContentGeneration(generationId);
     }
     GcsItemInfo gcsItemInfo = itemInfoBuilder.build();
     GcsFileInfo gcsFileInfo =
@@ -183,6 +195,30 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
             .build();
     GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(gcsFileInfo);
     return new GcsAnalyticsCoreInputStreamWrapper(inputStream, fileInfo.getSize());
+  }
+
+  private static SeekableByteChannel createAnalyticsCoreReadChannel(
+      GoogleHadoopFileSystem ghfs, URI gcsPath) throws IOException {
+    // same path validation as gcsio open(path); no metadata request is made here.
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(gcsPath, /* allowEmptyObjectName= */ false);
+    checkArgument(!resourceId.isDirectory(), "Cannot open a directory for reading: %s", gcsPath);
+    GcsItemId itemId = createGcsItemId(resourceId, resourceId.getGenerationId());
+    GoogleCloudStorageInputStream inputStream = ghfs.createAnalyticsCoreInputStream(itemId);
+    // size is resolved lazily, only if explicitly requested through the channel.
+    return new GcsAnalyticsCoreInputStreamWrapper(
+        inputStream, () -> getExistingFileInfo(ghfs.getGcsFs(), gcsPath).getSize());
+  }
+
+  private static GcsItemId createGcsItemId(StorageResourceId resourceId, long generationId) {
+    GcsItemId.Builder itemIdBuilder =
+        GcsItemId.builder()
+            .setBucketName(resourceId.getBucketName())
+            .setObjectName(resourceId.getObjectName());
+    if (generationId != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      itemIdBuilder.setContentGeneration(generationId);
+    }
+    return itemIdBuilder.build();
   }
 
   private GoogleHadoopFSInputStream(

@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
@@ -38,12 +40,32 @@ import java.util.function.IntFunction;
  */
 class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
 
-  private final long size;
+  @FunctionalInterface
+  interface SizeProvider {
+    long getSize() throws IOException;
+  }
+
+  private static final long UNKNOWN_SIZE = -1;
+
   private final GoogleCloudStorageInputStream inputStream;
-  private boolean channelIsOpen;
+  private final SizeProvider sizeProvider;
+  private volatile long size;
+  private volatile boolean channelIsOpen;
 
   GcsAnalyticsCoreInputStreamWrapper(GoogleCloudStorageInputStream inputStream, long size) {
-    this.inputStream = inputStream;
+    this(inputStream, size, () -> size);
+  }
+
+  /** Size is resolved through {@code sizeProvider} only when {@link #size()} is called. */
+  GcsAnalyticsCoreInputStreamWrapper(
+      GoogleCloudStorageInputStream inputStream, SizeProvider sizeProvider) {
+    this(inputStream, UNKNOWN_SIZE, sizeProvider);
+  }
+
+  private GcsAnalyticsCoreInputStreamWrapper(
+      GoogleCloudStorageInputStream inputStream, long size, SizeProvider sizeProvider) {
+    this.inputStream = checkNotNull(inputStream, "inputStream must not be null");
+    this.sizeProvider = checkNotNull(sizeProvider, "sizeProvider must not be null");
     this.size = size;
     this.channelIsOpen = true;
   }
@@ -82,13 +104,15 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
     // Throwing EOFException aligns with the Hadoop spec for seek >= len(data).
     // See:
     // https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/filesystem/fsdatainputstream.html#Seekable.seek.28s.29
-    if (size >= 0 && newPosition >= size) {
+    // Skipped while the size is unknown: seeking must not trigger a metadata request.
+    long knownSize = size;
+    if (knownSize >= 0 && newPosition >= knownSize) {
       GoogleCloudStorageEventBus.postOnException();
       throw new EOFException(
           "Invalid seek offset: position value ("
               + newPosition
               + ") must be between 0 and "
-              + size);
+              + knownSize);
     }
 
     inputStream.seek(newPosition);
@@ -98,7 +122,17 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
   @Override
   public long size() throws IOException {
     checkOpen();
-    return size;
+    long resolvedSize = size;
+    if (resolvedSize < 0) {
+      synchronized (this) {
+        resolvedSize = size;
+        if (resolvedSize < 0) {
+          resolvedSize = sizeProvider.getSize();
+          size = resolvedSize;
+        }
+      }
+    }
+    return resolvedSize;
   }
 
   @Override
@@ -122,9 +156,10 @@ class GcsAnalyticsCoreInputStreamWrapper implements SeekableByteChannel {
   public void readVectored(List<GcsObjectRange> ranges, IntFunction<ByteBuffer> allocate)
       throws IOException {
     checkOpen();
+    long knownSize = size;
     List<GcsObjectRange> validRanges = new ArrayList<>();
     for (GcsObjectRange range : ranges) {
-      if (size >= 0 && range.getOffset() + range.getLength() > size) {
+      if (knownSize >= 0 && range.getOffset() + range.getLength() > knownSize) {
         range
             .getByteBufferFuture()
             .completeExceptionally(new IOException("Range extends beyond file size: " + range));

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.gcs.analyticscore.client.GcsObjectRange;
 import com.google.cloud.gcs.analyticscore.core.GoogleCloudStorageInputStream;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -34,6 +35,7 @@ import java.nio.channels.NonWritableChannelException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import org.junit.Before;
 import org.junit.Test;
@@ -228,5 +230,124 @@ public class GcsAnalyticsCoreInputStreamWrapperTest {
     adapter.readFully(100L, buffer, 0, 100);
 
     verify(mockInputStream).readFully(100L, buffer, 0, 100);
+  }
+
+  @Test
+  public void size_whenUnknown_resolvesThroughSizeProviderOnceAndCaches() throws IOException {
+    AtomicInteger sizeProviderCalls = new AtomicInteger();
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(
+            mockInputStream,
+            () -> {
+              sizeProviderCalls.incrementAndGet();
+              return 500L;
+            });
+
+    assertThat(lazyAdapter.size()).isEqualTo(500L);
+    assertThat(lazyAdapter.size()).isEqualTo(500L);
+
+    assertThat(sizeProviderCalls.get()).isEqualTo(1);
+  }
+
+  @Test
+  public void size_whenUnknownAndSizeProviderFails_propagatesException() {
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(
+            mockInputStream,
+            () -> {
+              throw new FileNotFoundException("Item not found");
+            });
+
+    FileNotFoundException thrown = assertThrows(FileNotFoundException.class, lazyAdapter::size);
+
+    assertThat(thrown).hasMessageThat().contains("Item not found");
+  }
+
+  @Test
+  public void size_whenUnknownAndClosed_throwsClosedChannelExceptionWithoutResolvingSize()
+      throws IOException {
+    AtomicInteger sizeProviderCalls = new AtomicInteger();
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(
+            mockInputStream,
+            () -> {
+              sizeProviderCalls.incrementAndGet();
+              return 500L;
+            });
+    lazyAdapter.close();
+
+    assertThrows(ClosedChannelException.class, lazyAdapter::size);
+
+    assertThat(sizeProviderCalls.get()).isEqualTo(0);
+  }
+
+  @Test
+  public void position_whenSizeUnknown_seeksWithoutResolvingSize() throws IOException {
+    AtomicInteger sizeProviderCalls = new AtomicInteger();
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(
+            mockInputStream,
+            () -> {
+              sizeProviderCalls.incrementAndGet();
+              return 500L;
+            });
+
+    lazyAdapter.position(5000L);
+
+    verify(mockInputStream).seek(5000L);
+    assertThat(sizeProviderCalls.get()).isEqualTo(0);
+  }
+
+  @Test
+  public void position_whenSizeUnknown_withNegativePosition_throwsEOFException() {
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, () -> 500L);
+
+    assertThrows(EOFException.class, () -> lazyAdapter.position(-1L));
+  }
+
+  @Test
+  public void position_afterSizeResolved_validatesAgainstResolvedSize() throws IOException {
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(mockInputStream, () -> 500L);
+    assertThat(lazyAdapter.size()).isEqualTo(500L);
+
+    lazyAdapter.position(499L);
+    assertThrows(EOFException.class, () -> lazyAdapter.position(500L));
+
+    verify(mockInputStream).seek(499L);
+    verify(mockInputStream, never()).seek(500L);
+  }
+
+  @Test
+  public void readVectored_whenSizeUnknown_delegatesAllRangesWithoutResolvingSize()
+      throws IOException {
+    AtomicInteger sizeProviderCalls = new AtomicInteger();
+    GcsAnalyticsCoreInputStreamWrapper lazyAdapter =
+        new GcsAnalyticsCoreInputStreamWrapper(
+            mockInputStream,
+            () -> {
+              sizeProviderCalls.incrementAndGet();
+              return 500L;
+            });
+    CompletableFuture<ByteBuffer> future1 = new CompletableFuture<>();
+    GcsObjectRange range1 =
+        GcsObjectRange.builder().setOffset(0).setLength(100).setByteBufferFuture(future1).build();
+    CompletableFuture<ByteBuffer> future2 = new CompletableFuture<>();
+    GcsObjectRange range2 =
+        GcsObjectRange.builder()
+            .setOffset(5000)
+            .setLength(100)
+            .setByteBufferFuture(future2)
+            .build();
+    List<GcsObjectRange> ranges = Arrays.asList(range1, range2);
+    IntFunction<ByteBuffer> allocate = ByteBuffer::allocate;
+
+    lazyAdapter.readVectored(ranges, allocate);
+
+    verify(mockInputStream).readVectored(ranges, allocate);
+    assertThat(future1.isCompletedExceptionally()).isFalse();
+    assertThat(future2.isCompletedExceptionally()).isFalse();
+    assertThat(sizeProviderCalls.get()).isEqualTo(0);
   }
 }
