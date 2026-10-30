@@ -75,6 +75,20 @@
     execution cost due to the increased number of Cloud Storage `objects.get`
     and `objects.list` requests.
 
+*   `fs.gs.list.status.directory.first.enable` (default: `false`)
+
+    If `true`, `FileSystem`'s `listStatus` lists a path without a trailing `/`
+    as a directory first, and looks up an object with that name only if the
+    directory listing is empty. This saves one Cloud Storage `objects.get`
+    request for every directory listed, which is the common case for query
+    engines listing table partitions.
+
+    If both an object `a` and a directory `a/` exist, `listStatus(a)` returns
+    the contents of `a/` instead of the object `a`, as the S3A and ABFS
+    connectors do. `getFileStatus` is not affected. Listing a file or a missing
+    path sends the same requests as before, but one after another instead of in
+    parallel.
+
 *   `fs.gs.lazy.init.enable` (default: `false`)
 
     Enables lazy initialization of `GoogleHadoopFileSystem` instances.

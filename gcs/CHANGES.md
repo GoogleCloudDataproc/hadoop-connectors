@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add `fs.gs.list.status.directory.first.enable` to list a path as a directory before looking it up as an object in `listStatus`
 
 ## 4.0.7 - 2026-10-26
 1. Fix listStatusStartingFrom returning too few files when directory objects follow the start offset

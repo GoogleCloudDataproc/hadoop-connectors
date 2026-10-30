@@ -143,6 +143,11 @@ public class FeatureHeaderGenerator {
     if (storageOptions.isComposeDeleteSourceEnabled()) {
       features.set(TrackedFeatures.COMPOSE_DELETE_SOURCE_ENABLED.getBitPosition());
     }
+
+    // Directory-first listStatus
+    if (fsOptions.isListDirectoryFirstEnabled()) {
+      features.set(TrackedFeatures.LIST_DIRECTORY_FIRST_ENABLED.getBitPosition());
+    }
   }
 
   /**
