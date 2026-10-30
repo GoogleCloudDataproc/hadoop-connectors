@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add `fs.gs.list.status.directory.first.enable` to list a path as a directory before looking it up as an object in `listStatus`
 
 ## 4.0.9 - 2026-10-28
 1. Upgrade google.api-client-libraries.version to 2.9.2

@@ -1017,27 +1017,51 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
     boolean isHnBucket = isHnsOptimized(path);
 
-    ExecutorService executor = options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor;
-    Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
-        executor.submit(() -> listDirectory(dirId, isHnBucket, listOptions));
-
-    if (!pathId.isDirectory()) {
-      try {
-        GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(pathId);
+    // A path without a trailing '/' may name an object, a directory, or both. By default the
+    // object wins: it is looked up first and the directory listing is cancelled if it exists.
+    // With directory-first listing the directory is listed first and the object is looked up only
+    // if the listing is empty, which saves the object lookup on every directory.
+    List<GoogleCloudStorageItemInfo> dirItemInfos;
+    if (options.isListDirectoryFirstEnabled() && !pathId.isDirectory()) {
+      dirItemInfos = listDirectory(dirId, isHnBucket, listOptions);
+      if (dirItemInfos.isEmpty()) {
+        GoogleCloudStorageItemInfo pathInfo;
+        try {
+          pathInfo = gcs.getItemInfo(pathId);
+        } catch (Exception e) {
+          GoogleCloudStorageEventBus.postOnException();
+          throw e;
+        }
         if (pathInfo.exists()) {
           List<FileInfo> listedInfo = new ArrayList<>();
           listedInfo.add(FileInfo.fromItemInfo(pathInfo));
-          dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
           return listedInfo;
         }
-      } catch (Exception e) {
-        GoogleCloudStorageEventBus.postOnException();
-        dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
-        throw e;
       }
+    } else {
+      ExecutorService executor = options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor;
+      Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
+          executor.submit(() -> listDirectory(dirId, isHnBucket, listOptions));
+
+      if (!pathId.isDirectory()) {
+        try {
+          GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(pathId);
+          if (pathInfo.exists()) {
+            List<FileInfo> listedInfo = new ArrayList<>();
+            listedInfo.add(FileInfo.fromItemInfo(pathInfo));
+            dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
+            return listedInfo;
+          }
+        } catch (Exception e) {
+          GoogleCloudStorageEventBus.postOnException();
+          dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
+          throw e;
+        }
+      }
+
+      dirItemInfos = getFromFuture(dirItemInfosFuture);
     }
 
-    List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
       if (isHnsOptimized(path)
           && gcs.getFolderInfo(StorageResourceId.fromUriPath(path, true).toDirectoryId())

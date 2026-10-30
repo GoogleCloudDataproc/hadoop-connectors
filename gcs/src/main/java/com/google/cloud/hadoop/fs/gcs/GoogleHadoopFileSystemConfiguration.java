@@ -202,6 +202,18 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.status.parallel.enable",
           GoogleCloudStorageFileSystemOptions.DEFAULT.isStatusParallelEnabled());
 
+  /**
+   * If true, {@code listStatus} on a path without a trailing '/' lists it as a directory first, and
+   * looks up the object with that name only if the directory listing is empty, the same order the
+   * S3A and ABFS connectors use. This saves an {@code objects.get} request on every directory. When
+   * both an object {@code a} and a directory {@code a/} exist, {@code listStatus(a)} returns the
+   * directory's contents instead of the object; {@code getFileStatus} is unchanged.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_LIST_STATUS_DIRECTORY_FIRST_ENABLE =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.list.status.directory.first.enable",
+          GoogleCloudStorageFileSystemOptions.DEFAULT.isListDirectoryFirstEnabled());
+
   /** Configuration key for enabling lazy initialization of GCS FS instance. */
   public static final HadoopConfigurationProperty<Boolean> GCS_LAZY_INITIALIZATION_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.lazy.init.enable", false);
@@ -687,6 +699,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
+        .setListDirectoryFirstEnabled(
+            GCS_LIST_STATUS_DIRECTORY_FIRST_ENABLE.get(config, config::getBoolean))
         .setCloudLoggingEnabled(GCS_CLOUD_LOGGING_ENABLE.get(config, config::getBoolean));
   }
 

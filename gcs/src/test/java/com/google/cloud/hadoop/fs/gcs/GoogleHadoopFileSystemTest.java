@@ -278,6 +278,15 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
+  public void testGetGcsPath_keepsTrailingSlashOfDirectoryPath() throws URISyntaxException {
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
+    // Path(URI) keeps a trailing '/', unlike Path(String). Callers such as listStatusStartingFrom
+    // rely on it reaching GCS, so that listing starts after the object "dir" itself.
+    URI gcsDirPath = new URI("gs://" + myghfs.getUri().getAuthority() + "/dir/");
+    assertThat(myghfs.getGcsPath(new Path(gcsDirPath))).isEqualTo(gcsDirPath);
+  }
+
+  @Test
   public void testGetDefaultPortIndicatesPortsAreNotUsed() throws Exception {
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
