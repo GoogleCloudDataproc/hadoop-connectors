@@ -860,7 +860,13 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     checkState(size > 0, "size should be greater than 0 for '%s'", resourceId);
     int footerSize = toIntExact(response.getHeaders().getContentLength());
     footerContent = new byte[footerSize];
-    try (InputStream footerStream = response.getContent()) {
+    try (InputStream rawFooterStream = response.getContent();
+        InputStream footerStream =
+            new GcsReadDurationTrackerStream(
+                rawFooterStream,
+                UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false),
+                response.getHeaders(),
+                readOptions.getLatencyLoggingThreshold())) {
       int totalBytesRead = 0;
       int bytesRead = 0;
       do {
