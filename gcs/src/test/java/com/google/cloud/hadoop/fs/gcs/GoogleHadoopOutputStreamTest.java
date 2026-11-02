@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -454,10 +455,10 @@ public class GoogleHadoopOutputStreamTest {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
     GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
-    // Stub getFileInfo to return a valid GcsFileInfo (simulating file exists)
+    // Stub getFileInfoObject to return a valid GcsFileInfo (simulating file exists)
     GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
     when(mockFileInfo.exists()).thenReturn(true);
-    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    when(mockFs.getFileInfoObject(any(GcsItemId.class))).thenReturn(mockFileInfo);
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_exists_error.txt"));
 
     assertThrows(
@@ -468,6 +469,8 @@ public class GoogleHadoopOutputStreamTest {
                 analyticsGhfs.getGcsPath(objectPath),
                 CreateFileOptions.DEFAULT, // overwrite is false by default
                 new FileSystem.Statistics(analyticsGhfs.getScheme())));
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
@@ -476,11 +479,11 @@ public class GoogleHadoopOutputStreamTest {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
     GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
-    // Stub getFileInfo to return info with generation 123L
+    // Stub getFileInfoObject to return info with generation 123L
     GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
     when(mockFileInfo.exists()).thenReturn(true);
     when(mockFileInfo.getItemInfo().getContentGeneration()).thenReturn(Optional.of(123L));
-    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    when(mockFs.getFileInfoObject(any(GcsItemId.class))).thenReturn(mockFileInfo);
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_overwrite_gen.txt"));
     CreateFileOptions overwriteOptions =
         CreateFileOptions.builder().setWriteMode(CreateFileOptions.WriteMode.OVERWRITE).build();
@@ -496,12 +499,15 @@ public class GoogleHadoopOutputStreamTest {
     assertThat(lastCreatedAnalyticsItemId).isNotNull();
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration().isPresent()).isTrue();
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration().get()).isEqualTo(123L);
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
   public void create_withAnalyticsWriteEnabled_fileNotFound_usesGenerationZero() throws Exception {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
+    GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_not_found.txt"));
 
     GoogleHadoopOutputStream fout =
@@ -513,6 +519,8 @@ public class GoogleHadoopOutputStreamTest {
     fout.close();
 
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration()).isEqualTo(Optional.of(0L));
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
@@ -523,7 +531,7 @@ public class GoogleHadoopOutputStreamTest {
     GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
     GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
     when(mockFileInfo.exists()).thenReturn(false);
-    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    when(mockFs.getFileInfoObject(any(GcsItemId.class))).thenReturn(mockFileInfo);
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_not_exists.txt"));
 
     GoogleHadoopOutputStream fout =
@@ -535,6 +543,8 @@ public class GoogleHadoopOutputStreamTest {
     fout.close();
 
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration()).isEqualTo(Optional.of(0L));
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
@@ -543,6 +553,7 @@ public class GoogleHadoopOutputStreamTest {
     GoogleHadoopFileSystem analyticsGhfs =
         createAnalyticsEnabledGhfs(
             mockStream, GcsWriteOptions.builder().setBidiWriteEnabled(true).build());
+    GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_bidi_new.txt"));
 
     GoogleHadoopOutputStream fout =
@@ -554,6 +565,8 @@ public class GoogleHadoopOutputStreamTest {
     fout.close();
 
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration().isPresent()).isFalse();
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
@@ -567,7 +580,7 @@ public class GoogleHadoopOutputStreamTest {
     GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
     when(mockFileInfo.exists()).thenReturn(true);
     when(mockFileInfo.getItemInfo().getContentGeneration()).thenReturn(Optional.of(123L));
-    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    when(mockFs.getFileInfoObject(any(GcsItemId.class))).thenReturn(mockFileInfo);
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_bidi_overwrite.txt"));
     CreateFileOptions overwriteOptions =
         CreateFileOptions.builder().setWriteMode(CreateFileOptions.WriteMode.OVERWRITE).build();
@@ -581,6 +594,8 @@ public class GoogleHadoopOutputStreamTest {
     fout.close();
 
     assertThat(lastCreatedAnalyticsItemId.getContentGeneration().isPresent()).isFalse();
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
@@ -593,7 +608,7 @@ public class GoogleHadoopOutputStreamTest {
     GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
     GcsFileInfo mockFileInfo = mock(GcsFileInfo.class, RETURNS_DEEP_STUBS);
     when(mockFileInfo.exists()).thenReturn(true);
-    when(mockFs.getFileInfo(any(GcsItemId.class))).thenReturn(mockFileInfo);
+    when(mockFs.getFileInfoObject(any(GcsItemId.class))).thenReturn(mockFileInfo);
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_bidi_exists.txt"));
 
     assertThrows(
@@ -604,6 +619,8 @@ public class GoogleHadoopOutputStreamTest {
                 analyticsGhfs.getGcsPath(objectPath),
                 CreateFileOptions.DEFAULT,
                 new FileSystem.Statistics(analyticsGhfs.getScheme())));
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   @Test
@@ -612,8 +629,8 @@ public class GoogleHadoopOutputStreamTest {
     GoogleCloudStorageOutputStream mockStream = mock(GoogleCloudStorageOutputStream.class);
     GoogleHadoopFileSystem analyticsGhfs = createAnalyticsEnabledGhfs(mockStream);
     GcsFileSystem mockFs = analyticsGhfs.getAnalyticsCoreGcsFs();
-    // Stub getFileInfo to throw some other IOException (e.g. Permission Denied)
-    when(mockFs.getFileInfo(any(GcsItemId.class)))
+    // Stub getFileInfoObject to throw some other IOException (e.g. Permission Denied)
+    when(mockFs.getFileInfoObject(any(GcsItemId.class)))
         .thenThrow(new IOException("Permission denied (mocked)"));
     Path objectPath = new Path(analyticsGhfs.getUri().resolve("/analytics_other_io_error.txt"));
 
@@ -627,6 +644,8 @@ public class GoogleHadoopOutputStreamTest {
                     CreateFileOptions.DEFAULT,
                     new FileSystem.Statistics(analyticsGhfs.getScheme())));
     assertThat(exception).hasMessageThat().contains("Permission denied (mocked)");
+    verify(mockFs).getFileInfoObject(any(GcsItemId.class));
+    verify(mockFs, never()).getFileInfo(any(GcsItemId.class));
   }
 
   private GoogleHadoopFileSystem createAnalyticsEnabledGhfs(
@@ -641,10 +660,10 @@ public class GoogleHadoopOutputStreamTest {
     when(mockFs.getFileSystemOptions().getGcsClientOptions().getGcsWriteOptions())
         .thenReturn(baseWriteOptions);
     try {
-      when(mockFs.getFileInfo(any(GcsItemId.class)))
+      when(mockFs.getFileInfoObject(any(GcsItemId.class)))
           .thenThrow(new FileNotFoundException("Location does not exist or generation not found"));
     } catch (IOException e) {
-      logger.atWarning().withCause(e).log("Failed to stub getFileInfo");
+      logger.atWarning().withCause(e).log("Failed to stub getFileInfoObject");
     }
 
     GoogleHadoopFileSystem analyticsGhfs =

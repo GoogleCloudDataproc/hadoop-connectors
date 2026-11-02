@@ -251,7 +251,7 @@ class GoogleHadoopOutputStream extends OutputStream
     // TODO(user): Check if FileAlreadyExistsException can be thrown during stream creation in
     // Analytics Core rather than doing an explicit getFileInfo check here.
     try {
-      GcsFileInfo fileInfo = analyticsGcsFs.getFileInfo(itemIdBuilder.build());
+      GcsFileInfo fileInfo = analyticsGcsFs.getFileInfoObject(itemIdBuilder.build());
       if (fileInfo.exists()) {
         if (!overwrite) {
           GoogleCloudStorageEventBus.postOnException();
