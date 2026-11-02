@@ -19,17 +19,21 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
+import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.util.HadoopConfigurationProperty;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
@@ -40,6 +44,7 @@ final class AnalyticsCoreConfigMapper {
   static final String PROJECT_ID_KEY = "project-id";
   static final String USER_PROJECT_KEY = "user-project";
   static final String SERVICE_HOST_KEY = "service.host";
+  static final String CLIENT_PROTOCOL_KEY = "client.protocol";
   static final String READ_THREAD_COUNT_KEY = "analytics-core.read.thread.count";
   static final String MAX_MERGE_GAP_KEY = "analytics-core.read.vectored.range.merge-gap.max-bytes";
   static final String MAX_MERGE_SIZE_KEY =
@@ -57,6 +62,8 @@ final class AnalyticsCoreConfigMapper {
   static final String PCU_BUFFER_CAPACITY_KEY = "channel.write.pcu.buffer.capacity-bytes";
   static final String PCU_PART_FILE_CLEANUP_TYPE_KEY = "channel.write.pcu.part-file.cleanup-type";
   static final String PCU_PART_FILE_NAME_PREFIX_KEY = "channel.write.pcu.part-file.name-prefix";
+  static final String BIDI_WRITE_ENABLED_KEY = "channel.write.bidi.enabled";
+  static final String BIDI_WRITE_FINALIZE_ON_CLOSE_KEY = "channel.write.bidi.finalize-on-close";
   static final String ENCRYPTION_KEY_KEY = "encryption-key";
   static final String DECRYPTION_KEY_KEY = "decryption-key";
   static final String CHECKSUM_VALIDATION_ENABLED_KEY = "channel.write.checksum-validation.enabled";
@@ -190,6 +197,10 @@ final class AnalyticsCoreConfigMapper {
               GoogleHadoopFileSystemConfiguration.GCS_PCU_PART_FILE_NAME_PREFIX.getKey(),
               PCU_PART_FILE_NAME_PREFIX_KEY)
           .put(
+              GoogleHadoopFileSystemConfiguration.GCS_APPENDABLE_OBJECTS_FINALIZE_BEFORE_CLOSE
+                  .getKey(),
+              BIDI_WRITE_FINALIZE_ON_CLOSE_KEY)
+          .put(
               GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(),
               CHECKSUM_VALIDATION_ENABLED_KEY)
           .put(
@@ -256,8 +267,7 @@ final class AnalyticsCoreConfigMapper {
     mappedProperties.put(
         prefix + USER_AGENT_KEY, GoogleHadoopFileSystemConfiguration.getApplicationName(config));
 
-    // Ensure client.type is explicitly removed from mapped properties to prevent crashes
-    mappedProperties.remove(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey());
+    mapTransportProtocol(config, mappedProperties, prefix);
 
     mapEncryptionKey(config, mappedProperties, prefix);
 
@@ -266,6 +276,68 @@ final class AnalyticsCoreConfigMapper {
     mapAuthIdentityConfigs(config, prefix, mappedProperties);
 
     return mappedProperties;
+  }
+
+  /**
+   * Maps {@code fs.gs.client.type} / {@code fs.gs.bidi.enable} to Analytics Core's {@code
+   * client.protocol}. Appendable writes are enabled for {@link Protocol#BIDI} unless {@code
+   * channel.write.bidi.enabled} is set explicitly.
+   */
+  private static void mapTransportProtocol(
+      Configuration config, Map<String, String> map, String prefix) {
+    boolean transportConfigured =
+        config.get(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey()) != null
+            || config.get(
+                    GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey())
+                != null;
+
+    // Connector transport keys are not valid Analytics Core properties.
+    map.remove(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey());
+    map.remove(GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey());
+
+    String protocolKey = prefix + CLIENT_PROTOCOL_KEY;
+    Protocol protocol = toProtocol(config);
+    if (transportConfigured || !map.containsKey(protocolKey)) {
+      map.put(protocolKey, protocol.name());
+    } else {
+      protocol = parseProtocol(map.get(protocolKey)).orElse(protocol);
+    }
+
+    String bidiWriteKey = prefix + BIDI_WRITE_ENABLED_KEY;
+    // Explicit channel.write.bidi.enabled wins (opt-out for non-zonal buckets).
+    if (!map.containsKey(bidiWriteKey)) {
+      map.put(bidiWriteKey, String.valueOf(protocol == Protocol.BIDI));
+    }
+    if (!Boolean.parseBoolean(map.get(bidiWriteKey))) {
+      // Only meaningful for appendable writes.
+      map.remove(prefix + BIDI_WRITE_FINALIZE_ON_CLOSE_KEY);
+    }
+  }
+
+  /** Resolves the Analytics Core {@link Protocol} for the connector's transport configuration. */
+  @VisibleForTesting
+  static Protocol toProtocol(Configuration config) {
+    ClientType clientType =
+        GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.get(config, config::getEnum);
+    if (clientType != ClientType.STORAGE_CLIENT) {
+      return Protocol.HTTP;
+    }
+    boolean bidiEnabled =
+        GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.get(
+            config, config::getBoolean);
+    return bidiEnabled ? Protocol.BIDI : Protocol.GRPC;
+  }
+
+  /** Parses a pass-through {@code client.protocol}; unknown values are left to Analytics Core. */
+  private static Optional<Protocol> parseProtocol(String value) {
+    if (isNullOrEmpty(value)) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(Protocol.valueOf(value.trim().toUpperCase(Locale.ROOT)));
+    } catch (IllegalArgumentException e) {
+      return Optional.empty();
+    }
   }
 
   /**
