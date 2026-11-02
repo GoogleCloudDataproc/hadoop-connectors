@@ -25,65 +25,101 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
 /**
- * Integration tests for GoogleHadoopOutputStream with Analytics Core write path enabled.
+ * Integration tests for GoogleHadoopOutputStream with Analytics Core write path enabled, exercised
+ * over each transport the connector can map to Analytics Core.
+ *
+ * <p>With {@link Protocol#BIDI} these tests cover regular (non-appendable) writes on a regional
+ * bucket via {@code channel.write.bidi.enabled=false}; appendable writes to Rapid Storage are
+ * covered by {@link GoogleHadoopOutputStreamAnalyticsBidiIntegrationTest}.
  *
  * <p>TODO: In a follow-up task, consolidate this suite with GoogleHadoopOutputStreamIntegrationTest
  * by parameterizing the test matrix to cover both default and analytics core write paths.
  */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
+  @Parameterized.Parameter public Protocol protocol;
+
+  @Parameterized.Parameters(name = "protocol={0}")
+  public static Iterable<Protocol> getProtocols() {
+    return List.of(Protocol.HTTP, Protocol.GRPC, Protocol.BIDI);
+  }
+
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
-  private static GoogleHadoopFileSystem sharedGhfs;
+  private GoogleHadoopFileSystem sharedGhfs;
 
   @BeforeClass
   public static void beforeClass() throws Exception {
     gcsFsIHelper = GoogleCloudStorageFileSystemIntegrationHelper.create();
     gcsFsIHelper.beforeAllTests();
-    URI initUri =
-        gcsFsIHelper.getUniqueObjectUri(
-            GoogleHadoopOutputStreamAnalyticsIntegrationTest.class, "init");
-    sharedGhfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(initUri, getTestConfig());
   }
 
   @AfterClass
-  public static void afterClass() throws IOException {
-    if (sharedGhfs != null) {
-      sharedGhfs.close();
-    }
+  public static void afterClass() {
     if (gcsFsIHelper != null) {
       gcsFsIHelper.afterAllTests();
     }
   }
 
-  private static Configuration getTestConfig() {
+  @Before
+  public void before() throws Exception {
+    URI initUri = getUniqueObjectUri("init");
+    sharedGhfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(initUri, getTestConfig());
+    assertThat(
+            sharedGhfs
+                .getAnalyticsCoreGcsFs()
+                .getFileSystemOptions()
+                .getGcsClientOptions()
+                .getProtocol())
+        .isEqualTo(protocol);
+  }
+
+  @After
+  public void after() throws IOException {
+    if (sharedGhfs != null) {
+      sharedGhfs.close();
+    }
+  }
+
+  private Configuration getTestConfig() {
     Configuration conf = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
     conf.setBoolean(GCS_ANALYTICS_CORE_ENABLE.getKey(), true);
     conf.setBoolean(GCS_ANALYTICS_CORE_WRITE_ENABLE.getKey(), true);
+    GoogleHadoopFSInputStreamAnalyticsIntegrationTest.configureTransport(conf, protocol);
+    // Appendable writes require a zonal bucket.
+    conf.setBoolean("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY, false);
     return conf;
+  }
+
+  private URI getUniqueObjectUri(String tag) {
+    return gcsFsIHelper.getUniqueObjectUri(getClass(), tag + "_" + protocol);
   }
 
   @Test
   public void write_singleByte_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_singleByte");
+    URI path = getUniqueObjectUri("write_singleByte");
     Path hadoopPath = new Path(path);
     byte[] expected = "hello analytics core write".getBytes(UTF_8);
 
@@ -99,7 +135,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void write_byteArray_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_byteArray");
+    URI path = getUniqueObjectUri("write_byteArray");
     Path hadoopPath = new Path(path);
     byte[] expected = "hello analytics core write array".getBytes(UTF_8);
 
@@ -113,7 +149,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void write_byteArrayWithOffsetAndLength_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_byteArrayWithOffsetAndLength");
+    URI path = getUniqueObjectUri("write_byteArrayWithOffsetAndLength");
     Path hadoopPath = new Path(path);
     byte[] source = "hello analytics core write slice".getBytes(UTF_8);
     int offset = 6;
@@ -130,7 +166,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void write_largeData_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_largeData");
+    URI path = getUniqueObjectUri("write_largeData");
     Path hadoopPath = new Path(path);
     byte[] expected = new byte[2 * 1024 * 1024]; // 2 MiB
     new Random().nextBytes(expected);
@@ -145,7 +181,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void write_withZeroBufferSize_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_withZeroBufferSize");
+    URI path = getUniqueObjectUri("write_withZeroBufferSize");
     Path hadoopPath = new Path(path);
     Configuration config = getTestConfig();
     config.setInt(GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
@@ -163,7 +199,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void hsync_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "hsync");
+    URI path = getUniqueObjectUri("hsync");
     Path hadoopPath = new Path(path);
     Configuration config = getTestConfig();
     config.setTimeDuration(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getKey(), 1, SECONDS);
@@ -194,7 +230,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void overwrite_true_overwritesExistingFile() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "overwrite_true");
+    URI path = getUniqueObjectUri("overwrite_true");
     Path hadoopPath = new Path(path);
     byte[] initialContent = "initial content".getBytes(UTF_8);
 
@@ -213,7 +249,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void overwrite_false_throwsExceptionWhenFileExists() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "overwrite_false");
+    URI path = getUniqueObjectUri("overwrite_false");
     Path hadoopPath = new Path(path);
     byte[] initialContent = "initial content".getBytes(UTF_8);
 
@@ -226,7 +262,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void write_directOutputStream_writesContentCorrectly() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_directOutputStream");
+    URI path = getUniqueObjectUri("write_directOutputStream");
 
     byte[] expected = "hello analytics core direct stream write".getBytes(UTF_8);
     try (GoogleHadoopOutputStream out =
@@ -239,7 +275,7 @@ public class GoogleHadoopOutputStreamAnalyticsIntegrationTest {
 
   @Test
   public void write_zeroBytes_createsEmptyFile() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "write_zeroBytes");
+    URI path = getUniqueObjectUri("write_zeroBytes");
 
     try (GoogleHadoopOutputStream out =
         createGhfsOutputStream(sharedGhfs, path, CreateFileOptions.DEFAULT)) {

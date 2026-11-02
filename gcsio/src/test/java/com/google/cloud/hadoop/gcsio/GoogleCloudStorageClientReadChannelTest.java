@@ -1044,6 +1044,179 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(e).hasCauseThat().hasMessageThat().contains("Received data beyond the object size;");
   }
 
+  @Test
+  public void read_readExactLazyMetadata_rangeShorterThanPrefetchShift_readsExactRange()
+      throws Exception {
+    assertLazyReadExactServedBySingleRequest(2 * CHUNK_SIZE, 100);
+    verify(fakeReadChannel, times(0)).close();
+  }
+
+  @Test
+  public void read_readExactLazyMetadata_rangeEqualToPrefetchShift_usesSingleRequest()
+      throws Exception {
+    assertLazyReadExactServedBySingleRequest(2 * CHUNK_SIZE, CHUNK_SIZE / 2);
+    verify(fakeReadChannel, times(0)).close();
+  }
+
+  @Test
+  public void read_readExactLazyMetadata_rangeLongerThanPrefetchShift_usesSingleRequest()
+      throws Exception {
+    assertLazyReadExactServedBySingleRequest(2 * CHUNK_SIZE, 768);
+    verify(fakeReadChannel, times(0)).close();
+  }
+
+  @Test
+  public void read_readExactLazyMetadata_rangeEndingAtObjectEnd_servedFromCachedFooter()
+      throws Exception {
+    assertLazyReadExactServedBySingleRequest(OBJECT_SIZE - 100, 100);
+    verify(fakeReadChannel, times(1)).close();
+
+    int cachedPosition = OBJECT_SIZE - 50;
+    int cachedLength = 50;
+    readChannel.position(cachedPosition);
+    ByteBuffer buffer = ByteBuffer.allocate(cachedLength);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(cachedLength);
+    verifyContent(buffer, cachedPosition, cachedLength);
+    verify(mockedStorage, times(1)).reader(any(), any());
+    verify(fakeReadChannel, times(1)).close();
+  }
+
+  @Test
+  public void read_readExactLazyMetadata_reflectionPath_doesNotCallStorageGet() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setReadExactRequestedBytesEnabled(true)
+            .setFadvise(Fadvise.RANDOM)
+            .setMinRangeRequestSize(CHUNK_SIZE)
+            .build();
+    BlobInfo mockBlobInfo = mock(BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(1L);
+    MockStorageReadChannel fakeChannel = new MockStorageReadChannel(CONTENT, mockBlobInfo);
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeChannel);
+
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            /* itemInfo= */ null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    int position = 2 * CHUNK_SIZE;
+    int length = 100;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(length);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(length);
+    verifyContent(buffer, position, length);
+    assertThat(readChannel.position()).isEqualTo(position + length);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+    verify(mockedStorage, times(1)).reader(any(), any());
+    verify(mockedStorage, times(0)).get(any(BlobId.class), any());
+  }
+
+  @Test
+  public void read_lazyMetadataWithoutReadExact_keepsFooterPrefetchGuess() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setReadExactRequestedBytesEnabled(false)
+            .setFadvise(Fadvise.RANDOM)
+            .setMinRangeRequestSize(CHUNK_SIZE)
+            .build();
+    readChannel = newLazyMetadataChannel(readOptions);
+
+    int position = 2 * CHUNK_SIZE;
+    int length = 100;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(length);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(length);
+    verifyContent(buffer, position, length);
+    verify(mockedStorage, times(1)).reader(any(), any());
+    long expectedStart = position - CHUNK_SIZE / 2;
+    verify(fakeReadChannel).seek(expectedStart);
+    verify(fakeReadChannel).limit(expectedStart + CHUNK_SIZE);
+  }
+
+  @Test
+  public void read_readExactKnownSize_footerRegionIsNotExpanded() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(true)
+            .setReadExactRequestedBytesEnabled(true)
+            .setFadvise(Fadvise.RANDOM)
+            .setMinRangeRequestSize(CHUNK_SIZE)
+            .build();
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, readOptions);
+
+    int position = OBJECT_SIZE - 100;
+    int length = 50;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(length);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(length);
+    verifyContent(buffer, position, length);
+    verify(mockedStorage, times(1)).reader(any(), any());
+    verify(fakeReadChannel).seek(position);
+    verify(fakeReadChannel).limit(position + length);
+    verify(fakeReadChannel, times(0)).close();
+  }
+
+  private void assertLazyReadExactServedBySingleRequest(int position, int length) throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setReadExactRequestedBytesEnabled(true)
+            .setFadvise(Fadvise.RANDOM)
+            .setMinRangeRequestSize(CHUNK_SIZE)
+            .build();
+    readChannel = newLazyMetadataChannel(readOptions);
+
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(length);
+
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(length);
+    verifyContent(buffer, position, length);
+    assertThat(readChannel.position()).isEqualTo(position + length);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+    verify(mockedStorage, times(1)).reader(any(), any());
+    verify(mockedStorage, times(1)).get(any(BlobId.class), any());
+    verify(fakeReadChannel).seek(position);
+    verify(fakeReadChannel).limit((long) position + length);
+  }
+
+  private GoogleCloudStorageClientReadChannel newLazyMetadataChannel(
+      GoogleCloudStorageReadOptions readOptions) throws IOException {
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlob.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockedStorage.get(any(BlobId.class), any())).thenReturn(mockBlob);
+    return new GoogleCloudStorageClientReadChannel(
+        mockedStorage,
+        RESOURCE_ID,
+        /* itemInfo= */ null,
+        readOptions,
+        GrpcErrorTypeExtractor.INSTANCE,
+        GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+  }
+
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
     assertThat(buffer.position()).isEqualTo(length);
     assertByteArrayEquals(
