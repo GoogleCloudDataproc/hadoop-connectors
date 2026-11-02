@@ -24,10 +24,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nonnull;
 
 /**
  * An {@link ExecutorService} decorator that runs each task with the {@link InvocationIdContext
@@ -43,28 +45,42 @@ public final class InvocationIdPropagatingExecutorService extends ForwardingExec
   }
 
   /** Wraps the given executor so that it propagates the submitter's invocation ID. */
-  public static ExecutorService wrap(ExecutorService delegate) {
+  public static ExecutorService wrap(@Nonnull ExecutorService delegate) {
     return delegate instanceof InvocationIdPropagatingExecutorService
         ? delegate
         : new InvocationIdPropagatingExecutorService(delegate);
   }
 
-  /** Returns a {@link Runnable} that runs {@code task} with the current thread's invocation ID. */
-  public static Runnable wrap(Runnable task) {
-    checkNotNull(task, "task must not be null");
+  /**
+   * Returns an {@link Executor} that runs every task with the invocation ID of the thread calling
+   * this method, regardless of which thread later calls {@link Executor#execute}. Use it for future
+   * callbacks (e.g. {@code ApiFutures.addCallback}), whose tasks are handed to the executor by the
+   * thread that completes the future rather than by the thread that registers them.
+   */
+  public static Executor bind(@Nonnull Executor executor) {
+    checkNotNull(executor, "executor must not be null");
     String invocationId = InvocationIdContext.getInvocationId();
     if (invocationId.isEmpty()) {
-      return task;
+      return executor;
     }
-    return () -> {
-      try (InvocationIdContext.Scope ignored = InvocationIdContext.openScopeWithId(invocationId)) {
-        task.run();
-      }
-    };
+    return command -> executor.execute(withInvocationId(invocationId, command));
   }
 
-  /** Returns a {@link Callable} that runs {@code task} with the current thread's invocation ID. */
-  public static <T> Callable<T> wrap(Callable<T> task) {
+  /**
+   * Returns a {@link Runnable} that runs {@code task} with the current thread's invocation ID, or
+   * {@code task} itself if the current thread has no invocation ID.
+   */
+  public static Runnable wrap(@Nonnull Runnable task) {
+    checkNotNull(task, "task must not be null");
+    String invocationId = InvocationIdContext.getInvocationId();
+    return invocationId.isEmpty() ? task : withInvocationId(invocationId, task);
+  }
+
+  /**
+   * Returns a {@link Callable} that runs {@code task} with the current thread's invocation ID, or
+   * {@code task} itself if the current thread has no invocation ID.
+   */
+  public static <T> Callable<T> wrap(@Nonnull Callable<T> task) {
     checkNotNull(task, "task must not be null");
     String invocationId = InvocationIdContext.getInvocationId();
     if (invocationId.isEmpty()) {
@@ -73,6 +89,15 @@ public final class InvocationIdPropagatingExecutorService extends ForwardingExec
     return () -> {
       try (InvocationIdContext.Scope ignored = InvocationIdContext.openScopeWithId(invocationId)) {
         return task.call();
+      }
+    };
+  }
+
+  private static Runnable withInvocationId(String invocationId, Runnable task) {
+    checkNotNull(task, "task must not be null");
+    return () -> {
+      try (InvocationIdContext.Scope ignored = InvocationIdContext.openScopeWithId(invocationId)) {
+        task.run();
       }
     };
   }

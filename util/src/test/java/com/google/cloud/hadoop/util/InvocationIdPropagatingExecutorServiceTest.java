@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.SettableFuture;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -26,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -149,5 +151,36 @@ public class InvocationIdPropagatingExecutorServiceTest {
 
     assertThat(idInsideOwnScope).isNotEmpty();
     assertThat(executor.submit(GET_INVOCATION_ID).get()).isEmpty();
+  }
+
+  @Test
+  public void bind_futureCompletedOnThreadWithoutId_callbackUsesIdOfRegisteringThread()
+      throws Exception {
+    SettableFuture<String> future = SettableFuture.create();
+    CountDownLatch done = new CountDownLatch(1);
+    AtomicReference<String> idSeenByCallback = new AtomicReference<>();
+    String operationId;
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      operationId = InvocationIdContext.getInvocationId();
+      future.addListener(
+          () -> {
+            idSeenByCallback.set(InvocationIdContext.getInvocationId());
+            done.countDown();
+          },
+          InvocationIdPropagatingExecutorService.bind(executor));
+    }
+
+    Thread completer = new Thread(() -> future.set("done"));
+    completer.start();
+    completer.join();
+
+    assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
+    assertThat(idSeenByCallback.get()).isEqualTo(operationId);
+    assertThat(executor.submit(GET_INVOCATION_ID).get()).isEmpty();
+  }
+
+  @Test
+  public void bind_withoutActiveId_returnsSameExecutor() {
+    assertThat(InvocationIdPropagatingExecutorService.bind(executor)).isSameInstanceAs(executor);
   }
 }
