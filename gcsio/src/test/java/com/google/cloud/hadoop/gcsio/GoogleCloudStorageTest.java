@@ -39,6 +39,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.moveR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
+import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
@@ -75,6 +76,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.InvocationIdContext;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
@@ -82,6 +84,7 @@ import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorRespons
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -249,6 +252,37 @@ public class GoogleCloudStorageTest {
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       chunkUploadRequest.getContent().writeTo(writtenData);
       assertThat(writtenData.toByteArray()).isEqualTo(testData);
+    }
+  }
+
+  @Test
+  public void create_uploadOnBackgroundThread_usesInvocationIdOfOperation() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09};
+    MockHttpTransport transport =
+        mockTransport(
+            jsonErrorResponse(ErrorResponses.NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setCrc32c(calculateCrc32cFromBytes(testData))));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    String operationId;
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      operationId =
+          InvocationIdContext.getInvocationId().substring(GCCL_INVOCATION_ID_PREFIX.length());
+      try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
+        writeChannel.write(ByteBuffer.wrap(testData));
+      }
+    }
+
+    List<String> invocationIds = trackingRequestInitializerWithRetries.getAllRequestInvocationIds();
+    assertThat(invocationIds).hasSize(3);
+    assertThat(ImmutableSet.copyOf(invocationIds)).hasSize(3);
+    for (String invocationId : invocationIds) {
+      assertThat(invocationId).startsWith(operationId + "-");
     }
   }
 

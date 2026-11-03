@@ -27,6 +27,7 @@ import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutureCallback;
 import com.google.api.core.ApiFutures;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.storage.*;
 import com.google.cloud.storage.ZeroCopySupport.DisposableByteString;
 import com.google.common.annotations.VisibleForTesting;
@@ -392,7 +393,7 @@ public final class GoogleCloudStorageBidiReadChannel implements ReadVectoredSeek
                 }
               }
             },
-            boundedThreadPool);
+            InvocationIdPropagatingExecutorService.bind(boundedThreadPool));
         queuedRangesCount++;
       }
     } catch (Throwable t) {
