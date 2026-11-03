@@ -71,6 +71,7 @@ import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.hadoop.util.LoggingFormatter;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.TraceFactory;
@@ -230,7 +231,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private GhfsStorageStatistics storageStatistics;
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
-      Executors.newCachedThreadPool(DAEMON_THREAD_FACTORY);
+      InvocationIdPropagatingExecutorService.wrap(
+          Executors.newCachedThreadPool(DAEMON_THREAD_FACTORY));
   private GcsFileChecksumType checksumType = GCS_FILE_CHECKSUM_TYPE.getDefault();
   /** Underlying GCS file system object. */
   private Supplier<GoogleCloudStorageFileSystem> gcsFsSupplier;
@@ -1551,19 +1553,14 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         return super.openFileWithOptions(hadoopPath, parameters);
       }
 
-      String invocationId = InvocationIdContext.getInvocationId();
       CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
       backgroundTasksThreadPool.submit(
-          () -> {
-            try (InvocationIdContext.Scope taskScope =
-                InvocationIdContext.openScopeWithId(invocationId)) {
+          () ->
               LambdaUtils.eval(
                   result,
                   () ->
                       new FSDataInputStream(
-                          GoogleHadoopFSInputStream.create(this, fileInfo, statistics)));
-            }
-          });
+                          GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
       return result;
     }
   }
@@ -1770,22 +1767,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter)
       throws IOException {
-    String invocationId = InvocationIdContext.getInvocationId();
     try {
       return backgroundTasksThreadPool.invokeAny(
           ImmutableList.of(
-              () -> {
-                try (InvocationIdContext.Scope taskScope =
-                    InvocationIdContext.openScopeWithId(invocationId)) {
-                  return flatGlobInternal(fixedPath, filter);
-                }
-              },
-              () -> {
-                try (InvocationIdContext.Scope taskScope =
-                    InvocationIdContext.openScopeWithId(invocationId)) {
-                  return super.globStatus(fixedPath, filter);
-                }
-              }));
+              () -> flatGlobInternal(fixedPath, filter),
+              () -> super.globStatus(fixedPath, filter)));
     } catch (InterruptedException e) {
       GoogleCloudStorageEventBus.postOnException();
       Thread.currentThread().interrupt();

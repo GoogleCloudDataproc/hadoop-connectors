@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl.get
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -78,12 +79,14 @@ class BatchExecutor {
         !requestsExecutor.isShutdown() && !requestsExecutor.isTerminated(),
         "requestExecutor should not be terminated to queue request");
 
+    // The executor itself is not wrapped because isIdle() relies on the ThreadPoolExecutor.
     responseFutures.add(
         requestsExecutor.submit(
-            () -> {
-              execute(task, callback);
-              return null;
-            }));
+            InvocationIdPropagatingExecutorService.wrap(
+                () -> {
+                  execute(task, callback);
+                  return null;
+                })));
   }
 
   private static <T> void execute(Callable<T> task, FutureCallback<T> callback) throws Exception {

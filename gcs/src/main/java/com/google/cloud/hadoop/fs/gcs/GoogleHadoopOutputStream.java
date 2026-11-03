@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -92,11 +93,12 @@ class GoogleHadoopOutputStream extends OutputStream
   // deletions are awaited on close() so as long as all output streams are closed, there should
   // be no remaining in-flight work occurring inside this threadpool.
   private static final ExecutorService TMP_FILE_CLEANUP_THREADPOOL =
-      Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder()
-              .setNameFormat("ghfs-output-stream-sync-cleanup-%d")
-              .setDaemon(true)
-              .build());
+      InvocationIdPropagatingExecutorService.wrap(
+          Executors.newCachedThreadPool(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("ghfs-output-stream-sync-cleanup-%d")
+                  .setDaemon(true)
+                  .build()));
 
   private final GoogleHadoopFileSystem ghfs;
 
