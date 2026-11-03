@@ -24,6 +24,7 @@ import static org.apache.hadoop.fs.VectoredReadUtils.validateRangeRequest;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.hadoop.util.IoExceptionHelper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
@@ -67,16 +68,17 @@ public class VectoredIOImpl implements Closeable {
     this.vectoredReadOptions = vectoredReadOptions;
     // same fixedThreadPool executor, but provided a way to query task queue
     this.boundedThreadPool =
-        new ThreadPoolExecutor(
-            vectoredReadOptions.getReadThreads(),
-            vectoredReadOptions.getReadThreads(),
-            0L,
-            TimeUnit.MILLISECONDS,
-            taskQueue,
-            new ThreadFactoryBuilder()
-                .setNameFormat("vectoredRead-range-pool-%d")
-                .setDaemon(true)
-                .build());
+        InvocationIdPropagatingExecutorService.wrap(
+            new ThreadPoolExecutor(
+                vectoredReadOptions.getReadThreads(),
+                vectoredReadOptions.getReadThreads(),
+                0L,
+                TimeUnit.MILLISECONDS,
+                taskQueue,
+                new ThreadFactoryBuilder()
+                    .setNameFormat("vectoredRead-range-pool-%d")
+                    .setDaemon(true)
+                    .build()));
     this.storageStatistics = storageStatistics;
   }
 

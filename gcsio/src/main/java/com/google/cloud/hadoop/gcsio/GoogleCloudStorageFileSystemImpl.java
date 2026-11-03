@@ -34,6 +34,7 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceOperation;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.cloud.hadoop.util.ThreadTrace;
 import com.google.cloud.hadoop.util.TraceOperation;
@@ -229,7 +230,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
             new ThreadFactoryBuilder().setNameFormat("gcsfs-misc-%d").setDaemon(true).build());
     service.allowCoreThreadTimeOut(true);
     // allowCoreThreadTimeOut needs to be enabled for cases where the encapsulating class does not
-    return service;
+    return InvocationIdPropagatingExecutorService.wrap(service);
   }
 
   @Override
@@ -1219,7 +1220,8 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     ExecutorService fileInfoExecutor =
         maxThreads == 0
             ? newDirectExecutorService()
-            : newFixedThreadPool(min(maxThreads, paths.size()), DAEMON_THREAD_FACTORY);
+            : InvocationIdPropagatingExecutorService.wrap(
+                newFixedThreadPool(min(maxThreads, paths.size()), DAEMON_THREAD_FACTORY));
     try {
       List<Future<FileInfo>> infoFutures = new ArrayList<>(paths.size());
       for (URI path : paths) {
