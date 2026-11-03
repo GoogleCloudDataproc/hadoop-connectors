@@ -886,6 +886,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         assertThrows(IOException.class, () -> fs.initialize(new URI("gs://foobar/"), config));
 
     assertThat(exception).hasMessageThat().contains("missing-key.json");
+    assertThat(exception.getSuppressed()).hasLength(1);
+    assertThat(exception.getSuppressed()[0]).hasCauseThat().isSameInstanceAs(exception);
   }
 
   private static GcsClientOptions analyticsCoreClientOptions(GoogleHadoopFileSystem fs) {

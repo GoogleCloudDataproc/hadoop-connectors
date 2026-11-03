@@ -485,7 +485,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       }
       return new GcsFileSystemImpl(options);
     } catch (UncheckedIOException e) {
-      throw e.getCause();
+      IOException cause = e.getCause();
+      cause.addSuppressed(e);
+      throw cause;
     }
   }
 
