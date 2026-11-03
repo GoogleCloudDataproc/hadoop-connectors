@@ -1,84 +1,230 @@
 package com.google.cloud.hadoop.util;
 
-import static org.junit.Assert.*;
+import static com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
+@RunWith(JUnit4.class)
 public class InvocationIdContextTest {
 
+  private static final Pattern OPERATION_ID_PATTERN =
+      Pattern.compile("^" + Pattern.quote(GCCL_INVOCATION_ID_PREFIX) + "[0-9a-f]{8}$");
+
+  private static final Pattern REQUEST_ID_PATTERN =
+      Pattern.compile(
+          "^"
+              + Pattern.quote(GCCL_INVOCATION_ID_PREFIX)
+              + "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
+
   @Before
+  @After
   public void clearInvocationId() {
-    // Ensure the INVOCATION_ID is cleared before each test
     InvocationIdContext.clear();
   }
 
   @Test
   public void getInvocationId_initialContext_returnsEmptyString() {
-    // Test that the initial value of INVOCATION_ID is an empty string
-    assertEquals("", InvocationIdContext.getInvocationId());
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
   }
 
   @Test
-  public void setInvocationId_noExistingId_generatesValidId() {
-    // Set a new invocation ID and verify it is not empty
-    InvocationIdContext.setInvocationId();
+  public void newInvocationId_hasPrefixAndEightHexChars_andDoesNotSetContext() {
+    String invocationId = InvocationIdContext.newInvocationId();
 
-    String invocationId = InvocationIdContext.getInvocationId();
-    String uuidPart =
-        invocationId.substring(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length());
-
-    // Verify that the invocation ID is not empty
-    assertNotEquals("", invocationId);
-    // Verify the format of the invocation ID
-    assertTrue(invocationId.startsWith(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX));
-    assertEquals(8, uuidPart.length());
+    assertThat(invocationId).matches(OPERATION_ID_PATTERN);
+    assertThat(InvocationIdContext.newInvocationId()).isNotEqualTo(invocationId);
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
   }
 
   @Test
-  public void clear_whenIdExists_resetsToEmptyString() {
-    // Set an invocation ID, clear it, and verify it is reset to an empty string
-    InvocationIdContext.setInvocationId();
+  public void openScope_setsIdInsideAndClearsOnClose() {
+    String invocationId;
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      invocationId = InvocationIdContext.getInvocationId();
+      assertThat(invocationId).matches(OPERATION_ID_PATTERN);
+    }
 
-    InvocationIdContext.clear();
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
 
-    assertEquals("", InvocationIdContext.getInvocationId());
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      assertThat(InvocationIdContext.getInvocationId()).isNotEqualTo(invocationId);
+    }
   }
 
   @Test
-  public void setInvocationId_inNewThread_doesNotAffectParentThreadId()
-      throws InterruptedException {
-    // Test that the INVOCATION_ID is isolated across threads
-    InvocationIdContext.setInvocationId();
-    String mainThreadId = InvocationIdContext.getInvocationId();
+  public void openScope_clearsIdWhenOperationThrows() {
+    assertThrows(
+        IllegalStateException.class,
+        () -> {
+          try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+            throw new IllegalStateException("operation failed");
+          }
+        });
 
-    Thread thread =
-        new Thread(
-            () -> {
-              InvocationIdContext.setInvocationId();
-              assertNotEquals(mainThreadId, InvocationIdContext.getInvocationId());
-            });
-    thread.start();
-    thread.join();
-
-    // Ensure the main thread's invocation ID remains unchanged
-    assertEquals(mainThreadId, InvocationIdContext.getInvocationId());
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
   }
 
   @Test
-  public void getInvocationId_inChildThread_inheritsParentId() throws InterruptedException {
-    // Set an invocation ID in the parent thread
-    InvocationIdContext.setInvocationId();
-    String parentThreadId = InvocationIdContext.getInvocationId();
+  public void openScope_nestedInScopeWithId_reusesThatId() {
+    String streamId = InvocationIdContext.newInvocationId();
 
-    // Create a child thread and verify it inherits the same invocation ID
-    Thread childThread =
-        new Thread(() -> assertEquals(parentThreadId, InvocationIdContext.getInvocationId()));
-    childThread.start();
-    childThread.join();
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScopeWithId(streamId)) {
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScope()) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+      }
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+    }
 
-    // Ensure the parent thread's invocation ID remains unchanged
-    assertEquals(parentThreadId, InvocationIdContext.getInvocationId());
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScope_nested_reusesOuterIdAndKeepsItUntilOuterCloses() {
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScope()) {
+      String outerId = InvocationIdContext.getInvocationId();
+
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScope()) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
+      }
+
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_overridesAndRestoresPreviousId() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScope()) {
+      String outerId = InvocationIdContext.getInvocationId();
+
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScopeWithId(streamId)) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+      }
+
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(outerId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_withoutPreviousId_clearsOnClose() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScopeWithId(streamId)) {
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_sameIdAlreadyActive_keepsIdUntilOuterCloses() {
+    String streamId = InvocationIdContext.newInvocationId();
+
+    try (InvocationIdContext.Scope outer = InvocationIdContext.openScopeWithId(streamId)) {
+      try (InvocationIdContext.Scope inner = InvocationIdContext.openScopeWithId(streamId)) {
+        assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+      }
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(streamId);
+    }
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScopeWithId_nullOrEmptyId_throws() {
+    assertThrows(IllegalArgumentException.class, () -> InvocationIdContext.openScopeWithId(""));
+    assertThrows(IllegalArgumentException.class, () -> InvocationIdContext.openScopeWithId(null));
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void scopeClose_calledTwice_doesNotRestoreStaleId() {
+    InvocationIdContext.Scope outer = InvocationIdContext.openScope();
+    InvocationIdContext.Scope inner =
+        InvocationIdContext.openScopeWithId(InvocationIdContext.newInvocationId());
+
+    inner.close();
+    outer.close();
+    inner.close();
+    outer.close();
+
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+  }
+
+  @Test
+  public void openScope_inChildThread_doesNotInheritParentId() throws InterruptedException {
+    AtomicReference<String> childInitialId = new AtomicReference<>();
+    AtomicReference<String> childScopedId = new AtomicReference<>();
+
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      String parentId = InvocationIdContext.getInvocationId();
+
+      Thread child =
+          new Thread(
+              () -> {
+                childInitialId.set(InvocationIdContext.getInvocationId());
+                try (InvocationIdContext.Scope childScope = InvocationIdContext.openScope()) {
+                  childScopedId.set(InvocationIdContext.getInvocationId());
+                }
+              });
+      child.start();
+      child.join();
+
+      assertThat(childInitialId.get()).isEmpty();
+      assertThat(childScopedId.get()).matches(OPERATION_ID_PATTERN);
+      assertThat(childScopedId.get()).isNotEqualTo(parentId);
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(parentId);
+    }
+  }
+
+  @Test
+  public void newRequestInvocationId_withoutOperation_isFullUuidAndDoesNotSetContext() {
+    String requestId = InvocationIdContext.newRequestInvocationId();
+
+    assertThat(requestId).matches(REQUEST_ID_PATTERN);
+    assertThat(uuidOf(requestId).toString()).isEqualTo(uuidPartOf(requestId));
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    assertThat(InvocationIdContext.newRequestInvocationId()).isNotEqualTo(requestId);
+  }
+
+  @Test
+  public void newRequestInvocationId_withOperation_sharesOperationPrefixAndIsUnique() {
+    try (InvocationIdContext.Scope ignored = InvocationIdContext.openScope()) {
+      String operationId = InvocationIdContext.getInvocationId();
+
+      String requestId1 = InvocationIdContext.newRequestInvocationId();
+      String requestId2 = InvocationIdContext.newRequestInvocationId();
+
+      assertThat(requestId1).matches(REQUEST_ID_PATTERN);
+      assertThat(requestId2).matches(REQUEST_ID_PATTERN);
+      assertThat(requestId1).startsWith(operationId + "-");
+      assertThat(requestId2).startsWith(operationId + "-");
+      assertThat(requestId1).isNotEqualTo(requestId2);
+      assertThat(uuidOf(requestId1).toString()).isEqualTo(uuidPartOf(requestId1));
+      assertThat(InvocationIdContext.getInvocationId()).isEqualTo(operationId);
+    }
+  }
+
+  private static String uuidPartOf(String requestId) {
+    return requestId.substring(GCCL_INVOCATION_ID_PREFIX.length());
+  }
+
+  private static UUID uuidOf(String requestId) {
+    return UUID.fromString(uuidPartOf(requestId));
   }
 }
