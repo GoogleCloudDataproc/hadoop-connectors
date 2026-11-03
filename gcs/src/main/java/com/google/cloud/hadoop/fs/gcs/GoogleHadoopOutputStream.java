@@ -30,6 +30,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
+import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
@@ -85,11 +87,12 @@ class GoogleHadoopOutputStream extends OutputStream
   // deletions are awaited on close() so as long as all output streams are closed, there should
   // be no remaining in-flight work occurring inside this threadpool.
   private static final ExecutorService TMP_FILE_CLEANUP_THREADPOOL =
-      Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder()
-              .setNameFormat("ghfs-output-stream-sync-cleanup-%d")
-              .setDaemon(true)
-              .build());
+      InvocationIdPropagatingExecutorService.wrap(
+          Executors.newCachedThreadPool(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("ghfs-output-stream-sync-cleanup-%d")
+                  .setDaemon(true)
+                  .build()));
 
   private final GoogleHadoopFileSystem ghfs;
 
@@ -134,6 +137,7 @@ class GoogleHadoopOutputStream extends OutputStream
   private final GhfsInstrumentation instrumentation;
 
   private final GhfsStreamStats streamStats;
+  private final String invocationId;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -194,13 +198,23 @@ class GoogleHadoopOutputStream extends OutputStream
       this.tmpIndex = 0;
     }
 
-    this.tmpOut =
-        createOutputStream(
-            ghfs.getGcsFs(),
-            tmpGcsPath,
-            tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
+    String currentInvocationId = InvocationIdContext.getInvocationId();
+    this.invocationId =
+        currentInvocationId.isEmpty() ? InvocationIdContext.newInvocationId() : currentInvocationId;
+
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      this.tmpOut =
+          createOutputStream(
+              ghfs.getGcsFs(),
+              tmpGcsPath,
+              tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
+    }
     this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
     this.traceFactory = ghfs.getTraceFactory();
+  }
+
+  private InvocationIdContext.Scope openInvocationIdScope() {
+    return InvocationIdContext.openScopeWithId(invocationId);
   }
 
   private static OutputStream createOutputStream(
@@ -223,22 +237,23 @@ class GoogleHadoopOutputStream extends OutputStream
 
   @Override
   public void write(int b) throws IOException {
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.STREAM_WRITE_OPERATIONS.getSymbol(),
-        () -> {
-          long start = System.nanoTime();
-          throwIfNotOpen();
-          tmpOut.write(b);
-          streamStatistics.writeBytes(1);
-          // Using a lightweight implementation to update instrumentation. This method can be called
-          // quite
-          // frequently and need to be lightweight.
-          statistics.incrementBytesWritten(1);
-          statistics.incrementWriteOps(1);
-          streamStats.updateWriteStreamStats(1, start);
-          return null;
-        });
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      trackDuration(
+          streamStatistics,
+          GhfsStatistic.STREAM_WRITE_OPERATIONS.getSymbol(),
+          () -> {
+            long start = System.nanoTime();
+            throwIfNotOpen();
+            tmpOut.write(b);
+            streamStatistics.writeBytes(1);
+            // Using a lightweight implementation to update instrumentation. This method can be
+            // called quite frequently and need to be lightweight.
+            statistics.incrementBytesWritten(1);
+            statistics.incrementWriteOps(1);
+            streamStats.updateWriteStreamStats(1, start);
+            return null;
+          });
+    }
   }
 
   /**
@@ -253,26 +268,29 @@ class GoogleHadoopOutputStream extends OutputStream
       ITraceFactory traceFactory,
       CallableRaisingIOE<B> operation)
       throws IOException {
-
-    return GhfsGlobalStorageStatistics.trackDuration(
-        factory, stats, statistic, context, traceFactory, operation);
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      return GhfsGlobalStorageStatistics.trackDuration(
+          factory, stats, statistic, context, traceFactory, operation);
+    }
   }
 
   @Override
   public void write(@Nonnull byte[] b, int offset, int len) throws IOException {
-    trackDuration(
-        streamStatistics,
-        GhfsStatistic.STREAM_WRITE_OPERATIONS.getSymbol(),
-        () -> {
-          long start = System.nanoTime();
-          throwIfNotOpen();
-          tmpOut.write(b, offset, len);
-          statistics.incrementBytesWritten(len);
-          statistics.incrementWriteOps(1);
-          streamStats.updateWriteStreamStats(len, start);
-          streamStatistics.writeBytes(len);
-          return null;
-        });
+    try (InvocationIdContext.Scope ignored = openInvocationIdScope()) {
+      trackDuration(
+          streamStatistics,
+          GhfsStatistic.STREAM_WRITE_OPERATIONS.getSymbol(),
+          () -> {
+            long start = System.nanoTime();
+            throwIfNotOpen();
+            tmpOut.write(b, offset, len);
+            statistics.incrementBytesWritten(len);
+            statistics.incrementWriteOps(1);
+            streamStats.updateWriteStreamStats(len, start);
+            streamStatistics.writeBytes(len);
+            return null;
+          });
+    }
   }
 
   /**

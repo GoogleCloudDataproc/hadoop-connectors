@@ -2,6 +2,7 @@
 
 ## Next
 1. Fix gRPC fast-fail disabled read failures when Vectored IO is enabled.
+1. Scope the connector invocation ID to operations, streams, and thread pools and make it unique per HTTP request.
 
 ## 4.0.9 - 2026-10-28
 1. Upgrade google.api-client-libraries.version to 2.9.2
