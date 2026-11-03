@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Scope the connector invocation ID to operations, streams, and thread pools and make it unique per HTTP request.
 
 ## 3.0.22 - 2026-10-28
 1. Upgrade google.api-client.version to 2.9.2
