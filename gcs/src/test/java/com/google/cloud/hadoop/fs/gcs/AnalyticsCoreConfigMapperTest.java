@@ -17,10 +17,13 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
+import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsReadOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsVectoredReadOptions;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import java.util.Map;
@@ -104,6 +107,148 @@ public class AnalyticsCoreConfigMapperTest {
         .isEqualTo(Protocol.GRPC.name());
     assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY))
         .isEqualTo("false");
+  }
+
+  @Test
+  public void mapConfigs_byteSizeValuesWithBinaryPrefix_areConvertedToBytes() {
+    // Hadoop 3.5 core-default.xml sets these keys with binary prefixes (e.g. "8m").
+    Configuration config = new Configuration(/* loadDefaults= */ false);
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(), "8m");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(), "2M");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(), "4k");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
+        " 8m ");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(), "64m");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_CAPACITY.getKey(), "1g");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.INPLACE_SEEK_LIMIT_KEY))
+        .isEqualTo(String.valueOf(8L * 1024 * 1024));
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.RANDOM_READ_MIN_REQ_SIZE_KEY))
+        .isEqualTo(String.valueOf(2L * 1024 * 1024));
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_GAP_KEY))
+        .isEqualTo(String.valueOf(4L * 1024));
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.MAX_MERGE_SIZE_KEY))
+        .isEqualTo(String.valueOf(8L * 1024 * 1024));
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_CHUNK_SIZE_KEY))
+        .isEqualTo(String.valueOf(64L * 1024 * 1024));
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PCU_BUFFER_CAPACITY_KEY))
+        .isEqualTo(String.valueOf(1024L * 1024 * 1024));
+
+    // End to end: Analytics Core must parse all six converted values without throwing.
+    GcsFileSystemOptions options = GcsFileSystemOptions.createFromOptions(mapped, "fs.gs.");
+    GcsClientOptions clientOptions = options.getGcsClientOptions();
+    GcsReadOptions readOptions = clientOptions.getGcsReadOptions();
+    assertThat(readOptions.getInplaceSeekLimit()).isEqualTo(8 * 1024 * 1024);
+    assertThat(readOptions.getRandomReadMinRequestSize()).isEqualTo(2 * 1024 * 1024);
+    assertThat(clientOptions.getUploadChunkSize()).isEqualTo(64 * 1024 * 1024);
+    assertThat(clientOptions.getPcuBufferCapacity()).isEqualTo(1024 * 1024 * 1024);
+    // The merge-gap / merged-size getters are package-private in Analytics Core; parsing the
+    // vectored options from the same map is enough to prove the converted values are accepted.
+    assertThat(readOptions.getGcsVectoredReadOptions()).isNotNull();
+    assertThat(GcsVectoredReadOptions.createFromOptions(mapped, "fs.gs.")).isNotNull();
+  }
+
+  @Test
+  public void mapConfigs_byteSizeValuesWithBinaryPrefix_matchConnectorGetLongBytes() {
+    Configuration config = new Configuration(/* loadDefaults= */ false);
+    String key = GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey();
+    config.set(key, "8m");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(
+            Long.parseLong(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.INPLACE_SEEK_LIMIT_KEY)))
+        .isEqualTo(config.getLongBytes(key, -1));
+  }
+
+  @Test
+  public void mapConfigs_byteSizeValuesWithoutPrefix_arePassedThroughUnchanged() {
+    Configuration config = new Configuration(/* loadDefaults= */ false);
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(),
+        "8388608");
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(), "0");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.INPLACE_SEEK_LIMIT_KEY))
+        .isEqualTo("8388608");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.UPLOAD_CHUNK_SIZE_KEY))
+        .isEqualTo("0");
+  }
+
+  @Test
+  public void mapConfigs_malformedByteSizeValues_throwNamingTheKey() {
+    String key = GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey();
+    // string2long surfaces IllegalArgumentException ("8mb"), NumberFormatException ("xm") and
+    // StringIndexOutOfBoundsException ("") respectively; all must be normalised.
+    for (String malformed : new String[] {"8mb", "xm", "", "   "}) {
+      Configuration config = new Configuration(/* loadDefaults= */ false);
+      config.set(key, malformed);
+
+      IllegalArgumentException e =
+          assertThrows(
+              "value: '" + malformed + "'",
+              IllegalArgumentException.class,
+              () -> AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs."));
+
+      assertThat(e).hasMessageThat().contains(key);
+      assertThat(e).hasMessageThat().contains("'" + malformed + "'");
+    }
+  }
+
+  @Test
+  public void mapConfigs_nonByteSizeNumericKeys_areNotConverted() {
+    // fs.gs.vectored.read.threads is read with getInt by the connector, so a binary prefix is
+    // not a valid value for it and the mapper must not silently reinterpret it.
+    Configuration config = new Configuration(/* loadDefaults= */ false);
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_THREADS.getKey(), "8m");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_COUNT.getKey(), "2k");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.READ_THREAD_COUNT_KEY))
+        .isEqualTo("8m");
+    assertThat(mapped.get("fs.gs." + AnalyticsCoreConfigMapper.PCU_BUFFER_COUNT_KEY))
+        .isEqualTo("2k");
+  }
+
+  @Test
+  public void mapConfigs_byteSizeValuesAboveIntRange_areConvertedButRejectedByAnalyticsCore() {
+    // The connector reads this key as a long, so 4g is a valid value and the mapper converts it.
+    // Analytics Core 1.6.0, however, parses all mapped byte-size options as int and rejects values
+    // above Integer.MAX_VALUE. The mapper intentionally does not clamp or range-check; that limit
+    // belongs to Analytics Core.
+    Configuration config = new Configuration(/* loadDefaults= */ false);
+    config.set(
+        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(), "4g");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    String converted = mapped.get("fs.gs." + AnalyticsCoreConfigMapper.INPLACE_SEEK_LIMIT_KEY);
+    assertThat(converted).isEqualTo(String.valueOf(4L * 1024 * 1024 * 1024));
+    assertThat(Long.parseLong(converted)).isGreaterThan((long) Integer.MAX_VALUE);
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> GcsFileSystemOptions.createFromOptions(mapped, "fs.gs."));
+    assertThat(e).hasMessageThat().contains("Integer.MAX_VALUE");
+  }
+
+  @Test
+  public void byteSizeKeys_areAllMappedConnectorKeys() {
+    // Drift guard: BYTE_SIZE_KEYS is only consulted for keys that go through
+    // mapAndRemoveSource, so an entry missing from the mapping table would be dead.
+    assertThat(AnalyticsCoreConfigMapper.HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS.keySet())
+        .containsAtLeastElementsIn(AnalyticsCoreConfigMapper.BYTE_SIZE_KEYS);
   }
 
   @Test

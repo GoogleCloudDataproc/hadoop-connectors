@@ -37,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.StringUtils.TraditionalBinaryPrefix;
 
 /** Maps GCS Hadoop Connector configurations to GCS Analytics Core configurations. */
 final class AnalyticsCoreConfigMapper {
@@ -155,7 +156,8 @@ final class AnalyticsCoreConfigMapper {
               HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX.getKey())
           .withPrefixes(KEY_PREFIXES);
 
-  private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
+  @VisibleForTesting
+  static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
           .put(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), PROJECT_ID_KEY)
           .put(GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL.getKey(), SERVICE_HOST_KEY)
@@ -206,6 +208,31 @@ final class AnalyticsCoreConfigMapper {
           .put(
               GoogleHadoopFileSystemConfiguration.GCS_UNIVERSE_DOMAIN.getKey(), UNIVERSE_DOMAIN_KEY)
           .build();
+
+  /**
+   * Connector keys read with {@link Configuration#getLongBytes}, whose values may carry a binary
+   * prefix (e.g. {@code 8m}, as set by Hadoop 3.5's {@code core-default.xml}) and must be converted
+   * to a plain byte count before being handed to Analytics Core.
+   *
+   * <p>Keep in sync with the {@code getLongBytes} readers in {@link
+   * GoogleHadoopFileSystemConfiguration}. Every key here must also be present in {@link
+   * #HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS} (enforced by a unit test). Keys read with {@code
+   * getInt} (e.g. {@code fs.gs.vectored.read.threads}) are deliberately excluded, since the
+   * connector itself rejects binary prefixes for them.
+   *
+   * <p>Note: Analytics Core 1.6.0 parses all of these options as {@code int}, so converted values
+   * above {@link Integer#MAX_VALUE} (e.g. {@code 4g}) are rejected by Analytics Core even though
+   * the connector accepts them as {@code long}.
+   */
+  @VisibleForTesting
+  static final ImmutableSet<String> BYTE_SIZE_KEYS =
+      ImmutableSet.of(
+          GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_CAPACITY.getKey());
 
   private AnalyticsCoreConfigMapper() {
     // Utility class
@@ -469,7 +496,10 @@ final class AnalyticsCoreConfigMapper {
       String hadoopKey, Map<String, String> map, String analyticsCoreKey) {
     String value = map.remove(hadoopKey);
     if (value != null) {
-      if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
+      if (BYTE_SIZE_KEYS.contains(hadoopKey)) {
+        value = toBytes(hadoopKey, value);
+      } else if (hadoopKey.equals(
+          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
         value = toFileAccessPattern(value);
       } else if (hadoopKey.equals(
           GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey())) {
@@ -479,6 +509,31 @@ final class AnalyticsCoreConfigMapper {
         value = toPartFileCleanupType(value);
       }
       map.put(analyticsCoreKey, value);
+    }
+  }
+
+  /**
+   * Converts a byte-size value that may carry a binary prefix (e.g. {@code 8m}, as set by Hadoop
+   * 3.5's {@code core-default.xml}) to a plain byte count, the same way the connector reads these
+   * keys via {@link Configuration#getLongBytes}. Analytics Core parses these values with {@link
+   * Integer#parseInt} and does not understand binary prefixes.
+   *
+   * <p>Malformed values throw {@link IllegalArgumentException} naming the key, for parity with
+   * {@code Configuration#getLongBytes}, which also fails on malformed input. Unlike the enum
+   * helpers below, this intentionally does <em>not</em> fall back to a default: a silently
+   * defaulted buffer or chunk size is an invisible performance cliff.
+   */
+  private static String toBytes(String hadoopKey, String value) {
+    try {
+      return String.valueOf(TraditionalBinaryPrefix.string2long(value.trim()));
+    } catch (RuntimeException e) {
+      // string2long surfaces IllegalArgumentException, NumberFormatException or
+      // StringIndexOutOfBoundsException (empty value); none of them name the key.
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid byte-size value '%s' for key %s (expected e.g. 8388608 or 8m)",
+              value, hadoopKey),
+          e);
     }
   }
 
