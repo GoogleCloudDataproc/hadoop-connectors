@@ -46,6 +46,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingGrpcRequestInterceptor;
@@ -57,6 +58,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.storage.StorageException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -65,6 +67,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -189,6 +192,87 @@ public class GoogleCloudStorageImplTest {
           .containsExactly(getObjectRequestString(resourceId, filelds, testStorageClientImpl));
     }
     trackingGcs.delegate.close();
+  }
+
+  @Test
+  public void read_atObjectEnd_whenFastFailOnNotFound_isFalse_returnsEof() throws IOException {
+    if (!testStorageClientImpl) {
+      return;
+    }
+
+    int objectSize = 2 * 1024 * 1024;
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
+    byte[] content =
+        writeObject(
+            helperGcs, resourceId, /* partitionSize= */ objectSize, /* partitionsCount= */ 1);
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
+      readChannel.position(objectSize);
+      assertThat(readChannel.read(ByteBuffer.allocate(8))).isEqualTo(-1);
+      assertThat(readChannel.read(ByteBuffer.allocate(8))).isEqualTo(-1);
+
+      readChannel.position(objectSize - 8);
+      ByteBuffer footer = ByteBuffer.allocate(8);
+      assertThat(readChannel.read(footer)).isEqualTo(8);
+      assertThat(footer.array()).isEqualTo(Arrays.copyOfRange(content, objectSize - 8, objectSize));
+    } finally {
+      trackingGcs.delegate.close();
+    }
+  }
+
+  @Test(timeout = 60_000)
+  public void read_pastObjectEnd_whenFastFailOnNotFound_isFalse_throwsEofException()
+      throws IOException {
+    if (!testStorageClientImpl) {
+      return;
+    }
+
+    int objectSize = 1024 * 1024;
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
+    writeObject(helperGcs, resourceId, /* partitionSize= */ objectSize, /* partitionsCount= */ 1);
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .build();
+
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
+      readChannel.position(objectSize + 1);
+
+      assertThrows(EOFException.class, () -> readChannel.read(ByteBuffer.allocate(8)));
+
+      readChannel.position(0);
+      assertThat(readChannel.read(ByteBuffer.allocate(8))).isEqualTo(8);
+    } finally {
+      trackingGcs.delegate.close();
+    }
+  }
+
+  @Test(timeout = 60_000)
+  public void read_emptyObject_whenFastFailOnNotFound_isFalse_returnsEof() throws IOException {
+    if (!testStorageClientImpl) {
+      return;
+    }
+
+    StorageResourceId resourceId = new StorageResourceId(testBucket, name.getMethodName());
+    helperGcs.createEmptyObject(resourceId);
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
+      assertThat(readChannel.read(ByteBuffer.allocate(8))).isEqualTo(-1);
+      assertThat(readChannel.size()).isEqualTo(0);
+    } finally {
+      trackingGcs.delegate.close();
+    }
   }
 
   /**

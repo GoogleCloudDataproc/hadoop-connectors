@@ -353,12 +353,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             if (contentChannelEnd != objectSize && currentPosition == contentChannelEnd) {
               closeContentChannel();
               continue;
-            } else {
-              // TODO: If EOF is reached before anything was read (a first read at
-              // currentPosition == objectSize), return -1 instead of 0, and don't cache an empty
-              // footer in openByteChannel. See the review of #1835.
-              break;
             }
+            if (totalBytesRead == 0) {
+              return -1;
+            }
+            break;
           }
           totalBytesRead += bytesRead;
           currentPosition += bytesRead;
@@ -407,6 +406,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           logger.atFine().log(
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
+          if (byteChannel == null) {
+            reset();
+          }
           throw convertError(e);
         }
       }
@@ -451,6 +453,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           contentChannelCurrentPosition, contentChannelEnd);
 
       if (contentChannelEnd == objectSize
+          && contentChannelEnd > contentChannelCurrentPosition
           && (contentChannelEnd - contentChannelCurrentPosition)
               <= readOptions.getMinRangeRequestSize()) {
 
@@ -465,46 +468,18 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private ReadableByteChannel initializeMetadataAndValidateChannel(
         ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
       try {
-        if (!metadataInitialized) {
-          logger.atFine().log(
-              "Metadata not initialized. Forcing lazy channel connection with 0-byte read for '%s'",
-              resourceId);
+        ReadableByteChannel channel =
+            metadataInitialized
+                ? readableByteChannel
+                : initializeMetadataFromFirstByte(readableByteChannel, bytesToRead);
 
-          // TODO: If the request starts past the end of the object, GCS answers OUT_OF_RANGE and
-          // this read never returns: GzipReadableByteChannel (enabled by
-          // shouldReturnRawInputStream(false)) waits for metadata that java-storage never
-          // publishes. Fix in java-storage, and here by reading non-gzip objects as raw streams
-          // and probing with 1 byte (a 0-byte read on a raw stream sends no request). See the
-          // review of #1835.
-          // The 0-byte read triggers the actual ReadObjectRequest over the network
-          readableByteChannel.read(ByteBuffer.allocate(0));
-          // Extract the headers to populate objectSize
-          ensureMetadataInitialized(readableByteChannel);
-
-          logger.atFiner().log(
-              "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
-
-          ReadableByteChannel eofChannel = validateEndOfFile(readableByteChannel);
-          if (eofChannel != null) {
-            return eofChannel;
-          }
-
-          ReadableByteChannel gzipChannel = handleGzipDiscovery(readableByteChannel, bytesToRead);
-          if (gzipChannel != null) {
-            return gzipChannel;
-          }
-        }
-
-        // TODO: Also clamp when contentChannelEnd > objectSize. RANDOM and AUTO_RANDOM pick a
-        // finite end while the size is unknown, so it is never clamped here and the footer cache
-        // in openByteChannel is skipped. See the review of #1835.
         if (contentChannelEnd == Long.MAX_VALUE && objectSize != -1) {
           contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
           logger.atFiner().log(
               "Recalculated contentChannelEnd to %d for '%s'", contentChannelEnd, resourceId);
         }
 
-        return readableByteChannel;
+        return channel;
 
       } catch (IOException | RuntimeException e) {
         logger.atWarning().withCause(e).log(
@@ -524,6 +499,41 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         // This prevents RuntimeExceptions (like NPEs) from being masked as IOExceptions!
         throw e;
       }
+    }
+
+    private ReadableByteChannel initializeMetadataFromFirstByte(
+        ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
+      logger.atFine().log(
+          "Metadata not initialized. Reading the first byte to get it for '%s'", resourceId);
+
+      // A 0-byte read does not trigger the gRPC stream on a raw channel; read 1 byte and prefix it.
+      ByteBuffer firstByte = ByteBuffer.allocate(1);
+      readableByteChannel.read(firstByte);
+      ensureMetadataInitialized(readableByteChannel);
+
+      logger.atFiner().log(
+          "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
+
+      ReadableByteChannel eofChannel = validateEndOfFile(readableByteChannel);
+      if (eofChannel != null) {
+        return eofChannel;
+      }
+
+      ReadableByteChannel gzipChannel = handleGzipDiscovery(readableByteChannel, bytesToRead);
+      if (gzipChannel != null) {
+        return gzipChannel;
+      }
+
+      if (contentChannelEnd != Long.MAX_VALUE && contentChannelEnd > objectSize) {
+        contentChannelEnd = objectSize;
+        logger.atFiner().log(
+            "Clamped contentChannelEnd to the object size %d for '%s'", objectSize, resourceId);
+      }
+
+      firstByte.flip();
+      return firstByte.hasRemaining()
+          ? new PrefixedReadableByteChannel(firstByte, readableByteChannel)
+          : readableByteChannel;
     }
 
     private ReadableByteChannel validateEndOfFile(ReadableByteChannel readableByteChannel)
@@ -552,15 +562,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private ReadableByteChannel handleGzipDiscovery(
         ReadableByteChannel readableByteChannel, long bytesToRead) throws IOException {
       if (gzipEncoded) {
-        if (currentPosition != 0) {
-          // We guessed the boundary wrong for a GZIP file. Reopen it properly.
-          readableByteChannel.close();
-          // Reset channel boundaries
-          contentChannelCurrentPosition = -1;
-          contentChannelEnd = -1;
-          return openByteChannel(bytesToRead);
-        }
-        contentChannelEnd = objectSize;
+        // Reopen from start with decompression enabled once gzip encoding is discovered.
+        readableByteChannel.close();
+        contentChannelCurrentPosition = -1;
+        contentChannelEnd = -1;
+        return openByteChannel(bytesToRead);
       }
       return null;
     }
@@ -829,8 +835,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private BlobSourceOption[] generateReadOptions(BlobId blobId) {
       List<BlobSourceOption> blobReadOptions = new ArrayList<>();
-      // To get decoded content
-      blobReadOptions.add(BlobSourceOption.shouldReturnRawInputStream(false));
+      // Use a raw stream unless the object is known to be gzip-encoded; GzipReadableByteChannel
+      // blocks indefinitely when a read starts past EOF (OUT_OF_RANGE).
+      blobReadOptions.add(BlobSourceOption.shouldReturnRawInputStream(!gzipEncoded));
 
       if (blobId.getGeneration() != null && blobId.getGeneration() > 0) {
         blobReadOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
@@ -867,6 +874,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private IOException convertError(Exception error) {
     String msg = String.format("Error reading '%s'", resourceId);
     GoogleCloudStorageEventBus.postOnException();
+    if (error instanceof EOFException) {
+      return (EOFException) error;
+    }
     switch (errorExtractor.getErrorType(error)) {
       case NOT_FOUND:
         return createFileNotFoundException(
@@ -902,6 +912,41 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       GoogleCloudStorageEventBus.postOnException();
       throw new ClosedChannelException();
+    }
+  }
+
+  /** A channel that returns the remaining bytes of {@code prefix} before those of a delegate. */
+  private static final class PrefixedReadableByteChannel implements ReadableByteChannel {
+
+    private final ByteBuffer prefix;
+    private final ReadableByteChannel delegate;
+
+    PrefixedReadableByteChannel(ByteBuffer prefix, ReadableByteChannel delegate) {
+      this.prefix = prefix;
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int read(ByteBuffer dst) throws IOException {
+      if (!prefix.hasRemaining()) {
+        return delegate.read(dst);
+      }
+      int bytesToCopy = min(prefix.remaining(), dst.remaining());
+      int limit = prefix.limit();
+      prefix.limit(prefix.position() + bytesToCopy);
+      dst.put(prefix);
+      prefix.limit(limit);
+      return bytesToCopy;
+    }
+
+    @Override
+    public boolean isOpen() {
+      return delegate.isOpen();
+    }
+
+    @Override
+    public void close() throws IOException {
+      delegate.close();
     }
   }
 
