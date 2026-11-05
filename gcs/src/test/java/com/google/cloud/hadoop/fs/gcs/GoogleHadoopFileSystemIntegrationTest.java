@@ -2793,10 +2793,10 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       verify(metrics, 1L, stats);
 
       outStream.hsync();
-      verify(metrics, 3L, stats);
+      verify(metrics, 1L, stats);
     }
 
-    metrics.merge(GCS_API_COUNT, 1L, Long::sum);
+    // close() discards the empty tail instead of composing it; its async deletion is not tracked.
     verify(metrics, stats);
 
     try (FSDataInputStream ignored = myghfs.open(testFilePath)) {
