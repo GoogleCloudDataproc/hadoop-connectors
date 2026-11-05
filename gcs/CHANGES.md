@@ -1,6 +1,9 @@
 # Release Notes
 
 ## Next
+1. Add `fs.gs.list.status.directory.first.enable` to list a path as a directory before looking it up as an object in `listStatus`
+
+## 4.0.0 - 2025-12-15
 1. Add listStatusStartingFrom API.
 
 1. Add AUTO_RANDOM as new fadvise mode.
