@@ -12,31 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Integration tests only; unit tests run in GitHub Actions (.github/workflows/presubmit.yml).
 steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
     id: 'docker-build'
     args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
 
-  # 2. Run unit tests
-  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
-    id: 'unit-tests'
-    waitFor: ['docker-build']
-    entrypoint: 'bash'
-    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'unittest']
-    env:
-      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
-      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
-      - 'VCS_COMMIT_ID=$COMMIT_SHA'
-      - 'VCS_TAG=$TAG_NAME'
-      - 'CI_BUILD_ID=$BUILD_ID'
-
-  # 3. Run integration tests concurrently with unit tests
+  # 2. Run integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests'
     waitFor: ['docker-build']
     entrypoint: 'bash'
-    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh']
     env:
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
