@@ -77,6 +77,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.InvocationIdContext;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
@@ -2521,6 +2523,55 @@ public class GoogleCloudStorageTest {
         .containsExactly(getBucketStorageLayoutRequestString(testHnsBucket))
         .inOrder();
     assertThat(result).isFalse();
+  }
+
+  /**
+   * buckets.getStorageLayout has no userProject field, so the billing project must be sent as the
+   * x-goog-user-project header, or isHnBucket fails on Requester Pays buckets.
+   */
+  @Test
+  public void testIsHnBucket_requesterPays_setsUserProjectHeader() throws Exception {
+    String billingProject = "requester-pays-billing-project";
+    GoogleCloudStorageOptions options =
+        GCS_OPTIONS.toBuilder()
+            .setRequesterPaysOptions(
+                RequesterPaysOptions.builder()
+                    .setMode(RequesterPaysMode.ENABLED)
+                    .setProjectId(billingProject)
+                    .build())
+            .build();
+    BucketStorageLayout layout =
+        new BucketStorageLayout()
+            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(true));
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(options, transport, trackingRequestInitializerWithRetries);
+
+    String testBucket = "hns-bucket-requester-pays";
+    boolean result = gcs.isHnBucket(new URI("gs://" + testBucket));
+
+    assertThat(result).isTrue();
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(getBucketStorageLayoutRequestString(testBucket));
+    HttpRequest request = trackingRequestInitializerWithRetries.getAllRequests().get(0);
+    assertThat(request.getHeaders().getFirstHeaderStringValue("x-goog-user-project"))
+        .isEqualTo(billingProject);
+  }
+
+  @Test
+  public void testIsHnBucket_requesterPaysDisabled_noUserProjectHeader() throws Exception {
+    BucketStorageLayout layout =
+        new BucketStorageLayout()
+            .setHierarchicalNamespace(new HierarchicalNamespace().setEnabled(true));
+    MockHttpTransport transport = mockTransport(jsonDataResponse(layout));
+    GoogleCloudStorage gcs =
+        mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
+
+    String testBucket = "hns-bucket-requester-pays-disabled";
+    gcs.isHnBucket(new URI("gs://" + testBucket));
+
+    HttpRequest request = trackingRequestInitializerWithRetries.getAllRequests().get(0);
+    assertThat(request.getHeaders().getFirstHeaderStringValue("x-goog-user-project")).isNull();
   }
 
   @Test
