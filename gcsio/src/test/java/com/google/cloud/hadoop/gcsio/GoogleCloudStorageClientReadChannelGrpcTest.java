@@ -77,6 +77,7 @@ public class GoogleCloudStorageClientReadChannelGrpcTest {
           channel.position(OBJECT_SIZE + 1);
 
           assertThrows(EOFException.class, () -> channel.read(ByteBuffer.allocate(10)));
+          assertThrows(EOFException.class, () -> channel.read(ByteBuffer.allocate(10)));
         });
     assertThat(fakeStorage.getObjectCalls()).isEqualTo(1);
   }

@@ -1049,6 +1049,8 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(thrown)
         .hasMessageThat()
         .contains("Invalid seek offset: position value (15) must be between 0 and 10");
+    // Metadata is known now, a retry at the same position fails the same way.
+    assertThrows(EOFException.class, () -> readChannel.read(buffer));
 
     assertThat(readChannel.size()).isEqualTo(10L);
 
@@ -1168,6 +1170,79 @@ public class GoogleCloudStorageClientReadChannelTest {
     assertThat(readChannel.read(footer)).isEqualTo(8);
     verifyContent(footer, footerPosition, 8);
     verify(mockedStorage, times(1)).reader(any(), any());
+  }
+
+  @Test
+  public void read_lazyMetadata_pastObjectEndAfterSizeFetched_throwsEofException()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setFadvise(Fadvise.AUTO)
+            .build();
+    readChannel = newLazyMetadataChannel(readOptions);
+    readChannel.position(OBJECT_SIZE + 1);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+
+    assertThrows(EOFException.class, () -> readChannel.read(ByteBuffer.allocate(10)));
+    verify(mockedStorage, times(0)).reader(any(), any());
+  }
+
+  @Test
+  public void read_knownSize_randomReadOnObjectSmallerThanRangeRequest_cachesFooter()
+      throws Exception {
+    int objectSize = CHUNK_SIZE / 2;
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ objectSize,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+    readChannel = getJavaStorageChannel(itemInfo, DEFAULT_READ_OPTION);
+
+    int position = objectSize - 8;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(8);
+    assertThat(readChannel.read(buffer)).isEqualTo(8);
+    verifyContent(buffer, position, 8);
+    verify(fakeReadChannel).seek(0);
+    verify(fakeReadChannel).limit(objectSize);
+
+    readChannel.position(100);
+    ByteBuffer cached = ByteBuffer.allocate(8);
+    assertThat(readChannel.read(cached)).isEqualTo(8);
+    verifyContent(cached, 100, 8);
+    verify(mockedStorage, times(1)).reader(any(), any());
+  }
+
+  @Test
+  public void read_gzipEncodedItemInfo_overridesRandomAccessPattern() throws Exception {
+    GoogleCloudStorageItemInfo gzipItemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "gzip",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+    readChannel =
+        getJavaStorageChannel(
+            gzipItemInfo,
+            DEFAULT_READ_OPTION.toBuilder().setGzipEncodingSupportEnabled(true).build());
+
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(10);
+
+    assertThat(readChannel.randomAccessStatus()).isFalse();
   }
 
   // A fake ReadChannel that mimics StorageReadChannel by having a getObject method
