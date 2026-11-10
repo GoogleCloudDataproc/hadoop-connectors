@@ -79,8 +79,9 @@
     <google.cloud.library.bom.version>26.56.0</google.cloud.library.bom.version>
     <google.error-prone.version>2.16</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
-    <google.guava.version>33.1.0-jre</google.guava.version>
+    <google.guava.version>33.7.2-jre</google.guava.version>
     <google.java-format.version>1.15.0</google.java-format.version>
+    <grpc.version>1.85.1</grpc.version>
     <hadoop.version>3.3.6</hadoop.version>
     <opencensus.version>0.31.1</opencensus.version>
 
@@ -275,6 +276,14 @@
         <groupId>com.google.api-client</groupId>
         <artifactId>google-api-client-gson</artifactId>
         <version>${google.api-client-libraries.version}</version>
+      </dependency>
+      <!-- Imported before libraries-bom so that its gRPC version takes precedence. -->
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
