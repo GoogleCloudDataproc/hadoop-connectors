@@ -1,6 +1,8 @@
 # Release Notes
 
 ## Next
+
+## 3.1.22 - 2026-11-11
 1. Upgrade gRPC to 1.85.1 (Netty 4.2.17) and Guava to 33.7.2-jre to fix CVE-2026-75595 and CVE-2026-102554.
 1. Scope the connector invocation ID to operations, streams, and thread pools and make it unique per HTTP request.
 1. Do not compose an empty tail component on `hsync()`/`close()`. This removes two requests per
