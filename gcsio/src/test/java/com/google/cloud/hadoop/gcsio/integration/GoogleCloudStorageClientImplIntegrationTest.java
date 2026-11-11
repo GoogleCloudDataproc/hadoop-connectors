@@ -40,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -97,7 +98,11 @@ public class GoogleCloudStorageClientImplIntegrationTest {
   @BeforeClass
   public static void before() throws IOException {
     helperGcs = GoogleCloudStorageTestHelper.createGcsClientImpl();
-    helperGcs.createBucket(TEST_BUCKET);
+    try {
+      helperGcs.createBucket(TEST_BUCKET);
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
   }
 
   @AfterClass

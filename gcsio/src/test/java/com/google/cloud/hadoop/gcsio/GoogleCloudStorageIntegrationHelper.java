@@ -42,6 +42,7 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -124,6 +125,16 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       sharedBucketName1 = cachedSharedBucketName1;
       sharedBucketName2 = cachedSharedBucketName2;
     }
+    // Warm the static HNS cache so per-test request tracking does not depend on test execution
+    // order.
+    getStorage()
+        .isHnBucket(
+            UriPaths.fromStringPathComponents(
+                sharedBucketName1, /* objectName= */ null, /* allowEmptyObjectName= */ true));
+    getStorage()
+        .isHnBucket(
+            UriPaths.fromStringPathComponents(
+                sharedBucketName2, /* objectName= */ null, /* allowEmptyObjectName= */ true));
   }
 
   private String ensureReusableBucket(String cachedBucketName, String suffix, boolean isZonal)
@@ -599,13 +610,21 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   /** Creates a bucket and adds it to the list of buckets to delete at the end of tests. */
   public String createUniqueBucket(String suffix) throws IOException {
     String bucketName = getUniqueBucketName(suffix);
-    mkdir(bucketName);
+    try {
+      mkdir(bucketName);
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
     return bucketName;
   }
 
   public String createUniqueBucket(String suffix, CreateBucketOptions options) throws IOException {
     String bucketName = getUniqueBucketName(suffix);
-    gcs.createBucket(bucketName, options);
+    try {
+      gcs.createBucket(bucketName, options);
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
     return bucketName;
   }
 

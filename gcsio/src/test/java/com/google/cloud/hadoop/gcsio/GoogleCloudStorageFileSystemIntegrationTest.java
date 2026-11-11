@@ -568,13 +568,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testWriteAndReadObject() throws IOException {
     String bucketName = sharedBucketName1;
+    String testObjectName = gcsiHelper.getUniqueObjectName("write-and-read-object");
     String message = "Hello world!\n";
 
     // Write an object.
-    int numBytesWritten = gcsiHelper.writeTextFile(bucketName, objectName, message);
+    int numBytesWritten = gcsiHelper.writeTextFile(bucketName, testObjectName, message);
 
     // Read the whole object.
-    String message2 = gcsiHelper.readTextFile(bucketName, objectName, 0, numBytesWritten, true);
+    String message2 = gcsiHelper.readTextFile(bucketName, testObjectName, 0, numBytesWritten, true);
 
     // Verify we read what we wrote.
     assertThat(message2).isEqualTo(message);
@@ -584,16 +585,18 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testReadPartialObject() throws IOException {
     String bucketName = sharedBucketName1;
+    String testObjectName = gcsiHelper.getUniqueObjectName("read-partial-object");
     String message = "Hello world!\n";
 
     // Write an object.
-    gcsiHelper.writeTextFile(bucketName, objectName, message);
+    gcsiHelper.writeTextFile(bucketName, testObjectName, message);
 
     // Read the whole object in 2 parts.
     int offset = 6; // chosen arbitrarily.
-    String message1 = gcsiHelper.readTextFile(bucketName, objectName, 0, offset, false);
+    String message1 = gcsiHelper.readTextFile(bucketName, testObjectName, 0, offset, false);
     String message2 =
-        gcsiHelper.readTextFile(bucketName, objectName, offset, message.length() - offset, true);
+        gcsiHelper.readTextFile(
+            bucketName, testObjectName, offset, message.length() - offset, true);
 
     // Verify we read what we wrote.
     assertWithMessage("partial read mismatch")
