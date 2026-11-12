@@ -141,6 +141,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final int MIN_LISTED_FILES_FROM_OFFSET = 2;
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
+  private static final String USER_PROJECT_HEADER_NAME = "x-goog-user-project";
 
   static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
       CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
@@ -2947,6 +2948,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Field userProjectField = request.getClassInfo().getField(USER_PROJECT_FIELD_NAME);
     if (userProjectField != null) {
       request.set(USER_PROJECT_FIELD_NAME, projectId);
+    } else {
+      // Some requests (e.g. buckets.getStorageLayout, used by isHnBucket) have no userProject
+      // field. The JSON API also takes the billing project as the x-goog-user-project header;
+      // without it, requests to a Requester Pays bucket fail with "Bucket is a requester pays
+      // bucket but no user project provided."
+      request.getRequestHeaders().set(USER_PROJECT_HEADER_NAME, projectId);
     }
   }
 
