@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 4.0.10 - 2026-11-12
 1. Fix gRPC fast-fail disabled read failures when Vectored IO is enabled.
 1. Scope the connector invocation ID to operations, streams, and thread pools and make it unique per HTTP request.
 1. Upgrade gRPC to 1.85.1 (Netty 4.2.17), libraries-bom to 26.93.0 and Guava to 33.7.2-jre to fix CVE-2026-75595 and CVE-2026-102554.
