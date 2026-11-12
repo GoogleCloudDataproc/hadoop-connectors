@@ -3,7 +3,13 @@
 ## Next
 1. Add `fs.gs.list.status.directory.first.enable` to list a path as a directory before looking it up as an object in `listStatus`
 
-## 4.0.0 - 2025-12-15
+1. Upgrade gRPC to 1.85.1 (Netty 4.2.17), libraries-bom to 26.93.0 and Guava to 33.7.2-jre to fix
+   CVE-2026-75595 and CVE-2026-102554.
+
+1. Do not compose an empty tail component on `hsync()`/`close()`. This removes two requests per
+   file for the `write, hsync, close` sequence and the spurious `412 Precondition Failed` that a
+   retried compose could produce.
+
 1. Add listStatusStartingFrom API.
 
 1. Add AUTO_RANDOM as new fadvise mode.
