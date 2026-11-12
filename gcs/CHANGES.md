@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 4.0.10 - 2026-11-12
 1. Fix gRPC fast-fail disabled read failures when Vectored IO is enabled.
 1. Scope the connector invocation ID to operations, streams, and thread pools and make it unique per HTTP request.
