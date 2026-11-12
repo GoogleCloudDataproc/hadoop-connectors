@@ -44,6 +44,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
@@ -255,6 +256,80 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     assertThat(optionsCaptor.getAllValues())
         .doesNotContain(BlobSourceOption.generationMatch(generation));
+  }
+
+  @Test
+  public void read_objectNotGzipEncoded_requestsRawStream() throws IOException {
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
+
+    assertThat(optionsCaptor.getAllValues())
+        .contains(BlobSourceOption.shouldReturnRawInputStream(true));
+  }
+
+  @Test
+  public void read_gzipEncodedObject_requestsDecompressedStream() throws IOException {
+    GoogleCloudStorageItemInfo gzipItemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "gzip",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+    readChannel =
+        getJavaStorageChannel(
+            gzipItemInfo,
+            DEFAULT_READ_OPTION.toBuilder().setGzipEncodingSupportEnabled(true).build());
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage).reader(any(BlobId.class), optionsCaptor.capture());
+
+    assertThat(optionsCaptor.getAllValues())
+        .contains(BlobSourceOption.shouldReturnRawInputStream(false));
+  }
+
+  @Test
+  public void read_lazyMetadata_requestsDecompressedStreamOnceGzipEncodingIsKnown()
+      throws IOException {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setGzipEncodingSupportEnabled(true)
+            .build();
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlob.getContentEncoding()).thenReturn("gzip");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockedStorage.get(any(BlobId.class), any())).thenReturn(mockBlob);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            /* itemInfo= */ null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    readChannel.read(ByteBuffer.allocate(1));
+
+    ArgumentCaptor<BlobSourceOption> optionsCaptor =
+        ArgumentCaptor.forClass(BlobSourceOption.class);
+    verify(mockedStorage, times(2)).reader(any(BlobId.class), optionsCaptor.capture());
+    assertThat(optionsCaptor.getAllValues())
+        .containsAtLeast(
+            BlobSourceOption.shouldReturnRawInputStream(true),
+            BlobSourceOption.shouldReturnRawInputStream(false))
+        .inOrder();
   }
 
   @Test
@@ -843,7 +918,8 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     int bytesRead = readChannel.read(buffer);
 
-    assertThat(bytesRead).isEqualTo(0);
+    assertThat(bytesRead).isEqualTo(-1);
+    assertThat(readChannel.read(buffer)).isEqualTo(-1);
     assertThat(readChannel.size()).isEqualTo(0L);
   }
 
@@ -968,16 +1044,205 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     // Once read() is called, the lazy fetch retrieves the actual size (10L).
     // validateEndOfFile will realize position (15) > objectSize (10) and throw an EOFException.
-    IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-
-    assertThat(thrown).hasCauseThat().isInstanceOf(EOFException.class);
+    EOFException thrown = assertThrows(EOFException.class, () -> readChannel.read(buffer));
 
     assertThat(thrown)
-        .hasCauseThat()
         .hasMessageThat()
         .contains("Invalid seek offset: position value (15) must be between 0 and 10");
+    // Metadata is known now, a retry at the same position fails the same way.
+    assertThrows(EOFException.class, () -> readChannel.read(buffer));
 
     assertThat(readChannel.size()).isEqualTo(10L);
+
+    readChannel.position(2);
+    ByteBuffer content = ByteBuffer.allocate(3);
+    assertThat(readChannel.read(content)).isEqualTo(3);
+    assertThat(new String(content.array(), StandardCharsets.UTF_8)).isEqualTo("234");
+  }
+
+  @Test
+  public void read_lazyMetadata_firstReadAtObjectEnd_returnsMinusOne() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+    readChannel = newLazyMetadataChannel(readOptions);
+
+    readChannel.position(OBJECT_SIZE);
+
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(-1);
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(-1);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+  }
+
+  @Test
+  public void read_lazyMetadata_footerReadAfterReadAtObjectEnd_returnsFooterBytes()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+    readChannel = newLazyMetadataChannel(readOptions);
+    readChannel.position(OBJECT_SIZE);
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(-1);
+
+    int position = OBJECT_SIZE - 8;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(8);
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(8);
+    verifyContent(buffer, position, 8);
+  }
+
+  @Test
+  public void read_gzipEncoded_readAtEndOfStream_returnsMinusOne() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("0123456789");
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(
+                content, ImmutableList.of(REQUEST_TYPE.READ_CHUNK, REQUEST_TYPE.NEGATIVE_READ)));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    GoogleCloudStorageItemInfo gzipItemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ content.size(),
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "gzip",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+    readChannel =
+        getJavaStorageChannel(
+            gzipItemInfo,
+            DEFAULT_READ_OPTION.toBuilder().setGzipEncodingSupportEnabled(true).build());
+
+    assertThat(readChannel.read(ByteBuffer.allocate(content.size()))).isEqualTo(content.size());
+
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(-1);
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(-1);
+  }
+
+  @Test
+  public void read_lazyMetadata_gzipEncodedFromStart_reopensWholeObject() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setGzipEncodingSupportEnabled(true)
+            .build();
+    Blob mockBlob = mock(Blob.class);
+    when(mockBlob.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlob.getContentEncoding()).thenReturn("gzip");
+    when(mockBlob.getGeneration()).thenReturn(1L);
+    when(mockedStorage.get(any(BlobId.class), any())).thenReturn(mockBlob);
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            /* itemInfo= */ null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+
+    ByteBuffer buffer = ByteBuffer.allocate(100);
+    int bytesRead = readChannel.read(buffer);
+
+    assertThat(bytesRead).isEqualTo(100);
+    verifyContent(buffer, 0, 100);
+    verify(mockedStorage, times(2)).reader(any(), any());
+    verify(fakeReadChannel).limit(Long.MAX_VALUE);
+  }
+
+  @Test
+  public void read_lazyMetadata_randomReadNearObjectEnd_cachesFooter() throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+    readChannel = newLazyMetadataChannel(readOptions);
+
+    int position = OBJECT_SIZE - 100;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    assertThat(readChannel.read(buffer)).isEqualTo(10);
+    verifyContent(buffer, position, 10);
+
+    int footerPosition = OBJECT_SIZE - 8;
+    readChannel.position(footerPosition);
+    ByteBuffer footer = ByteBuffer.allocate(8);
+    assertThat(readChannel.read(footer)).isEqualTo(8);
+    verifyContent(footer, footerPosition, 8);
+    verify(mockedStorage, times(1)).reader(any(), any());
+  }
+
+  @Test
+  public void read_lazyMetadata_pastObjectEndAfterSizeFetched_throwsEofException()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder()
+            .setFastFailOnNotFoundEnabled(false)
+            .setFadvise(Fadvise.AUTO)
+            .build();
+    readChannel = newLazyMetadataChannel(readOptions);
+    readChannel.position(OBJECT_SIZE + 1);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+
+    assertThrows(EOFException.class, () -> readChannel.read(ByteBuffer.allocate(10)));
+    verify(mockedStorage, times(0)).reader(any(), any());
+  }
+
+  @Test
+  public void read_knownSize_randomReadOnObjectSmallerThanRangeRequest_cachesFooter()
+      throws Exception {
+    int objectSize = CHUNK_SIZE / 2;
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ objectSize,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "text",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+    readChannel = getJavaStorageChannel(itemInfo, DEFAULT_READ_OPTION);
+
+    int position = objectSize - 8;
+    readChannel.position(position);
+    ByteBuffer buffer = ByteBuffer.allocate(8);
+    assertThat(readChannel.read(buffer)).isEqualTo(8);
+    verifyContent(buffer, position, 8);
+    verify(fakeReadChannel).seek(0);
+    verify(fakeReadChannel).limit(objectSize);
+
+    readChannel.position(100);
+    ByteBuffer cached = ByteBuffer.allocate(8);
+    assertThat(readChannel.read(cached)).isEqualTo(8);
+    verifyContent(cached, 100, 8);
+    verify(mockedStorage, times(1)).reader(any(), any());
+  }
+
+  @Test
+  public void read_gzipEncodedItemInfo_overridesRandomAccessPattern() throws Exception {
+    GoogleCloudStorageItemInfo gzipItemInfo =
+        GoogleCloudStorageItemInfo.createObject(
+            RESOURCE_ID,
+            /* creationTime= */ 10L,
+            /* modificationTime= */ 15L,
+            /* size= */ OBJECT_SIZE,
+            /* contentType= */ "text/plain",
+            /* contentEncoding= */ "gzip",
+            /* metadata= */ null,
+            /* contentGeneration= */ 1,
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
+    readChannel =
+        getJavaStorageChannel(
+            gzipItemInfo,
+            DEFAULT_READ_OPTION.toBuilder().setGzipEncodingSupportEnabled(true).build());
+
+    assertThat(readChannel.read(ByteBuffer.allocate(10))).isEqualTo(10);
+
+    assertThat(readChannel.randomAccessStatus()).isFalse();
   }
 
   // A fake ReadChannel that mimics StorageReadChannel by having a getObject method
