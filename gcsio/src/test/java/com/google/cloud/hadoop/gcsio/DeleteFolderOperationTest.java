@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
@@ -152,7 +151,9 @@ public class DeleteFolderOperationTest {
   }
 
   private void addFolders(List<FolderInfo> foldersToDelete, String curFolderName) {
-    Random r = new Random();
+    // Use a counter instead of random names so that sibling folders never collide; duplicate
+    // folder paths would make the number of unique folders differ from foldersToDelete.size().
+    int nextFolderId = 0;
     Queue<String> q = new ArrayDeque<>();
     q.add(curFolderName);
 
@@ -162,8 +163,8 @@ public class DeleteFolderOperationTest {
       if (foldersToDelete.size() > 2000) return;
 
       for (int i = 0; i < 3; i++) {
-        long nextFolderName = r.nextInt(100000);
-        q.add(top + nextFolderName + "/");
+        q.add(top + nextFolderId + "/");
+        nextFolderId++;
       }
     }
   }
