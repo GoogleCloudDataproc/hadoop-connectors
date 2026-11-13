@@ -15,3 +15,13 @@
 ignore:
   - ".*/generated-sources/.*"
   - ".*/testing/.*"
+
+# `unittest` is uploaded on every commit (GitHub Actions), `integrationtest` only
+# on commits where `/gcbrun` ran (Cloud Build); carry a flag forward when a
+# commit has no new upload for it.
+flag_management:
+  individual_flags:
+    - name: unittest
+      carryforward: true
+    - name: integrationtest
+      carryforward: true
