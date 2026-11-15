@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add `fs.gs.list.status.directory.first.enable` to list a path as a directory before looking it up as an object in `listStatus`
 
 ## 4.0.10 - 2026-11-12
 1. Fix gRPC fast-fail disabled read failures when Vectored IO is enabled.
