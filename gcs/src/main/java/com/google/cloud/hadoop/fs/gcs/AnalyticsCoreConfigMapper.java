@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
@@ -37,6 +38,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.StringUtils.TraditionalBinaryPrefix;
 
 /** Maps GCS Hadoop Connector configurations to GCS Analytics Core configurations. */
 final class AnalyticsCoreConfigMapper {
@@ -82,6 +84,8 @@ final class AnalyticsCoreConfigMapper {
   static final String PROXY_ADDRESS_KEY = "analytics-core.auth.proxy.address";
   static final String PROXY_USERNAME_KEY = "analytics-core.auth.proxy.username";
   static final String PROXY_PASSWORD_KEY = "analytics-core.auth.proxy.password";
+  static final String HTTP_CONNECT_TIMEOUT_KEY = "analytics-core.auth.http.connect-timeout-ms";
+  static final String HTTP_READ_TIMEOUT_KEY = "analytics-core.auth.http.read-timeout-ms";
 
   private static final String WORKLOAD_IDENTITY_FEDERATION_VALUE = "WORKLOAD_IDENTITY_FEDERATION";
 
@@ -155,7 +159,14 @@ final class AnalyticsCoreConfigMapper {
               HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX.getKey())
           .withPrefixes(KEY_PREFIXES);
 
-  private static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
+  private static final HadoopConfigurationProperty<Long> HTTP_READ_TIMEOUT =
+      new HadoopConfigurationProperty<>(
+              HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX.getKey(),
+              HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX.getDefault())
+          .withPrefixes(KEY_PREFIXES);
+
+  @VisibleForTesting
+  static final ImmutableMap<String, String> HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS =
       ImmutableMap.<String, String>builder()
           .put(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), PROJECT_ID_KEY)
           .put(GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL.getKey(), SERVICE_HOST_KEY)
@@ -207,6 +218,31 @@ final class AnalyticsCoreConfigMapper {
               GoogleHadoopFileSystemConfiguration.GCS_UNIVERSE_DOMAIN.getKey(), UNIVERSE_DOMAIN_KEY)
           .build();
 
+  /**
+   * Connector keys read with {@link Configuration#getLongBytes}, whose values may carry a binary
+   * prefix (e.g. {@code 8m}, as set by Hadoop 3.5's {@code core-default.xml}) and must be converted
+   * to a plain byte count before being handed to Analytics Core.
+   *
+   * <p>Keep in sync with the {@code getLongBytes} readers in {@link
+   * GoogleHadoopFileSystemConfiguration}. Every key here must also be present in {@link
+   * #HADOOP_TO_ANALYTICS_CORE_KEY_MAPPINGS} (enforced by a unit test). Keys read with {@code
+   * getInt} (e.g. {@code fs.gs.vectored.read.threads}) are deliberately excluded, since the
+   * connector itself rejects binary prefixes for them.
+   *
+   * <p>Note: Analytics Core 1.6.0 parses all of these options as {@code int}, so converted values
+   * above {@link Integer#MAX_VALUE} (e.g. {@code 4g}) are rejected by Analytics Core even though
+   * the connector accepts them as {@code long}.
+   */
+  @VisibleForTesting
+  static final ImmutableSet<String> BYTE_SIZE_KEYS =
+      ImmutableSet.of(
+          GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_RANGE_MIN_SEEK.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_VECTORED_READ_MERGED_RANGE_MAX_SIZE.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(),
+          GoogleHadoopFileSystemConfiguration.GCS_PCU_BUFFER_CAPACITY.getKey());
+
   private AnalyticsCoreConfigMapper() {
     // Utility class
   }
@@ -218,7 +254,29 @@ final class AnalyticsCoreConfigMapper {
    * <p>Auth and proxy settings are translated from their connector spelling ({@code fs.gs.auth.*},
    * {@code fs.gs.proxy.*}, {@code fs.gs.token.server.url}) to the {@code analytics-core.auth.*}
    * keys, resolving JCEKS secrets and impersonation the same way the connector does. Auth keys set
-   * directly in the Analytics Core spelling are ignored.
+   * directly in the Analytics Core spelling are ignored. The HTTP timeouts are always mapped, so
+   * Analytics Core uses the same timeouts as the connector.
+   *
+   * <p>When Analytics Core builds credentials and transports from these mapped keys instead of
+   * {@link HadoopCredentialsConfiguration}, the following behavior differences apply:
+   *
+   * <ul>
+   *   <li>{@code UNAUTHENTICATED} builds unauthenticated credentials instead of failing with a
+   *       {@code NullPointerException}.
+   *   <li>{@code fs.gs.token.server.url} uses the JVM default trust store instead of Google's
+   *       bundled {@code google.p12} trust store. Empty or whitespace-only URLs are treated as
+   *       unset, and {@code APPLICATION_DEFAULT} logs a warning if the resolved credential ignores
+   *       the URL.
+   *   <li>{@code fs.gs.http.connect-timeout} and {@code fs.gs.http.read-timeout} also apply to
+   *       Analytics Core's HTTP data plane. Negative values fail at initialization on all Analytics
+   *       Core paths, and values above {@link Integer#MAX_VALUE} ms fail on HTTP or Analytics Core
+   *       credential transports.
+   *   <li>Missing service-account keyfiles or Workload Identity Federation files throw {@link
+   *       java.nio.file.NoSuchFileException} (an {@link IOException}) instead of {@link
+   *       java.io.FileNotFoundException}.
+   *   <li>Leading and trailing whitespace is trimmed from file paths, OAuth client secrets, refresh
+   *       tokens, and proxy passwords.
+   * </ul>
    *
    * @param config The Hadoop configuration.
    * @param prefix The prefix used for Analytics Core properties (e.g., "fs.gs.").
@@ -273,6 +331,7 @@ final class AnalyticsCoreConfigMapper {
 
     removeSweptAuthKeys(mappedProperties, prefix);
     mapProxyConfigs(config, prefix, mappedProperties);
+    mapHttpTimeouts(config, prefix, mappedProperties);
     mapAuthIdentityConfigs(config, prefix, mappedProperties);
 
     return mappedProperties;
@@ -341,6 +400,16 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
+   * Returns whether a Hadoop token plugin ({@code ACCESS_TOKEN_PROVIDER} or a delegation token
+   * binding) supplies the identity, in which case the connector builds the credentials itself.
+   */
+  static boolean usesHadoopTokenProvider(Configuration config) {
+    return AUTHENTICATION_TYPE.get(config, config::getEnum)
+            == AuthenticationType.ACCESS_TOKEN_PROVIDER
+        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get));
+  }
+
+  /**
    * Maps {@code fs.gs.encryption.key} via {@code getPassword} so JCEKS secrets are resolved for
    * both CSEK reads and writes.
    */
@@ -363,6 +432,23 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
+   * Maps the HTTP timeouts in milliseconds. {@code 0} means no timeout in both the connector and
+   * Analytics Core.
+   */
+  private static void mapHttpTimeouts(
+      Configuration config, String prefix, Map<String, String> map) {
+    map.put(
+        prefix + HTTP_CONNECT_TIMEOUT_KEY,
+        Long.toString(
+            GoogleHadoopFileSystemConfiguration.GCS_HTTP_CONNECT_TIMEOUT
+                .getTimeDuration(config)
+                .toMillis()));
+    map.put(
+        prefix + HTTP_READ_TIMEOUT_KEY,
+        Long.toString(HTTP_READ_TIMEOUT.getTimeDuration(config).toMillis()));
+  }
+
+  /**
    * Maps the auth type and only the keys that type uses, so secrets of other auth types left in a
    * shared cluster config are not forwarded. {@code ACCESS_TOKEN_PROVIDER} and delegation tokens
    * are Hadoop-only plugins and map to nothing; the connector keeps building those credentials
@@ -370,11 +456,10 @@ final class AnalyticsCoreConfigMapper {
    */
   private static void mapAuthIdentityConfigs(
       Configuration config, String prefix, Map<String, String> map) {
-    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
-    if (authType == AuthenticationType.ACCESS_TOKEN_PROVIDER
-        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+    if (usesHadoopTokenProvider(config)) {
       return;
     }
+    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
     map.put(prefix + AUTH_TYPE_KEY, toAnalyticsCoreAuthType(authType));
 
     switch (authType) {
@@ -410,7 +495,11 @@ final class AnalyticsCoreConfigMapper {
       Optional<String> impersonationServiceAccount =
           HadoopCredentialsConfiguration.getImpersonationServiceAccount(config, GCS_CONFIG_PREFIX);
       impersonationServiceAccount.ifPresent(
-          account -> map.put(prefix + IMPERSONATION_SERVICE_ACCOUNT_KEY, account));
+          account -> {
+            checkArgument(
+                !account.trim().isEmpty(), "Impersonation service account must not be blank");
+            map.put(prefix + IMPERSONATION_SERVICE_ACCOUNT_KEY, account);
+          });
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to resolve impersonation service account", e);
     }
@@ -469,7 +558,10 @@ final class AnalyticsCoreConfigMapper {
       String hadoopKey, Map<String, String> map, String analyticsCoreKey) {
     String value = map.remove(hadoopKey);
     if (value != null) {
-      if (hadoopKey.equals(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
+      if (BYTE_SIZE_KEYS.contains(hadoopKey)) {
+        value = toBytes(hadoopKey, value);
+      } else if (hadoopKey.equals(
+          GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_FADVISE.getKey())) {
         value = toFileAccessPattern(value);
       } else if (hadoopKey.equals(
           GoogleHadoopFileSystemConfiguration.GCS_CLIENT_UPLOAD_TYPE.getKey())) {
@@ -479,6 +571,31 @@ final class AnalyticsCoreConfigMapper {
         value = toPartFileCleanupType(value);
       }
       map.put(analyticsCoreKey, value);
+    }
+  }
+
+  /**
+   * Converts a byte-size value that may carry a binary prefix (e.g. {@code 8m}, as set by Hadoop
+   * 3.5's {@code core-default.xml}) to a plain byte count, the same way the connector reads these
+   * keys via {@link Configuration#getLongBytes}. Analytics Core parses these values with {@link
+   * Integer#parseInt} and does not understand binary prefixes.
+   *
+   * <p>Malformed values throw {@link IllegalArgumentException} naming the key, for parity with
+   * {@code Configuration#getLongBytes}, which also fails on malformed input. Unlike the enum
+   * helpers below, this intentionally does <em>not</em> fall back to a default: a silently
+   * defaulted buffer or chunk size is an invisible performance cliff.
+   */
+  private static String toBytes(String hadoopKey, String value) {
+    try {
+      return String.valueOf(TraditionalBinaryPrefix.string2long(value.trim()));
+    } catch (RuntimeException e) {
+      // string2long surfaces IllegalArgumentException, NumberFormatException or
+      // StringIndexOutOfBoundsException (empty value); none of them name the key.
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid byte-size value '%s' for key %s (expected e.g. 8388608 or 8m)",
+              value, hadoopKey),
+          e);
     }
   }
 
