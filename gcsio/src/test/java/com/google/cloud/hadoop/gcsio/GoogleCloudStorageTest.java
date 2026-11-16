@@ -120,6 +120,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -176,6 +177,13 @@ public class GoogleCloudStorageTest {
             /* replaceRequestParams= */ false);
     trackingRequestInitializerWithoutRetries =
         new TrackingHttpRequestInitializer(/* replaceRequestParams= */ false);
+  }
+
+  @After
+  public void tearDown() {
+    // Some tests exercise code paths that re-assert the thread's interrupt status. Clear it so it
+    // does not leak into subsequent tests, which all run on the same thread.
+    Thread.interrupted();
   }
 
   private static StorageObject getStorageObjectForEmptyObjectWithMetadata(
@@ -1360,6 +1368,8 @@ public class GoogleCloudStorageTest {
         assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
     assertThat(thrown).hasMessageThat().isEqualTo("read IOException");
     assertThat(thrown.getSuppressed()).isEqualTo(new Throwable[] {sleepException});
+    // The read channel restores the interrupt status; this also clears it.
+    assertThat(Thread.interrupted()).isTrue();
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
@@ -4236,12 +4246,18 @@ public class GoogleCloudStorageTest {
 
   static StorageObject newStorageObject(String bucketName, String objectName) {
     Random r = new Random();
+    // Keep the size well above the footer prefetch threshold (GoogleCloudStorageReadOptions
+    // minRangeRequestSize, 2 MiB by default): smaller objects switch the read channel to a
+    // different code path, which the mocked responses in the tests do not account for. 4 MiB
+    // leaves headroom above that threshold.
+    int minSize = 4 * 1024 * 1024;
     return new StorageObject()
         .setBucket(bucketName)
         .setName(objectName)
-        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
+        .setSize(BigInteger.valueOf(minSize + r.nextInt(Integer.MAX_VALUE - minSize)))
         .setStorageClass("standard")
-        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
+        // Generation 0 is not a valid object generation.
+        .setGeneration(1L + r.nextInt(Integer.MAX_VALUE - 1))
         .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
         .setTimeCreated(new DateTime(new Date()))
         .setUpdated(new DateTime(new Date()));
