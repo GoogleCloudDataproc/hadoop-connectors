@@ -39,40 +39,70 @@ import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
 
 final class MockStorage extends StorageImplBase {
 
-  private List<AbstractMessage> requests;
-  private Queue<java.lang.Object> responses;
+  // gRPC server handlers run concurrently on server threads, so both collections must be
+  // thread-safe.
+  private final List<AbstractMessage> requests = Collections.synchronizedList(new ArrayList<>());
+  private final List<java.lang.Object> responses = new ArrayList<>();
 
-  public MockStorage() {
-    requests = new ArrayList<>();
-    responses = new LinkedList<>();
-  }
+  public MockStorage() {}
 
+  /** Returns a snapshot of the requests received so far. */
   public List<AbstractMessage> getRequests() {
-    return requests;
+    synchronized (requests) {
+      return new ArrayList<>(requests);
+    }
   }
 
   public void addResponse(AbstractMessage response) {
-    responses.add(response);
+    synchronized (responses) {
+      responses.add(response);
+    }
   }
 
   public void addException(Exception exception) {
-    responses.add(exception);
+    synchronized (responses) {
+      responses.add(exception);
+    }
   }
 
   public void reset() {
-    requests = new ArrayList<>();
-    responses = new LinkedList<>();
+    requests.clear();
+    synchronized (responses) {
+      responses.clear();
+    }
+  }
+
+  /**
+   * Returns the next queued response matching {@code expectedType}, or the next queued {@link
+   * Exception} when no response of {@code expectedType} is queued. This allows multi-threaded batch
+   * operations that issue multiple RPC types per item (e.g., {@code GetBucket} -> {@code
+   * WriteObject} -> {@code GetObject}) to consume their matching responses deterministically
+   * regardless of thread scheduling.
+   */
+  private java.lang.Object pollResponse(Class<? extends AbstractMessage> expectedType) {
+    synchronized (responses) {
+      boolean hasExpectedType = responses.stream().anyMatch(expectedType::isInstance);
+      Iterator<java.lang.Object> it = responses.iterator();
+      while (it.hasNext()) {
+        java.lang.Object item = it.next();
+        if (expectedType.isInstance(item) || (!hasExpectedType && item instanceof Exception)) {
+          it.remove();
+          return item;
+        }
+      }
+      return responses.isEmpty() ? null : responses.remove(0);
+    }
   }
 
   @Override
   public void createBucket(CreateBucketRequest request, StreamObserver<Bucket> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Bucket.class);
     if (response instanceof Bucket) {
       requests.add(request);
       responseObserver.onNext(((Bucket) response));
@@ -92,7 +122,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void composeObject(ComposeObjectRequest request, StreamObserver<Object> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Object.class);
     if (response instanceof Object) {
       requests.add(request);
       responseObserver.onNext(((Object) response));
@@ -112,7 +142,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void deleteBucket(DeleteBucketRequest request, StreamObserver<Empty> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Empty.class);
     if (response instanceof Empty) {
       requests.add(request);
       responseObserver.onNext(((Empty) response));
@@ -133,7 +163,7 @@ final class MockStorage extends StorageImplBase {
   @Override
   public void listBuckets(
       ListBucketsRequest request, StreamObserver<ListBucketsResponse> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(ListBucketsResponse.class);
     if (response instanceof ListBucketsResponse) {
       requests.add(request);
       responseObserver.onNext(((ListBucketsResponse) response));
@@ -153,7 +183,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void getBucket(GetBucketRequest request, StreamObserver<Bucket> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Bucket.class);
     if (response instanceof Bucket) {
       requests.add(request);
       responseObserver.onNext(((Bucket) response));
@@ -173,7 +203,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void deleteObject(DeleteObjectRequest request, StreamObserver<Empty> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Empty.class);
     if (response instanceof Empty) {
       requests.add(request);
       responseObserver.onNext(((Empty) response));
@@ -193,7 +223,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void getObject(GetObjectRequest request, StreamObserver<Object> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Object.class);
     if (response instanceof Object) {
       requests.add(request);
       responseObserver.onNext(((Object) response));
@@ -213,7 +243,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void updateObject(UpdateObjectRequest request, StreamObserver<Object> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Object.class);
     if (response instanceof Object) {
       requests.add(request);
       responseObserver.onNext(((Object) response));
@@ -234,7 +264,7 @@ final class MockStorage extends StorageImplBase {
   @Override
   public void rewriteObject(
       RewriteObjectRequest request, StreamObserver<RewriteResponse> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(RewriteResponse.class);
     if (response instanceof RewriteResponse) {
       requests.add(request);
       responseObserver.onNext(((RewriteResponse) response));
@@ -259,7 +289,7 @@ final class MockStorage extends StorageImplBase {
       @Override
       public void onNext(WriteObjectRequest value) {
         requests.add(value);
-        final java.lang.Object response = responses.remove();
+        final java.lang.Object response = pollResponse(WriteObjectResponse.class);
         if (response instanceof WriteObjectResponse) {
           responseObserver.onNext(((WriteObjectResponse) response));
         } else if (response instanceof Exception) {
@@ -285,7 +315,7 @@ final class MockStorage extends StorageImplBase {
 
   @Override
   public void moveObject(MoveObjectRequest request, StreamObserver<Object> responseObserver) {
-    java.lang.Object response = responses.poll();
+    java.lang.Object response = pollResponse(Object.class);
     if (response instanceof Object) {
       requests.add(request);
       responseObserver.onNext(((Object) response));
@@ -312,7 +342,7 @@ final class MockStorage extends StorageImplBase {
         // Record the incoming request.
         requests.add(value);
 
-        java.lang.Object response = responses.poll();
+        java.lang.Object response = pollResponse(BidiWriteObjectResponse.class);
         if (response instanceof BidiWriteObjectResponse) {
           responseObserver.onNext(((BidiWriteObjectResponse) response));
         } else if (response instanceof Exception) {
