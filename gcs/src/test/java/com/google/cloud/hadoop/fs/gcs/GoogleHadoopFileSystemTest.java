@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
+import com.google.cloud.gcs.analyticscore.client.GcsRetryOptions;
 import com.google.cloud.gcs.analyticscore.client.auth.AuthType;
 import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
@@ -63,6 +64,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
@@ -797,7 +799,28 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
     fs.initialize(new URI("gs://foobar/"), config);
 
-    assertThat(analyticsCoreClientOptions(fs).getProtocol()).isEqualTo(Protocol.HTTP);
+    GcsClientOptions clientOptions = analyticsCoreClientOptions(fs);
+    assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.HTTP);
+    assertThat(clientOptions.getGcsRetryOptions().hasOverrides()).isFalse();
+    fs.close();
+  }
+
+  @Test
+  public void initialize_analyticsCoreEnabled_httpClientHonorsMaxRetryConfig() throws Exception {
+    Configuration config = accessTokenProviderConfig(TestingAccessTokenProvider.class);
+    config.setBoolean("fs.gs.analytics.core.enable", true);
+    config.setInt("fs.gs.http.max.retry", 3);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+
+    fs.initialize(new URI("gs://foobar/"), config);
+
+    GcsRetryOptions retryOptions = analyticsCoreClientOptions(fs).getGcsRetryOptions();
+    assertThat(retryOptions.getMaxAttempts()).isEqualTo(Optional.of(4));
+    assertThat(retryOptions.getTotalTimeout())
+        .isEqualTo(
+            Optional.of(
+                Duration.ofMillis(AnalyticsCoreConfigMapper.APIARY_MAX_RETRY_ELAPSED_TIME_MS)));
+    assertThat(retryOptions.getInitialRetryDelay()).isEqualTo(Optional.empty());
     fs.close();
   }
 
@@ -813,6 +836,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     GcsClientOptions clientOptions = analyticsCoreClientOptions(fs);
     assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.GRPC);
     assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isFalse();
+    assertThat(clientOptions.getGcsRetryOptions().hasOverrides()).isFalse();
     fs.close();
   }
 
@@ -832,6 +856,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(clientOptions.getProtocol()).isEqualTo(Protocol.BIDI);
     assertThat(clientOptions.getGcsWriteOptions().isBidiWriteEnabled()).isTrue();
     assertThat(clientOptions.getGcsWriteOptions().isBidiFinalizeOnClose()).isTrue();
+    assertThat(clientOptions.getGcsRetryOptions().hasOverrides()).isFalse();
     fs.close();
   }
 
