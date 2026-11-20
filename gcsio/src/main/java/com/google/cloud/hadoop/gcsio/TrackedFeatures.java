@@ -64,7 +64,9 @@ public enum TrackedFeatures {
 
   MULTI_OPEN_API(15),
 
-  COMPOSE_DELETE_SOURCE_ENABLED(16);
+  COMPOSE_DELETE_SOURCE_ENABLED(16),
+
+  LIST_DIRECTORY_FIRST_ENABLED(17);
 
   private final int bitPosition;
 
