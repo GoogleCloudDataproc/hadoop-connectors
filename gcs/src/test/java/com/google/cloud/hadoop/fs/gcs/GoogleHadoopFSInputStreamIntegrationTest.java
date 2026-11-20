@@ -279,44 +279,44 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
 
-    GoogleHadoopFileSystem ghfs =
-        GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getParameterizedConfig());
+    try (GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, getParameterizedConfig())) {
+      String testContent = "test content";
+      gcsFsIHelper.writeTextFile(path, testContent);
 
-    String testContent = "test content";
-    gcsFsIHelper.writeTextFile(path, testContent);
+      byte[] value = new byte[2];
+      byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
+      GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+      assertThat(in.read(value, 0, 1)).isEqualTo(1);
+      assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+      assertThat(value).isEqualTo(expected);
 
-    byte[] value = new byte[2];
-    byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
-    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
-    assertThat(in.read(value, 0, 1)).isEqualTo(1);
-    assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
-    assertThat(value).isEqualTo(expected);
+      IOStatistics ioStats = in.getIOStatistics();
+      TestUtils.verifyDurationMetric(ioStats, STREAM_READ_OPERATIONS.getSymbol(), 2);
+      TestUtils.verifyDurationMetric(ioStats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 2);
 
-    IOStatistics ioStats = in.getIOStatistics();
-    TestUtils.verifyDurationMetric(ioStats, STREAM_READ_OPERATIONS.getSymbol(), 2);
-    TestUtils.verifyDurationMetric(ioStats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 2);
+      in.seek(0);
 
-    in.seek(0);
+      TestUtils.verifyDurationMetric(ioStats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 3);
+      in.close();
 
-    TestUtils.verifyDurationMetric(ioStats, STREAM_READ_SEEK_OPERATIONS.getSymbol(), 3);
-    in.close();
+      TestUtils.verifyDurationMetric(ioStats, STREAM_READ_CLOSE_OPERATIONS.getSymbol(), 1);
 
-    TestUtils.verifyDurationMetric(ioStats, STREAM_READ_CLOSE_OPERATIONS.getSymbol(), 1);
+      try (GoogleHadoopFSInputStream inputStream = createGhfsInputStream(ghfs, path)) {
+        Throwable exception =
+            assertThrows(EOFException.class, () -> inputStream.seek(testContent.length()));
+        TestUtils.verifyDurationMetric(
+            inputStream.getIOStatistics(), STREAM_READ_SEEK_OPERATIONS + SUFFIX_FAILURES, 1);
+      }
 
-    try (GoogleHadoopFSInputStream inputStream = createGhfsInputStream(ghfs, path)) {
-      Throwable exception =
-          assertThrows(EOFException.class, () -> inputStream.seek(testContent.length()));
       TestUtils.verifyDurationMetric(
-          inputStream.getIOStatistics(), STREAM_READ_SEEK_OPERATIONS + SUFFIX_FAILURES, 1);
+          ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_CLOSE_OPERATIONS.getSymbol(), 2);
+      TestUtils.verifyDurationMetric(
+          ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_SEEK_OPERATIONS.getSymbol(), 4);
+
+      TestUtils.verifyDurationMetric(
+          ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_OPERATIONS.getSymbol(), 2);
     }
-
-    TestUtils.verifyDurationMetric(
-        ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_CLOSE_OPERATIONS.getSymbol(), 2);
-    TestUtils.verifyDurationMetric(
-        ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_SEEK_OPERATIONS.getSymbol(), 4);
-
-    TestUtils.verifyDurationMetric(
-        ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_OPERATIONS.getSymbol(), 2);
   }
 
   @Test

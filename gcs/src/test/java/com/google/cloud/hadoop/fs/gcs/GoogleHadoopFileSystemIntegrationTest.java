@@ -2871,12 +2871,12 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
       String metric, long expected, GhfsThreadLocalStatistics statistics) {
     assertThat(statistics.isTracked(metric)).isTrue();
 
-    if (!metric.toLowerCase().contains("time")) {
+    if (metric.toLowerCase().contains("backoff") || metric.equals(GCS_API_COUNT)) {
+      // back off and retried GCS API calls are not deterministic
+      assertThat(statistics.getLong(metric)).isAtLeast(expected);
+    } else if (!metric.toLowerCase().contains("time")) {
       // time metrics are not deterministic
       assertThat(statistics.getLong(metric)).isEqualTo(expected);
-    } else if (!metric.toLowerCase().contains("time")) {
-      // back off is not deterministic
-      assertThat(statistics.getLong(metric)).isAtLeast(expected);
     }
   }
 
