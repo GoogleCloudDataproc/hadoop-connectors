@@ -52,9 +52,19 @@ class InMemoryGlobberFileSystem extends FileSystem {
    */
   public static FileSystem createInstance(
       Configuration config, Path workingDirectory, Collection<FileStatus> fileStatuses) {
-    checkNotNull(config, "configuration can not be null");
+    return createInstance(config, workingDirectory, fileStatuses, Map.of());
+  }
 
-    FileSystem fileSystem = new InMemoryGlobberFileSystem(workingDirectory, fileStatuses);
+  public static FileSystem createInstance(
+      Configuration config,
+      Path workingDirectory,
+      Collection<FileStatus> fileStatuses,
+      Map<Path, IOException> poisonedDirectories) {
+    checkNotNull(config, "configuration can not be null");
+    checkNotNull(poisonedDirectories, "poisonedDirectories can not be null");
+
+    FileSystem fileSystem =
+        new InMemoryGlobberFileSystem(workingDirectory, fileStatuses, poisonedDirectories);
     fileSystem.setConf(config);
 
     return fileSystem;
@@ -64,14 +74,19 @@ class InMemoryGlobberFileSystem extends FileSystem {
   private final URI uri;
   private final Map<Path, FileStatus> fileStatusesByPath;
   private final Map<Path, List<FileStatus>> fileStatusesByParentPath;
+  private final Map<Path, IOException> poisonedDirectories;
 
   /**
    * Constructs an instance of InMemoryGlobberFileSystem using the provided collection of {@link
    * FileStatus} objects; {@code initialize()} will not re-initialize it.
    */
-  private InMemoryGlobberFileSystem(Path workingDirectory, Collection<FileStatus> fileStatuses) {
+  private InMemoryGlobberFileSystem(
+      Path workingDirectory,
+      Collection<FileStatus> fileStatuses,
+      Map<Path, IOException> poisonedDirectories) {
     this.workingDirectory = workingDirectory;
     this.uri = workingDirectory.toUri();
+    this.poisonedDirectories = Map.copyOf(poisonedDirectories);
 
     this.fileStatusesByPath = Maps.newHashMapWithExpectedSize(fileStatuses.size());
     this.fileStatusesByParentPath = Maps.newHashMapWithExpectedSize(fileStatuses.size() / 5);
@@ -107,6 +122,10 @@ class InMemoryGlobberFileSystem extends FileSystem {
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
     Path qualifiedPath = makeQualified(f);
+    IOException poisonedError = poisonedDirectories.get(qualifiedPath);
+    if (poisonedError != null) {
+      throw poisonedError;
+    }
     List<FileStatus> fileStatuses = fileStatusesByParentPath.get(qualifiedPath);
     if (fileStatuses == null) {
       throw new FileNotFoundException(
