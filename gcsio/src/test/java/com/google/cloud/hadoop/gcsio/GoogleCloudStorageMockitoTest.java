@@ -44,6 +44,7 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.protobuf.Timestamp;
@@ -521,5 +522,49 @@ public class GoogleCloudStorageMockitoTest {
 
     // Verify that the folder-specific API was not called
     verify(mockStorageControlStub, never()).getFolderCallable();
+  }
+
+  @Test
+  public void testLazyGetStorageControlClient_setsUserAgentHeader() throws IOException {
+    gcs.setStorageControlClient(null);
+    StorageControlClient client = gcs.lazyGetStorageControlClient();
+    try {
+      assertThat(client.getSettings().getHeaderProvider().getHeaders())
+          .containsEntry("user-agent", "gcsio-unit-test");
+    } finally {
+      // Closes the lazily created client and resets gcs.storageControlClient to null.
+      gcs.close();
+    }
+  }
+
+  @Test
+  public void testLazyGetStorageControlClient_withFeatureHeaderGenerator_setsFeatureHeader()
+      throws IOException {
+    GoogleCloudStorageOptions gcsOptions =
+        GoogleCloudStorageOptions.builder()
+            .setAppName("gcsio-unit-test")
+            .setProjectId(PROJECT_ID)
+            // Enables a tracked feature so that the feature header value is non-empty.
+            .setHnBucketRenameEnabled(true)
+            .build();
+    FeatureHeaderGenerator featureHeaderGenerator =
+        new FeatureHeaderGenerator(
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(gcsOptions)
+                .build());
+    GoogleCloudStorageImpl gcsWithFeatureHeader =
+        GoogleCloudStorageImpl.builder()
+            .setOptions(gcsOptions)
+            .setCredentials(new FakeCredentials())
+            .setHttpTransport(mockTransport())
+            .setFeatureHeaderGenerator(featureHeaderGenerator)
+            .build();
+    try {
+      StorageControlClient client = gcsWithFeatureHeader.lazyGetStorageControlClient();
+      assertThat(client.getSettings().getHeaderProvider().getHeaders())
+          .containsEntry(FeatureHeaderGenerator.HEADER_NAME, featureHeaderGenerator.getValue());
+    } finally {
+      gcsWithFeatureHeader.close();
+    }
   }
 }
