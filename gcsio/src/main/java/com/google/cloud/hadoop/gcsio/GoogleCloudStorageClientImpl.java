@@ -433,7 +433,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     return GoogleCredentials.create(new AccessToken("", null));
   }
 
-  private static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
+  static ImmutableMap<String, String> getUpdatedHeadersWithUserAgent(
       GoogleCloudStorageOptions storageOptions) {
     ImmutableMap<String, String> httpRequestHeaders =
         MoreObjects.firstNonNull(storageOptions.getHttpRequestHeaders(), ImmutableMap.of());
