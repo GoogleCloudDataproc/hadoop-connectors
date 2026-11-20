@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Prevent dot-segment path normalization during rename and path conversion
 
 ## 2.2.34 - 2026-10-28
 1. Upgrade google.api-client.version to 2.9.2
