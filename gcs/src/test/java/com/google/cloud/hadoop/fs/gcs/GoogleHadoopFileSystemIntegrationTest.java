@@ -2914,6 +2914,19 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
           expectedValue += stats.getLong(meanKey) * metricCount;
           roundOff += metricCount;
         }
+        if (name.equals(GoogleCloudStorageStatistics.GCS_API_TIME.getSymbol())) {
+          // GCS_API_TIME includes both HTTP request TTFB (summed above via expectedSum) and
+          // stream data transfer duration posted on stream close. Because
+          // STREAM_READ_DATA_TRANSFER_DURATION is recorded via updateStats() rather than
+          // updateMetric(), its base opsCount is 0, so we use STREAM_READ_CLOSE_OPERATIONS as
+          // the sample count.
+          long streamReadCloseCount =
+              stats.getLong(GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS.getSymbol());
+          expectedValue +=
+              stats.getLong(GhfsStatistic.STREAM_READ_DATA_TRANSFER_DURATION.getSymbol() + "_mean")
+                  * streamReadCloseCount;
+          roundOff += streamReadCloseCount;
+        }
 
         assertWithMessage(name).that(value).isAtLeast(expectedValue);
         assertWithMessage(name).that(value).isLessThan(expectedValue + roundOff + 1);
