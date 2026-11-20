@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Prevent dot-segment path normalization during rename and path conversion
 
 ## 4.0.10 - 2026-11-12
 1. Fix gRPC fast-fail disabled read failures when Vectored IO is enabled.
