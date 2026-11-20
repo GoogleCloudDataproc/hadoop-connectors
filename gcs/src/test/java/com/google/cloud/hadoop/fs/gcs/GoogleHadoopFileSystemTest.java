@@ -40,6 +40,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
@@ -56,6 +57,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.Arrays;
 import java.util.logging.*;
 import java.util.regex.Matcher;
@@ -238,6 +240,204 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
             return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
           }
         });
+  }
+
+  @Test
+  public void testRenameDirectory_rejectsPathTraversalObject() throws Exception {
+    for (boolean moveEnabled : new boolean[] {true, false}) {
+      GoogleCloudStorageFileSystem memoryGcsFs =
+          new GoogleCloudStorageFileSystemImpl(
+              InMemoryGoogleCloudStorage::new,
+              GoogleCloudStorageFileSystemOptions.builder()
+                  .setCloudStorageOptions(
+                      getInMemoryGoogleCloudStorageOptions().toBuilder()
+                          .setMoveOperationEnabled(moveEnabled)
+                          .build())
+                  .build());
+      try (GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem(memoryGcsFs)) {
+        URI initUri = new URI("gs://traversal-ghfs-bucket-" + moveEnabled);
+        myghfs.initialize(initUri, new Configuration());
+        myghfs.mkdirs(new Path(initUri));
+        String bucket = myghfs.getUri().getAuthority();
+
+        try (WritableByteChannel ch =
+            myghfs.getGcsFs().getGcs().create(new StorageResourceId(bucket, "staging/legit.txt"))) {
+          ch.write(ByteBuffer.wrap("legit".getBytes(UTF_8)));
+        }
+        try (WritableByteChannel ch =
+            myghfs.getGcsFs().getGcs().create(new StorageResourceId(bucket, "victim/existing"))) {
+          ch.write(ByteBuffer.wrap("ORIGINAL".getBytes(UTF_8)));
+        }
+        try (WritableByteChannel ch =
+            myghfs
+                .getGcsFs()
+                .getGcs()
+                .create(new StorageResourceId(bucket, "staging/../victim/existing"))) {
+          ch.write(ByteBuffer.wrap("ATTACKER".getBytes(UTF_8)));
+        }
+
+        boolean renamed =
+            myghfs.rename(
+                new Path("gs://" + bucket + "/staging"), new Path("gs://" + bucket + "/final"));
+
+        assertThat(renamed).isFalse();
+        assertThat(
+                myghfs
+                    .getGcsFs()
+                    .getGcs()
+                    .getItemInfo(new StorageResourceId(bucket, "final/legit.txt"))
+                    .exists())
+            .isFalse();
+        try (SeekableByteChannel ch =
+            myghfs
+                .getGcsFs()
+                .getGcs()
+                .open(
+                    new StorageResourceId(bucket, "victim/existing"),
+                    GoogleCloudStorageReadOptions.DEFAULT)) {
+          ByteBuffer buf = ByteBuffer.allocate((int) ch.size());
+          while (buf.hasRemaining()) {
+            if (ch.read(buf) == -1) {
+              break;
+            }
+          }
+          assertThat(new String(buf.array(), UTF_8)).isEqualTo("ORIGINAL");
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testListStatusAndGlobStatus_dotSegmentErrorContractAndModeConsistency()
+      throws Exception {
+    for (String globAlgo : new String[] {"CONCURRENT", "FLAT", "DEFAULT"}) {
+      GoogleCloudStorageFileSystem memoryGcsFs =
+          new GoogleCloudStorageFileSystemImpl(
+              InMemoryGoogleCloudStorage::new,
+              GoogleCloudStorageFileSystemOptions.builder()
+                  .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                  .build());
+      try (GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem(memoryGcsFs)) {
+        Configuration conf = new Configuration();
+        conf.set("fs.gs.glob.algorithm", globAlgo);
+        URI initUri = new URI("gs://glob-dot-bucket-" + globAlgo.toLowerCase());
+        myghfs.initialize(initUri, conf);
+        myghfs.mkdirs(new Path(initUri));
+        String bucket = myghfs.getUri().getAuthority();
+
+        try (WritableByteChannel ch =
+            myghfs
+                .getGcsFs()
+                .getGcs()
+                .create(new StorageResourceId(bucket, "globroot/good/a.txt"))) {
+          ch.write(ByteBuffer.wrap("GOOD".getBytes(UTF_8)));
+        }
+        try (WritableByteChannel ch =
+            myghfs
+                .getGcsFs()
+                .getGcs()
+                .create(new StorageResourceId(bucket, "globroot/bad/../evil.txt"))) {
+          ch.write(ByteBuffer.wrap("ATTACKER".getBytes(UTF_8)));
+        }
+
+        URI badUri = new URI("gs", bucket, "/globroot/bad/../evil.txt", null, null);
+        assertThat(assertThrows(IllegalArgumentException.class, () -> myghfs.getHadoopPath(badUri)))
+            .hasMessageThat()
+            .contains("must not contain '.' or '..' path segments");
+
+        // Remote GCS dot-segment objects surface as checked IOException on FileSystem APIs.
+        Path badDirPath = new Path("gs://" + bucket + "/globroot/bad");
+        assertThat(assertThrows(IOException.class, () -> myghfs.listStatus(badDirPath)))
+            .hasMessageThat()
+            .contains("must not contain '.' or '..' path segments");
+
+        // Matching glob descending into poisoned directory throws IOException across all modes.
+        Path wildcardGlob = new Path("gs://" + bucket + "/globroot/*/*.txt");
+        assertThat(assertThrows(IOException.class, () -> myghfs.globStatus(wildcardGlob)))
+            .hasMessageThat()
+            .contains("must not contain '.' or '..' path segments");
+
+        // Unrelated sibling dot-segment prefix does not break glob targeting a clean directory.
+        FileStatus[] goodMatches =
+            myghfs.globStatus(new Path("gs://" + bucket + "/globroot/{good}/*.txt"));
+        assertThat(goodMatches).hasLength(1);
+        assertThat(goodMatches[0].getPath().toString())
+            .isEqualTo("gs://" + bucket + "/globroot/good/a.txt");
+      }
+    }
+  }
+
+  @Test
+  public void testPercentEncodedDotSegments_rejectedInGetGcsPathCreateAndRename() throws Exception {
+    try (FileSystem localFs = createInMemoryGoogleHadoopFileSystem()) {
+      GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) localFs;
+      String bucket = myghfs.getUri().getAuthority();
+      Path srcFile = new Path("gs://" + bucket + "/src_file.txt");
+      try (FSDataOutputStream out = myghfs.create(srcFile)) {
+        out.write("hello".getBytes(UTF_8));
+      }
+      myghfs.mkdirs(new Path("gs://" + bucket + "/staging"));
+
+      Path encodedDotDotDst = new Path(URI.create("gs://" + bucket + "/staging/%2e%2e"));
+      Path encodedDotFile = new Path(URI.create("gs://" + bucket + "/staging/%2e/f"));
+
+      assertThat(
+              assertThrows(
+                  IllegalArgumentException.class, () -> myghfs.getGcsPath(encodedDotDotDst)))
+          .hasMessageThat()
+          .contains("must not contain '.' or '..' path segments");
+      assertThat(assertThrows(IllegalArgumentException.class, () -> myghfs.create(encodedDotFile)))
+          .hasMessageThat()
+          .contains("must not contain '.' or '..' path segments");
+      assertThat(
+              assertThrows(
+                  IllegalArgumentException.class, () -> myghfs.rename(srcFile, encodedDotDotDst)))
+          .hasMessageThat()
+          .contains("must not contain '.' or '..' path segments");
+    }
+  }
+
+  @Test
+  public void testGetHadoopPathAndRoundTrip_validDotsColonsBackslashesAndBucketWithoutSlash()
+      throws Exception {
+    try (FileSystem localFs = createInMemoryGoogleHadoopFileSystem()) {
+      GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) localFs;
+      String bucket = myghfs.getUri().getAuthority();
+
+      // Bucket URI without trailing slash returns fsRoot instead of throwing NPE/IAE.
+      assertThat(myghfs.getHadoopPath(new URI("gs://" + bucket)))
+          .isEqualTo(new Path(myghfs.getUri()));
+
+      String[] validObjectNames = {
+        "dir/.hidden",
+        "dir/..leading",
+        "dir/trailing..",
+        "dir/part:001.parquet",
+        "dir/2026-11-20T04:00:00Z.parquet",
+        "dir/%2e%2e/literal.txt",
+        "dir/query?a=1#frag",
+        "dir/my file.txt",
+        "dir/staging\\..\\literal_backslash",
+        "dir/c:\\..\\literal_drive",
+      };
+
+      for (String obj : validObjectNames) {
+        try (WritableByteChannel ch =
+            myghfs.getGcsFs().getGcs().create(new StorageResourceId(bucket, obj))) {
+          ch.write(ByteBuffer.wrap(("payload:" + obj).getBytes(UTF_8)));
+        }
+        URI gcsUri = UriPaths.fromStringPathComponents(bucket, obj, false);
+        Path hadoopPath = myghfs.getHadoopPath(gcsUri);
+        assertThat(myghfs.getGcsPath(hadoopPath)).isEqualTo(gcsUri);
+        try (FSDataInputStream in = myghfs.open(hadoopPath)) {
+          byte[] bytes = in.readAllBytes();
+          assertThat(new String(bytes, UTF_8)).isEqualTo("payload:" + obj);
+        }
+      }
+
+      FileStatus[] listed = myghfs.listStatus(new Path("gs://" + bucket + "/dir"));
+      assertThat(listed.length).isAtLeast(9);
+    }
   }
 
   @Test

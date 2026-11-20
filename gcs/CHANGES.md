@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Prevent dot-segment path normalization during rename and path conversion
 
 ## 3.0.23 - 2026-11-12
 1. Upgrade gRPC to 1.85.1 (Netty 4.2.17) and Guava to 33.7.2-jre to fix CVE-2026-75595 and CVE-2026-102554.
