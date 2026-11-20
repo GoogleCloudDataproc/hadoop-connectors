@@ -58,6 +58,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
@@ -434,21 +435,23 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         "Path '%s' must be fully qualified.",
         qualifiedPath);
 
-    // Strip initial '..'s to make root is its own parent.
-    StringBuilder sb = new StringBuilder(uri.getPath());
-    while (sb.indexOf("/../") == 0) {
+    Path result;
+    String upath = uri.getPath();
+
+    // Strip initial '..'s to make root its own parent.
+    int i = 0;
+    while (upath.startsWith("/../", i)) {
       // Leave a preceding slash, so path is still absolute.
-      sb.delete(0, 3);
+      i += 3;
     }
-
-    String strippedPath = sb.toString();
-
-    // Allow a Path of gs://someBucket to map to gs://someBucket/
-    if (strippedPath.equals("/..") || strippedPath.equals("")) {
-      strippedPath = "/";
+    if (i == upath.length() || upath.substring(i).equals("/..")) {
+      // Allow a Path of gs://someBucket to map to gs://someBucket/
+      result = new Path(uri.getScheme(), uri.getAuthority(), "/");
+    } else if (i == 0) {
+      result = qualifiedPath;
+    } else {
+      result = new Path(uri.getScheme(), uri.getAuthority(), upath.substring(i));
     }
-
-    Path result = new Path(uri.getScheme(), uri.getAuthority(), strippedPath);
     logger.atFiner().log("makeQualified(path: %s): %s", path, result);
     return result;
   }
@@ -1094,7 +1097,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
-  private FileStatus getFileStatus(FileInfo fileInfo, String userName) {
+  private FileStatus getFileStatus(FileInfo fileInfo, String userName) throws IOException {
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.
     FileStatus status =
@@ -1108,11 +1111,20 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             reportedPermissions,
             /* owner= */ userName,
             /* group= */ userName,
-            getHadoopPath(fileInfo.getPath()));
+            getHadoopPathFromRemote(fileInfo.getPath()));
     logger.atFiner().log(
         "getFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
     return status;
+  }
+
+  private Path getHadoopPathFromRemote(URI gcsPath) throws IOException {
+    try {
+      return getHadoopPath(gcsPath);
+    } catch (IllegalArgumentException e) {
+      GoogleCloudStorageEventBus.postOnException();
+      throw new IOException(e.getMessage(), e);
+    }
   }
 
   /**
@@ -1282,12 +1294,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       ListPage<FileInfo> infoPage =
           getGcsFs().listFileInfoForPrefixPage(prefixUri, LIST_OPTIONS, pageToken);
 
+      Map<Path, IOException> poisonedDirectories = new HashMap<>();
       Collection<FileStatus> statusPage =
-          toFileStatusesWithImplicitDirectories(infoPage.getItems());
+          toFileStatusesWithImplicitDirectories(infoPage.getItems(), poisonedDirectories);
 
       // TODO: refactor to use GlobPattern and PathFilter directly without helper FS
       FileSystem helperFileSystem =
-          InMemoryGlobberFileSystem.createInstance(getConf(), getWorkingDirectory(), statusPage);
+          InMemoryGlobberFileSystem.createInstance(
+              getConf(), getWorkingDirectory(), statusPage, poisonedDirectories);
       FileStatus[] matchedStatusPage = helperFileSystem.globStatus(fixedPath, filter);
       if (matchedStatusPage != null) {
         Collections.addAll(
@@ -1328,38 +1342,66 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** Helper method that converts {@link FileInfo} collection to {@link FileStatus} collection. */
   private Collection<FileStatus> toFileStatusesWithImplicitDirectories(
-      Collection<FileInfo> fileInfos) throws IOException {
+      Collection<FileInfo> fileInfos, Map<Path, IOException> poisonedDirectories)
+      throws IOException {
     List<FileStatus> fileStatuses = new ArrayList<>(fileInfos.size());
     Set<URI> filePaths = Sets.newHashSetWithExpectedSize(fileInfos.size());
+    List<URI> ancestorSeeds = new ArrayList<>(fileInfos.size());
     String userName = getUgiUserName();
     for (FileInfo fileInfo : fileInfos) {
-      filePaths.add(fileInfo.getPath());
-      fileStatuses.add(getFileStatus(fileInfo, userName));
+      StorageResourceId itemId =
+          StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ true);
+      String objectName = itemId.getObjectName();
+      int dotIdx = StringPaths.indexOfDotSegment(objectName);
+      if (dotIdx >= 0) {
+        String validParentObj = dotIdx == 0 ? null : objectName.substring(0, dotIdx);
+        URI validParentUri =
+            UriPaths.fromStringPathComponents(
+                itemId.getBucketName(), validParentObj, /* allowEmptyObjectName= */ true);
+        Path poisonedDirPath = getHadoopPathFromRemote(validParentUri);
+        poisonedDirectories.putIfAbsent(
+            poisonedDirPath,
+            new IOException(
+                String.format(
+                    "GCS object name in '%s' must not contain '.' or '..' path segments",
+                    fileInfo.getPath())));
+        ancestorSeeds.add(validParentUri);
+      } else {
+        filePaths.add(fileInfo.getPath());
+        fileStatuses.add(getFileStatus(fileInfo, userName));
+        ancestorSeeds.add(UriPaths.getParentPath(fileInfo.getPath()));
+      }
     }
 
     // The flow for populating this doesn't bother to populate metadata entries for parent
     // directories but we know the parent directories are expected to exist, so we'll just
     // populate the missing entries explicitly here. Necessary for getFileStatus(parentOfInfo)
     // to work when using an instance of this class.
-    for (FileInfo fileInfo : fileInfos) {
-      URI parentPath = UriPaths.getParentPath(fileInfo.getPath());
-      while (parentPath != null && !parentPath.equals(GoogleCloudStorageFileSystem.GCS_ROOT)) {
-        if (!filePaths.contains(parentPath)) {
-          logger.atFiner().log("Adding fake entry for missing parent path '%s'", parentPath);
-          StorageResourceId id = StorageResourceId.fromUriPath(parentPath, true);
-
-          GoogleCloudStorageItemInfo fakeItemInfo =
-              GoogleCloudStorageItemInfo.createInferredDirectory(id);
-          FileInfo fakeFileInfo = FileInfo.fromItemInfo(fakeItemInfo);
-
-          filePaths.add(parentPath);
-          fileStatuses.add(getFileStatus(fakeFileInfo, userName));
-        }
-        parentPath = UriPaths.getParentPath(parentPath);
-      }
+    for (URI ancestorSeed : ancestorSeeds) {
+      inferMissingAncestorDirectories(ancestorSeed, filePaths, fileStatuses, userName);
     }
 
     return fileStatuses;
+  }
+
+  private void inferMissingAncestorDirectories(
+      URI startDir, Set<URI> filePaths, List<FileStatus> fileStatuses, String userName)
+      throws IOException {
+    URI parentPath = startDir;
+    while (parentPath != null && !parentPath.equals(GoogleCloudStorageFileSystem.GCS_ROOT)) {
+      if (!filePaths.contains(parentPath)) {
+        logger.atFiner().log("Adding fake entry for missing parent path '%s'", parentPath);
+        StorageResourceId id = StorageResourceId.fromUriPath(parentPath, true);
+
+        GoogleCloudStorageItemInfo fakeItemInfo =
+            GoogleCloudStorageItemInfo.createInferredDirectory(id);
+        FileInfo fakeFileInfo = FileInfo.fromItemInfo(fakeItemInfo);
+
+        filePaths.add(parentPath);
+        fileStatuses.add(getFileStatus(fakeFileInfo, userName));
+      }
+      parentPath = UriPaths.getParentPath(parentPath);
+    }
   }
 
   /** Helper method to get the UGI short user name */
