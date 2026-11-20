@@ -41,6 +41,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.storage.control.v2.StorageControlClient;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.junit.After;
@@ -304,5 +305,17 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockBatchHelper).queue(any(Storage.Objects.Get.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockBatchHelper).flush();
+  }
+
+  @Test
+  public void testLazyGetStorageControlClient_setsUserAgentHeader() throws IOException {
+    StorageControlClient client = gcs.lazyGetStorageControlClient();
+    try {
+      assertThat(client.getSettings().getHeaderProvider().getHeaders())
+          .containsEntry("user-agent", "gcsio-unit-test");
+    } finally {
+      // Closes the lazily created client and resets gcs.storageControlClient to null.
+      gcs.close();
+    }
   }
 }
