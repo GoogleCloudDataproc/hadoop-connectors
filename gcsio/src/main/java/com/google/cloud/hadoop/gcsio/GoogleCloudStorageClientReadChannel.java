@@ -53,6 +53,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /** Provides seekable read access to GCS via java-storage library. */
@@ -65,6 +66,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private static final String OTEL_DECORATED_READ_CHANNEL = "OtelDecoratedReadChannel";
   private static final String STORAGE_READ_CHANNEL = "StorageReadChannel";
   private static final String GRPC_BLOB_READ_CHANNEL = "GrpcBlobReadChannel";
+  // How long to wait for the read channel to publish the object metadata after it returned data.
+  private static final long METADATA_WAIT_TIMEOUT_SECONDS = 1;
 
   private StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
@@ -515,8 +518,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
       // A 0-byte read does not trigger the gRPC stream on a raw channel; read 1 byte and prefix it.
       ByteBuffer firstByte = ByteBuffer.allocate(1);
-      readableByteChannel.read(firstByte);
-      ensureMetadataInitialized(readableByteChannel);
+      int probeBytes = readableByteChannel.read(firstByte);
+      // java-storage hands out the data before completing the metadata future, so wait for it
+      // when the probe returned data instead of falling back to a metadata fetch.
+      ensureMetadataInitialized(readableByteChannel, /* awaitMetadata= */ probeBytes > 0);
 
       logger.atFiner().log(
           "Metadata extracted! True objectSize is now %d for '%s'", objectSize, resourceId);
@@ -580,17 +585,23 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     private void ensureMetadataInitialized(ReadableByteChannel readableByteChannel)
         throws IOException {
+      ensureMetadataInitialized(readableByteChannel, /* awaitMetadata= */ false);
+    }
+
+    private void ensureMetadataInitialized(
+        ReadableByteChannel readableByteChannel, boolean awaitMetadata) throws IOException {
       if (metadataInitialized) {
         return;
       }
 
-      if (!initializeMetadataFromChannel(readableByteChannel)) {
+      if (!initializeMetadataFromChannel(readableByteChannel, awaitMetadata)) {
         logger.atInfo().log("Fallback to metadata fetch for '%s'", resourceId);
         fetchMetadata();
       }
     }
 
-    private boolean initializeMetadataFromChannel(ReadableByteChannel readableByteChannel) {
+    private boolean initializeMetadataFromChannel(
+        ReadableByteChannel readableByteChannel, boolean awaitMetadata) {
       if (!(readableByteChannel instanceof ReadChannel)) {
         return false;
       }
@@ -598,10 +609,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       try {
         ApiFuture<BlobInfo> blobInfoFuture =
             getBlobInfoFromReadChannelFunction((ReadChannel) readableByteChannel);
-        if (!blobInfoFuture.isDone()) {
+        if (!awaitMetadata && !blobInfoFuture.isDone()) {
           return false;
         }
-        BlobInfo blobInfo = blobInfoFuture.get();
+        BlobInfo blobInfo = blobInfoFuture.get(METADATA_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         if (blobInfo == null) {
           return false;
         }
@@ -609,6 +620,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         objectSize = blobInfo.getSize();
         initMetadata(blobInfo.getContentEncoding(), objectSize, blobInfo.getGeneration());
         return true;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        logger.atWarning().withCause(e).log(
+            "Interrupted while getting metadata from read channel for '%s'", resourceId);
+        return false;
       } catch (Exception e) {
         logger.atWarning().withCause(e).log(
             "Failed to get metadata from read channel for '%s'", resourceId);

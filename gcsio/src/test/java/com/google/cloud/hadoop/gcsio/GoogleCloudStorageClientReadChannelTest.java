@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.api.core.SettableApiFuture;
 import com.google.cloud.ReadChannel;
 import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
@@ -39,12 +40,14 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
@@ -1248,16 +1251,61 @@ public class GoogleCloudStorageClientReadChannelTest {
   // A fake ReadChannel that mimics StorageReadChannel by having a getObject method
   // and a class name ending in "StorageReadChannel"
   private static class MockStorageReadChannel extends FakeReadChannel {
-    private final com.google.cloud.storage.BlobInfo blobInfo;
+    private final com.google.api.core.ApiFuture<com.google.cloud.storage.BlobInfo> blobInfoFuture;
 
     public MockStorageReadChannel(ByteString content, com.google.cloud.storage.BlobInfo blobInfo) {
+      this(content, com.google.api.core.ApiFutures.immediateFuture(blobInfo));
+    }
+
+    public MockStorageReadChannel(
+        ByteString content,
+        com.google.api.core.ApiFuture<com.google.cloud.storage.BlobInfo> blobInfoFuture) {
       super(content);
-      this.blobInfo = blobInfo;
+      this.blobInfoFuture = blobInfoFuture;
     }
 
     public com.google.api.core.ApiFuture<com.google.cloud.storage.BlobInfo> getObject() {
-      return com.google.api.core.ApiFutures.immediateFuture(blobInfo);
+      return blobInfoFuture;
     }
+  }
+
+  @Test
+  public void read_lazyMetadata_metadataPublishedAfterFirstBytes_doesNotFetchMetadata()
+      throws Exception {
+    GoogleCloudStorageReadOptions readOptions =
+        DEFAULT_READ_OPTION.toBuilder().setFastFailOnNotFoundEnabled(false).build();
+    BlobInfo mockBlobInfo = mock(BlobInfo.class);
+    when(mockBlobInfo.getSize()).thenReturn((long) OBJECT_SIZE);
+    when(mockBlobInfo.getContentEncoding()).thenReturn("text/plain");
+    when(mockBlobInfo.getGeneration()).thenReturn(1L);
+    // java-storage completes the metadata future shortly after handing out the first bytes.
+    SettableApiFuture<BlobInfo> blobInfoFuture = SettableApiFuture.create();
+    when(mockedStorage.reader(any(), any()))
+        .thenReturn(new MockStorageReadChannel(CONTENT, blobInfoFuture));
+    readChannel =
+        new GoogleCloudStorageClientReadChannel(
+            mockedStorage,
+            RESOURCE_ID,
+            /* itemInfo= */ null,
+            readOptions,
+            GrpcErrorTypeExtractor.INSTANCE,
+            GoogleCloudStorageOptions.DEFAULT.toBuilder().build());
+    Thread publisher =
+        new Thread(
+            () -> {
+              Uninterruptibles.sleepUninterruptibly(Duration.ofMillis(200));
+              blobInfoFuture.set(mockBlobInfo);
+            });
+    publisher.start();
+
+    ByteBuffer buffer = ByteBuffer.allocate(100);
+    int bytesRead = readChannel.read(buffer);
+    publisher.join();
+
+    assertThat(bytesRead).isEqualTo(100);
+    verifyContent(buffer, 0, 100);
+    assertThat(readChannel.size()).isEqualTo(OBJECT_SIZE);
+    verify(mockedStorage, times(0)).get(any(BlobId.class), any());
   }
 
   @Test
