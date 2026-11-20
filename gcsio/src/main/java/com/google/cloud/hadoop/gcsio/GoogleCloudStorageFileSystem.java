@@ -674,6 +674,7 @@ public class GoogleCloudStorageFileSystem {
     Preconditions.checkNotNull(src);
     Preconditions.checkNotNull(dst);
     checkArgument(!src.equals(GCS_ROOT), "Root path cannot be renamed.");
+    validateNoDotSegmentsInDestination(src, dst);
 
     // Parent of the destination path.
     URI dstParent = UriPaths.getParentPath(dst);
@@ -843,22 +844,20 @@ public class GoogleCloudStorageFileSystem {
         throw new IOException("Rename dir to self is forbidden");
       }
 
-      URI dstRelativeToSrc = src.relativize(dst);
-      // Throw if dst URI relative to src is not equal to dst,
-      // because this means that src is a parent directory of dst
-      // and src cannot be "renamed" to its subdirectory
-      if (!dstRelativeToSrc.equals(dst)) {
+      // Throw if dst is a subdirectory of src, as src cannot be renamed into its own subdirectory.
+      if (isSubdirectory(src, dst)) {
         GoogleCloudStorageEventBus.postOnException();
         throw new IOException("Rename to subdir is forbidden");
       }
 
       if (dstInfo.exists()) {
         if (dst.equals(GCS_ROOT)) {
+          validateRelativeChildPath(srcItemName, src, dst);
           dst =
               UriPaths.fromStringPathComponents(
                   srcItemName, /* objectName= */ null, /* allowEmptyObjectName= */ true);
         } else {
-          dst = UriPaths.toDirectory(dst.resolve(srcItemName));
+          dst = UriPaths.toDirectory(resolveChildUri(dst, srcItemName, src));
         }
       }
     } else {
@@ -872,7 +871,7 @@ public class GoogleCloudStorageFileSystem {
           GoogleCloudStorageEventBus.postOnException();
           throw new IOException("Cannot rename because path does not exist: " + dstInfo.getPath());
         } else {
-          dst = dst.resolve(srcItemName);
+          dst = resolveChildUri(dst, srcItemName, src);
         }
       }
     }
@@ -908,37 +907,55 @@ public class GoogleCloudStorageFileSystem {
    */
   private void renameDirectoryInternal(
       FileInfo srcInfo, URI dst, Optional<CoopLockOperationRename> coopLockOp) throws IOException {
-    checkArgument(srcInfo.isDirectory(), "'%s' should be a directory", srcInfo);
-    checkArgument(dst.toString().endsWith(PATH_DELIMITER), "'%s' should be a directory", dst);
-
     URI src = srcInfo.getPath();
-    if (this.options.getCloudStorageOptions().isHnBucketRenameEnabled()
-        && this.gcs.isHnBucket(src)) {
-      this.gcs.renameHnFolder(src, dst);
-      return;
-    }
-
+    StorageResourceId srcResourceId;
+    StorageResourceId dstResourceId;
     // Mapping from each src to its respective dst.
     // Sort src items so that parent directories appear before their children.
     // That allows us to copy parent directories before we copy their children.
     Map<FileInfo, URI> srcToDstItemNames = new TreeMap<>(FILE_INFO_PATH_COMPARATOR);
     Map<FileInfo, URI> srcToDstMarkerItemNames = new TreeMap<>(FILE_INFO_PATH_COMPARATOR);
+    try {
+      checkArgument(srcInfo.isDirectory(), "'%s' should be a directory", srcInfo);
+      checkArgument(dst.toString().endsWith(PATH_DELIMITER), "'%s' should be a directory", dst);
 
-    // List of individual paths to rename;
-    // we will try to carry out the copies in this list's order.
-    List<FileInfo> srcItemInfos = listFileInfoForPrefix(src, DELETE_RENAME_LIST_OPTIONS);
+      srcResourceId = StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
+      dstResourceId =
+          StorageResourceId.fromUriPath(
+              dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
+      checkArgument(!dstResourceId.isRoot(), "Destination directory must not be root: %s", dst);
+      validateNoDotSegmentsInDestination(src, dst);
 
-    // Create a list of sub-items to copy.
-    Pattern markerFilePattern = options.getMarkerFilePattern();
-    String prefix = src.toString();
-    for (FileInfo srcItemInfo : srcItemInfos) {
-      String relativeItemName = srcItemInfo.getPath().toString().substring(prefix.length());
-      URI dstItemName = dst.resolve(relativeItemName);
-      if (markerFilePattern != null && markerFilePattern.matcher(relativeItemName).matches()) {
-        srcToDstMarkerItemNames.put(srcItemInfo, dstItemName);
-      } else {
-        srcToDstItemNames.put(srcItemInfo, dstItemName);
+      if (this.options.getCloudStorageOptions().isHnBucketRenameEnabled()
+          && this.gcs.isHnBucket(src)) {
+        if (StringPaths.hasDotSegment(srcResourceId.getObjectName())) {
+          GoogleCloudStorageEventBus.postOnException();
+          logger.atWarning().log(
+              "Refusing to rename '%s' to '%s': source contains '.' or '..' path segment",
+              src, dst);
+          throw new IOException(
+              String.format(
+                  "Refusing to rename '%s' to '%s': source contains '.' or '..' path segment",
+                  src, dst));
+        }
+        this.gcs.renameHnFolder(src, dst);
+        return;
       }
+
+      // List of individual paths to rename;
+      // we will try to carry out the copies in this list's order.
+      List<FileInfo> srcItemInfos = listFileInfoForPrefix(src, DELETE_RENAME_LIST_OPTIONS);
+      collectItemsToRename(
+          src,
+          dst,
+          srcResourceId,
+          dstResourceId,
+          srcItemInfos,
+          srcToDstItemNames,
+          srcToDstMarkerItemNames);
+    } catch (IOException | RuntimeException e) {
+      coopLockOp.ifPresent(CoopLockOperationRename::unlock);
+      throw e;
     }
 
     coopLockOp.ifPresent(
@@ -954,11 +971,6 @@ public class GoogleCloudStorageFileSystem {
         mkdir(dst);
       }
 
-      StorageResourceId srcResourceId =
-          StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
-      StorageResourceId dstResourceId =
-          StorageResourceId.fromUriPath(
-              dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
       if (this.options.getCloudStorageOptions().isMoveOperationEnabled()
           && srcResourceId.getBucketName().equals(dstResourceId.getBucketName())) {
 
@@ -971,9 +983,10 @@ public class GoogleCloudStorageFileSystem {
 
         if (srcInfo.getItemInfo().isBucket()) {
           deleteBucket(Collections.singletonList(srcInfo));
-        } else {
-          // If src is a directory then srcItemInfos does not contain its own name,
-          // we delete item separately in the list.
+        } else if (!srcToDstItemNames.containsKey(srcInfo)
+            && !srcToDstMarkerItemNames.containsKey(srcInfo)) {
+          // If src is a directory then srcItemInfos normally does not contain its own name,
+          // so we delete it separately unless it was already included in the move map.
           deleteObjects(Collections.singletonList(srcInfo));
         }
       } else {
@@ -989,8 +1002,9 @@ public class GoogleCloudStorageFileSystem {
         srcItemsToDelete.addAll(srcToDstItemNames.keySet());
         if (srcInfo.getItemInfo().isBucket()) {
           bucketsToDelete.add(srcInfo);
-        } else {
-          // If src is a directory then srcItemInfos does not contain its own name,
+        } else if (!srcToDstItemNames.containsKey(srcInfo)
+            && !srcToDstMarkerItemNames.containsKey(srcInfo)) {
+          // If src is a directory then srcItemInfos normally does not contain its own name,
           // therefore add it to the list before we delete items in the list.
           srcItemsToDelete.add(srcInfo);
         }
@@ -1004,6 +1018,124 @@ public class GoogleCloudStorageFileSystem {
     } finally {
       coopLockOp.ifPresent(CoopLockOperationRename::cancelRenewal);
     }
+  }
+
+  /** Returns true if {@code dst} is strictly inside directory {@code src}. */
+  private static boolean isSubdirectory(URI src, URI dst) {
+    if (dst.equals(GCS_ROOT) || src.equals(dst)) {
+      return false;
+    }
+    StorageResourceId srcId = StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
+    StorageResourceId dstId = StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
+    if (!Objects.equals(srcId.getBucketName(), dstId.getBucketName())) {
+      return false;
+    }
+    if (srcId.isBucket()) {
+      return !dstId.isBucket();
+    }
+    if (dstId.isBucket()) {
+      return false;
+    }
+    String srcPrefix = StringPaths.toDirectoryPath(srcId.getObjectName());
+    String dstPrefix = StringPaths.toDirectoryPath(dstId.getObjectName());
+    return !srcPrefix.equals(dstPrefix) && dstPrefix.startsWith(srcPrefix);
+  }
+
+  private void collectItemsToRename(
+      URI src,
+      URI dst,
+      StorageResourceId srcResourceId,
+      StorageResourceId dstResourceId,
+      List<FileInfo> srcItemInfos,
+      Map<FileInfo, URI> srcToDstItemNames,
+      Map<FileInfo, URI> srcToDstMarkerItemNames)
+      throws IOException {
+    Pattern markerFilePattern = options.getMarkerFilePattern();
+    String srcPrefix = Strings.nullToEmpty(srcResourceId.getObjectName());
+    String dstBucket = dstResourceId.getBucketName();
+    String dstPrefix =
+        dstResourceId.isBucket() ? "" : StringPaths.toDirectoryPath(dstResourceId.getObjectName());
+    for (FileInfo srcItemInfo : srcItemInfos) {
+      String srcObjectName = srcItemInfo.getItemInfo().getObjectName();
+      if (srcObjectName == null
+          || !srcObjectName.startsWith(srcPrefix)
+          || (srcPrefix.isEmpty() && srcObjectName.isEmpty())) {
+        GoogleCloudStorageEventBus.postOnException();
+        logger.atWarning().log(
+            "Refusing to rename '%s': object name '%s' is outside source '%s'",
+            srcItemInfo.getPath(), srcObjectName, src);
+        throw new IOException(
+            String.format(
+                "Refusing to rename '%s': object name '%s' is outside source '%s'",
+                srcItemInfo.getPath(), srcObjectName, src));
+      }
+      String relativeItemName = srcObjectName.substring(srcPrefix.length());
+      URI dstItemName =
+          srcObjectName.equals(srcPrefix)
+              ? dst
+              : resolveChildUri(dstBucket, dstPrefix, dst, relativeItemName, srcItemInfo.getPath());
+      if (markerFilePattern != null && markerFilePattern.matcher(relativeItemName).matches()) {
+        srcToDstMarkerItemNames.put(srcItemInfo, dstItemName);
+      } else {
+        srcToDstItemNames.put(srcItemInfo, dstItemName);
+      }
+    }
+  }
+
+  private static void validateNoDotSegmentsInDestination(URI src, URI dst) throws IOException {
+    if (dst.equals(GCS_ROOT)) {
+      return;
+    }
+    StorageResourceId dstId = StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
+    if (StringPaths.hasDotSegment(dstId.getObjectName())) {
+      GoogleCloudStorageEventBus.postOnException();
+      logger.atWarning().log(
+          "Refusing to rename '%s' to '%s': destination contains '.' or '..' path segment",
+          src, dst);
+      throw new IOException(
+          String.format(
+              "Refusing to rename '%s' to '%s': destination contains '.' or '..' path segment",
+              src, dst));
+    }
+  }
+
+  private static void validateRelativeChildPath(String relativePath, URI srcPath, URI dstDir)
+      throws IOException {
+    if (isNullOrEmpty(relativePath)
+        || relativePath.startsWith(PATH_DELIMITER)
+        || StringPaths.hasDotSegment(relativePath)) {
+      GoogleCloudStorageEventBus.postOnException();
+      logger.atWarning().log(
+          "Refusing to rename '%s': invalid relative path '%s' for destination '%s'",
+          srcPath, relativePath, dstDir);
+      throw new IOException(
+          String.format(
+              "Refusing to rename '%s': invalid relative path '%s' for destination '%s'",
+              srcPath, relativePath, dstDir));
+    }
+  }
+
+  /**
+   * Resolves a relative child object name under {@code dstDir} without using {@link
+   * URI#resolve(String)}, rejecting empty paths, leading slashes, and {@code .}/{@code ..} path
+   * segments to prevent path traversal outside or within {@code dstDir}.
+   */
+  private static URI resolveChildUri(URI dstDir, String relativePath, URI srcPath)
+      throws IOException {
+    StorageResourceId dstDirId =
+        StorageResourceId.fromUriPath(dstDir, /* allowEmptyObjectName= */ true);
+    checkArgument(!dstDirId.isRoot(), "Destination directory must not be root: %s", dstDir);
+    String dstPrefix =
+        dstDirId.isBucket() ? "" : StringPaths.toDirectoryPath(dstDirId.getObjectName());
+    return resolveChildUri(dstDirId.getBucketName(), dstPrefix, dstDir, relativePath, srcPath);
+  }
+
+  private static URI resolveChildUri(
+      String dstBucket, String dstPrefix, URI dstDir, String relativePath, URI srcPath)
+      throws IOException {
+    validateRelativeChildPath(relativePath, srcPath, dstDir);
+    return UriPaths.fromStringPathComponents(
+        dstBucket, dstPrefix + relativePath, /* allowEmptyObjectName= */ false);
   }
 
   /** Copies items in given map that maps source items to destination items. */

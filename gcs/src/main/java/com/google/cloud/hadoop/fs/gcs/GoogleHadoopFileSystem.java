@@ -17,9 +17,11 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.common.annotations.VisibleForTesting;
@@ -119,11 +121,6 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
   public Path getHadoopPath(URI gcsPath) {
     logger.atFiner().log("getHadoopPath(gcsPath: %s)", gcsPath);
 
-    // Handle root. Delegate to getGcsPath on "gs:/" to resolve the appropriate gs://<bucket> URI.
-    if (gcsPath.equals(getGcsPath(getFileSystemRoot()))) {
-      return getFileSystemRoot();
-    }
-
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
 
     // Unlike the global-rooted GHFS, gs:// has no meaning in the bucket-rooted world.
@@ -133,8 +130,19 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
         "Authority of URI '%s' doesn't match root bucket '%s'",
         resourceId.getBucketName(),
         rootBucket);
+    String objectName = resourceId.getObjectName();
+    if (isNullOrEmpty(objectName)) {
+      return getFileSystemRoot();
+    }
+    checkArgument(
+        !StringPaths.hasDotSegment(objectName),
+        "GCS object name in '%s' must not contain '.' or '..' path segments",
+        gcsPath);
 
-    Path hadoopPath = new Path(getScheme() + "://" + rootBucket + '/' + resourceId.getObjectName());
+    Path hadoopPath =
+        new Path(
+            UriPaths.fromStringPathComponents(
+                rootBucket, StringPaths.toFilePath(objectName), /* allowEmptyObjectName= */ false));
     logger.atFiner().log("getHadoopPath(gcsPath: %s): %s", gcsPath, hadoopPath);
     return hadoopPath;
   }
@@ -157,6 +165,10 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
       // between bucket and objectName.
       objectName = objectName.substring(1);
     }
+    checkArgument(
+        !StringPaths.hasDotSegment(objectName),
+        "GCS object name in '%s' must not contain '.' or '..' path segments",
+        hadoopPath);
 
     // Construct GCS path uri.
     URI gcsPath =

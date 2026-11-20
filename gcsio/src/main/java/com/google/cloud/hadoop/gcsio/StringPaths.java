@@ -169,4 +169,40 @@ public final class StringPaths {
         ? path
         : path + GoogleCloudStorage.PATH_DELIMITER;
   }
+
+  /**
+   * Returns true if any {@code /}-delimited segment of {@code path} equals {@code "."} or {@code
+   * ".."}.
+   */
+  public static boolean hasDotSegment(String path) {
+    return indexOfDotSegment(path) >= 0;
+  }
+
+  /**
+   * Returns the starting character index of the first {@code /}-delimited segment in {@code path}
+   * that equals {@code "."} or {@code ".."}, or {@code -1} if none exists.
+   */
+  public static int indexOfDotSegment(String path) {
+    if (isNullOrEmpty(path)) {
+      return -1;
+    }
+    int start = 0;
+    int len = path.length();
+    while (start < len) {
+      int slash = path.indexOf('/', start);
+      int end = slash < 0 ? len : slash;
+      if (isDotSegment(path, start, end - start)) {
+        return start;
+      }
+      start = end + 1;
+    }
+    return -1;
+  }
+
+  private static boolean isDotSegment(String path, int start, int segLen) {
+    if (segLen == 1) {
+      return path.charAt(start) == '.';
+    }
+    return segLen == 2 && path.charAt(start) == '.' && path.charAt(start + 1) == '.';
+  }
 }
