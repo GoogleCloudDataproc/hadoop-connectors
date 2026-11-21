@@ -1,5 +1,7 @@
 # Release Notes
 
+## Next
+
 ## 2.2.35 - 2026-11-20
 1. Prevent dot-segment path normalization during rename and path conversion
 
