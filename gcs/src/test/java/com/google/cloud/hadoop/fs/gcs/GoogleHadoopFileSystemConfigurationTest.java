@@ -118,6 +118,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.requester.pays.project.id", null);
           put("fs.gs.rewrite.max.chunk.size", 512 * 1024 * 1024L);
           put("fs.gs.status.parallel.enable", true);
+          put("fs.gs.list.status.directory.first.enable", false);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");

@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Add `fs.gs.list.status.directory.first.enable` to list a path as a directory before looking it up as an object in `listStatus`
 
 ## 4.0.11 - 2026-11-20
 1. Prevent dot-segment path normalization during rename and path conversion

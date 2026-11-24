@@ -42,6 +42,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
         .setStatusParallelEnabled(true)
+        .setListDirectoryFirstEnabled(false)
         .setCloudLoggingEnabled(false);
   }
 
@@ -61,6 +62,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract Pattern getMarkerFilePattern();
 
   public abstract boolean isStatusParallelEnabled();
+
+  public abstract boolean isListDirectoryFirstEnabled();
 
   public abstract boolean isCloudLoggingEnabled();
 
@@ -97,6 +100,14 @@ public abstract class GoogleCloudStorageFileSystemOptions {
      * methods to reduce latency.
      */
     public abstract Builder setStatusParallelEnabled(boolean statusParallelEnabled);
+
+    /**
+     * Makes {@code listFileInfo} list a path without a trailing '/' as a directory first, and
+     * look up the object with that name only if the directory listing is empty. This saves an
+     * {@code objects.get} on every directory. When both an object {@code a} and a directory {@code
+     * a/} exist, the directory's contents are returned instead of the object.
+     */
+    public abstract Builder setListDirectoryFirstEnabled(boolean listDirectoryFirstEnabled);
 
     public abstract Builder setCloudLoggingEnabled(boolean cloudLoggingEnabled);
 
