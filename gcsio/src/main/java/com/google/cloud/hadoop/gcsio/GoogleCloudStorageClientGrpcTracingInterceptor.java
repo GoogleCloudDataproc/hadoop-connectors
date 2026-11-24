@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.cloud.hadoop.util.LoggingUrlRedactor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
@@ -50,6 +51,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   public static final String IDEMPOTENCY_TOKEN_HEADER = "x-goog-gcs-idempotency-token";
   private static final String DEFAULT_INVOCATION_ID = "NOT-FOUND";
+  @VisibleForTesting static final String STREAM_UPLOAD_ID_NOT_FOUND = "STREAM_UPLOAD_ID_NOT_FOUND";
   private static final Metadata.Key<String> idempotencyKey =
       Metadata.Key.of(IDEMPOTENCY_TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
 
@@ -259,14 +261,26 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           toJson(
               getResponseTrackingInfo()
                   .put(GoogleCloudStorageTracingFields.RESOURCE.name, resourceId)
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, response.getUploadId())
+                  .put(
+                      GoogleCloudStorageTracingFields.UPLOAD_ID.name,
+                      formatUploadIdForLog(response.getUploadId()))
                   .build()));
     }
   }
 
+  @VisibleForTesting
+  static String formatUploadIdForLog(String uploadId) {
+    if (Strings.isNullOrEmpty(uploadId)) {
+      return "";
+    }
+    if (STREAM_UPLOAD_ID_NOT_FOUND.equals(uploadId)) {
+      return STREAM_UPLOAD_ID_NOT_FOUND;
+    }
+    return LoggingUrlRedactor.digestToken(uploadId);
+  }
+
   private class WriteObjectStreamTracer extends TrackingStreamTracer {
 
-    private static final String STREAM_UPLOAD_ID_NOT_FOUND = "STREAM_UPLOAD_ID_NOT_FOUND";
     private String streamUploadId = STREAM_UPLOAD_ID_NOT_FOUND;
 
     WriteObjectStreamTracer(String rpcMethod) {
@@ -278,13 +292,15 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       WriteObjectRequest request = (WriteObjectRequest) message;
       String uploadId = request.getUploadId();
       if (!Strings.isNullOrEmpty(uploadId)) {
-        updateUploadId(request.getUploadId());
+        updateUploadId(uploadId);
       }
       logger.atInfo().log(
           "%s",
           toJson(
               getRequestTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, request.getUploadId())
+                  .put(
+                      GoogleCloudStorageTracingFields.UPLOAD_ID.name,
+                      formatUploadIdForLog(uploadId))
                   .put(GoogleCloudStorageTracingFields.WRITE_OFFSET.name, request.getWriteOffset())
                   .put(
                       GoogleCloudStorageTracingFields.FINALIZE_WRITE.name, request.getFinishWrite())
@@ -302,7 +318,9 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
           "%s",
           toJson(
               getResponseTrackingInfo()
-                  .put(GoogleCloudStorageTracingFields.UPLOAD_ID.name, this.streamUploadId)
+                  .put(
+                      GoogleCloudStorageTracingFields.UPLOAD_ID.name,
+                      formatUploadIdForLog(this.streamUploadId))
                   .put(
                       GoogleCloudStorageTracingFields.PERSISTED_SIZE.name,
                       response.getPersistedSize())
@@ -313,11 +331,14 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
       if (streamUploadId.equals(STREAM_UPLOAD_ID_NOT_FOUND)) {
         this.streamUploadId = uploadId;
       }
-      checkState(
-          uploadId.equals(streamUploadId),
-          String.format(
-              "Write stream should have unique uploadId associated with each chunk request. Expected was %s got %s",
-              streamUploadId, uploadId));
+      if (!uploadId.equals(streamUploadId)) {
+        checkState(
+            false,
+            "Write stream should have unique uploadId associated with each chunk request."
+                + " Expected was %s got %s",
+            formatUploadIdForLog(streamUploadId),
+            formatUploadIdForLog(uploadId));
+      }
     }
   }
 

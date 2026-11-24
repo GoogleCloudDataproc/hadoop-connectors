@@ -152,7 +152,9 @@ public class RequestTracker {
     @Override
     public String toString() {
       return String.format(
-          "[url=%s; invocationId=%s]", request.getUrl(), request.getHeaders().get(GOOG_API_CLIENT));
+          "[url=%s; invocationId=%s]",
+          LoggingUrlRedactor.redactUrl(request.getUrl()),
+          request.getHeaders().get(GOOG_API_CLIENT));
     }
   }
 }
