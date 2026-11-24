@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpHeaders;
 import com.google.common.eventbus.Subscribe;
@@ -100,5 +101,12 @@ public class GcsReadDurationTrackerStreamTest {
 
     assertThat(events).hasSize(1);
     assertThat(events.get(0).isLatencyThresholdBreached()).isTrue();
+  }
+
+  @Test
+  public void nullDelegate_failsFast() {
+    assertThrows(
+        NullPointerException.class,
+        () -> new GcsReadDurationTrackerStream(null, path, null, 1000L));
   }
 }
