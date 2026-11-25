@@ -125,16 +125,6 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       sharedBucketName1 = cachedSharedBucketName1;
       sharedBucketName2 = cachedSharedBucketName2;
     }
-    // Warm the static HNS cache so per-test request tracking does not depend on test execution
-    // order.
-    getStorage()
-        .isHnBucket(
-            UriPaths.fromStringPathComponents(
-                sharedBucketName1, /* objectName= */ null, /* allowEmptyObjectName= */ true));
-    getStorage()
-        .isHnBucket(
-            UriPaths.fromStringPathComponents(
-                sharedBucketName2, /* objectName= */ null, /* allowEmptyObjectName= */ true));
   }
 
   private String ensureReusableBucket(String cachedBucketName, String suffix, boolean isZonal)

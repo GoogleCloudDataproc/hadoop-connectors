@@ -60,7 +60,7 @@ public class GoogleCloudStorageFileSystemHttpClientNewIntegrationTest
 
     gcsfsIHelper = new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs);
     gcsfsIHelper.beforeAllTests();
-    isTracingSupported = true;
+    warmHnBucketCache();
   }
 
   @AfterClass

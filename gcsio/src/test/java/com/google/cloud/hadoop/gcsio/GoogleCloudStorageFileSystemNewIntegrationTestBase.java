@@ -62,6 +62,20 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   protected static RetryHttpInitializer httpRequestsInitializer;
   protected static GoogleCloudStorageFileSystemIntegrationHelper gcsfsIHelper;
 
+  /**
+   * Warms the static HNS cache for the shared test buckets, so that the request strings tracked by
+   * each test do not depend on which test happens to trigger the lookup first.
+   */
+  protected static void warmHnBucketCache() throws IOException {
+    GoogleCloudStorage gcs = gcsfsIHelper.gcsfs.getGcs();
+    for (String bucketName :
+        List.of(gcsfsIHelper.sharedBucketName1, gcsfsIHelper.sharedBucketName2)) {
+      gcs.isHnBucket(
+          UriPaths.fromStringPathComponents(
+              bucketName, /* objectName= */ null, /* allowEmptyObjectName= */ true));
+    }
+  }
+
   @Rule public TestName name = new TestName();
 
   protected TrackingHttpRequestInitializer gcsRequestsTracker;
@@ -69,9 +83,11 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
   protected GoogleCloudStorageFileSystem gcsFs;
 
   // The tests in this file explicitly check the request strings. The requests strings may vary
-  // depending on the gcs client used. This flag can be set to false for disabling these request
-  // checks.
-  protected static boolean isTracingSupported = true;
+  // depending on the gcs client used. Subclasses can override this to return false for disabling
+  // these request checks.
+  protected boolean isTracingSupported() {
+    return true;
+  }
 
   @Before
   public void before() {
@@ -96,7 +112,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.mkdir(dirObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRawRequestStrings())
           .containsExactly(
               uploadRequestString(
@@ -122,7 +138,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     gcsfsIHelper.mkdir(bucketName, dirObject);
     gcsFs.mkdir(dirObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRawRequestStrings())
           .containsExactly(
               uploadRequestString(
@@ -148,7 +164,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.mkdirs(dirObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRawRequestStrings())
           .containsExactly(
               batchRequestString(),
@@ -177,7 +193,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     gcsfsIHelper.mkdirs(dirObjectUri);
     gcsFs.mkdirs(dirObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRawRequestStrings())
           .containsExactly(
               batchRequestString(),
@@ -209,7 +225,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(dirObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -235,7 +251,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(dirObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -259,7 +275,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo fileInfo = gcsFs.getFileInfo(fileObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(getRequestString(bucketName, fileObject));
     }
@@ -281,7 +297,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -329,7 +345,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -377,7 +393,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -423,7 +439,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -484,7 +500,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             bucketUri.resolve(dirObject + "/subdir/f3"))
         .inOrder();
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject + "/f1"),
@@ -520,7 +536,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             bucketUri.resolve(dirObject + "/f2"),
             bucketUri.resolve(dirObject + "/subdir/f3"));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               listRequestWithTrailingDelimiter(
@@ -550,7 +566,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(fileObjectUri);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, fileObject),
@@ -594,7 +610,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -625,7 +641,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(fileInfos).hasSize(5000);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -669,7 +685,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -693,7 +709,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -714,7 +730,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     assertThrows(
         FileNotFoundException.class, () -> gcsFs.listFileInfo(bucketUri.resolve(dirObject)));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -754,7 +770,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(fileInfos).containsExactly(expectedFileInfo);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -831,7 +847,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(fileInfos).containsExactly(expectedFileInfo);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -1026,7 +1042,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     assertThat(thrown).hasCauseThat().hasCauseThat().isInstanceOf(NullPointerException.class);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject),
@@ -1181,7 +1197,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.delete(bucketUri.resolve(dirObject + "/f1"), /* recursive= */ false);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       // This test performs additional POST request to dirObject when run singly, as result
       // generationId for delete operation need to be increased for DELETE request.
       assertThat(gcsRequestsTracker.getAllRequestStrings())
@@ -1206,7 +1222,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.delete(bucketUri.resolve(dirObject + "/f1"), /* recursive= */ false);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject + "/"),
@@ -1250,7 +1266,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ false);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject + "/"),
@@ -1280,7 +1296,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/d1/");
     gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ false);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsAtLeast(
               listRequestWithTrailingDelimiter(
@@ -1315,7 +1331,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ true);
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               listRequestWithTrailingDelimiter(
@@ -1348,7 +1364,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject + "/f1"),
@@ -1389,7 +1405,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject + "/f1"),
@@ -1425,7 +1441,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
 
     gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       // This test performs additional POST request to dirObject when run singly, as result
       // generationId for delete operation need to be increased for DELETE request.
       assertThat(gcsRequestsTracker.getAllRequestStrings())
@@ -1469,7 +1485,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
             gcsFs.rename(
                 bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2")));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               getRequestString(bucketName, dirObject + "/f1"),
@@ -1501,7 +1517,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
         bucketUri.resolve(dirObject + "/srcParent/srcDir"),
         bucketUri.resolve(dirObject + "/dstParent/dstDir"));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               // Get src info
@@ -1744,7 +1760,7 @@ public abstract class GoogleCloudStorageFileSystemNewIntegrationTestBase {
         bucketUri.resolve(dirObject + "/srcParent/srcDir"),
         bucketUri.resolve(dirObject + "/dstParent/dstDir"));
 
-    if (isTracingSupported) {
+    if (isTracingSupported()) {
       assertThat(gcsRequestsTracker.getAllRequestStrings())
           .containsExactly(
               // Get src info
