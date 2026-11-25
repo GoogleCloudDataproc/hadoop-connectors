@@ -24,12 +24,6 @@ steps:
     waitFor: ['docker-build']
     entrypoint: 'bash'
     args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'unittest']
-    env:
-      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
-      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
-      - 'VCS_COMMIT_ID=$COMMIT_SHA'
-      - 'VCS_TAG=$TAG_NAME'
-      - 'CI_BUILD_ID=$BUILD_ID'
 
   # 3. Run integration tests concurrently with unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
@@ -39,11 +33,6 @@ steps:
     args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
     env:
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
-      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
-      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
-      - 'VCS_COMMIT_ID=$COMMIT_SHA'
-      - 'VCS_TAG=$TAG_NAME'
-      - 'CI_BUILD_ID=$BUILD_ID'
       - 'GCS_TEST_DIRECT_PATH_PREFERRED=false'
 
 # Tests take on average 25 minutes to run

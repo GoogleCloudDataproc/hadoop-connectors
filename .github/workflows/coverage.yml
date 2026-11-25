@@ -1,0 +1,65 @@
+# Runs the unit tests with the coverage profile and uploads the report to
+# Codecov. Integration tests run in Cloud Build (see cloudbuild/) and are not
+# part of this report.
+name: coverage
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: 'temurin'
+          java-version: 17
+          cache: maven
+
+      - name: Run unit tests and collect coverage
+        run: ./mvnw -B -e -Pcoverage clean verify
+
+      - name: Download Codecov CLI
+        id: download-codecov
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 2 \
+            -o "${RUNNER_TEMP}/codecov" \
+            "https://cli.codecov.io/v11.3.2/linux/codecov"
+
+      - name: Verify Codecov CLI checksum
+        id: verify-codecov
+        if: steps.download-codecov.outcome == 'success'
+        run: |
+          set -euo pipefail
+          if ! echo "8e1bfb71661378530f6ea21e82b414095899e565cbb4cf555c613064be17b973  ${RUNNER_TEMP}/codecov" | sha256sum -c -; then
+            rm -f "${RUNNER_TEMP}/codecov"
+            exit 1
+          fi
+          chmod +x "${RUNNER_TEMP}/codecov"
+
+      - name: Upload coverage report to Codecov
+        if: steps.verify-codecov.outcome == 'success'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          binary: ${{ runner.temp }}/codecov
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittest
+          fail_ci_if_error: false

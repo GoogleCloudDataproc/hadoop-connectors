@@ -20,12 +20,9 @@ readonly TEST_TYPE="${1:-unittest}"
 
 cd /hadoop-connectors
 
-# Run unit or integration tests and generate test coverage report
+# Run unit or integration tests
 if [[ $TEST_TYPE == unittest ]]; then
-  ./mvnw -B -e -Pcoverage clean verify
+  ./mvnw -B -e clean verify
 else
-  ./mvnw -B -e -Pintegration-test -Pcoverage clean verify
+  ./mvnw -B -e -Pintegration-test clean verify
 fi
-
-# Upload test coverage report to Codecov
-bash <(curl -s https://codecov.io/bash) -K -F "${TEST_TYPE}"
