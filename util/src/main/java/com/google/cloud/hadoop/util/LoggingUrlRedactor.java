@@ -78,46 +78,19 @@ public final class LoggingUrlRedactor {
     if (url == null) {
       return "null";
     }
-    GenericUrl sanitized;
-    try {
-      sanitized = url.clone();
-      sanitized.setUserInfo(null);
-      if (sanitized.getFragment() != null) {
-        sanitized.setFragment(redactSensitiveKeyValues(sanitized.getFragment()));
-      }
-      for (Map.Entry<String, Object> entry : new ArrayList<>(sanitized.entrySet())) {
-        String key = entry.getKey();
-        if (key == null || isSafeQueryParam(key)) {
-          continue;
-        }
-        Object value = entry.getValue();
-        if (value == null) {
-          continue;
-        }
-        sanitized.set(key, redactValue(value));
-      }
-    } catch (IllegalArgumentException e) {
-      // GenericUrl.clone() uses reflective Data.clone(), which rejects non-public Collection
-      // implementations such as List.of(), ImmutableList, and Collections.emptyList().
-      sanitized = copyAndRedactWithoutClone(url);
-    }
-    return sanitized.build();
-  }
-
-  private static GenericUrl copyAndRedactWithoutClone(GenericUrl url) {
-    GenericUrl copy = new GenericUrl();
+    GenericUrl sanitized = new GenericUrl();
     if (url.getScheme() != null) {
-      copy.setScheme(url.getScheme());
+      sanitized.setScheme(url.getScheme());
     }
     if (url.getHost() != null) {
-      copy.setHost(url.getHost());
+      sanitized.setHost(url.getHost());
     }
-    copy.setPort(url.getPort());
+    sanitized.setPort(url.getPort());
     if (url.getPathParts() != null) {
-      copy.setPathParts(new ArrayList<>(url.getPathParts()));
+      sanitized.setPathParts(new ArrayList<>(url.getPathParts()));
     }
     if (url.getFragment() != null) {
-      copy.setFragment(redactSensitiveKeyValues(url.getFragment()));
+      sanitized.setFragment(redactSensitiveKeyValues(url.getFragment()));
     }
     for (Map.Entry<String, Object> entry : url.entrySet()) {
       String key = entry.getKey();
@@ -126,13 +99,13 @@ public final class LoggingUrlRedactor {
         continue;
       }
       if (isSafeQueryParam(key)) {
-        copy.set(
+        sanitized.set(
             key, value instanceof Collection<?> ? new ArrayList<>((Collection<?>) value) : value);
       } else {
-        copy.set(key, redactValue(value));
+        sanitized.set(key, redactValue(value));
       }
     }
-    return copy;
+    return sanitized.build();
   }
 
   private static Object redactValue(Object value) {

@@ -16,8 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import com.google.cloud.hadoop.util.LoggingUrlRedactor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -332,12 +330,11 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
         this.streamUploadId = uploadId;
       }
       if (!uploadId.equals(streamUploadId)) {
-        checkState(
-            false,
-            "Write stream should have unique uploadId associated with each chunk request."
-                + " Expected was %s got %s",
-            formatUploadIdForLog(streamUploadId),
-            formatUploadIdForLog(uploadId));
+        throw new IllegalStateException(
+            String.format(
+                "Write stream should have unique uploadId associated with each chunk request."
+                    + " Expected was %s got %s",
+                formatUploadIdForLog(streamUploadId), formatUploadIdForLog(uploadId)));
       }
     }
   }
