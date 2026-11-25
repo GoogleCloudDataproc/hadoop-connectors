@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
@@ -83,6 +84,16 @@ final class AnalyticsCoreConfigMapper {
   static final String PROXY_ADDRESS_KEY = "analytics-core.auth.proxy.address";
   static final String PROXY_USERNAME_KEY = "analytics-core.auth.proxy.username";
   static final String PROXY_PASSWORD_KEY = "analytics-core.auth.proxy.password";
+  static final String HTTP_CONNECT_TIMEOUT_KEY = "analytics-core.auth.http.connect-timeout-ms";
+  static final String HTTP_READ_TIMEOUT_KEY = "analytics-core.auth.http.read-timeout-ms";
+  static final String RETRY_MAX_ATTEMPTS_KEY = "analytics-core.retry.max-attempts";
+  static final String RETRY_TOTAL_TIMEOUT_MS_KEY = "analytics-core.retry.total-timeout-ms";
+
+  /**
+   * Maximum total elapsed time for Apiary HTTP retries (30 minutes, matching {@code
+   * com.google.cloud.hadoop.util.RetryHttpInitializer}).
+   */
+  static final long APIARY_MAX_RETRY_ELAPSED_TIME_MS = 1_800_000L;
 
   private static final String WORKLOAD_IDENTITY_FEDERATION_VALUE = "WORKLOAD_IDENTITY_FEDERATION";
 
@@ -154,6 +165,12 @@ final class AnalyticsCoreConfigMapper {
   private static final HadoopConfigurationProperty<RedactedString> PROXY_PASSWORD =
       new HadoopConfigurationProperty<RedactedString>(
               HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX.getKey())
+          .withPrefixes(KEY_PREFIXES);
+
+  private static final HadoopConfigurationProperty<Long> HTTP_READ_TIMEOUT =
+      new HadoopConfigurationProperty<>(
+              HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX.getKey(),
+              HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX.getDefault())
           .withPrefixes(KEY_PREFIXES);
 
   @VisibleForTesting
@@ -245,7 +262,29 @@ final class AnalyticsCoreConfigMapper {
    * <p>Auth and proxy settings are translated from their connector spelling ({@code fs.gs.auth.*},
    * {@code fs.gs.proxy.*}, {@code fs.gs.token.server.url}) to the {@code analytics-core.auth.*}
    * keys, resolving JCEKS secrets and impersonation the same way the connector does. Auth keys set
-   * directly in the Analytics Core spelling are ignored.
+   * directly in the Analytics Core spelling are ignored. The HTTP timeouts are always mapped, so
+   * Analytics Core uses the same timeouts as the connector.
+   *
+   * <p>When Analytics Core builds credentials and transports from these mapped keys instead of
+   * {@link HadoopCredentialsConfiguration}, the following behavior differences apply:
+   *
+   * <ul>
+   *   <li>{@code UNAUTHENTICATED} builds unauthenticated credentials instead of failing with a
+   *       {@code NullPointerException}.
+   *   <li>{@code fs.gs.token.server.url} uses the JVM default trust store instead of Google's
+   *       bundled {@code google.p12} trust store. Empty or whitespace-only URLs are treated as
+   *       unset, and {@code APPLICATION_DEFAULT} logs a warning if the resolved credential ignores
+   *       the URL.
+   *   <li>{@code fs.gs.http.connect-timeout} and {@code fs.gs.http.read-timeout} also apply to
+   *       Analytics Core's HTTP data plane. Negative values fail at initialization on all Analytics
+   *       Core paths, and values above {@link Integer#MAX_VALUE} ms fail on HTTP or Analytics Core
+   *       credential transports.
+   *   <li>Missing service-account keyfiles or Workload Identity Federation files throw {@link
+   *       java.nio.file.NoSuchFileException} (an {@link IOException}) instead of {@link
+   *       java.io.FileNotFoundException}.
+   *   <li>Leading and trailing whitespace is trimmed from file paths, OAuth client secrets, refresh
+   *       tokens, and proxy passwords.
+   * </ul>
    *
    * @param config The Hadoop configuration.
    * @param prefix The prefix used for Analytics Core properties (e.g., "fs.gs.").
@@ -294,12 +333,14 @@ final class AnalyticsCoreConfigMapper {
     mappedProperties.put(
         prefix + USER_AGENT_KEY, GoogleHadoopFileSystemConfiguration.getApplicationName(config));
 
-    mapTransportProtocol(config, mappedProperties, prefix);
+    Optional<Protocol> protocol = mapTransportProtocol(config, mappedProperties, prefix);
+    mapRetryConfigs(config, mappedProperties, prefix, protocol);
 
     mapEncryptionKey(config, mappedProperties, prefix);
 
     removeSweptAuthKeys(mappedProperties, prefix);
     mapProxyConfigs(config, prefix, mappedProperties);
+    mapHttpTimeouts(config, prefix, mappedProperties);
     mapAuthIdentityConfigs(config, prefix, mappedProperties);
 
     return mappedProperties;
@@ -307,10 +348,11 @@ final class AnalyticsCoreConfigMapper {
 
   /**
    * Maps {@code fs.gs.client.type} / {@code fs.gs.bidi.enable} to Analytics Core's {@code
-   * client.protocol}. Appendable writes are enabled for {@link Protocol#BIDI} unless {@code
-   * channel.write.bidi.enabled} is set explicitly.
+   * client.protocol} and returns the resolved {@link Protocol} (if recognized). Appendable writes
+   * are enabled for {@link Protocol#BIDI} unless {@code channel.write.bidi.enabled} is set
+   * explicitly.
    */
-  private static void mapTransportProtocol(
+  private static Optional<Protocol> mapTransportProtocol(
       Configuration config, Map<String, String> map, String prefix) {
     boolean transportConfigured =
         config.get(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey()) != null
@@ -323,21 +365,90 @@ final class AnalyticsCoreConfigMapper {
     map.remove(GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey());
 
     String protocolKey = prefix + CLIENT_PROTOCOL_KEY;
-    Protocol protocol = toProtocol(config);
+    Optional<Protocol> resolvedProtocol;
     if (transportConfigured || !map.containsKey(protocolKey)) {
+      Protocol protocol = toProtocol(config);
       map.put(protocolKey, protocol.name());
+      resolvedProtocol = Optional.of(protocol);
     } else {
-      protocol = parseProtocol(map.get(protocolKey)).orElse(protocol);
+      resolvedProtocol = parseProtocol(map.get(protocolKey));
     }
 
     String bidiWriteKey = prefix + BIDI_WRITE_ENABLED_KEY;
     // Explicit channel.write.bidi.enabled wins (opt-out for non-zonal buckets).
     if (!map.containsKey(bidiWriteKey)) {
-      map.put(bidiWriteKey, String.valueOf(protocol == Protocol.BIDI));
+      boolean isBidi = resolvedProtocol.isPresent() && resolvedProtocol.get() == Protocol.BIDI;
+      map.put(bidiWriteKey, String.valueOf(isBidi));
     }
     if (!Boolean.parseBoolean(map.get(bidiWriteKey))) {
       // Only meaningful for appendable writes.
       map.remove(prefix + BIDI_WRITE_FINALIZE_ON_CLOSE_KEY);
+    }
+    return resolvedProtocol;
+  }
+
+  /**
+   * Maps an explicitly set {@code fs.gs.http.max.retry} onto {@code analytics-core.retry.*} when
+   * the resolved protocol is {@link Protocol#HTTP}. When the key is not set, nothing is added and
+   * the {@code java-storage} default {@code RetrySettings} apply.
+   *
+   * <p>The retry count is mapped as {@code max-attempts = retries + 1} and overrides a
+   * passed-through {@code analytics-core.retry.max-attempts}. When {@code retries > 0}, the total
+   * timeout is raised to the Apiary client's 30 minutes ({@link #APIARY_MAX_RETRY_ELAPSED_TIME_MS})
+   * unless {@code analytics-core.retry.total-timeout-ms} is passed through: under the {@code
+   * java-storage} default of 50 seconds the timeout ends the retries after about five requests, so
+   * a higher attempt count alone would have no effect. When {@code retries == 0} (single attempt,
+   * fail-fast), {@code total-timeout-ms} is left unset so deadlines are not widened. The backoff
+   * delays stay at the {@code java-storage} defaults.
+   *
+   * <p>For {@link Protocol#GRPC} and {@link Protocol#BIDI} the key is ignored, as the legacy {@code
+   * STORAGE_CLIENT} ignores it. The connector's {@code fs.gs.http.max.retry} key is removed from
+   * the map for all protocols.
+   */
+  private static void mapRetryConfigs(
+      Configuration config, Map<String, String> map, String prefix, Optional<Protocol> protocol) {
+    String maxRetryHadoopKey = GoogleHadoopFileSystemConfiguration.GCS_HTTP_MAX_RETRY.getKey();
+    map.remove(maxRetryHadoopKey);
+
+    if (!protocol.isPresent() || protocol.get() != Protocol.HTTP) {
+      return;
+    }
+    if (config.get(maxRetryHadoopKey) == null) {
+      return;
+    }
+
+    long maxRetries = parseMaxHttpRetries(config);
+    map.put(prefix + RETRY_MAX_ATTEMPTS_KEY, String.valueOf(maxRetries + 1L));
+    if (maxRetries > 0) {
+      putDefaultIfBlank(
+          map,
+          prefix + RETRY_TOTAL_TIMEOUT_MS_KEY,
+          String.valueOf(APIARY_MAX_RETRY_ELAPSED_TIME_MS));
+    }
+  }
+
+  private static int parseMaxHttpRetries(Configuration config) {
+    String key = GoogleHadoopFileSystemConfiguration.GCS_HTTP_MAX_RETRY.getKey();
+    int maxRetries;
+    try {
+      maxRetries =
+          GoogleHadoopFileSystemConfiguration.GCS_HTTP_MAX_RETRY.get(config, config::getInt);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid integer value '%s' for key %s (expected non-negative integer)",
+              config.get(key), key),
+          e);
+    }
+    checkArgument(
+        maxRetries >= 0, "Invalid value %s for key %s: must be non-negative", maxRetries, key);
+    return maxRetries;
+  }
+
+  private static void putDefaultIfBlank(Map<String, String> map, String key, String defaultValue) {
+    String existing = map.get(key);
+    if (existing == null || existing.trim().isEmpty()) {
+      map.put(key, defaultValue);
     }
   }
 
@@ -368,6 +479,16 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
+   * Returns whether a Hadoop token plugin ({@code ACCESS_TOKEN_PROVIDER} or a delegation token
+   * binding) supplies the identity, in which case the connector builds the credentials itself.
+   */
+  static boolean usesHadoopTokenProvider(Configuration config) {
+    return AUTHENTICATION_TYPE.get(config, config::getEnum)
+            == AuthenticationType.ACCESS_TOKEN_PROVIDER
+        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get));
+  }
+
+  /**
    * Maps {@code fs.gs.encryption.key} via {@code getPassword} so JCEKS secrets are resolved for
    * both CSEK reads and writes.
    */
@@ -390,6 +511,23 @@ final class AnalyticsCoreConfigMapper {
   }
 
   /**
+   * Maps the HTTP timeouts in milliseconds. {@code 0} means no timeout in both the connector and
+   * Analytics Core.
+   */
+  private static void mapHttpTimeouts(
+      Configuration config, String prefix, Map<String, String> map) {
+    map.put(
+        prefix + HTTP_CONNECT_TIMEOUT_KEY,
+        Long.toString(
+            GoogleHadoopFileSystemConfiguration.GCS_HTTP_CONNECT_TIMEOUT
+                .getTimeDuration(config)
+                .toMillis()));
+    map.put(
+        prefix + HTTP_READ_TIMEOUT_KEY,
+        Long.toString(HTTP_READ_TIMEOUT.getTimeDuration(config).toMillis()));
+  }
+
+  /**
    * Maps the auth type and only the keys that type uses, so secrets of other auth types left in a
    * shared cluster config are not forwarded. {@code ACCESS_TOKEN_PROVIDER} and delegation tokens
    * are Hadoop-only plugins and map to nothing; the connector keeps building those credentials
@@ -397,11 +535,10 @@ final class AnalyticsCoreConfigMapper {
    */
   private static void mapAuthIdentityConfigs(
       Configuration config, String prefix, Map<String, String> map) {
-    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
-    if (authType == AuthenticationType.ACCESS_TOKEN_PROVIDER
-        || !isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+    if (usesHadoopTokenProvider(config)) {
       return;
     }
+    AuthenticationType authType = AUTHENTICATION_TYPE.get(config, config::getEnum);
     map.put(prefix + AUTH_TYPE_KEY, toAnalyticsCoreAuthType(authType));
 
     switch (authType) {
@@ -437,7 +574,11 @@ final class AnalyticsCoreConfigMapper {
       Optional<String> impersonationServiceAccount =
           HadoopCredentialsConfiguration.getImpersonationServiceAccount(config, GCS_CONFIG_PREFIX);
       impersonationServiceAccount.ifPresent(
-          account -> map.put(prefix + IMPERSONATION_SERVICE_ACCOUNT_KEY, account));
+          account -> {
+            checkArgument(
+                !account.trim().isEmpty(), "Impersonation service account must not be blank");
+            map.put(prefix + IMPERSONATION_SERVICE_ACCOUNT_KEY, account);
+          });
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to resolve impersonation service account", e);
     }

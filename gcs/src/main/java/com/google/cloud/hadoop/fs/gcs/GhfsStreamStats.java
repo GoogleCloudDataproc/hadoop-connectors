@@ -22,10 +22,10 @@ class GhfsStreamStats {
   private final GhfsGlobalStorageStatistics storageStatistics;
   private final GhfsStatistic durationStat;
   private final Object context;
-  private long maxLatencyMs;
+  private long maxLatencyNs;
   private int operationCount;
-  private long minLatencyMs;
-  private long totalMs;
+  private long minLatencyNs;
+  private long totalNs;
 
   GhfsStreamStats(
       @Nonnull GhfsGlobalStorageStatistics storageStatistics,
@@ -42,11 +42,14 @@ class GhfsStreamStats {
     }
 
     storageStatistics.updateStats(
-        durationStat, minLatencyMs, maxLatencyMs, totalMs, operationCount, context);
-    this.totalMs = 0;
+        durationStat,
+        toMillis(minLatencyNs),
+        toMillis(maxLatencyNs),
+        toMillis(totalNs),
+        operationCount,
+        context);
+    this.totalNs = 0;
     this.operationCount = 0;
-    this.maxLatencyMs = 0;
-    this.minLatencyMs = 0;
   }
 
   void updateWriteStreamStats(int len, long start) {
@@ -72,15 +75,15 @@ class GhfsStreamStats {
   }
 
   private void updateStats(long start) {
-    long latencyMs = toMillis(System.nanoTime() - start);
-    this.maxLatencyMs = Math.max(latencyMs, this.maxLatencyMs);
+    long latency = System.nanoTime() - start;
+    this.maxLatencyNs = Math.max(latency, this.maxLatencyNs);
     if (operationCount == 0) {
-      this.minLatencyMs = latencyMs;
+      this.minLatencyNs = latency;
     } else {
-      this.minLatencyMs = Math.min(latencyMs, this.minLatencyMs);
+      this.minLatencyNs = Math.min(latency, this.minLatencyNs);
     }
 
-    this.totalMs += latencyMs;
+    this.totalNs += latency;
     this.operationCount++;
   }
 }

@@ -19,14 +19,22 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.gax.retrying.RetrySettings;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsClientOptions.Protocol;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystemOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsReadOptions;
+import com.google.cloud.gcs.analyticscore.client.GcsRetryOptions;
 import com.google.cloud.gcs.analyticscore.client.GcsVectoredReadOptions;
+import com.google.cloud.gcs.analyticscore.client.auth.AuthType;
+import com.google.cloud.gcs.analyticscore.client.auth.GcsAuthOptions;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
+import com.google.cloud.storage.StorageOptions;
+import com.google.common.collect.ImmutableList;
+import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.alias.CredentialProvider;
@@ -44,8 +52,8 @@ public class AnalyticsCoreConfigMapperTest {
   @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
   /**
-   * Mappings emitted for every configuration: the user agent, and the transport selection, which is
-   * always derived from {@code fs.gs.client.type} / {@code fs.gs.bidi.enable}.
+   * Mappings emitted for every configuration: the user agent, default auth type, HTTP timeouts, and
+   * the transport selection derived from {@code fs.gs.client.type} / {@code fs.gs.bidi.enable}.
    */
   private static final Map<String, String> EXPECTED_MANDATORY_MAPPINGS =
       Map.of(
@@ -56,7 +64,32 @@ public class AnalyticsCoreConfigMapperTest {
           "fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY,
           Protocol.HTTP.name(),
           "fs.gs." + AnalyticsCoreConfigMapper.BIDI_WRITE_ENABLED_KEY,
-          "false");
+          "false",
+          "fs.gs." + AnalyticsCoreConfigMapper.HTTP_CONNECT_TIMEOUT_KEY,
+          "5000",
+          "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+          "5000");
+
+  private static final String HTTP_MAX_RETRY =
+      GoogleHadoopFileSystemConfiguration.GCS_HTTP_MAX_RETRY.getKey();
+  private static final String RETRY_MAX_ATTEMPTS =
+      "fs.gs." + AnalyticsCoreConfigMapper.RETRY_MAX_ATTEMPTS_KEY;
+  private static final String RETRY_TOTAL_TIMEOUT_MS =
+      "fs.gs." + AnalyticsCoreConfigMapper.RETRY_TOTAL_TIMEOUT_MS_KEY;
+  private static final String RETRY_INITIAL_DELAY_MS =
+      "fs.gs.analytics-core.retry.initial-delay-ms";
+  private static final String RETRY_DELAY_MULTIPLIER =
+      "fs.gs.analytics-core.retry.delay-multiplier";
+  private static final String RETRY_MAX_DELAY_MS = "fs.gs.analytics-core.retry.max-delay-ms";
+
+  /** Every Analytics Core retry key, with the {@code fs.gs.} prefix. */
+  private static final ImmutableList<String> ALL_RETRY_KEYS =
+      ImmutableList.of(
+          RETRY_MAX_ATTEMPTS,
+          RETRY_INITIAL_DELAY_MS,
+          RETRY_DELAY_MULTIPLIER,
+          RETRY_MAX_DELAY_MS,
+          RETRY_TOTAL_TIMEOUT_MS);
 
   @Test
   public void mapConfigs_mapsConnectorPropertiesToAnalyticsCore() {
@@ -325,6 +358,8 @@ public class AnalyticsCoreConfigMapperTest {
         .isFalse();
     assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey()))
         .isFalse();
+    assertThat(mapped.containsKey(GoogleHadoopFileSystemConfiguration.GCS_HTTP_MAX_RETRY.getKey()))
+        .isFalse();
   }
 
   @Test
@@ -500,6 +535,22 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
+  public void mapConfigs_mapsHttpTimeoutsInMillis() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.http.connect-timeout", "30s");
+    config.set("fs.gs.http.read-timeout", "0");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_CONNECT_TIMEOUT_KEY,
+            "30000",
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+            "0");
+  }
+
+  @Test
   public void mapConfigs_transportSettingsUnset_omitsAnalyticsCoreKeys() {
     Configuration config = new Configuration();
 
@@ -654,10 +705,33 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
+  public void mapConfigs_blankImpersonationServiceAccount_throwsIllegalArgumentException()
+      throws Exception {
+    Configuration staticBlankConfig = new Configuration();
+    staticBlankConfig.set("fs.gs.auth.impersonation.service.account", "   ");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> AnalyticsCoreConfigMapper.mapConfigs(staticBlankConfig, "fs.gs."));
+
+    Configuration userOverrideBlankConfig = new Configuration();
+    String currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    userOverrideBlankConfig.set(
+        "fs.gs.auth.impersonation.service.account", "static-sa@proj.iam.gserviceaccount.com");
+    userOverrideBlankConfig.set(
+        "fs.gs.auth.impersonation.service.account.for.user." + currentUser, "   ");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> AnalyticsCoreConfigMapper.mapConfigs(userOverrideBlankConfig, "fs.gs."));
+  }
+
+  @Test
   public void mapConfigs_fallsBackToGoogleCloudPrefixWhenFsGsUnset() {
     Configuration config = new Configuration();
     config.set("google.cloud.auth.type", "APPLICATION_DEFAULT");
     config.set("google.cloud.proxy.address", "base-proxy:8080");
+    config.set("google.cloud.http.read-timeout", "20s");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -666,7 +740,9 @@ public class AnalyticsCoreConfigMapperTest {
             "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
             "APPLICATION_DEFAULT",
             "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
-            "base-proxy:8080");
+            "base-proxy:8080",
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+            "20000");
   }
 
   @Test
@@ -674,8 +750,10 @@ public class AnalyticsCoreConfigMapperTest {
     Configuration config = new Configuration();
     config.set("fs.gs.auth.type", "UNAUTHENTICATED");
     config.set("fs.gs.proxy.address", "connector-proxy:3128");
+    config.set("fs.gs.http.read-timeout", "10s");
     config.set("fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY, "SERVICE_ACCOUNT_JSON_KEYFILE");
     config.set("fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY, "analytics-core-proxy:9090");
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY, "1");
 
     Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
 
@@ -684,7 +762,9 @@ public class AnalyticsCoreConfigMapperTest {
             "fs.gs." + AnalyticsCoreConfigMapper.AUTH_TYPE_KEY,
             "UNAUTHENTICATED",
             "fs.gs." + AnalyticsCoreConfigMapper.PROXY_ADDRESS_KEY,
-            "connector-proxy:3128");
+            "connector-proxy:3128",
+            "fs.gs." + AnalyticsCoreConfigMapper.HTTP_READ_TIMEOUT_KEY,
+            "10000");
   }
 
   @Test
@@ -780,6 +860,7 @@ public class AnalyticsCoreConfigMapperTest {
     config.set(GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY.getKey(), "my-csek-key");
     config.set(
         GoogleHadoopFileSystemConfiguration.GCS_WRITE_ROLLING_CHECKSUM_ENABLE.getKey(), "true");
+    config.set(GoogleHadoopFileSystemConfiguration.GCS_HTTP_MAX_RETRY.getKey(), "7");
     config.set("fs.gs.client.type", "STORAGE_CLIENT");
     return config;
   }
@@ -1223,6 +1304,32 @@ public class AnalyticsCoreConfigMapperTest {
   }
 
   @Test
+  public void mapConfigs_authMapping_isParsedByAnalyticsCore() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE");
+    config.set("fs.gs.auth.service.account.json.keyfile", "/path/to/key.json");
+    config.set("fs.gs.auth.impersonation.service.account", "sa@proj.iam.gserviceaccount.com");
+    config.set("fs.gs.proxy.address", "proxy-host:1234");
+    config.set("fs.gs.http.connect-timeout", "30s");
+    config.set("fs.gs.http.read-timeout", "10s");
+
+    GcsAuthOptions authOptions =
+        GcsFileSystemOptions.createFromOptions(
+                AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs."), "fs.gs.")
+            .getGcsAuthOptions();
+
+    assertThat(authOptions.getAuthType())
+        .isEqualTo(Optional.of(AuthType.SERVICE_ACCOUNT_JSON_KEYFILE));
+    assertThat(authOptions.getServiceAccountJsonKeyfile())
+        .isEqualTo(Optional.of("/path/to/key.json"));
+    assertThat(authOptions.getImpersonationServiceAccount())
+        .isEqualTo(Optional.of("sa@proj.iam.gserviceaccount.com"));
+    assertThat(authOptions.getProxyAddress()).isEqualTo(Optional.of("proxy-host:1234"));
+    assertThat(authOptions.getHttpConnectTimeout()).isEqualTo(Duration.ofSeconds(30));
+    assertThat(authOptions.getHttpReadTimeout()).isEqualTo(Duration.ofSeconds(10));
+  }
+
+  @Test
   public void toProtocol_resolvesProtocolFromClientTypeAndBidiFlag() {
     Configuration config = new Configuration();
     assertThat(AnalyticsCoreConfigMapper.toProtocol(config)).isEqualTo(Protocol.HTTP);
@@ -1234,5 +1341,222 @@ public class AnalyticsCoreConfigMapperTest {
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), true);
     assertThat(AnalyticsCoreConfigMapper.toProtocol(config)).isEqualTo(Protocol.BIDI);
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_maxRetryUnset_addsNoRetryKeys() {
+    Configuration config = new Configuration(false);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.keySet()).containsNoneIn(ALL_RETRY_KEYS);
+    GcsFileSystemOptions options = GcsFileSystemOptions.createFromOptions(mapped, "fs.gs.");
+    assertThat(options.getGcsClientOptions().getGcsRetryOptions().hasOverrides()).isFalse();
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_maxRetrySet_mapsMaxAttemptsAndApiaryTotalTimeout() {
+    Configuration config = new Configuration(false);
+    config.setInt(HTTP_MAX_RETRY, 10);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped).containsAtLeast(RETRY_MAX_ATTEMPTS, "11", RETRY_TOTAL_TIMEOUT_MS, "1800000");
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            HTTP_MAX_RETRY, RETRY_INITIAL_DELAY_MS, RETRY_DELAY_MULTIPLIER, RETRY_MAX_DELAY_MS);
+
+    GcsRetryOptions retryOptions =
+        GcsFileSystemOptions.createFromOptions(mapped, "fs.gs.")
+            .getGcsClientOptions()
+            .getGcsRetryOptions();
+    assertThat(retryOptions.getMaxAttempts()).isEqualTo(Optional.of(11));
+    assertThat(retryOptions.getTotalTimeout())
+        .isEqualTo(
+            Optional.of(
+                Duration.ofMillis(AnalyticsCoreConfigMapper.APIARY_MAX_RETRY_ELAPSED_TIME_MS)));
+    assertThat(retryOptions.getInitialRetryDelay()).isEqualTo(Optional.empty());
+    assertThat(retryOptions.getRetryDelayMultiplier()).isEqualTo(Optional.empty());
+    assertThat(retryOptions.getMaxRetryDelay()).isEqualTo(Optional.empty());
+
+    // The backoff delays stay at the java-storage defaults.
+    RetrySettings sdkDefaults = StorageOptions.getDefaultRetrySettings();
+    RetrySettings applied = retryOptions.applyTo(sdkDefaults);
+    assertThat(applied.getMaxAttempts()).isEqualTo(11);
+    assertThat(applied.getTotalTimeoutDuration()).isEqualTo(Duration.ofMinutes(30));
+    assertThat(applied.getInitialRetryDelayDuration())
+        .isEqualTo(sdkDefaults.getInitialRetryDelayDuration());
+    assertThat(applied.getRetryDelayMultiplier()).isEqualTo(sdkDefaults.getRetryDelayMultiplier());
+    assertThat(applied.getMaxRetryDelayDuration())
+        .isEqualTo(sdkDefaults.getMaxRetryDelayDuration());
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_zeroMaxRetry_mapsToSingleAttemptWithoutRaisingTimeout() {
+    Configuration config = new Configuration(false);
+    config.setInt(HTTP_MAX_RETRY, 0);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get(RETRY_MAX_ATTEMPTS)).isEqualTo("1");
+    assertThat(mapped).doesNotContainKey(RETRY_TOTAL_TIMEOUT_MS);
+
+    GcsRetryOptions retryOptions =
+        GcsFileSystemOptions.createFromOptions(mapped, "fs.gs.")
+            .getGcsClientOptions()
+            .getGcsRetryOptions();
+    RetrySettings sdkDefaults = StorageOptions.getDefaultRetrySettings();
+    RetrySettings applied = retryOptions.applyTo(sdkDefaults);
+    assertThat(applied.getMaxAttempts()).isEqualTo(1);
+    assertThat(applied.getTotalTimeoutDuration()).isEqualTo(sdkDefaults.getTotalTimeoutDuration());
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_whitespacePaddedMaxRetry_isParsed() {
+    Configuration config = new Configuration(false);
+    config.set(HTTP_MAX_RETRY, " 3 ");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get(RETRY_MAX_ATTEMPTS)).isEqualTo("4");
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_maxIntMaxRetry_doesNotOverflowAndIsRejectedDownstream() {
+    Configuration config = new Configuration(false);
+    config.setInt(HTTP_MAX_RETRY, Integer.MAX_VALUE);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped.get(RETRY_MAX_ATTEMPTS)).isEqualTo("2147483648");
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> GcsFileSystemOptions.createFromOptions(mapped, "fs.gs."));
+    assertThat(e).hasMessageThat().contains("Integer.MAX_VALUE");
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_invalidOrNegativeMaxRetry_throwsNamingConnectorKey() {
+    for (String invalid : new String[] {"-1", "-5", "abc", "", "   "}) {
+      Configuration config = new Configuration(false);
+      config.set(HTTP_MAX_RETRY, invalid);
+
+      IllegalArgumentException e =
+          assertThrows(
+              "value: '" + invalid + "'",
+              IllegalArgumentException.class,
+              () -> AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs."));
+
+      assertThat(e).hasMessageThat().contains(HTTP_MAX_RETRY);
+    }
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_maxRetrySet_overridesPassedThroughMaxAttemptsOnly() {
+    Configuration config = new Configuration(false);
+    config.setInt(HTTP_MAX_RETRY, 3);
+    config.set(RETRY_MAX_ATTEMPTS, "99");
+    config.set(RETRY_TOTAL_TIMEOUT_MS, "120000");
+    config.set(RETRY_INITIAL_DELAY_MS, "500");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped)
+        .containsAtLeast(
+            RETRY_MAX_ATTEMPTS,
+            "4",
+            RETRY_TOTAL_TIMEOUT_MS,
+            "120000",
+            RETRY_INITIAL_DELAY_MS,
+            "500");
+    assertThat(mapped.keySet()).containsNoneOf(RETRY_DELAY_MULTIPLIER, RETRY_MAX_DELAY_MS);
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_maxRetrySet_blankPassedThroughTotalTimeout_isReplaced() {
+    Configuration config = new Configuration(false);
+    config.setInt(HTTP_MAX_RETRY, 3);
+    config.set(RETRY_TOTAL_TIMEOUT_MS, "   ");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped).containsEntry(RETRY_TOTAL_TIMEOUT_MS, "1800000");
+  }
+
+  @Test
+  public void mapConfigs_httpProtocol_maxRetryUnset_leavesPassedThroughRetryKeysUntouched() {
+    // A pass-through max-delay-ms equal to java-storage's default initial delay (1000 ms) must
+    // remain valid.
+    Configuration config = new Configuration(false);
+    config.set(RETRY_MAX_DELAY_MS, "1000");
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped).containsEntry(RETRY_MAX_DELAY_MS, "1000");
+    assertThat(mapped.keySet())
+        .containsNoneOf(
+            RETRY_MAX_ATTEMPTS,
+            RETRY_INITIAL_DELAY_MS,
+            RETRY_DELAY_MULTIPLIER,
+            RETRY_TOTAL_TIMEOUT_MS);
+
+    GcsRetryOptions retryOptions =
+        GcsFileSystemOptions.createFromOptions(mapped, "fs.gs.")
+            .getGcsClientOptions()
+            .getGcsRetryOptions();
+    RetrySettings applied = retryOptions.applyTo(StorageOptions.getDefaultRetrySettings());
+    assertThat(applied.getMaxRetryDelayDuration()).isEqualTo(Duration.ofSeconds(1));
+  }
+
+  @Test
+  public void mapConfigs_passedThroughHttpProtocol_maxRetrySet_isMapped() {
+    Configuration config = new Configuration(false);
+    config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, " http ");
+    config.setInt(HTTP_MAX_RETRY, 2);
+
+    Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+    assertThat(mapped).containsAtLeast(RETRY_MAX_ATTEMPTS, "3", RETRY_TOTAL_TIMEOUT_MS, "1800000");
+  }
+
+  @Test
+  public void mapConfigs_grpcAndBidiProtocols_ignoreAndDropMaxRetry() {
+    for (boolean bidi : new boolean[] {false, true}) {
+      Configuration config = new Configuration(false);
+      config.setEnum(
+          GoogleHadoopFileSystemConfiguration.GCS_CLIENT_TYPE.getKey(), ClientType.STORAGE_CLIENT);
+      config.setBoolean(
+          GoogleHadoopFileSystemConfiguration.GCS_OPERATION_BIDI_API_ENABLE.getKey(), bidi);
+      config.setInt(HTTP_MAX_RETRY, 4);
+
+      Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+      assertThat(mapped).doesNotContainKey(HTTP_MAX_RETRY);
+      assertThat(mapped.keySet()).containsNoneIn(ALL_RETRY_KEYS);
+      GcsFileSystemOptions options = GcsFileSystemOptions.createFromOptions(mapped, "fs.gs.");
+      assertThat(options.getGcsClientOptions().getGcsRetryOptions().hasOverrides()).isFalse();
+    }
+  }
+
+  @Test
+  public void mapConfigs_nonHttpPassedThroughProtocols_keepOnlyPassedThroughRetryKeys() {
+    for (String passedProtocol : new String[] {"GRPC", "BIDI", "CARRIER_PIGEON"}) {
+      Configuration config = new Configuration(false);
+      config.set("fs.gs." + AnalyticsCoreConfigMapper.CLIENT_PROTOCOL_KEY, passedProtocol);
+      config.setInt(HTTP_MAX_RETRY, 4);
+      config.set(RETRY_MAX_ATTEMPTS, "8");
+
+      Map<String, String> mapped = AnalyticsCoreConfigMapper.mapConfigs(config, "fs.gs.");
+
+      assertThat(mapped).containsEntry(RETRY_MAX_ATTEMPTS, "8");
+      assertThat(mapped.keySet())
+          .containsNoneOf(
+              HTTP_MAX_RETRY,
+              RETRY_INITIAL_DELAY_MS,
+              RETRY_DELAY_MULTIPLIER,
+              RETRY_MAX_DELAY_MS,
+              RETRY_TOTAL_TIMEOUT_MS);
+    }
   }
 }
