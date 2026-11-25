@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -42,21 +43,30 @@ public class LoggingUrlRedactorTest {
             "https://storage.googleapis.com/storage/v1/b/my-bucket/o"
                 + "?alt=media"
                 + "&delimiter=/"
+                + "&endOffset=z"
                 + "&fields=items(name,size)"
                 + "&generation=42"
                 + "&ifGenerationMatch=0"
                 + "&ifGenerationNotMatch=1"
                 + "&ifMetaGenerationMatch=2"
                 + "&ifMetaGenerationNotMatch=3"
+                + "&ifSourceGenerationMatch=4"
+                + "&ifSourceGenerationNotMatch=5"
+                + "&ifSourceMetagenerationMatch=6"
+                + "&ifSourceMetagenerationNotMatch=7"
                 + "&includeFoldersAsPrefixes=true"
                 + "&includeTrailingDelimiter=true"
-                + "&maxResults=100"
                 + "&matchGlob=*.parquet"
+                + "&maxBytesRewrittenPerCall=1048576"
+                + "&maxResults=100"
                 + "&name=dir/obj"
                 + "&pageToken=next-page"
                 + "&prefix=dir/"
+                + "&project=my-gcp-proj"
                 + "&projection=noAcl"
                 + "&softDeleted=false"
+                + "&sourceGeneration=9"
+                + "&startOffset=a"
                 + "&uploadType=resumable"
                 + "&userProject=my-proj"
                 + "&versions=true");
@@ -80,6 +90,7 @@ public class LoggingUrlRedactorTest {
             + "&Signature=SECRET_V2_SIG"
             + "&GoogleAccessId=SECRET_ACCESS_ID"
             + "&access_token=SECRET_OAUTH_TOKEN"
+            + "&oauth_token=SECRET_LEGACY_OAUTH"
             + "&key=SECRET_API_KEY"
             + "&customParam=SECRET_CUSTOM";
     GenericUrl url = new GenericUrl(rawUrl);
@@ -96,6 +107,7 @@ public class LoggingUrlRedactorTest {
     assertThat(redacted).contains("Signature=REDACTED");
     assertThat(redacted).contains("GoogleAccessId=REDACTED");
     assertThat(redacted).contains("access_token=REDACTED");
+    assertThat(redacted).contains("oauth_token=REDACTED");
     assertThat(redacted).contains("key=REDACTED");
     assertThat(redacted).contains("customParam=REDACTED");
     assertThat(redacted).doesNotContain("SECRET_");
@@ -145,78 +157,147 @@ public class LoggingUrlRedactorTest {
   }
 
   @Test
-  public void redactUrl_handlesNonPublicImmutableCollectionsWithoutMutating() {
+  public void redactUrl_handlesImmutableCollectionsAndStringBuilderValuesWithoutMutating() {
     GenericUrl url =
         new GenericUrl("https://alice:pass@storage.googleapis.com:8443/upload/b/bkt/o#frag");
     url.set("upload_id", List.of("secret-a", "secret-b"));
+    url.set("unmod_token", Collections.unmodifiableList(Arrays.asList("secret-c")));
     url.set("empty_list", Collections.emptyList());
-    url.set("prefix", ImmutableList.of("dir/"));
+    url.set("prefix", new StringBuilder("my-dir/"));
+    url.set("name", ImmutableList.of("obj"));
+    url.setPathParts(List.of("", "upload", "b", "bkt", "o"));
 
     String redacted = LoggingUrlRedactor.redactUrl(url);
 
     assertThat(redacted)
         .isEqualTo(
             "https://storage.googleapis.com:8443/upload/b/bkt/o"
-                + "?upload_id=REDACTED&upload_id=REDACTED&prefix=dir/#frag");
+                + "?upload_id=REDACTED&upload_id=REDACTED"
+                + "&unmod_token=REDACTED"
+                + "&prefix=my-dir/&name=obj#REDACTED");
     assertThat(redacted).doesNotContain("alice");
     assertThat(redacted).doesNotContain("pass");
-    assertThat(redacted).doesNotContain("secret-a");
-    assertThat(redacted).doesNotContain("secret-b");
+    assertThat(redacted).doesNotContain("secret-");
     assertThat(url.getUserInfo()).isEqualTo("alice:pass");
     assertThat(url.get("upload_id")).isEqualTo(List.of("secret-a", "secret-b"));
   }
 
   @Test
-  public void redactUrl_redactsSensitiveKeyValuesInFragmentsWithoutMutatingOriginal() {
-    GenericUrl tokenFragmentUrl =
-        new GenericUrl(
-            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
-                + "?uploadType=resumable#access_token=SECRET_FRAG_TOKEN&section=intro");
-    GenericUrl hashBeforeQueryUrl =
-        new GenericUrl(
-            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/file"
-                + "#1?uploadType=resumable&upload_id=SECRET_HASH_UPLOAD_ID");
-    GenericUrl benignFragmentUrl =
-        new GenericUrl(
-            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o?uploadType=resumable#frag");
-
-    String redactedTokenFragment = LoggingUrlRedactor.redactUrl(tokenFragmentUrl);
-    String redactedHashBeforeQuery = LoggingUrlRedactor.redactUrl(hashBeforeQueryUrl);
-    String redactedBenignFragment = LoggingUrlRedactor.redactUrl(benignFragmentUrl);
-
-    assertThat(redactedTokenFragment).contains("uploadType=resumable");
-    assertThat(redactedTokenFragment).contains("#access_token=REDACTED&section=intro");
-    assertThat(redactedTokenFragment).doesNotContain("SECRET_FRAG_TOKEN");
-    assertThat(tokenFragmentUrl.getFragment())
-        .isEqualTo("access_token=SECRET_FRAG_TOKEN&section=intro");
-
-    assertThat(redactedHashBeforeQuery).contains("#1?uploadType=resumable&upload_id=REDACTED");
-    assertThat(redactedHashBeforeQuery).doesNotContain("SECRET_HASH_UPLOAD_ID");
-    assertThat(hashBeforeQueryUrl.getFragment())
-        .isEqualTo("1?uploadType=resumable&upload_id=SECRET_HASH_UPLOAD_ID");
-
-    assertThat(redactedBenignFragment)
-        .isEqualTo(
-            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o?uploadType=resumable#frag");
-  }
-
-  @Test
-  public void redactUrl_redactsSensitiveFragmentInNonPublicCollectionFallbackWithoutMutating() {
-    GenericUrl url =
-        new GenericUrl(
-            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
-                + "#access_token=SECRET_FALLBACK_FRAG&upload_id=SECRET_FALLBACK_UPLOAD_ID");
-    url.set("upload_id", List.of("secret-a"));
+  public void redactUrl_handlesIncompleteUrlAndNullElementsWithoutThrowing() {
+    GenericUrl url = new GenericUrl();
+    url.setPathParts(Arrays.asList("", "upload", null, "o"));
+    url.set("prefix", Arrays.asList("dir/", null));
+    url.set("upload_id", "SECRET_INCOMPLETE");
 
     String redacted = LoggingUrlRedactor.redactUrl(url);
 
-    assertThat(redacted).contains("upload_id=REDACTED");
-    assertThat(redacted).contains("#access_token=REDACTED&upload_id=REDACTED");
-    assertThat(redacted).doesNotContain("SECRET_FALLBACK_");
-    assertThat(redacted).doesNotContain("secret-a");
-    assertThat(url.getFragment())
-        .isEqualTo("access_token=SECRET_FALLBACK_FRAG&upload_id=SECRET_FALLBACK_UPLOAD_ID");
-    assertThat(url.get("upload_id")).isEqualTo(List.of("secret-a"));
+    assertThat(redacted).isEqualTo("/upload//o?prefix=dir/&upload_id=REDACTED");
+    assertThat(redacted).doesNotContain("SECRET_INCOMPLETE");
+  }
+
+  @Test
+  public void redactUrl_preservesVerbatimRawPathWithoutDoubleEncoding() {
+    GenericUrl url =
+        new GenericUrl(
+            "https://storage.googleapis.com/storage/v1/b/bkt/o/dir%2Ffile%2B1"
+                + "?uploadType=resumable&upload_id=SECRET_VERBATIM#raw-secret",
+            /* verbatim= */ true);
+
+    String redacted = LoggingUrlRedactor.redactUrl(url);
+
+    assertThat(redacted)
+        .isEqualTo(
+            "https://storage.googleapis.com/storage/v1/b/bkt/o/dir%2Ffile%2B1"
+                + "?uploadType=resumable&upload_id=REDACTED#REDACTED");
+    assertThat(redacted).doesNotContain("%252F");
+    assertThat(redacted).doesNotContain("SECRET_VERBATIM");
+    assertThat(redacted).doesNotContain("raw-secret");
+  }
+
+  @Test
+  public void redactUrl_replacesAnyFragmentWithRedactedWithoutMutatingOriginal() {
+    GenericUrl commaSecretFragment =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable#upload_id=SECRET_A,SECRET_B;oauth_token=SECRET_C");
+    GenericUrl hashBeforeQuery =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/file"
+                + "#1?uploadType=resumable&upload_id=SECRET_HASH_UPLOAD_ID");
+    GenericUrl bareSecretFragment =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable#SECRET_RAW_FRAGMENT_TOKEN");
+
+    String redactedComma = LoggingUrlRedactor.redactUrl(commaSecretFragment);
+    String redactedHash = LoggingUrlRedactor.redactUrl(hashBeforeQuery);
+    String redactedBare = LoggingUrlRedactor.redactUrl(bareSecretFragment);
+
+    assertThat(redactedComma)
+        .isEqualTo(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable#REDACTED");
+    assertThat(redactedComma).doesNotContain("SECRET_");
+    assertThat(commaSecretFragment.getFragment())
+        .isEqualTo("upload_id=SECRET_A,SECRET_B;oauth_token=SECRET_C");
+
+    assertThat(redactedHash)
+        .isEqualTo("https://storage.googleapis.com/upload/storage/v1/b/bkt/o/file#REDACTED");
+    assertThat(redactedHash).doesNotContain("SECRET_HASH_UPLOAD_ID");
+
+    assertThat(redactedBare)
+        .isEqualTo(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable#REDACTED");
+    assertThat(redactedBare).doesNotContain("SECRET_RAW_FRAGMENT_TOKEN");
+  }
+
+  @Test
+  public void redactUrlString_redactsValidRelativeAndMalformedUrls() {
+    assertThat(LoggingUrlRedactor.redactUrlString(null)).isEqualTo("null");
+    assertThat(LoggingUrlRedactor.redactUrlString("")).isEmpty();
+
+    String full =
+        "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/a+b"
+            + "?uploadType=resumable&upload_id=SECRET_FULL_1";
+    assertThat(LoggingUrlRedactor.redactUrlString(full))
+        .isEqualTo(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/a%2Bb"
+                + "?uploadType=resumable&upload_id=REDACTED");
+
+    String relative = "/upload/storage/v1/b/bkt/o/a+b?upload_id=SECRET_REL#frag_secret";
+    String redactedRelative = LoggingUrlRedactor.redactUrlString(relative);
+    assertThat(redactedRelative).isEqualTo("/upload/storage/v1/b/bkt/o/a+b?REDACTED#REDACTED");
+    assertThat(redactedRelative).doesNotContain("SECRET_REL");
+    assertThat(redactedRelative).doesNotContain("frag_secret");
+
+    String malformedWithUserInfo = "customscheme://alice:pw@host/path?upload_id=SECRET_BAD";
+    String redactedMalformed = LoggingUrlRedactor.redactUrlString(malformedWithUserInfo);
+    assertThat(redactedMalformed).isEqualTo("customscheme://host/path?REDACTED");
+    assertThat(redactedMalformed).doesNotContain("alice");
+    assertThat(redactedMalformed).doesNotContain("pw");
+    assertThat(redactedMalformed).doesNotContain("SECRET_BAD");
+  }
+
+  @Test
+  public void formatThrowableForLog_redactsUrlsAcrossCausalChain() {
+    assertThat(LoggingUrlRedactor.formatThrowableForLog(null)).isEqualTo("null");
+
+    IOException root =
+        new IOException(
+            "503 Service Unavailable\n"
+                + "PUT https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable&upload_id=SECRET_CAUSE_ID\n"
+                + "backend error");
+    IOException outer = new IOException("Upload failed", root);
+
+    String summary = LoggingUrlRedactor.formatThrowableForLog(outer);
+
+    assertThat(summary).contains("Upload failed");
+    assertThat(summary).contains("503 Service Unavailable");
+    assertThat(summary).contains("uploadType=resumable");
+    assertThat(summary).contains("upload_id=REDACTED");
+    assertThat(summary).doesNotContain("SECRET_CAUSE_ID");
   }
 
   @Test

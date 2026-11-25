@@ -28,6 +28,7 @@ import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpMethods;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
@@ -51,6 +52,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 
 /**
  * Implements a HttpRequestInitializer which adds a ResponseInterceptor to each HttpRequest and
@@ -62,7 +64,15 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   private final Gson gson = new Gson();
 
   private static final String UPLOAD_ID_RESPONSE_HEADER = "x-guploader-uploadid";
-  private static final String RESUMABLE_REQUEST_HEADER = "x-goog-resumable";
+  private static final String UPLOAD_URL_RESPONSE_HEADER = "x-goog-upload-url";
+  private static final String UPLOAD_CONTROL_URL_RESPONSE_HEADER = "x-goog-upload-control-url";
+
+  private static final ImmutableSet<String> UPLOAD_INDICATOR_REQUEST_HEADERS =
+      ImmutableSet.of(
+          "x-goog-resumable",
+          "x-goog-upload-protocol",
+          "x-goog-upload-command",
+          UPLOAD_URL_RESPONSE_HEADER);
 
   private static final ImmutableSet<String> REDACTED_REQUEST_HEADERS =
       Stream.of(AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION)
@@ -70,7 +80,8 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
           .collect(toImmutableSet());
 
   private static final ImmutableSet<String> REDACTED_RESPONSE_HEADERS =
-      Stream.of(SET_COOKIE, LOCATION)
+      Stream.of(
+              SET_COOKIE, LOCATION, UPLOAD_URL_RESPONSE_HEADER, UPLOAD_CONTROL_URL_RESPONSE_HEADER)
           .map(header -> header.toLowerCase(Locale.US))
           .collect(toImmutableSet());
 
@@ -90,6 +101,10 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   @VisibleForTesting
   void logAndRemoveRequestFromTracking(HttpResponse httpResponse) {
     HttpRequest request = httpResponse.getRequest();
+    HttpRequestResponseTimeTracker tracker = requestTracker.remove(request);
+    if (!logger.atInfo().isEnabled()) {
+      return;
+    }
 
     Map<String, Object> jsonMap = new HashMap<>();
     jsonMap.put("request_method", request.getRequestMethod());
@@ -100,7 +115,6 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
     jsonMap.put("response_status_message", httpResponse.getStatusMessage());
     jsonMap.put("thread_name", Thread.currentThread().getName());
 
-    HttpRequestResponseTimeTracker tracker = requestTracker.remove(request);
     if (tracker != null) {
       jsonMap.put("response_time", tracker.getResponseTime());
       jsonMap.put("request_start_time_utc", tracker.getStartTimeUtc());
@@ -118,17 +132,32 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   }
 
   private static ImmutableMap<String, Object> filterMap(
-      HttpHeaders httpHeaders, Set<String> filterSet) {
+      @Nullable HttpHeaders httpHeaders, Set<String> filterSet) {
+    if (httpHeaders == null) {
+      return ImmutableMap.of();
+    }
     return httpHeaders.entrySet().stream()
-        .filter(e -> !filterSet.contains(e.getKey().toLowerCase(Locale.US)))
+        .filter(
+            e ->
+                e.getKey() != null
+                    && e.getValue() != null
+                    && !filterSet.contains(e.getKey().toLowerCase(Locale.US)))
         .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private static ImmutableMap<String, Object> filterResponseHeaders(
       HttpRequest request, HttpResponse httpResponse) {
-    boolean digestUploadId = isUploadRequest(request, httpResponse);
-    return httpResponse.getHeaders().entrySet().stream()
-        .filter(e -> !REDACTED_RESPONSE_HEADERS.contains(e.getKey().toLowerCase(Locale.US)))
+    HttpHeaders responseHeaders = httpResponse.getHeaders();
+    if (responseHeaders == null) {
+      return ImmutableMap.of();
+    }
+    boolean digestUploadId = shouldDigestUploadId(request);
+    return responseHeaders.entrySet().stream()
+        .filter(
+            e ->
+                e.getKey() != null
+                    && e.getValue() != null
+                    && !REDACTED_RESPONSE_HEADERS.contains(e.getKey().toLowerCase(Locale.US)))
         .collect(
             toImmutableMap(
                 Map.Entry::getKey,
@@ -138,37 +167,51 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
                         : e.getValue()));
   }
 
-  private static boolean isUploadRequest(HttpRequest request, HttpResponse httpResponse) {
-    GenericUrl url = request.getUrl();
-    if (url != null) {
-      String rawPath = url.getRawPath();
-      if (rawPath != null) {
-        String lowerPath = rawPath.toLowerCase(Locale.US);
-        if (lowerPath.startsWith("/upload/") || lowerPath.contains("/upload/storage/")) {
-          return true;
-        }
-      }
-      for (String key : url.keySet()) {
-        if ("upload_id".equalsIgnoreCase(key) || "uploadtype".equalsIgnoreCase(key)) {
-          return true;
-        }
-      }
-    }
-    if (request.getHeaders() != null
-        && request.getHeaders().getFirstHeaderStringValue(RESUMABLE_REQUEST_HEADER) != null) {
+  private static boolean shouldDigestUploadId(HttpRequest request) {
+    String method = request.getRequestMethod();
+    if (!HttpMethods.GET.equalsIgnoreCase(method) && !HttpMethods.HEAD.equalsIgnoreCase(method)) {
       return true;
     }
-    return httpResponse.getHeaders() != null && httpResponse.getHeaders().getLocation() != null;
+    return hasUploadQueryParam(request.getUrl()) || hasUploadHeader(request.getHeaders());
   }
 
-  private static Object digestHeaderValue(Object value) {
+  private static boolean hasUploadQueryParam(@Nullable GenericUrl url) {
+    if (url == null) {
+      return false;
+    }
+    for (String key : url.keySet()) {
+      if ("upload_id".equalsIgnoreCase(key) || "uploadtype".equalsIgnoreCase(key)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasUploadHeader(@Nullable HttpHeaders headers) {
+    if (headers == null) {
+      return false;
+    }
+    for (String header : UPLOAD_INDICATOR_REQUEST_HEADERS) {
+      if (headers.getFirstHeaderStringValue(header) != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @VisibleForTesting
+  @Nullable
+  static Object digestHeaderValue(@Nullable Object value) {
+    if (value == null) {
+      return null;
+    }
     if (value instanceof Collection<?>) {
       return ((Collection<?>) value)
           .stream()
               .map(item -> item == null ? null : LoggingUrlRedactor.digestToken(item.toString()))
               .collect(toList());
     }
-    return LoggingUrlRedactor.digestToken(String.valueOf(value));
+    return LoggingUrlRedactor.digestToken(value.toString());
   }
 
   private static class HttpRequestResponseTimeTracker {

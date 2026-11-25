@@ -888,13 +888,66 @@ public class RetryHttpInitializerTest {
                               && msg.contains("uploadType=resumable")
                               && msg.contains("upload_id=REDACTED")))
           .isTrue();
-      for (LogRecord record : records) {
-        assertThat(record.getMessage()).doesNotContain(secretUploadId);
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
       }
       assertThat(req.getUrl().getFirst("upload_id")).isEqualTo(secretUploadId);
     } finally {
       julLogger.removeHandler(handler);
       julLogger.setLevel(previousLevel);
+    }
+  }
+
+  @Test
+  public void escapeRedirectPath_redactsUploadIdInFineLogWithoutBreakingRedirect()
+      throws IOException {
+    String secretUploadId = "SECRET_REDIRECT_UPLOAD_ID";
+    String rawLocation =
+        "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/file+name"
+            + "?uploadType=resumable&upload_id="
+            + secretUploadId;
+    Logger julLogger = Logger.getLogger(RetryHttpInitializer.class.getName());
+    List<LogRecord> records = new ArrayList<>();
+    Handler handler = capturingHandler(records);
+    Level previousLevel = julLogger.getLevel();
+    boolean previousUseParentHandlers = julLogger.getUseParentHandlers();
+    julLogger.setUseParentHandlers(false);
+    julLogger.addHandler(handler);
+    julLogger.setLevel(Level.FINE);
+    try {
+      HttpRequestFactory requestFactory =
+          mockTransport(emptyResponse(308).addHeader("Location", rawLocation), emptyResponse(200))
+              .createRequestFactory(
+                  createRetryHttpInitializer(new FakeCredentials("Bearer: token"), millis -> {}));
+      HttpRequest req =
+          requestFactory
+              .buildPutRequest(
+                  new GenericUrl(
+                      "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                          + "?uploadType=resumable&upload_id="
+                          + secretUploadId),
+                  null)
+              .setThrowExceptionOnExecuteError(false);
+
+      HttpResponse response = req.execute();
+
+      assertThat(response.getStatusCode()).isEqualTo(200);
+      assertThat(
+              records.stream()
+                  .map(LogRecord::getMessage)
+                  .anyMatch(
+                      msg ->
+                          msg.contains("contains unescaped '+'")
+                              && msg.contains("uploadType=resumable")
+                              && msg.contains("upload_id=REDACTED")))
+          .isTrue();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+      }
+    } finally {
+      julLogger.removeHandler(handler);
+      julLogger.setLevel(previousLevel);
+      julLogger.setUseParentHandlers(previousUseParentHandlers);
     }
   }
 
@@ -934,8 +987,8 @@ public class RetryHttpInitializerTest {
                               && msg.contains("uploadType=resumable")
                               && msg.contains("upload_id=REDACTED")))
           .isTrue();
-      for (LogRecord record : records) {
-        assertThat(record.getMessage()).doesNotContain(secretUploadId);
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
       }
       assertThat(req.getUrl().getFirst("upload_id")).isEqualTo(secretUploadId);
     } finally {
@@ -947,15 +1000,19 @@ public class RetryHttpInitializerTest {
   private static Handler capturingHandler(List<LogRecord> records) {
     return new Handler() {
       @Override
-      public void publish(LogRecord record) {
-        records.add(record);
+      public void publish(LogRecord logRecord) {
+        records.add(logRecord);
       }
 
       @Override
-      public void flush() {}
+      public void flush() {
+        // No-op stub for in-memory test log handler.
+      }
 
       @Override
-      public void close() {}
+      public void close() {
+        // No-op stub for in-memory test log handler.
+      }
     };
   }
 

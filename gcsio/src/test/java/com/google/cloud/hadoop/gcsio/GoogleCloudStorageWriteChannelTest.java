@@ -34,6 +34,7 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.storage.Storage;
+import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -49,6 +50,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -143,6 +148,103 @@ public class GoogleCloudStorageWriteChannelTest {
     IOException e = assertThrows(IOException.class, () -> channel.close());
     assertThat(e).hasCauseThat().isInstanceOf(HttpResponseException.class);
     assertThat(e).hasCauseThat().hasMessageThat().contains("Provided CRC32C");
+  }
+
+  @Test
+  public void write_reuploadFromCache_redactsUploadIdInWarningLog() throws IOException {
+    String secretUploadId = "SECRET_REUPLOAD_CACHE_UPLOAD_ID";
+    byte[] testData = {1, 2, 3, 4};
+    String expectedCrc32c = calculateCrc32c(testData);
+    List<LogRecord> records = Collections.synchronizedList(new ArrayList<>());
+    Handler handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord logRecord) {
+            records.add(logRecord);
+          }
+
+          @Override
+          public void flush() {
+            // No-op stub for in-memory test log handler.
+          }
+
+          @Override
+          public void close() {
+            // No-op stub for in-memory test log handler.
+          }
+        };
+    Logger channelLogger = Logger.getLogger(AbstractGoogleAsyncWriteChannel.class.getName());
+    Level previousLevel = channelLogger.getLevel();
+    boolean previousUseParentHandlers = channelLogger.getUseParentHandlers();
+    channelLogger.setUseParentHandlers(false);
+    channelLogger.addHandler(handler);
+    channelLogger.setLevel(Level.WARNING);
+    try {
+      MockHttpTransport transport =
+          new MockHttpTransport() {
+            int putAttempt = 0;
+
+            @Override
+            public LowLevelHttpRequest buildRequest(String method, String url) {
+              return new MockLowLevelHttpRequest() {
+                @Override
+                public LowLevelHttpResponse execute() {
+                  if (HttpMethods.POST.equals(method)) {
+                    return new MockLowLevelHttpResponse()
+                        .setStatusCode(200)
+                        .addHeader(
+                            "Location",
+                            "https://storage.googleapis.com/upload/storage/v1/b/bucket/o"
+                                + "?uploadType=resumable&upload_id="
+                                + secretUploadId);
+                  }
+                  if (HttpMethods.PUT.equals(method) && putAttempt++ == 0) {
+                    return new MockLowLevelHttpResponse().setStatusCode(503);
+                  }
+                  return createPutSuccessResponse("bucket", "object", expectedCrc32c);
+                }
+              };
+            }
+          };
+      Storage storage =
+          new Storage(
+              transport,
+              GsonFactory.getDefaultInstance(),
+              new RetryHttpInitializer(
+                  new FakeCredentials(),
+                  RetryHttpInitializerOptions.builder().setMaxRequestRetries(0).build()));
+      GoogleCloudStorageWriteChannel channel =
+          new GoogleCloudStorageWriteChannel(
+              storage,
+              new ClientRequestHelper<>(),
+              Executors.newCachedThreadPool(),
+              AsyncWriteChannelOptions.builder().setUploadCacheSize(1024).build(),
+              new StorageResourceId("bucket", "object"),
+              CreateObjectOptions.DEFAULT_OVERWRITE,
+              ObjectWriteConditions.NONE);
+
+      channel.initialize();
+      channel.write(ByteBuffer.wrap(testData));
+      channel.close();
+
+      assertThat(
+              records.stream()
+                  .map(LogRecord::getMessage)
+                  .anyMatch(
+                      msg ->
+                          msg.contains("Reuploading using cached data")
+                              && msg.contains("uploadType=resumable")
+                              && msg.contains("upload_id=REDACTED")))
+          .isTrue();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+        assertThat(logRecord.getThrown()).isNull();
+      }
+    } finally {
+      channelLogger.removeHandler(handler);
+      channelLogger.setLevel(previousLevel);
+      channelLogger.setUseParentHandlers(previousUseParentHandlers);
+    }
   }
 
   private String calculateCrc32c(byte[] data) {

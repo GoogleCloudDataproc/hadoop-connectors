@@ -344,7 +344,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           String escapedLocation = redirectLocation.replace("+", "%2B");
           logger.atFine().log(
               "Redirect path '%s' contains unescaped '+', replacing with '%%2B': '%s'",
-              redirectLocation, escapedLocation);
+              LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrlString(redirectLocation)),
+              LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrlString(escapedLocation)));
           response.getHeaders().setLocation(escapedLocation);
         }
       }

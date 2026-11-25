@@ -34,6 +34,7 @@ import com.google.cloud.hadoop.util.LoggingUrlRedactor;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper;
 import com.google.gson.Gson;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.logging.Level;
@@ -52,10 +53,14 @@ public class EventLoggingHttpRequestInitializerTest {
 
   private EventLoggingHttpRequestInitializer requestInitializer;
   private AssertingLogHandler assertingHandler;
+  private Level previousLevel;
+  private boolean previousUseParentHandlers;
 
   @Before
   public void setUp() throws IOException {
     assertingHandler = new AssertingLogHandler();
+    previousLevel = LOGGER.getLevel();
+    previousUseParentHandlers = LOGGER.getUseParentHandlers();
     LOGGER.setUseParentHandlers(false);
     LOGGER.addHandler(assertingHandler);
     LOGGER.setLevel(Level.INFO);
@@ -66,6 +71,8 @@ public class EventLoggingHttpRequestInitializerTest {
   @After
   public void verifyAndRemoveAssertingHandler() {
     LOGGER.removeHandler(assertingHandler);
+    LOGGER.setLevel(previousLevel);
+    LOGGER.setUseParentHandlers(previousUseParentHandlers);
   }
 
   @Test
@@ -266,6 +273,104 @@ public class EventLoggingHttpRequestInitializerTest {
         (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("response_headers");
     assertThat(respHeaders.get("x-guploader-uploadid"))
         .isEqualTo(Collections.singletonList(readTraceId));
+  }
+
+  @Test
+  public void testCustomEndpointPutAndScottyResponseHeadersAreRedactedFailClosed()
+      throws IOException {
+    String secretUploadId = "SECRET_CUSTOM_PROXY_UPLOAD_ID";
+    String expectedDigest = LoggingUrlRedactor.digestToken(secretUploadId);
+    MockLowLevelHttpResponse mockResponse =
+        MockHttpTransportHelper.emptyResponse(308)
+            .addHeader("X-GUploader-UploadID", secretUploadId)
+            .addHeader("X-Goog-Upload-URL", "https://proxy.example/session?upload_id=SECRET_URL")
+            .addHeader(
+                "X-Goog-Upload-Control-URL", "https://proxy.example/ctrl?upload_id=SECRET_CTRL");
+    // Custom proxy PUT without /upload/ or upload_id query param must still fail closed.
+    HttpRequest putRequest =
+        mockTransport(mockResponse)
+            .createRequestFactory()
+            .buildPutRequest(new GenericUrl("https://proxy.example/v1/session/abc"), null)
+            .setThrowExceptionOnExecuteError(false);
+    requestInitializer.initialize(putRequest);
+    putRequest.execute();
+
+    assertingHandler.assertLogCount(1);
+    Map<?, ?> respHeaders =
+        (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("response_headers");
+    assertThat(respHeaders.get("x-goog-upload-url")).isNull();
+    assertThat(respHeaders.get("x-goog-upload-control-url")).isNull();
+    assertThat(respHeaders.get("x-guploader-uploadid"))
+        .isEqualTo(Collections.singletonList(expectedDigest));
+    String allLogsJson = new Gson().toJson(assertingHandler.getAllLogRecords());
+    assertThat(allLogsJson).doesNotContain(secretUploadId);
+    assertThat(allLogsJson).doesNotContain("SECRET_URL");
+    assertThat(allLogsJson).doesNotContain("SECRET_CTRL");
+  }
+
+  @Test
+  public void testGetRedirectFiltersLocationButPreservesReadTraceIdAndResumableHeaderDigests()
+      throws IOException {
+    String readTraceId = "READ_REDIRECT_TRACE_ID";
+    MockLowLevelHttpResponse redirectResponse =
+        MockHttpTransportHelper.emptyResponse(302)
+            .addHeader(LOCATION, "https://storage.googleapis.com/o?X-Goog-Signature=SECRET_SIG")
+            .addHeader("X-GUploader-UploadID", readTraceId);
+    HttpRequest redirectGet =
+        mockTransport(redirectResponse)
+            .createRequestFactory()
+            .buildGetRequest(new GenericUrl("https://storage.googleapis.com/storage/v1/b/bkt/o/x"))
+            .setFollowRedirects(false)
+            .setThrowExceptionOnExecuteError(false);
+    requestInitializer.initialize(redirectGet);
+    redirectGet.execute();
+
+    String resumableId = "SECRET_XML_RESUMABLE_ID";
+    MockLowLevelHttpResponse resumableResponse =
+        MockHttpTransportHelper.emptyResponse(200).addHeader("X-GUploader-UploadID", resumableId);
+    HttpRequest resumableGet =
+        mockTransport(resumableResponse)
+            .createRequestFactory()
+            .buildGetRequest(new GenericUrl("https://storage.googleapis.com/bkt/obj"))
+            .setHeaders(new HttpHeaders().set("x-goog-resumable", "start"));
+    requestInitializer.initialize(resumableGet);
+    resumableGet.execute();
+
+    assertingHandler.assertLogCount(2);
+    Map<?, ?> redirectRespHeaders =
+        (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("response_headers");
+    assertThat(redirectRespHeaders.get("location")).isNull();
+    assertThat(redirectRespHeaders.get("x-guploader-uploadid"))
+        .isEqualTo(Collections.singletonList(readTraceId));
+
+    Map<?, ?> resumableRespHeaders =
+        (Map<?, ?>) assertingHandler.getLogRecordAtIndex(1).get("response_headers");
+    assertThat(resumableRespHeaders.get("x-guploader-uploadid"))
+        .isEqualTo(Collections.singletonList(LoggingUrlRedactor.digestToken(resumableId)));
+  }
+
+  @Test
+  public void testDigestHeaderValueHandlesNullAndMultiValueWithNull() {
+    assertThat(EventLoggingHttpRequestInitializer.digestHeaderValue(null)).isNull();
+    assertThat(
+            EventLoggingHttpRequestInitializer.digestHeaderValue(
+                Arrays.asList("tok-1", null, "tok-2")))
+        .isEqualTo(
+            Arrays.asList(
+                LoggingUrlRedactor.digestToken("tok-1"),
+                null,
+                LoggingUrlRedactor.digestToken("tok-2")));
+  }
+
+  @Test
+  public void testInfoDisabledSkipsLoggingCleanly() throws IOException {
+    LOGGER.setLevel(Level.WARNING);
+    HttpRequest httpRequest =
+        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(200));
+    requestInitializer.initialize(httpRequest);
+    httpRequest.execute();
+
+    assertingHandler.assertLogCount(0);
   }
 
   private static void verifyFields(Map<String, Object> logRecord, int expectedStatusCode) {

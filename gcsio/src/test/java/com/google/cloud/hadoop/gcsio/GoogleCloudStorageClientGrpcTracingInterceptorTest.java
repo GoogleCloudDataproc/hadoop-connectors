@@ -198,17 +198,56 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
     writeCall.start(new NoOpListener<>(), headers);
     writeCall.sendMessage(WriteObjectRequest.newBuilder().setUploadId(uploadId1).build());
 
+    WriteObjectRequest mismatchedRequest =
+        WriteObjectRequest.newBuilder().setUploadId(uploadId2).build();
     IllegalStateException thrown =
-        assertThrows(
-            IllegalStateException.class,
-            () ->
-                writeCall.sendMessage(
-                    WriteObjectRequest.newBuilder().setUploadId(uploadId2).build()));
+        assertThrows(IllegalStateException.class, () -> writeCall.sendMessage(mismatchedRequest));
 
     assertThat(thrown.getMessage()).contains(LoggingUrlRedactor.digestToken(uploadId1));
     assertThat(thrown.getMessage()).contains(LoggingUrlRedactor.digestToken(uploadId2));
     assertThat(thrown.getMessage()).doesNotContain(uploadId1);
     assertThat(thrown.getMessage()).doesNotContain(uploadId2);
+  }
+
+  @Test
+  public void writeObjectTracing_chunkOmittingUploadIdRetainsStreamDigestInResponse() {
+    String rawUploadId = "SECRET_MULTI_CHUNK_UPLOAD_ID";
+    String expectedDigest = LoggingUrlRedactor.digestToken(rawUploadId);
+
+    AtomicReference<ClientCall.Listener<WriteObjectResponse>> writeListenerRef =
+        new AtomicReference<>();
+    ClientCall<WriteObjectRequest, WriteObjectResponse> writeCall =
+        interceptor.interceptCall(
+            StorageGrpc.getWriteObjectMethod(), CallOptions.DEFAULT, fakeChannel(writeListenerRef));
+    Metadata headers = new Metadata();
+    headers.put(IDEMPOTENCY_KEY, "inv-multichunk-1");
+    writeCall.start(new NoOpListener<>(), headers);
+    // Chunk 1 carries upload_id; chunk 2 omits it (matching Gapic finishMessage behavior).
+    writeCall.sendMessage(
+        WriteObjectRequest.newBuilder().setUploadId(rawUploadId).setWriteOffset(0).build());
+    writeCall.sendMessage(
+        WriteObjectRequest.newBuilder().setWriteOffset(4).setFinishWrite(true).build());
+    writeListenerRef.get().onMessage(WriteObjectResponse.newBuilder().setPersistedSize(8).build());
+    writeListenerRef.get().onClose(Status.OK, new Metadata());
+
+    assertingHandler.assertLogCount(4);
+    assertThat(
+            assertingHandler
+                .getLogRecordAtIndex(0)
+                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
+        .isEqualTo(expectedDigest);
+    assertThat(
+            assertingHandler
+                .getLogRecordAtIndex(1)
+                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
+        .isEqualTo("");
+    assertThat(
+            assertingHandler
+                .getLogRecordAtIndex(2)
+                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
+        .isEqualTo(expectedDigest);
+    String allLogsJson = new Gson().toJson(assertingHandler.getAllLogRecords());
+    assertThat(allLogsJson).doesNotContain(rawUploadId);
   }
 
   @Test
@@ -225,17 +264,16 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
         .isEqualTo(LoggingUrlRedactor.digestToken("raw-token"));
   }
 
-  private static <RespT> Channel fakeChannel(
-      AtomicReference<ClientCall.Listener<RespT>> capturedListener) {
+  private static <V> Channel fakeChannel(AtomicReference<ClientCall.Listener<V>> capturedListener) {
     return new Channel() {
       @Override
-      public <ReqT, R> ClientCall<ReqT, R> newCall(
-          MethodDescriptor<ReqT, R> methodDescriptor, CallOptions callOptions) {
-        return new ClientCall<ReqT, R>() {
+      public <Q, R> ClientCall<Q, R> newCall(
+          MethodDescriptor<Q, R> methodDescriptor, CallOptions callOptions) {
+        return new ClientCall<Q, R>() {
           @Override
           @SuppressWarnings("unchecked")
           public void start(Listener<R> responseListener, Metadata headers) {
-            capturedListener.set((Listener<RespT>) responseListener);
+            capturedListener.set((Listener<V>) responseListener);
             for (ClientStreamTracer.Factory factory : callOptions.getStreamTracerFactories()) {
               ClientStreamTracer tracer =
                   factory.newClientStreamTracer(
@@ -245,16 +283,24 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
           }
 
           @Override
-          public void request(int numMessages) {}
+          public void request(int numMessages) {
+            // No-op stub for fake ClientCall.
+          }
 
           @Override
-          public void cancel(String message, Throwable cause) {}
+          public void cancel(String message, Throwable cause) {
+            // No-op stub for fake ClientCall.
+          }
 
           @Override
-          public void halfClose() {}
+          public void halfClose() {
+            // No-op stub for fake ClientCall.
+          }
 
           @Override
-          public void sendMessage(ReqT message) {}
+          public void sendMessage(Q message) {
+            // No-op stub for fake ClientCall.
+          }
         };
       }
 

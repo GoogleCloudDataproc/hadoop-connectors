@@ -279,7 +279,7 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
 
   private class WriteObjectStreamTracer extends TrackingStreamTracer {
 
-    private String streamUploadId = STREAM_UPLOAD_ID_NOT_FOUND;
+    private volatile String streamUploadId = STREAM_UPLOAD_ID_NOT_FOUND;
 
     WriteObjectStreamTracer(String rpcMethod) {
       super(rpcMethod);
@@ -326,15 +326,17 @@ public class GoogleCloudStorageClientGrpcTracingInterceptor implements ClientInt
     }
 
     private void updateUploadId(@Nonnull String uploadId) {
-      if (streamUploadId.equals(STREAM_UPLOAD_ID_NOT_FOUND)) {
+      String currentUploadId = this.streamUploadId;
+      if (STREAM_UPLOAD_ID_NOT_FOUND.equals(currentUploadId)) {
         this.streamUploadId = uploadId;
+        return;
       }
-      if (!uploadId.equals(streamUploadId)) {
+      if (!uploadId.equals(currentUploadId)) {
         throw new IllegalStateException(
             String.format(
                 "Write stream should have unique uploadId associated with each chunk request."
                     + " Expected was %s got %s",
-                formatUploadIdForLog(streamUploadId), formatUploadIdForLog(uploadId)));
+                formatUploadIdForLog(currentUploadId), formatUploadIdForLog(uploadId)));
       }
     }
   }
