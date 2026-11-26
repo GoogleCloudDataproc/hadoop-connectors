@@ -160,7 +160,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public ImmutableList<HttpRequest> getAllRequests() {
-    return ImmutableList.copyOf(requests);
+    synchronized (requests) {
+      return ImmutableList.copyOf(requests);
+    }
   }
 
   public ImmutableList<String> getAllRequestStrings() {
@@ -169,7 +171,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong generationMatchId = new AtomicLong();
     AtomicLong sourceGenerationMatchId = new AtomicLong();
     AtomicLong resumableUploadId = new AtomicLong();
-    return requests.stream()
+    return getAllRequests().stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
         // Replace randomized pageToken with predictable value, so it could be asserted in tests
         .map(r -> replacePageTokenWithId(r, pageTokenId))
@@ -189,14 +191,14 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public ImmutableList<String> getAllRequestInvocationIds() {
-    return requests.stream()
+    return getAllRequests().stream()
         .map(r -> getInvocationId(r.getHeaders()))
         .filter(not(Strings::isNullOrEmpty))
         .collect(toImmutableList());
   }
 
   public ImmutableList<String> getAllRawRequestStrings() {
-    return requests.stream()
+    return getAllRequests().stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
         .collect(toImmutableList());
   }
