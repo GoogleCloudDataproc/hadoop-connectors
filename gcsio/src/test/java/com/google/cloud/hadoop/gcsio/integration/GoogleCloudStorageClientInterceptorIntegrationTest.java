@@ -45,6 +45,7 @@ import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import io.grpc.Status;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -89,7 +90,11 @@ public class GoogleCloudStorageClientInterceptorIntegrationTest {
 
   @BeforeClass
   public static void setup() throws IOException {
-    helperGcs.createBucket(TEST_BUCKET);
+    try {
+      helperGcs.createBucket(TEST_BUCKET);
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
   }
 
   @AfterClass

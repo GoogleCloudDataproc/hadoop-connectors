@@ -2756,7 +2756,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     // TODO: Some of the GCS API related operations, which are run in a separate thread are not
     // tracked.
     // It will be fixed in a separate change
-    runTest(subdirPath, myghfs, stats);
+    runTest(subdirPath, myghfs, stats, /* allowExtraGcsApiCalls= */ false);
 
     myghfs.close();
   }
@@ -2788,7 +2788,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
               try (GoogleHadoopFileSystem myghfs = new GoogleHadoopFileSystem()) {
                 Path subdirPath = new Path(parentPath, "foo-subdir" + i);
                 myghfs.initialize(subdirPath.toUri(), config);
-                runTest(subdirPath, myghfs, stats);
+                runTest(subdirPath, myghfs, stats, /* allowExtraGcsApiCalls= */ true);
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }
@@ -2804,33 +2804,36 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
   }
 
   private static void runTest(
-      Path subdirPath, GoogleHadoopFileSystem myghfs, GhfsThreadLocalStatistics stats)
+      Path subdirPath,
+      GoogleHadoopFileSystem myghfs,
+      GhfsThreadLocalStatistics stats,
+      boolean allowExtraGcsApiCalls)
       throws IOException {
     Map<String, Long> metrics = getThreadLocalMetrics(stats);
     myghfs.mkdirs(subdirPath);
 
-    verify(metrics, 1L, stats);
+    verify(metrics, 1L, stats, allowExtraGcsApiCalls);
 
     myghfs.getFileStatus(subdirPath);
-    verify(metrics, 2L, stats);
+    verify(metrics, 2L, stats, allowExtraGcsApiCalls);
 
     Path testFilePath = subdirPath.suffix("/test.empty");
     try (FSDataOutputStream outStream = myghfs.create(testFilePath)) {
-      verify(metrics, 1L, stats);
+      verify(metrics, 1L, stats, allowExtraGcsApiCalls);
 
       outStream.hflush();
-      verify(metrics, 1L, stats);
+      verify(metrics, 1L, stats, allowExtraGcsApiCalls);
 
       outStream.hsync();
-      verify(metrics, 3L, stats);
+      verify(metrics, 3L, stats, allowExtraGcsApiCalls);
     }
 
     metrics.merge(GCS_API_COUNT, 1L, Long::sum);
-    verify(metrics, stats);
+    verify(metrics, stats, allowExtraGcsApiCalls);
 
     try (FSDataInputStream ignored = myghfs.open(testFilePath)) {
       ignored.read();
-      verify(metrics, 1L, stats);
+      verify(metrics, 1L, stats, allowExtraGcsApiCalls);
     }
 
     Path dst = subdirPath.suffix("/test.rename.empty");
@@ -2841,38 +2844,49 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
     verify(
         metrics,
         myghfs.getGcsFs().getOptions().getClientType() == ClientType.STORAGE_CLIENT ? 0L : 1L,
-        stats);
+        stats,
+        allowExtraGcsApiCalls);
 
     myghfs.delete(dst);
-    verify(metrics, 2L, stats);
+    verify(metrics, 2L, stats, allowExtraGcsApiCalls);
 
     myghfs.delete(subdirPath, true);
-    verify(metrics, 4L, stats);
+    verify(metrics, 4L, stats, allowExtraGcsApiCalls);
   }
 
   private static void verify(
-      Map<String, Long> metrics, long gcsApiCount, GhfsThreadLocalStatistics stats) {
+      Map<String, Long> metrics,
+      long gcsApiCount,
+      GhfsThreadLocalStatistics stats,
+      boolean allowExtraGcsApiCalls) {
     metrics.merge(HADOOP_API_COUNT, 1L, Long::sum);
     metrics.merge(GCS_API_COUNT, gcsApiCount, Long::sum);
-    verify(metrics, stats);
+    verify(metrics, stats, allowExtraGcsApiCalls);
   }
 
   private static void verify(
-      Map<String, Long> expectedMetrics, GhfsThreadLocalStatistics statistics) {
-    expectedMetrics.forEach((key, value) -> checkTracked(key, value, statistics));
+      Map<String, Long> expectedMetrics,
+      GhfsThreadLocalStatistics statistics,
+      boolean allowExtraGcsApiCalls) {
+    expectedMetrics.forEach(
+        (key, value) -> checkTracked(key, value, statistics, allowExtraGcsApiCalls));
     assertThat(getThreadLocalMetrics(statistics).size()).isEqualTo(expectedMetrics.size());
   }
 
   private static void checkTracked(
-      String metric, long expected, GhfsThreadLocalStatistics statistics) {
+      String metric,
+      long expected,
+      GhfsThreadLocalStatistics statistics,
+      boolean allowExtraGcsApiCalls) {
     assertThat(statistics.isTracked(metric)).isTrue();
 
-    if (!metric.toLowerCase().contains("time")) {
+    if (metric.toLowerCase().contains("backoff")
+        || (allowExtraGcsApiCalls && metric.equals(GCS_API_COUNT))) {
+      // back off and retried GCS API calls are not deterministic
+      assertThat(statistics.getLong(metric)).isAtLeast(expected);
+    } else if (!metric.toLowerCase().contains("time")) {
       // time metrics are not deterministic
       assertThat(statistics.getLong(metric)).isEqualTo(expected);
-    } else if (!metric.toLowerCase().contains("time")) {
-      // back off is not deterministic
-      assertThat(statistics.getLong(metric)).isAtLeast(expected);
     }
   }
 

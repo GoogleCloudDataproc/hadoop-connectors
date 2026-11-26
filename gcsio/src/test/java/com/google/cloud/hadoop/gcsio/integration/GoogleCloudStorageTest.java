@@ -64,6 +64,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -114,14 +115,22 @@ public class GoogleCloudStorageTest {
   private static String createUniqueBucket(GoogleCloudStorage gcs, String suffix)
       throws IOException {
     String bucketName = getUniqueBucketName(suffix) + "_" + gcs.hashCode();
-    gcs.createBucket(bucketName);
+    try {
+      gcs.createBucket(bucketName);
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
     return bucketName;
   }
 
   private static String createHnBucket(GoogleCloudStorage gcs, String suffix) throws IOException {
     String bucketName = getUniqueBucketName(suffix) + "_" + gcs.hashCode();
-    gcs.createBucket(
-        bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    try {
+      gcs.createBucket(
+          bucketName, CreateBucketOptions.builder().setHierarchicalNamespaceEnabled(true).build());
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
     return bucketName;
   }
 
