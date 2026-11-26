@@ -25,6 +25,11 @@ import org.apache.hadoop.fs.statistics.StoreStatisticNames;
 class TestUtils {
 
   static void verifyDurationMetric(IOStatistics ioStatistics, String symbol, int expected) {
+    verifyDurationMetric(ioStatistics, symbol, expected, /* checkMin= */ true);
+  }
+
+  static void verifyDurationMetric(
+      IOStatistics ioStatistics, String symbol, int expected, boolean checkMin) {
     assertThat(ioStatistics.counters().get(symbol)).isEqualTo(expected);
     String minKey = String.format("%s%s", symbol, StoreStatisticNames.SUFFIX_MIN);
     String meanKey = String.format("%s%s", symbol, StoreStatisticNames.SUFFIX_MEAN);
@@ -34,8 +39,10 @@ class TestUtils {
     Long maxValue = ioStatistics.maximums().get(maxKey);
     long meanValue = Math.round(ioStatistics.meanStatistics().get(meanKey).mean());
 
-    assertThat(minValue).isLessThan(maxValue + 1);
-    assertThat(minValue).isLessThan(meanValue + 1);
+    if (checkMin) {
+      assertThat(minValue).isLessThan(maxValue + 1);
+      assertThat(minValue).isLessThan(meanValue + 1);
+    }
     assertThat(meanValue).isLessThan(maxValue + 1);
   }
 
