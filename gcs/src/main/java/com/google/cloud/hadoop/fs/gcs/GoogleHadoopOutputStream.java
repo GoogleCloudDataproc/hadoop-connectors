@@ -33,6 +33,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.VerificationAttributes;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.ITraceFactory;
 import com.google.cloud.hadoop.util.InvocationIdContext;
@@ -40,6 +42,7 @@ import com.google.cloud.hadoop.util.InvocationIdPropagatingExecutorService;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.BufferedOutputStream;
@@ -52,6 +55,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -59,6 +63,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32C;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
@@ -130,6 +135,12 @@ class GoogleHadoopOutputStream extends OutputStream
   // Number of bytes written to the current component. An empty tail component is not composed
   // onto the destination, because that would only create a new generation of identical content.
   private long tmpBytesWritten;
+
+  // Number of bytes written to this stream and their CRC32C: the size and the CRC32C that the
+  // destination has once the current component is committed. Not tracked when the stream appends
+  // to an existing object, because the destination then holds bytes the stream didn't write.
+  private long bytesWritten;
+  private final CRC32C writtenCrc32c = new CRC32C();
 
   // Whether the stream appends to an existing object.
   private final boolean appendMode;
@@ -329,6 +340,10 @@ class GoogleHadoopOutputStream extends OutputStream
             throwIfNotOpen();
             tmpOut.write(b);
             tmpBytesWritten++;
+            if (!appendMode) {
+              bytesWritten++;
+              writtenCrc32c.update(b);
+            }
             streamStatistics.writeBytes(1);
             // Using a lightweight implementation to update instrumentation. This method can be
             // called quite frequently and need to be lightweight.
@@ -369,6 +384,10 @@ class GoogleHadoopOutputStream extends OutputStream
             throwIfNotOpen();
             tmpOut.write(b, offset, len);
             tmpBytesWritten += len;
+            if (!appendMode) {
+              bytesWritten += len;
+              writtenCrc32c.update(b, offset, len);
+            }
             statistics.incrementBytesWritten(len);
             statistics.incrementWriteOps(1);
             streamStats.updateWriteStreamStats(len, start);
@@ -494,13 +513,56 @@ class GoogleHadoopOutputStream extends OutputStream
         discardEmptyTail(gcs, dstId, tmpId);
         return;
       }
-      GoogleCloudStorageItemInfo composedObject =
-          gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
+      GoogleCloudStorageItemInfo composedObject;
+      try {
+        composedObject =
+            gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
+      } catch (IOException e) {
+        composedObject = getDestinationIfComposeWasApplied(gcs, e);
+      }
       dstGenerationId = composedObject.getContentGeneration();
       if (!composeDeleteSourceEnabled) {
         scheduleTempFileDeletion(gcs, tmpId);
       }
     }
+  }
+
+  /**
+   * Returns the destination object if the compose() call that failed with {@code composeFailure}
+   * was in fact applied, otherwise throws {@code composeFailure}.
+   *
+   * <p>A compose request carries a generation precondition, so it fails with "412 Precondition
+   * Failed" when it is sent again after it was applied. A request is sent again when its response
+   * doesn't arrive, so this error doesn't always mean that another writer changed the destination.
+   * The request was applied if the destination holds exactly the bytes written to this stream.
+   */
+  private GoogleCloudStorageItemInfo getDestinationIfComposeWasApplied(
+      GoogleCloudStorage gcs, IOException composeFailure) throws IOException {
+    if (appendMode || !ApiErrorExtractor.INSTANCE.preconditionNotMet(composeFailure)) {
+      throw composeFailure;
+    }
+    GoogleCloudStorageItemInfo dstInfo;
+    try {
+      dstInfo =
+          gcs.getItemInfo(
+              StorageResourceId.fromUriPath(dstGcsPath, /* allowEmptyObjectName= */ false));
+    } catch (IOException e) {
+      composeFailure.addSuppressed(e);
+      throw composeFailure;
+    }
+    VerificationAttributes dstAttributes = dstInfo.getVerificationAttributes();
+    if (!dstInfo.exists()
+        || dstInfo.getSize() != bytesWritten
+        || dstAttributes == null
+        || !Arrays.equals(
+            dstAttributes.getCrc32c(), Ints.toByteArray((int) writtenCrc32c.getValue()))) {
+      throw composeFailure;
+    }
+    logger.atInfo().log(
+        "compose() of %s onto %s failed with a precondition error after it was applied;"
+            + " continuing from generation %d",
+        tmpGcsPath, dstGcsPath, dstInfo.getContentGeneration());
+    return dstInfo;
   }
 
   /**

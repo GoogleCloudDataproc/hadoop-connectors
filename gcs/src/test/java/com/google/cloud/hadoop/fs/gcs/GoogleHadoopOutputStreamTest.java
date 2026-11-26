@@ -35,6 +35,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.gcs.analyticscore.client.GcsFileInfo;
 import com.google.cloud.gcs.analyticscore.client.GcsFileSystem;
 import com.google.cloud.gcs.analyticscore.client.GcsItemId;
@@ -50,16 +53,23 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.primitives.Bytes;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.WritableByteChannel;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -1059,6 +1069,227 @@ public class GoogleHadoopOutputStreamTest {
       assertThat(memoryGcsFs.getGcs().getItemInfo(backgroundDeletedObjects.get(0)).exists())
           .isFalse();
       assertThat(readFile(ghfsDeleteSource, objectPath)).isEqualTo(data);
+    }
+  }
+
+  @Test
+  public void hflush_composeAppliedButResponseLost_continues() throws Exception {
+    ComposeResponseLosingStorage storage = useComposeResponseLosingStorage();
+    Path objectPath = new Path(ghfs.getUri().resolve("/compose_response_lost.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04};
+    byte[] data3 = {0x05};
+    byte[] data4 = {0x06, 0x07};
+
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data1, 0, data1.length);
+      fout.hflush(); // This one commits straight into destination.
+      fout.write(data2, 0, data2.length);
+      fout.hflush(); // The stream learns the destination generation from this compose.
+
+      storage.loseResponseOfNextCompose();
+      fout.write(data3, 0, data3.length);
+      fout.hflush();
+
+      fout.write(data4, 0, data4.length);
+      fout.hflush();
+    }
+
+    assertThat(readFile(objectPath)).isEqualTo(Bytes.concat(data1, data2, data3, data4));
+  }
+
+  @Test
+  public void hflush_firstComposeAppliedButResponseLost_continues() throws Exception {
+    ComposeResponseLosingStorage storage = useComposeResponseLosingStorage();
+    Path objectPath = new Path(ghfs.getUri().resolve("/first_compose_response_lost.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04};
+    byte[] data3 = {0x05};
+
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data1, 0, data1.length);
+      fout.hflush(); // This one commits straight into destination.
+
+      storage.loseResponseOfNextCompose();
+      fout.write(data2, 0, data2.length);
+      fout.hflush();
+
+      fout.write(data3, 0, data3.length);
+    }
+
+    assertThat(readFile(objectPath)).isEqualTo(Bytes.concat(data1, data2, data3));
+  }
+
+  @Test
+  public void close_composeAppliedButResponseLost_succeeds() throws Exception {
+    ComposeResponseLosingStorage storage = useComposeResponseLosingStorage();
+    Path objectPath = new Path(ghfs.getUri().resolve("/close_compose_response_lost.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04};
+
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(data1, 0, data1.length);
+      fout.hflush(); // This one commits straight into destination.
+
+      storage.loseResponseOfNextCompose();
+      fout.write(data2, 0, data2.length);
+    }
+
+    assertThat(readFile(objectPath)).isEqualTo(Bytes.concat(data1, data2));
+  }
+
+  @Test
+  public void hflush_destinationReplacedByAnotherWriter_fails() throws Exception {
+    ComposeResponseLosingStorage storage = useComposeResponseLosingStorage();
+    Path objectPath = new Path(ghfs.getUri().resolve("/replaced_by_another_writer.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04};
+    byte[] data3 = {0x05};
+    byte[] otherWriterData = {0x2a};
+
+    FSDataOutputStream fout = ghfs.create(objectPath);
+    fout.write(data1, 0, data1.length);
+    fout.hflush(); // This one commits straight into destination.
+    fout.write(data2, 0, data2.length);
+    fout.hflush(); // The stream learns the destination generation from this compose.
+
+    storage.replaceObject(ghfs.getGcsPath(objectPath), otherWriterData);
+    fout.write(data3, 0, data3.length);
+
+    assertThrows(IOException.class, fout::hflush);
+    assertThat(readFile(objectPath)).isEqualTo(otherWriterData);
+  }
+
+  @Test
+  public void hflush_destinationReplacedWithContentOfExpectedSize_fails() throws Exception {
+    ComposeResponseLosingStorage storage = useComposeResponseLosingStorage();
+    Path objectPath = new Path(ghfs.getUri().resolve("/replaced_with_expected_size.txt"));
+    byte[] data1 = {0x01, 0x02};
+    byte[] data2 = {0x03, 0x04};
+    byte[] data3 = {0x05};
+    byte[] otherWriterData = new byte[data1.length + data2.length + data3.length];
+
+    FSDataOutputStream fout = ghfs.create(objectPath);
+    fout.write(data1, 0, data1.length);
+    fout.hflush(); // This one commits straight into destination.
+    fout.write(data2, 0, data2.length);
+    fout.hflush(); // The stream learns the destination generation from this compose.
+
+    storage.replaceObject(ghfs.getGcsPath(objectPath), otherWriterData);
+    fout.write(data3, 0, data3.length);
+
+    assertThrows(IOException.class, fout::hflush);
+    assertThat(readFile(objectPath)).isEqualTo(otherWriterData);
+  }
+
+  @Test
+  public void append_composeAppliedButResponseLost_fails() throws Exception {
+    ComposeResponseLosingStorage storage = useComposeResponseLosingStorage();
+    Path objectPath = new Path(ghfs.getUri().resolve("/append_compose_response_lost.txt"));
+    byte[] existingData = {0x01, 0x02};
+    byte[] appendedData = {0x03, 0x04};
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      fout.write(existingData, 0, existingData.length);
+    }
+
+    // The stream didn't write the existing content, so it can't tell that the destination is the
+    // result of its own request.
+    FSDataOutputStream fout = ghfs.append(objectPath);
+    storage.loseResponseOfNextCompose();
+    fout.write(appendedData, 0, appendedData.length);
+
+    assertThrows(IOException.class, fout::hflush);
+  }
+
+  private ComposeResponseLosingStorage useComposeResponseLosingStorage() throws IOException {
+    AtomicReference<ComposeResponseLosingStorage> storage = new AtomicReference<>();
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            options -> {
+              storage.set(new ComposeResponseLosingStorage(options));
+              return storage.get();
+            });
+    return storage.get();
+  }
+
+  /**
+   * In-memory storage that gives a new generation to an object each time it is replaced, as GCS
+   * does, and that can fail a compose request the way a client sees it when the response is lost:
+   * the request is applied, and the one sent again in its place fails the generation precondition.
+   */
+  private static class ComposeResponseLosingStorage extends InMemoryGoogleCloudStorage {
+
+    private final Map<String, Long> generations = new HashMap<>();
+    private long nextGeneration = 2;
+    private boolean loseResponseOfNextCompose;
+
+    ComposeResponseLosingStorage(GoogleCloudStorageOptions options) {
+      super(options);
+    }
+
+    synchronized void loseResponseOfNextCompose() {
+      loseResponseOfNextCompose = true;
+    }
+
+    synchronized void replaceObject(URI path, byte[] content) throws IOException {
+      StorageResourceId id = StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
+      try (WritableByteChannel channel = create(id, CreateObjectOptions.DEFAULT_OVERWRITE)) {
+        channel.write(ByteBuffer.wrap(content));
+      }
+      generations.put(id.getObjectName(), nextGeneration++);
+    }
+
+    @Override
+    public synchronized GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId)
+        throws IOException {
+      GoogleCloudStorageItemInfo info = super.getItemInfo(resourceId);
+      Long generation = generations.get(resourceId.getObjectName());
+      if (generation == null || !info.exists()) {
+        return info;
+      }
+      return GoogleCloudStorageItemInfo.createObject(
+          info.getResourceId(),
+          info.getCreationTime(),
+          info.getModificationTime(),
+          info.getSize(),
+          info.getContentType(),
+          info.getContentEncoding(),
+          info.getMetadata(),
+          generation,
+          info.getMetaGeneration(),
+          info.getVerificationAttributes());
+    }
+
+    @Override
+    public synchronized GoogleCloudStorageItemInfo composeObjects(
+        List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
+        throws IOException {
+      if (destination.hasGenerationId()
+          && destination.getGenerationId() != getItemInfo(destination).getContentGeneration()) {
+        throw preconditionFailed();
+      }
+      super.composeObjects(
+          sources.stream()
+              .map(ComposeResponseLosingStorage::withoutGeneration)
+              .collect(Collectors.toList()),
+          withoutGeneration(destination),
+          options);
+      generations.put(destination.getObjectName(), nextGeneration++);
+      if (loseResponseOfNextCompose) {
+        loseResponseOfNextCompose = false;
+        throw preconditionFailed();
+      }
+      return getItemInfo(destination);
+    }
+
+    private static StorageResourceId withoutGeneration(StorageResourceId id) {
+      return new StorageResourceId(id.getBucketName(), id.getObjectName());
+    }
+
+    private static GoogleJsonResponseException preconditionFailed() {
+      return new GoogleJsonResponseException(
+          new HttpResponseException.Builder(412, "Precondition Failed", new HttpHeaders()),
+          /* details= */ null);
     }
   }
 }
