@@ -86,6 +86,8 @@ public enum GhfsStatistic {
   INVOCATION_LIST_STATUS(
       StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_DURATION_TOTAL, true),
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_DURATION_TOTAL, true),
+  INVOCATION_MOVE_DIRECTORY_CONTENTS(
+      "op_move_directory_contents", "Calls of moveDirectoryContents()", TYPE_DURATION_TOTAL, true),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_DURATION_TOTAL, true),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_DURATION_TOTAL, true),
   INVOCATION_COPY_FROM_LOCAL_FILE(

@@ -59,6 +59,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.cloud.hadoop.gcsio.TrackedFeatures;
@@ -117,6 +118,7 @@ import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
@@ -184,6 +186,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private static final String OBJECT_FIELDS = "bucket,name,size,updated";
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
+  private static final ListObjectOptions MOVE_CONTENTS_LIST_OPTIONS =
+      ListObjectOptions.DEFAULT_FLAT_LIST.toBuilder().setFields("bucket,name").build();
   private static final String XATTR_KEY_PREFIX = "GHFS_XATTR_";
   // Use empty array as null value because GCS API already uses null value to remove metadata key
   private static final byte[] XATTR_NULL_VALUE = new byte[0];
@@ -2021,6 +2025,64 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     if (isClosed()) {
       GoogleCloudStorageEventBus.postOnException();
       throw new IOException("GoogleHadoopFileSystem has been closed or not initialized.");
+    }
+  }
+
+  /**
+   * Moves all non-directory objects under {@code srcPrefix} to the same relative names under {@code
+   * dstPrefix} in this filesystem's bucket with a batched GCS move, overwriting existing
+   * destination objects and skipping directory placeholder objects. If {@code progressable} is
+   * non-null, it is notified before listing and, if any objects are moved, before moving.
+   *
+   * <p>Callers must ensure the bucket is flat (non-HNS), {@code srcPrefix} is a non-empty directory
+   * prefix ending with {@code /}, and {@code dstPrefix} ends with {@code /} (or is {@code ""} for
+   * the bucket root) and is neither equal to nor under {@code srcPrefix}.
+   */
+  void moveDirectoryContents(
+      String srcPrefix, String dstPrefix, @Nullable Progressable progressable) throws IOException {
+    trackDurationWithTracing(
+        instrumentation,
+        globalStorageStatistics,
+        GhfsStatistic.INVOCATION_MOVE_DIRECTORY_CONTENTS,
+        String.format("moveDirectoryContents(%s -> %s)", srcPrefix, dstPrefix),
+        this.traceFactory,
+        () -> {
+          checkOpen();
+          String bucket = fsRoot.toUri().getAuthority();
+          GoogleCloudStorage gcs = getGcsFs().getGcs();
+          reportProgress(progressable);
+          List<GoogleCloudStorageItemInfo> items =
+              gcs.listObjectInfo(bucket, srcPrefix, MOVE_CONTENTS_LIST_OPTIONS);
+          int movedCount = 0;
+          if (!items.isEmpty()) {
+            Map<StorageResourceId, StorageResourceId> srcToDst =
+                Maps.newLinkedHashMapWithExpectedSize(items.size());
+            for (GoogleCloudStorageItemInfo item : items) {
+              if (item.isDirectory()) {
+                continue;
+              }
+              String relativePath = item.getObjectName().substring(srcPrefix.length());
+              // Omit destination generation precondition so retries cleanly overwrite partial
+              // outputs.
+              srcToDst.put(
+                  item.getResourceId(), new StorageResourceId(bucket, dstPrefix + relativePath));
+            }
+            movedCount = srcToDst.size();
+            if (!srcToDst.isEmpty()) {
+              reportProgress(progressable);
+              gcs.move(srcToDst);
+            }
+          }
+          logger.atFiner().log(
+              "moveDirectoryContents(srcPrefix: %s, dstPrefix: %s): %d",
+              srcPrefix, dstPrefix, movedCount);
+          return null;
+        });
+  }
+
+  private static void reportProgress(@Nullable Progressable progressable) {
+    if (progressable != null) {
+      progressable.progress();
     }
   }
 

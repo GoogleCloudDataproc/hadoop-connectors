@@ -36,6 +36,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_LOCAT
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_STATUS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_LIST_STATUS_RESULT_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_MKDIRS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_MOVE_DIRECTORY_CONTENTS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_OPEN;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_OP_XATTR_LIST;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_RENAME;
@@ -3160,6 +3161,7 @@ public abstract class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoop
             INVOCATION_HSYNC.getSymbol(),
             INVOCATION_LIST_STATUS.getSymbol(),
             INVOCATION_MKDIRS.getSymbol(),
+            INVOCATION_MOVE_DIRECTORY_CONTENTS.getSymbol(),
             INVOCATION_OPEN.getSymbol(),
             INVOCATION_RENAME.getSymbol(),
             STREAM_READ_OPERATIONS.getSymbol(),

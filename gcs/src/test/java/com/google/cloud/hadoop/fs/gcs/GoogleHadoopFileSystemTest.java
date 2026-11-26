@@ -70,6 +70,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -1240,6 +1241,68 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
       assertThat(InvocationIdContext.getInvocationId()).isEmpty();
     }
     assertThat(ghfs.getFileStatus(file).getLen()).isEqualTo(3);
+  }
+
+  @Test
+  public void moveDirectoryContents_movesObjectsAndReportsProgress() throws Exception {
+    GoogleHadoopFileSystem openFs = (GoogleHadoopFileSystem) ghfs;
+    Path baseDir = new Path(openFs.getWorkingDirectory(), "move_dir_contents");
+    Path srcDir = new Path(baseDir, "src");
+    Path siblingDir = new Path(baseDir, "src2");
+    Path dstDir = new Path(baseDir, "dst");
+    openFs.mkdirs(srcDir);
+    openFs.mkdirs(new Path(baseDir, "marker_only/nested_empty"));
+    createFile(new Path(srcDir, "nested/part-0.parquet"), new byte[] {1, 2});
+    createFile(new Path(srcDir, "part-1.parquet"), new byte[] {3, 4, 5});
+    createFile(new Path(siblingDir, "untouched.parquet"), new byte[] {9});
+    String basePrefix =
+        StorageResourceId.fromUriPath(openFs.getGcsPath(baseDir), /* allowEmptyObjectName= */ true)
+            .toDirectoryId()
+            .getObjectName();
+    String srcPrefix = basePrefix + "src/";
+    String dstPrefix = basePrefix + "dst/";
+
+    AtomicInteger progressCalls = new AtomicInteger();
+    try (LogCapture logs = new LogCapture(GoogleHadoopFileSystem.class)) {
+      openFs.moveDirectoryContents(srcPrefix, dstPrefix, progressCalls::incrementAndGet);
+      assertThat(logs.invocationIdOf("moveDirectoryContents(srcPrefix:")).isNotEmpty();
+    }
+    assertThat(progressCalls.get()).isEqualTo(2);
+    assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    assertThat(openFs.getFileStatus(new Path(dstDir, "nested/part-0.parquet")).getLen())
+        .isEqualTo(2);
+    assertThat(openFs.getFileStatus(new Path(dstDir, "part-1.parquet")).getLen()).isEqualTo(3);
+    assertThat(openFs.exists(new Path(srcDir, "part-1.parquet"))).isFalse();
+    assertThat(openFs.exists(new Path(siblingDir, "untouched.parquet"))).isTrue();
+    assertThat(openFs.exists(new Path(dstDir, "untouched.parquet"))).isFalse();
+
+    // Null Progressable moves files; empty and directory-marker-only listings return before move.
+    createFile(new Path(srcDir, "part-2.parquet"), new byte[] {6});
+    openFs.moveDirectoryContents(srcPrefix, dstPrefix, /* progressable= */ null);
+    assertThat(openFs.getFileStatus(new Path(dstDir, "part-2.parquet")).getLen()).isEqualTo(1);
+    AtomicInteger noMoveProgressCalls = new AtomicInteger();
+    openFs.moveDirectoryContents(
+        basePrefix + "empty/", dstPrefix, noMoveProgressCalls::incrementAndGet);
+    openFs.moveDirectoryContents(
+        basePrefix + "marker_only/", dstPrefix, noMoveProgressCalls::incrementAndGet);
+    assertThat(noMoveProgressCalls.get()).isEqualTo(2);
+    assertThat(openFs.exists(new Path(dstDir, "nested_empty"))).isFalse();
+    assertThat(
+            openFs
+                .getIOStatistics()
+                .counters()
+                .get(GhfsStatistic.INVOCATION_MOVE_DIRECTORY_CONTENTS.getSymbol()))
+        .isEqualTo(4L);
+
+    try (GoogleHadoopFileSystem closedFs = createInMemoryGoogleHadoopFileSystem()) {
+      closedFs.close();
+      IOException closedEx =
+          assertThrows(
+              IOException.class,
+              () -> closedFs.moveDirectoryContents(srcPrefix, dstPrefix, /* progressable= */ null));
+      assertThat(closedEx).hasMessageThat().contains("closed or not initialized");
+      assertThat(InvocationIdContext.getInvocationId()).isEmpty();
+    }
   }
 
   private static final class LogCapture implements AutoCloseable {
