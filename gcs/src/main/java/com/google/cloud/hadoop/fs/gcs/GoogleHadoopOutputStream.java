@@ -136,9 +136,9 @@ class GoogleHadoopOutputStream extends OutputStream
   // onto the destination, because that would only create a new generation of identical content.
   private long tmpBytesWritten;
 
-  // Number of bytes written to this stream and their CRC32C. Unless the stream appends to an
-  // existing object, they are the size and the CRC32C that the destination has once the current
-  // component is committed.
+  // Number of bytes written to this stream and their CRC32C: the size and the CRC32C that the
+  // destination has once the current component is committed. Not tracked when the stream appends
+  // to an existing object, because the destination then holds bytes the stream didn't write.
   private long bytesWritten;
   private final CRC32C writtenCrc32c = new CRC32C();
 
@@ -340,8 +340,10 @@ class GoogleHadoopOutputStream extends OutputStream
             throwIfNotOpen();
             tmpOut.write(b);
             tmpBytesWritten++;
-            bytesWritten++;
-            writtenCrc32c.update(b);
+            if (!appendMode) {
+              bytesWritten++;
+              writtenCrc32c.update(b);
+            }
             streamStatistics.writeBytes(1);
             // Using a lightweight implementation to update instrumentation. This method can be
             // called quite frequently and need to be lightweight.
@@ -382,8 +384,10 @@ class GoogleHadoopOutputStream extends OutputStream
             throwIfNotOpen();
             tmpOut.write(b, offset, len);
             tmpBytesWritten += len;
-            bytesWritten += len;
-            writtenCrc32c.update(b, offset, len);
+            if (!appendMode) {
+              bytesWritten += len;
+              writtenCrc32c.update(b, offset, len);
+            }
             statistics.incrementBytesWritten(len);
             statistics.incrementWriteOps(1);
             streamStats.updateWriteStreamStats(len, start);
