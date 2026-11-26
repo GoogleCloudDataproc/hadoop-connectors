@@ -106,7 +106,44 @@ spark.hadoop.google.cloud.auth.service.account.enable=true
 # The JSON keyfile of the service account used for GCS
 # access when google.cloud.auth.service.account.enable is true.
 spark.hadoop.google.cloud.auth.service.account.json.keyfile=/path/to/keyfile
+
+# Optional: Enable GCS-optimized FileOutputCommitter (requires algorithm.version=2).
+# Set factory.scheme.gs for ORC, CSV, JSON, text, Avro, and Hive SQL; set BOTH together for
+# DSv1/DSv2 Parquet so driver/executor paths stay aligned (do not set globally for MR reducers):
+spark.hadoop.mapreduce.outputcommitter.factory.scheme.gs=com.google.cloud.hadoop.fs.gcs.GcsFileOutputCommitterFactory
+spark.sql.parquet.output.committer.class=com.google.cloud.hadoop.fs.gcs.GcsFileOutputCommitter
+spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2
 ```
+
+Notes for `GcsFileOutputCommitter` (prefix `mapreduce.*`, `fs.gs.*`, and `parquet.*` keys below with
+`spark.hadoop.` when configuring Spark):
+
+*   For Spark Parquet, always configure **both**
+    `spark.hadoop.mapreduce.outputcommitter.factory.scheme.gs` and
+    `spark.sql.parquet.output.committer.class` together (required for DSv1
+    Parquet under default `SQLHadoopMapReduceCommitProtocol`, and required for
+    DSv2 Parquet so driver `setupJob` and executor `commitTask` do not split
+    between `ManifestCommitter` and `GcsFileOutputCommitter`). Global
+    `spark.hadoop.mapreduce.outputcommitter.factory.class` takes precedence over
+    `scheme.gs` if set.
+*   Legacy `mapred` RDD writes (`RDD.saveAsTextFile`, `saveAsHadoopFile`) and direct
+    `ParquetOutputFormat` (`saveAsNewAPIHadoopFile`) bypass
+    `PathOutputCommitterFactory` and `spark.sql.parquet.output.committer.class`.
+*   **Prerequisites:** Requires `mapreduce.fileoutputcommitter.algorithm.version=2`,
+    `mapreduce.fileoutputcommitter.marksuccessfuljobs=true`,
+    `mapreduce.fileoutputcommitter.concurrent.write.enabled=false`,
+    `fs.gs.operation.move.enable=true`, and a flat (non-HNS) GCS
+    bucket. Otherwise all calls delegate to `FileOutputCommitter` (including
+    hierarchical namespace / Rapid buckets or if the HNS bucket lookup fails).
+*   **Caching:** With `fs.gs.performance.cache.enable=true`, the listing
+    fetches full object metadata and `move` invalidates only source cache entries,
+    so previously cached destination entries on the same JVM can remain stale
+    until the cache TTL expires.
+*   **Limitations:** `mapreduce.fileoutputcommitter.task.cleanup.enabled=true` is
+    ignored (`cleanupJob` cleans `_temporary`), and binding `GcsFileOutputCommitter`
+    via `spark.sql.parquet.output.committer.class` (in place of
+    `ParquetOutputCommitter`) does not emit `parquet.summary.metadata.level != NONE`
+    summary files.
 
 ## Test the installation
 
