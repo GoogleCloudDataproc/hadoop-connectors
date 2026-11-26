@@ -237,8 +237,10 @@ public class VectoredIOImpl implements Closeable {
 
           if (numRead >= totalBytesRead) {
             ByteBuffer childBuffer = sliceTo(readContent, combinedFileRange.getOffset(), child);
-            child.getData().complete(childBuffer);
+            // Update stats before completing the future so callers observe them once the read
+            // is done.
             updateBytesRead(child.getLength());
+            child.getData().complete(childBuffer);
           } else {
             throw new EOFException(
                 String.format(

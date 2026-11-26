@@ -37,6 +37,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -564,7 +565,11 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   /** Creates a bucket and adds it to the list of buckets to delete at the end of tests. */
   public String createUniqueBucket(String suffix) throws IOException {
     String bucketName = getUniqueBucketName(suffix);
-    mkdir(bucketName);
+    try {
+      mkdir(bucketName);
+    } catch (FileAlreadyExistsException e) {
+      // Bucket creation may succeed on the server and return 409 on client retry.
+    }
     return bucketName;
   }
 }
