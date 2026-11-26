@@ -1,6 +1,7 @@
 # Release Notes
 
 ## Next
+1. Fix flaky test
 
 ## 3.1.23 - 2026-11-20
 1. Prevent dot-segment path normalization during rename and path conversion
