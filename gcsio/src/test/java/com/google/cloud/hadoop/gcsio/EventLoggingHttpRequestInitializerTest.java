@@ -206,7 +206,7 @@ public class EventLoggingHttpRequestInitializerTest {
   }
 
   @Test
-  public void testNullHeaderValueAndInfoDisabledHandledCleanly() throws IOException {
+  public void testNullHeaderValueFilteredCleanly() throws IOException {
     HttpHeaders headersWithNull = new HttpHeaders();
     headersWithNull.put("null-header", null);
     headersWithNull.set("custom-request-header", "keep");
@@ -221,14 +221,17 @@ public class EventLoggingHttpRequestInitializerTest {
         (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("request_headers");
     assertThat(requestHeadersMap.get("null-header")).isNull();
     assertThat(requestHeadersMap.get("custom-request-header")).isEqualTo("keep");
+  }
 
+  @Test
+  public void testInfoDisabledSkipsLogging() throws IOException {
     LOGGER.setLevel(Level.WARNING);
     HttpRequest skippedRequest =
         getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(200));
     requestInitializer.initialize(skippedRequest);
     skippedRequest.execute();
 
-    assertingHandler.assertLogCount(1);
+    assertingHandler.assertLogCount(0);
   }
 
   @Test
