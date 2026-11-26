@@ -308,6 +308,17 @@ public class FeatureHeaderGeneratorTest {
                   hnsEnabled,
                   fastFailEnabled,
                   TrackedFeatures.COMPOSE_DELETE_SOURCE_ENABLED)
+            },
+            {
+              "List Directory First Enabled",
+              GoogleCloudStorageFileSystemOptions.DEFAULT.toBuilder()
+                  .setListDirectoryFirstEnabled(true)
+                  .build(),
+              createBitSet(
+                  fadviseAuto,
+                  hnsEnabled,
+                  fastFailEnabled,
+                  TrackedFeatures.LIST_DIRECTORY_FIRST_ENABLED)
             }
           });
     }
