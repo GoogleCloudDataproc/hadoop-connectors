@@ -133,6 +133,7 @@ public class EventLoggingHttpRequestInitializerTest {
     String googApiKey = "SECRET_GOOG_API_KEY";
     String apiKey = "SECRET_API_KEY";
     String iamAuthToken = "SECRET_IAM_AUTH_TOKEN";
+    String googAuthorization = "Bearer SECRET_GOOG_AUTHORIZATION";
     String idempotencyToken = "benign-idempotency-token-123";
     HttpRequest httpRequest =
         getHttpRequestWithResponse(httpResponse)
@@ -149,7 +150,8 @@ public class EventLoggingHttpRequestInitializerTest {
                     .set("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY-SHA256", copySourceEncryptionKeySha256)
                     .set("X-Goog-Api-Key", googApiKey)
                     .set("X-API-Key", apiKey)
-                    .set("X-Goog-Iam-Authorization-Token", iamAuthToken));
+                    .set("X-Goog-Iam-Authorization-Token", iamAuthToken)
+                    .set("X-Goog-Authorization", googAuthorization));
     requestInitializer.initialize(httpRequest);
 
     HttpResponse res = httpRequest.execute();
@@ -177,6 +179,8 @@ public class EventLoggingHttpRequestInitializerTest {
     assertThat(requestHeadersMap.get("X-Goog-Api-Key")).isNull();
     assertThat(requestHeadersMap.get("X-API-Key")).isNull();
     assertThat(requestHeadersMap.get("X-Goog-Iam-Authorization-Token")).isNull();
+    assertThat(requestHeadersMap.get("X-Goog-Authorization")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-authorization")).isNull();
     assertThat(requestHeadersMap.get("x-goog-encryption-algorithm")).isEqualTo("AES256");
     assertThat(requestHeadersMap.get("x-goog-gcs-idempotency-token")).isEqualTo(idempotencyToken);
 
@@ -188,6 +192,7 @@ public class EventLoggingHttpRequestInitializerTest {
     assertThat(serializedLog).doesNotContain(googApiKey);
     assertThat(serializedLog).doesNotContain(apiKey);
     assertThat(serializedLog).doesNotContain(iamAuthToken);
+    assertThat(serializedLog).doesNotContain(googAuthorization);
 
     // Caller request headers must remain unmutated.
     assertThat(httpRequest.getHeaders().get("X-Goog-Encryption-Key")).isEqualTo(encryptionKey);

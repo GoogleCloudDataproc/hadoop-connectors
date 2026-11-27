@@ -66,6 +66,7 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   private static final String GOOG_API_KEY_HEADER = "x-goog-api-key";
   private static final String API_KEY_HEADER = "x-api-key";
   private static final String IAM_AUTHORIZATION_TOKEN_HEADER = "x-goog-iam-authorization-token";
+  private static final String GOOG_AUTHORIZATION_HEADER = "x-goog-authorization";
 
   private static final ImmutableSet<String> REDACTED_REQUEST_HEADERS =
       Stream.of(
@@ -78,7 +79,8 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
               COPY_SOURCE_ENCRYPTION_KEY_SHA256_HEADER,
               GOOG_API_KEY_HEADER,
               API_KEY_HEADER,
-              IAM_AUTHORIZATION_TOKEN_HEADER)
+              IAM_AUTHORIZATION_TOKEN_HEADER,
+              GOOG_AUTHORIZATION_HEADER)
           .map(header -> header.toLowerCase(Locale.US))
           .collect(toImmutableSet());
 
