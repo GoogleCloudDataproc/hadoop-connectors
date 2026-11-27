@@ -339,6 +339,10 @@ public class LoggingUrlRedactorTest {
             LoggingUrlRedactor.redactUrlsInText(
                 "(https://host.example/o?name=a(1)&upload_id=" + id + ")"))
         .isEqualTo("(https://host.example/o?name=a(1)&upload_id=" + digest + ")");
+    assertThat(LoggingUrlRedactor.redactUrlsInText("[https://host.example/o?upload_id=" + id + "]"))
+        .isEqualTo("[https://host.example/o?upload_id=" + digest + "]");
+    assertThat(LoggingUrlRedactor.redactUrlsInText("[http://[::1]:8080/o?upload_id=" + id + "]"))
+        .isEqualTo("[http://[::1]:8080/o?upload_id=" + digest + "]");
   }
 
   @Test
