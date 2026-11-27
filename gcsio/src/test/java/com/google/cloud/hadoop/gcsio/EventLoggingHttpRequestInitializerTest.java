@@ -30,6 +30,7 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper;
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Level;
@@ -48,10 +49,14 @@ public class EventLoggingHttpRequestInitializerTest {
 
   private EventLoggingHttpRequestInitializer requestInitializer;
   private AssertingLogHandler assertingHandler;
+  private Level previousLevel;
+  private boolean previousUseParentHandlers;
 
   @Before
   public void setUp() throws IOException {
     assertingHandler = new AssertingLogHandler();
+    previousLevel = LOGGER.getLevel();
+    previousUseParentHandlers = LOGGER.getUseParentHandlers();
     LOGGER.setUseParentHandlers(false);
     LOGGER.addHandler(assertingHandler);
     LOGGER.setLevel(Level.INFO);
@@ -62,6 +67,8 @@ public class EventLoggingHttpRequestInitializerTest {
   @After
   public void verifyAndRemoveAssertingHandler() {
     LOGGER.removeHandler(assertingHandler);
+    LOGGER.setLevel(previousLevel);
+    LOGGER.setUseParentHandlers(previousUseParentHandlers);
   }
 
   @Test
@@ -116,16 +123,36 @@ public class EventLoggingHttpRequestInitializerTest {
   @Test
   public void testTracingHeadersFiltered() throws IOException {
     int expectedStatusCode = 201;
+    String encryptionKey = "BASE64_ENCRYPTION_KEY_VALUE";
+    String encryptionKeySha256 = "BASE64_ENCRYPTION_KEY_SHA256";
+    String copySourceEncryptionKey = "BASE64_COPY_SOURCE_KEY_VALUE";
+    String copySourceEncryptionKeySha256 = "BASE64_COPY_SOURCE_KEY_SHA256";
+    String googApiKey = "SECRET_GOOG_API_KEY";
+    String apiKey = "SECRET_API_KEY";
+    String iamAuthToken = "SECRET_IAM_AUTH_TOKEN";
+    String googAuthorization = "Bearer SECRET_GOOG_AUTHORIZATION";
+    String idempotencyToken = "benign-idempotency-token-123";
     MockLowLevelHttpResponse httpResponse =
         MockHttpTransportHelper.emptyResponse(expectedStatusCode)
-            .addHeader(SET_COOKIE, "cookieName=cookieValue");
+            .addHeader(SET_COOKIE, "cookieName=cookieValue")
+            .addHeader("X-Goog-Encryption-Key-Sha256", encryptionKeySha256);
     HttpRequest httpRequest =
         getHttpRequestWithResponse(httpResponse)
             .setHeaders(
                 new HttpHeaders()
                     .set(AUTHORIZATION, "Bearer TOKEN")
                     .set(COOKIE, "cookieName=cookieValue")
-                    .set(PROXY_AUTHORIZATION, "Basic user/pass"));
+                    .set(PROXY_AUTHORIZATION, "Basic user/pass")
+                    .set("x-goog-encryption-algorithm", "AES256")
+                    .set("x-goog-gcs-idempotency-token", idempotencyToken)
+                    .set("X-Goog-Encryption-Key", encryptionKey)
+                    .set("X-Goog-Encryption-Key-Sha256", encryptionKeySha256)
+                    .set("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY", copySourceEncryptionKey)
+                    .set("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY-SHA256", copySourceEncryptionKeySha256)
+                    .set("X-Goog-Api-Key", googApiKey)
+                    .set("X-API-Key", apiKey)
+                    .set("X-Goog-Iam-Authorization-Token", iamAuthToken)
+                    .set("X-Goog-Authorization", googAuthorization));
     requestInitializer.initialize(httpRequest);
 
     HttpResponse res = httpRequest.execute();
@@ -142,10 +169,77 @@ public class EventLoggingHttpRequestInitializerTest {
     assertThat(requestHeadersMap.get("authorization")).isNull();
     assertThat(requestHeadersMap.get("cookie")).isNull();
     assertThat(requestHeadersMap.get("proxy-authorization")).isNull();
+    assertThat(requestHeadersMap.get("X-Goog-Encryption-Key")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-encryption-key")).isNull();
+    assertThat(requestHeadersMap.get("X-Goog-Encryption-Key-Sha256")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-encryption-key-sha256")).isNull();
+    assertThat(requestHeadersMap.get("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-copy-source-encryption-key")).isNull();
+    assertThat(requestHeadersMap.get("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY-SHA256")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-copy-source-encryption-key-sha256")).isNull();
+    assertThat(requestHeadersMap.get("X-Goog-Api-Key")).isNull();
+    assertThat(requestHeadersMap.get("X-API-Key")).isNull();
+    assertThat(requestHeadersMap.get("X-Goog-Iam-Authorization-Token")).isNull();
+    assertThat(requestHeadersMap.get("X-Goog-Authorization")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-authorization")).isNull();
+    assertThat(requestHeadersMap.get("x-goog-encryption-algorithm")).isEqualTo("AES256");
+    assertThat(requestHeadersMap.get("x-goog-gcs-idempotency-token")).isEqualTo(idempotencyToken);
+
+    String serializedLog = new Gson().toJson(logRecord);
+    assertThat(serializedLog).doesNotContain(encryptionKey);
+    assertThat(serializedLog).doesNotContain(encryptionKeySha256);
+    assertThat(serializedLog).doesNotContain(copySourceEncryptionKey);
+    assertThat(serializedLog).doesNotContain(copySourceEncryptionKeySha256);
+    assertThat(serializedLog).doesNotContain(googApiKey);
+    assertThat(serializedLog).doesNotContain(apiKey);
+    assertThat(serializedLog).doesNotContain(iamAuthToken);
+    assertThat(serializedLog).doesNotContain(googAuthorization);
+
+    // Caller request headers must remain unmutated.
+    assertThat(httpRequest.getHeaders().get("X-Goog-Encryption-Key")).isEqualTo(encryptionKey);
+    assertThat(httpRequest.getHeaders().get("X-Goog-Encryption-Key-Sha256"))
+        .isEqualTo(encryptionKeySha256);
+    assertThat(httpRequest.getHeaders().get("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY"))
+        .isEqualTo(copySourceEncryptionKey);
+    assertThat(httpRequest.getHeaders().get("X-GOOG-COPY-SOURCE-ENCRYPTION-KEY-SHA256"))
+        .isEqualTo(copySourceEncryptionKeySha256);
+    assertThat(httpRequest.getHeaders().get("X-Goog-Api-Key")).isEqualTo(googApiKey);
+
     Object responseHeadersObj = logRecord.get("response_headers");
     assertThat(responseHeadersObj).isInstanceOf(Map.class);
     Map<?, ?> responseHeadersMap = (Map<?, ?>) responseHeadersObj;
     assertThat(responseHeadersMap.get("set-cookie")).isNull();
+    assertThat(responseHeadersMap.get("X-Goog-Encryption-Key-Sha256")).isNull();
+    assertThat(responseHeadersMap.get("x-goog-encryption-key-sha256")).isNull();
+  }
+
+  @Test
+  public void testNullHeaderValueFilteredCleanly() throws IOException {
+    HttpHeaders headersWithNull = new HttpHeaders();
+    headersWithNull.put("null-header", null);
+    headersWithNull.set("custom-request-header", "keep");
+    HttpRequest httpRequest =
+        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(200))
+            .setHeaders(headersWithNull);
+    requestInitializer.initialize(httpRequest);
+    httpRequest.execute();
+
+    assertingHandler.assertLogCount(1);
+    Map<?, ?> requestHeadersMap =
+        (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("request_headers");
+    assertThat(requestHeadersMap.get("null-header")).isNull();
+    assertThat(requestHeadersMap.get("custom-request-header")).isEqualTo("keep");
+  }
+
+  @Test
+  public void testInfoDisabledSkipsLogging() throws IOException {
+    LOGGER.setLevel(Level.WARNING);
+    HttpRequest skippedRequest =
+        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(200));
+    requestInitializer.initialize(skippedRequest);
+    skippedRequest.execute();
+
+    assertingHandler.assertLogCount(0);
   }
 
   @Test

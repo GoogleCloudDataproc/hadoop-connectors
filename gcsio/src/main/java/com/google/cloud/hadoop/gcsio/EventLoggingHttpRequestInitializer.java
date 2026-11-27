@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 
 /**
  * Implements a HttpRequestInitializer which adds a ResponseInterceptor to each HttpRequest and
@@ -56,13 +57,37 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final Gson gson = new Gson();
 
+  private static final String ENCRYPTION_KEY_HEADER = "x-goog-encryption-key";
+  private static final String ENCRYPTION_KEY_SHA256_HEADER = "x-goog-encryption-key-sha256";
+  private static final String COPY_SOURCE_ENCRYPTION_KEY_HEADER =
+      "x-goog-copy-source-encryption-key";
+  private static final String COPY_SOURCE_ENCRYPTION_KEY_SHA256_HEADER =
+      "x-goog-copy-source-encryption-key-sha256";
+  private static final String GOOG_API_KEY_HEADER = "x-goog-api-key";
+  private static final String API_KEY_HEADER = "x-api-key";
+  private static final String IAM_AUTHORIZATION_TOKEN_HEADER = "x-goog-iam-authorization-token";
+  private static final String GOOG_AUTHORIZATION_HEADER = "x-goog-authorization";
+
   private static final ImmutableSet<String> REDACTED_REQUEST_HEADERS =
-      Stream.of(AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION)
+      Stream.of(
+              AUTHORIZATION,
+              COOKIE,
+              PROXY_AUTHORIZATION,
+              ENCRYPTION_KEY_HEADER,
+              ENCRYPTION_KEY_SHA256_HEADER,
+              COPY_SOURCE_ENCRYPTION_KEY_HEADER,
+              COPY_SOURCE_ENCRYPTION_KEY_SHA256_HEADER,
+              GOOG_API_KEY_HEADER,
+              API_KEY_HEADER,
+              IAM_AUTHORIZATION_TOKEN_HEADER,
+              GOOG_AUTHORIZATION_HEADER)
           .map(header -> header.toLowerCase(Locale.US))
           .collect(toImmutableSet());
 
   private static final ImmutableSet<String> REDACTED_RESPONSE_HEADERS =
-      ImmutableSet.of(SET_COOKIE.toLowerCase(Locale.US));
+      Stream.of(SET_COOKIE, ENCRYPTION_KEY_SHA256_HEADER)
+          .map(header -> header.toLowerCase(Locale.US))
+          .collect(toImmutableSet());
 
   // Using a ConcurrentMap with weak key reference to avoid potential memory leak during failure
   // scenarios. We do not get an response interceptor callback if there is some failure while
@@ -80,6 +105,10 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   @VisibleForTesting
   void logAndRemoveRequestFromTracking(HttpResponse httpResponse) {
     HttpRequest request = httpResponse.getRequest();
+    HttpRequestResponseTimeTracker tracker = requestTracker.remove(request);
+    if (!logger.atInfo().isEnabled()) {
+      return;
+    }
 
     Map<String, Object> jsonMap = new HashMap<>();
     jsonMap.put("request_method", request.getRequestMethod());
@@ -91,7 +120,6 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
     jsonMap.put("response_status_message", httpResponse.getStatusMessage());
     jsonMap.put("thread_name", Thread.currentThread().getName());
 
-    HttpRequestResponseTimeTracker tracker = requestTracker.remove(request);
     if (tracker != null) {
       jsonMap.put("response_time", tracker.getResponseTime());
       jsonMap.put("request_start_time_utc", tracker.getStartTimeUtc());
@@ -109,9 +137,16 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   }
 
   private static ImmutableMap<String, Object> filterMap(
-      HttpHeaders httpHeaders, Set<String> filterSet) {
+      @Nullable HttpHeaders httpHeaders, Set<String> filterSet) {
+    if (httpHeaders == null) {
+      return ImmutableMap.of();
+    }
     return httpHeaders.entrySet().stream()
-        .filter(e -> !filterSet.contains(e.getKey().toLowerCase(Locale.US)))
+        .filter(
+            e ->
+                e.getKey() != null
+                    && e.getValue() != null
+                    && !filterSet.contains(e.getKey().toLowerCase(Locale.US)))
         .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
