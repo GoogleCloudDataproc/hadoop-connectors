@@ -35,31 +35,10 @@ jobs:
       - name: Run unit tests and collect coverage
         run: ./mvnw -B -e -Pcoverage clean verify
 
-      - name: Download Codecov CLI
-        id: download-codecov
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-delay 2 \
-            -o "${RUNNER_TEMP}/codecov" \
-            "https://cli.codecov.io/v11.3.2/linux/codecov"
-
-      - name: Verify Codecov CLI checksum
-        id: verify-codecov
-        if: steps.download-codecov.outcome == 'success'
-        run: |
-          set -euo pipefail
-          if ! echo "8e1bfb71661378530f6ea21e82b414095899e565cbb4cf555c613064be17b973  ${RUNNER_TEMP}/codecov" | sha256sum -c -; then
-            rm -f "${RUNNER_TEMP}/codecov"
-            exit 1
-          fi
-          chmod +x "${RUNNER_TEMP}/codecov"
-
       - name: Upload coverage report to Codecov
-        if: steps.verify-codecov.outcome == 'success'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
-          binary: ${{ runner.temp }}/codecov
+          version: v11.3.2
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittest
-          fail_ci_if_error: false
+          fail_ci_if_error: ${{ github.event_name == 'push' }}
