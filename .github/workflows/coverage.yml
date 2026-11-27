@@ -1,0 +1,44 @@
+# Runs the unit tests with the coverage profile and uploads the report to
+# Codecov. Integration tests run in Cloud Build (see cloudbuild/) and are not
+# part of this report.
+name: coverage
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: 'temurin'
+          java-version: 17
+          cache: maven
+
+      - name: Run unit tests and collect coverage
+        run: ./mvnw -B -e -Pcoverage clean verify
+
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          version: v11.3.2
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittest
+          fail_ci_if_error: ${{ github.event_name == 'push' }}
