@@ -123,9 +123,6 @@ public class EventLoggingHttpRequestInitializerTest {
   @Test
   public void testTracingHeadersFiltered() throws IOException {
     int expectedStatusCode = 201;
-    MockLowLevelHttpResponse httpResponse =
-        MockHttpTransportHelper.emptyResponse(expectedStatusCode)
-            .addHeader(SET_COOKIE, "cookieName=cookieValue");
     String encryptionKey = "BASE64_ENCRYPTION_KEY_VALUE";
     String encryptionKeySha256 = "BASE64_ENCRYPTION_KEY_SHA256";
     String copySourceEncryptionKey = "BASE64_COPY_SOURCE_KEY_VALUE";
@@ -135,6 +132,10 @@ public class EventLoggingHttpRequestInitializerTest {
     String iamAuthToken = "SECRET_IAM_AUTH_TOKEN";
     String googAuthorization = "Bearer SECRET_GOOG_AUTHORIZATION";
     String idempotencyToken = "benign-idempotency-token-123";
+    MockLowLevelHttpResponse httpResponse =
+        MockHttpTransportHelper.emptyResponse(expectedStatusCode)
+            .addHeader(SET_COOKIE, "cookieName=cookieValue")
+            .addHeader("X-Goog-Encryption-Key-Sha256", encryptionKeySha256);
     HttpRequest httpRequest =
         getHttpRequestWithResponse(httpResponse)
             .setHeaders(
@@ -208,6 +209,8 @@ public class EventLoggingHttpRequestInitializerTest {
     assertThat(responseHeadersObj).isInstanceOf(Map.class);
     Map<?, ?> responseHeadersMap = (Map<?, ?>) responseHeadersObj;
     assertThat(responseHeadersMap.get("set-cookie")).isNull();
+    assertThat(responseHeadersMap.get("X-Goog-Encryption-Key-Sha256")).isNull();
+    assertThat(responseHeadersMap.get("x-goog-encryption-key-sha256")).isNull();
   }
 
   @Test

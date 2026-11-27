@@ -85,7 +85,9 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
           .collect(toImmutableSet());
 
   private static final ImmutableSet<String> REDACTED_RESPONSE_HEADERS =
-      ImmutableSet.of(SET_COOKIE.toLowerCase(Locale.US));
+      Stream.of(SET_COOKIE, ENCRYPTION_KEY_SHA256_HEADER)
+          .map(header -> header.toLowerCase(Locale.US))
+          .collect(toImmutableSet());
 
   // Using a ConcurrentMap with weak key reference to avoid potential memory leak during failure
   // scenarios. We do not get an response interceptor callback if there is some failure while
