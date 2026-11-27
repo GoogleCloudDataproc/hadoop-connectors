@@ -886,7 +886,8 @@ public class RetryHttpInitializerTest {
                       msg ->
                           msg.contains("status code 410")
                               && msg.contains("uploadType=resumable")
-                              && msg.contains("upload_id=REDACTED")))
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
           .isTrue();
       for (LogRecord logRecord : records) {
         assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
@@ -939,7 +940,8 @@ public class RetryHttpInitializerTest {
                       msg ->
                           msg.contains("contains unescaped '+'")
                               && msg.contains("uploadType=resumable")
-                              && msg.contains("upload_id=REDACTED")))
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
           .isTrue();
       for (LogRecord logRecord : records) {
         assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
@@ -985,7 +987,8 @@ public class RetryHttpInitializerTest {
                       msg ->
                           msg.contains("Encountered an IOException")
                               && msg.contains("uploadType=resumable")
-                              && msg.contains("upload_id=REDACTED")))
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
           .isTrue();
       for (LogRecord logRecord : records) {
         assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);

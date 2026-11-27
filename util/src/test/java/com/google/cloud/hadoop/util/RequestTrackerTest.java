@@ -163,9 +163,9 @@ public class RequestTrackerTest extends TestCase {
 
     assertThat(contextString).contains("uploadType=resumable");
     assertThat(contextString).contains("name=dir/file");
-    assertThat(contextString).contains("upload_id=REDACTED");
+    assertThat(contextString).contains("upload_id=" + LoggingUrlRedactor.digestToken(uploadId));
     assertThat(contextString).doesNotContain(uploadId);
-    assertThat(trackerString).contains("upload_id=REDACTED");
+    assertThat(trackerString).contains("upload_id=" + LoggingUrlRedactor.digestToken(uploadId));
     assertThat(trackerString).doesNotContain(uploadId);
     assertThat(uploadRequest.getUrl().getFirst("upload_id")).isEqualTo(uploadId);
     assertThat(uploadRequest.getUrl().getFirst("alt")).isEqualTo("media");

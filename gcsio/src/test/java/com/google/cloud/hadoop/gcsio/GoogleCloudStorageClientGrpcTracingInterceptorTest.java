@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.util.LoggingUrlRedactor;
@@ -37,7 +38,7 @@ import io.grpc.ClientStreamTracer;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -137,20 +138,9 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
     writeListenerRef.get().onMessage(WriteObjectResponse.newBuilder().setPersistedSize(8).build());
     writeListenerRef.get().onClose(Status.OK, new Metadata());
 
-    assertingHandler.assertLogCount(7);
-    Map<String, Object> startResponseLog = assertingHandler.getLogRecordAtIndex(1);
-    Map<String, Object> writeRequest1Log = assertingHandler.getLogRecordAtIndex(3);
-    Map<String, Object> writeRequest2Log = assertingHandler.getLogRecordAtIndex(4);
-    Map<String, Object> writeResponseLog = assertingHandler.getLogRecordAtIndex(5);
-
-    assertThat(startResponseLog.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(expectedDigest);
-    assertThat(writeRequest1Log.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(expectedDigest);
-    assertThat(writeRequest2Log.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(expectedDigest);
-    assertThat(writeResponseLog.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(expectedDigest);
+    assertThat(uploadIds("StartResumableWrite", "response")).containsExactly(expectedDigest);
+    assertThat(uploadIds("WriteObject", "request")).containsExactly(expectedDigest, expectedDigest);
+    assertThat(uploadIds("WriteObject", "response")).containsExactly(expectedDigest);
 
     String allLogsJson = new Gson().toJson(assertingHandler.getAllLogRecords());
     assertThat(allLogsJson).doesNotContain(rawUploadId);
@@ -170,17 +160,9 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
     writeListenerRef.get().onMessage(WriteObjectResponse.newBuilder().setPersistedSize(0).build());
     writeListenerRef.get().onClose(Status.OK, new Metadata());
 
-    assertingHandler.assertLogCount(3);
-    assertThat(
-            assertingHandler
-                .getLogRecordAtIndex(0)
-                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo("");
-    assertThat(
-            assertingHandler
-                .getLogRecordAtIndex(1)
-                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(GoogleCloudStorageClientGrpcTracingInterceptor.STREAM_UPLOAD_ID_NOT_FOUND);
+    assertThat(uploadIds("WriteObject", "request")).containsExactly("");
+    assertThat(uploadIds("WriteObject", "response"))
+        .containsExactly(GoogleCloudStorageClientGrpcTracingInterceptor.STREAM_UPLOAD_ID_NOT_FOUND);
   }
 
   @Test
@@ -230,22 +212,8 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
     writeListenerRef.get().onMessage(WriteObjectResponse.newBuilder().setPersistedSize(8).build());
     writeListenerRef.get().onClose(Status.OK, new Metadata());
 
-    assertingHandler.assertLogCount(4);
-    assertThat(
-            assertingHandler
-                .getLogRecordAtIndex(0)
-                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(expectedDigest);
-    assertThat(
-            assertingHandler
-                .getLogRecordAtIndex(1)
-                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo("");
-    assertThat(
-            assertingHandler
-                .getLogRecordAtIndex(2)
-                .get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
-        .isEqualTo(expectedDigest);
+    assertThat(uploadIds("WriteObject", "request")).containsExactly(expectedDigest, "").inOrder();
+    assertThat(uploadIds("WriteObject", "response")).containsExactly(expectedDigest);
     String allLogsJson = new Gson().toJson(assertingHandler.getAllLogRecords());
     assertThat(allLogsJson).doesNotContain(rawUploadId);
   }
@@ -262,6 +230,18 @@ public class GoogleCloudStorageClientGrpcTracingInterceptorTest {
         .isEqualTo(GoogleCloudStorageClientGrpcTracingInterceptor.STREAM_UPLOAD_ID_NOT_FOUND);
     assertThat(GoogleCloudStorageClientGrpcTracingInterceptor.formatUploadIdForLog("raw-token"))
         .isEqualTo(LoggingUrlRedactor.digestToken("raw-token"));
+  }
+
+  /** Returns the logged upload IDs for one RPC method and stream operation, in log order. */
+  private List<Object> uploadIds(String rpcMethod, String streamOperation) {
+    return assertingHandler.getAllLogRecords().stream()
+        .filter(r -> rpcMethod.equals(r.get(GoogleCloudStorageTracingFields.RPC_METHOD.name)))
+        .filter(
+            r ->
+                streamOperation.equals(
+                    r.get(GoogleCloudStorageTracingFields.STREAM_OPERATION.name)))
+        .map(r -> r.get(GoogleCloudStorageTracingFields.UPLOAD_ID.name))
+        .collect(toList());
   }
 
   private static <V> Channel fakeChannel(AtomicReference<ClientCall.Listener<V>> capturedListener) {

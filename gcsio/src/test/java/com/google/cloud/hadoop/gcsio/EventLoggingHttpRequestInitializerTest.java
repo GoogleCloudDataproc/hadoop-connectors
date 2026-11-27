@@ -28,6 +28,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.cloud.hadoop.util.LoggingUrlRedactor;
@@ -183,7 +184,7 @@ public class EventLoggingHttpRequestInitializerTest {
   }
 
   @Test
-  public void testResumableUploadRedactsUrlFiltersLocationAndDigestsUploadIdHeader()
+  public void testResumableUploadRedactsUrlAndLocationAndDigestsUploadIdHeader()
       throws IOException {
     String secretUploadId = "SECRET_HTTP_TRACE_UPLOAD_ID";
     String expectedDigest = LoggingUrlRedactor.digestToken(secretUploadId);
@@ -229,7 +230,12 @@ public class EventLoggingHttpRequestInitializerTest {
             "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
                 + "?uploadType=resumable&name=dir/obj");
     Map<?, ?> initRespHeaders = (Map<?, ?>) initLog.get("response_headers");
-    assertThat(initRespHeaders.get("location")).isNull();
+    assertThat(initRespHeaders.get("location"))
+        .isEqualTo(
+            Collections.singletonList(
+                "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                    + "?uploadType=resumable&upload_id="
+                    + expectedDigest));
     assertThat(initRespHeaders.get("x-guploader-uploadid"))
         .isEqualTo(Collections.singletonList(expectedDigest));
     assertThat(initRespHeaders.get("custom-header"))
@@ -237,7 +243,7 @@ public class EventLoggingHttpRequestInitializerTest {
 
     Map<String, Object> chunkLog = assertingHandler.getLogRecordAtIndex(1);
     assertThat(chunkLog.get("request_url").toString()).contains("uploadType=resumable");
-    assertThat(chunkLog.get("request_url").toString()).contains("upload_id=REDACTED");
+    assertThat(chunkLog.get("request_url").toString()).contains("upload_id=" + expectedDigest);
     Map<?, ?> chunkRespHeaders = (Map<?, ?>) chunkLog.get("response_headers");
     assertThat(chunkRespHeaders.get("x-guploader-uploadid"))
         .isEqualTo(Collections.singletonList(expectedDigest));
@@ -276,8 +282,30 @@ public class EventLoggingHttpRequestInitializerTest {
   }
 
   @Test
-  public void testCustomEndpointPutAndScottyResponseHeadersAreRedactedFailClosed()
-      throws IOException {
+  public void testNonUploadMutationsPreserveGUploaderUploadIdHeader() throws IOException {
+    String traceId = "MUTATION_SCOTTY_TRACE_ID";
+    GenericUrl objectUrl = new GenericUrl("https://storage.googleapis.com/storage/v1/b/bkt/o/obj");
+    GenericUrl composeUrl =
+        new GenericUrl("https://storage.googleapis.com/storage/v1/b/bkt/o/obj/compose");
+    for (HttpRequest request :
+        Arrays.asList(
+            traceIdRequestFactory(traceId).buildDeleteRequest(objectUrl),
+            traceIdRequestFactory(traceId).buildPatchRequest(objectUrl, null),
+            traceIdRequestFactory(traceId).buildPostRequest(composeUrl, null))) {
+      requestInitializer.initialize(request);
+      request.execute();
+    }
+
+    assertingHandler.assertLogCount(3);
+    for (Map<String, Object> logRecord : assertingHandler.getAllLogRecords()) {
+      Map<?, ?> respHeaders = (Map<?, ?>) logRecord.get("response_headers");
+      assertThat(respHeaders.get("x-guploader-uploadid"))
+          .isEqualTo(Collections.singletonList(traceId));
+    }
+  }
+
+  @Test
+  public void testCustomEndpointUploadResponseHeadersAreRedacted() throws IOException {
     String secretUploadId = "SECRET_CUSTOM_PROXY_UPLOAD_ID";
     String expectedDigest = LoggingUrlRedactor.digestToken(secretUploadId);
     MockLowLevelHttpResponse mockResponse =
@@ -286,7 +314,7 @@ public class EventLoggingHttpRequestInitializerTest {
             .addHeader("X-Goog-Upload-URL", "https://proxy.example/session?upload_id=SECRET_URL")
             .addHeader(
                 "X-Goog-Upload-Control-URL", "https://proxy.example/ctrl?upload_id=SECRET_CTRL");
-    // Custom proxy PUT without /upload/ or upload_id query param must still fail closed.
+    // The upload session headers in the response mark this custom endpoint PUT as an upload.
     HttpRequest putRequest =
         mockTransport(mockResponse)
             .createRequestFactory()
@@ -298,8 +326,16 @@ public class EventLoggingHttpRequestInitializerTest {
     assertingHandler.assertLogCount(1);
     Map<?, ?> respHeaders =
         (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("response_headers");
-    assertThat(respHeaders.get("x-goog-upload-url")).isNull();
-    assertThat(respHeaders.get("x-goog-upload-control-url")).isNull();
+    assertThat(respHeaders.get("x-goog-upload-url"))
+        .isEqualTo(
+            Collections.singletonList(
+                "https://proxy.example/session?upload_id="
+                    + LoggingUrlRedactor.digestToken("SECRET_URL")));
+    assertThat(respHeaders.get("x-goog-upload-control-url"))
+        .isEqualTo(
+            Collections.singletonList(
+                "https://proxy.example/ctrl?upload_id="
+                    + LoggingUrlRedactor.digestToken("SECRET_CTRL")));
     assertThat(respHeaders.get("x-guploader-uploadid"))
         .isEqualTo(Collections.singletonList(expectedDigest));
     String allLogsJson = new Gson().toJson(assertingHandler.getAllLogRecords());
@@ -309,7 +345,7 @@ public class EventLoggingHttpRequestInitializerTest {
   }
 
   @Test
-  public void testGetRedirectFiltersLocationButPreservesReadTraceIdAndResumableHeaderDigests()
+  public void testGetRedirectRedactsLocationAndPreservesReadTraceIdAndResumableHeaderDigests()
       throws IOException {
     String readTraceId = "READ_REDIRECT_TRACE_ID";
     MockLowLevelHttpResponse redirectResponse =
@@ -339,7 +375,11 @@ public class EventLoggingHttpRequestInitializerTest {
     assertingHandler.assertLogCount(2);
     Map<?, ?> redirectRespHeaders =
         (Map<?, ?>) assertingHandler.getLogRecordAtIndex(0).get("response_headers");
-    assertThat(redirectRespHeaders.get("location")).isNull();
+    assertThat(redirectRespHeaders.get("location"))
+        .isEqualTo(
+            Collections.singletonList(
+                "https://storage.googleapis.com/o?X-Goog-Signature="
+                    + LoggingUrlRedactor.REDACTED));
     assertThat(redirectRespHeaders.get("x-guploader-uploadid"))
         .isEqualTo(Collections.singletonList(readTraceId));
 
@@ -386,5 +426,11 @@ public class EventLoggingHttpRequestInitializerTest {
     return mockTransport(response)
         .createRequestFactory()
         .buildGetRequest(new GenericUrl(REQUEST_URL));
+  }
+
+  private static HttpRequestFactory traceIdRequestFactory(String traceId) {
+    return mockTransport(
+            MockHttpTransportHelper.emptyResponse(200).addHeader("X-GUploader-UploadID", traceId))
+        .createRequestFactory();
   }
 }

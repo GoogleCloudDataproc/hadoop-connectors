@@ -28,7 +28,6 @@ import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpHeaders;
-import com.google.api.client.http.HttpMethods;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
@@ -51,6 +50,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
@@ -67,12 +67,14 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   private static final String UPLOAD_URL_RESPONSE_HEADER = "x-goog-upload-url";
   private static final String UPLOAD_CONTROL_URL_RESPONSE_HEADER = "x-goog-upload-control-url";
 
-  private static final ImmutableSet<String> UPLOAD_INDICATOR_REQUEST_HEADERS =
+  // Request or response headers that mark an HTTP exchange as part of a resumable upload.
+  private static final ImmutableSet<String> UPLOAD_INDICATOR_HEADERS =
       ImmutableSet.of(
           "x-goog-resumable",
           "x-goog-upload-protocol",
           "x-goog-upload-command",
-          UPLOAD_URL_RESPONSE_HEADER);
+          UPLOAD_URL_RESPONSE_HEADER,
+          UPLOAD_CONTROL_URL_RESPONSE_HEADER);
 
   private static final ImmutableSet<String> REDACTED_REQUEST_HEADERS =
       Stream.of(AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION)
@@ -80,8 +82,12 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
           .collect(toImmutableSet());
 
   private static final ImmutableSet<String> REDACTED_RESPONSE_HEADERS =
-      Stream.of(
-              SET_COOKIE, LOCATION, UPLOAD_URL_RESPONSE_HEADER, UPLOAD_CONTROL_URL_RESPONSE_HEADER)
+      ImmutableSet.of(SET_COOKIE.toLowerCase(Locale.US));
+
+  // Response headers that carry URLs (redirect targets and upload session URLs). They are logged
+  // with their query parameters redacted.
+  private static final ImmutableSet<String> URL_RESPONSE_HEADERS =
+      Stream.of(LOCATION, UPLOAD_URL_RESPONSE_HEADER, UPLOAD_CONTROL_URL_RESPONSE_HEADER)
           .map(header -> header.toLowerCase(Locale.US))
           .collect(toImmutableSet());
 
@@ -151,7 +157,7 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
     if (responseHeaders == null) {
       return ImmutableMap.of();
     }
-    boolean digestUploadId = shouldDigestUploadId(request);
+    boolean digestUploadId = isUploadExchange(request, responseHeaders);
     return responseHeaders.entrySet().stream()
         .filter(
             e ->
@@ -161,18 +167,27 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
         .collect(
             toImmutableMap(
                 Map.Entry::getKey,
-                e ->
-                    digestUploadId && UPLOAD_ID_RESPONSE_HEADER.equalsIgnoreCase(e.getKey())
-                        ? digestHeaderValue(e.getValue())
-                        : e.getValue()));
+                e -> formatResponseHeaderValue(e.getKey(), e.getValue(), digestUploadId)));
   }
 
-  private static boolean shouldDigestUploadId(HttpRequest request) {
-    String method = request.getRequestMethod();
-    if (!HttpMethods.GET.equalsIgnoreCase(method) && !HttpMethods.HEAD.equalsIgnoreCase(method)) {
-      return true;
+  private static Object formatResponseHeaderValue(
+      String name, Object value, boolean digestUploadId) {
+    String lowerCaseName = name.toLowerCase(Locale.US);
+    if (URL_RESPONSE_HEADERS.contains(lowerCaseName)) {
+      return mapHeaderValue(value, LoggingUrlRedactor::redactUrlString);
     }
-    return hasUploadQueryParam(request.getUrl()) || hasUploadHeader(request.getHeaders());
+    if (digestUploadId && UPLOAD_ID_RESPONSE_HEADER.equals(lowerCaseName)) {
+      return digestHeaderValue(value);
+    }
+    return value;
+  }
+
+  // x-guploader-uploadid holds the upload session ID only on resumable upload exchanges. On other
+  // requests it is a trace ID that Cloud Storage support uses to look up the request.
+  private static boolean isUploadExchange(HttpRequest request, HttpHeaders responseHeaders) {
+    return hasUploadQueryParam(request.getUrl())
+        || hasUploadHeader(request.getHeaders())
+        || hasUploadHeader(responseHeaders);
   }
 
   private static boolean hasUploadQueryParam(@Nullable GenericUrl url) {
@@ -191,7 +206,7 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
     if (headers == null) {
       return false;
     }
-    for (String header : UPLOAD_INDICATOR_REQUEST_HEADERS) {
+    for (String header : UPLOAD_INDICATOR_HEADERS) {
       if (headers.getFirstHeaderStringValue(header) != null) {
         return true;
       }
@@ -202,16 +217,21 @@ public class EventLoggingHttpRequestInitializer implements HttpRequestInitialize
   @VisibleForTesting
   @Nullable
   static Object digestHeaderValue(@Nullable Object value) {
+    return mapHeaderValue(value, LoggingUrlRedactor::digestToken);
+  }
+
+  @Nullable
+  private static Object mapHeaderValue(@Nullable Object value, Function<String, String> mapper) {
     if (value == null) {
       return null;
     }
     if (value instanceof Collection<?>) {
       return ((Collection<?>) value)
           .stream()
-              .map(item -> item == null ? null : LoggingUrlRedactor.digestToken(item.toString()))
+              .map(item -> item == null ? null : mapper.apply(item.toString()))
               .collect(toList());
     }
-    return LoggingUrlRedactor.digestToken(value.toString());
+    return mapper.apply(value.toString());
   }
 
   private static class HttpRequestResponseTimeTracker {

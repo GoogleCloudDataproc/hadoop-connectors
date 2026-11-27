@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.flogger.LazyArgs;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import java.io.BufferedInputStream;
@@ -181,9 +180,8 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       if (uploadCache == null) {
         throw e;
       }
-      logger.atWarning().log(
-          "Reuploading using cached data after error: %s",
-          LazyArgs.lazy(() -> LoggingUrlRedactor.formatThrowableForLog(e)));
+      logger.atWarning().withCause(LoggingUrlRedactor.redactThrowable(e)).log(
+          "Reuploading using cached data");
       reuploadFromCache();
     } finally {
       closeInternal();
@@ -270,8 +268,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
       }
+      // HTTP errors embed the resumable upload URL in their message, and callers log the whole
+      // cause chain, so pass on a redacted copy of the cause.
       throw new IOException(
-          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
+          String.format("Upload failed for '%s'", getResourceString()),
+          LoggingUrlRedactor.redactThrowable(e.getCause()));
     }
   }
 }

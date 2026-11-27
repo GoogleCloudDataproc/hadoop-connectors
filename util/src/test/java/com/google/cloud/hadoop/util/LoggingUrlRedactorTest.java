@@ -18,9 +18,15 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.api.client.googleapis.json.GoogleJsonError;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpResponseException;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -42,7 +48,10 @@ public class LoggingUrlRedactorTest {
         new GenericUrl(
             "https://storage.googleapis.com/storage/v1/b/my-bucket/o"
                 + "?alt=media"
+                + "&contentEncoding=gzip"
                 + "&delimiter=/"
+                + "&destinationKmsKeyName=projects/p/locations/l/keyRings/r/cryptoKeys/k"
+                + "&destinationPredefinedAcl=private"
                 + "&endOffset=z"
                 + "&fields=items(name,size)"
                 + "&generation=42"
@@ -56,11 +65,14 @@ public class LoggingUrlRedactorTest {
                 + "&ifSourceMetagenerationNotMatch=7"
                 + "&includeFoldersAsPrefixes=true"
                 + "&includeTrailingDelimiter=true"
+                + "&kmsKeyName=projects/p/locations/l/keyRings/r/cryptoKeys/k"
                 + "&matchGlob=*.parquet"
                 + "&maxBytesRewrittenPerCall=1048576"
                 + "&maxResults=100"
                 + "&name=dir/obj"
                 + "&pageToken=next-page"
+                + "&predefinedAcl=private"
+                + "&predefinedDefaultObjectAcl=projectPrivate"
                 + "&prefix=dir/"
                 + "&project=my-gcp-proj"
                 + "&projection=noAcl"
@@ -92,7 +104,8 @@ public class LoggingUrlRedactorTest {
             + "&access_token=SECRET_OAUTH_TOKEN"
             + "&oauth_token=SECRET_LEGACY_OAUTH"
             + "&key=SECRET_API_KEY"
-            + "&customParam=SECRET_CUSTOM";
+            + "&customParam=SECRET_CUSTOM"
+            + "&quotaUser=SECRET_QUOTA_USER";
     GenericUrl url = new GenericUrl(rawUrl);
     String originalBuilt = url.build();
 
@@ -100,7 +113,8 @@ public class LoggingUrlRedactorTest {
 
     assertThat(redacted).contains("uploadType=resumable");
     assertThat(redacted).contains("name=path/file.txt");
-    assertThat(redacted).contains("upload_id=REDACTED");
+    assertThat(redacted)
+        .contains("upload_id=" + LoggingUrlRedactor.digestToken("SECRET_UPLOAD_TOKEN"));
     assertThat(redacted).contains("X-Goog-Signature=REDACTED");
     assertThat(redacted).contains("X-Goog-Credential=REDACTED");
     assertThat(redacted).contains("X-Goog-Security-Token=REDACTED");
@@ -110,6 +124,7 @@ public class LoggingUrlRedactorTest {
     assertThat(redacted).contains("oauth_token=REDACTED");
     assertThat(redacted).contains("key=REDACTED");
     assertThat(redacted).contains("customParam=REDACTED");
+    assertThat(redacted).contains("quotaUser=REDACTED");
     assertThat(redacted).doesNotContain("SECRET_");
     assertThat(url.build()).isEqualTo(originalBuilt);
     assertThat(url.getFirst("upload_id")).isEqualTo("SECRET_UPLOAD_TOKEN");
@@ -127,7 +142,8 @@ public class LoggingUrlRedactorTest {
     assertThat(redacted)
         .isEqualTo(
             "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
-                + "?uploadType=resumable&upload_id=REDACTED");
+                + "?uploadType=resumable&upload_id="
+                + LoggingUrlRedactor.digestToken("SECRET_ID"));
     assertThat(redacted).doesNotContain("alice");
     assertThat(redacted).doesNotContain("topsecret");
     assertThat(url.getUserInfo()).isEqualTo("alice:topsecret");
@@ -145,7 +161,12 @@ public class LoggingUrlRedactorTest {
     String redacted = LoggingUrlRedactor.redactUrl(url);
 
     assertThat(redacted).contains("uploadType=resumable");
-    assertThat(redacted).contains("upload_id=REDACTED&upload_id=REDACTED");
+    assertThat(redacted)
+        .contains(
+            "upload_id="
+                + LoggingUrlRedactor.digestToken("secret-1")
+                + "&upload_id="
+                + LoggingUrlRedactor.digestToken("secret-2"));
     assertThat(redacted).contains("token=REDACTED&token=REDACTED");
     assertThat(redacted).contains("api_key=REDACTED");
     assertThat(redacted).doesNotContain("secret-1");
@@ -172,7 +193,10 @@ public class LoggingUrlRedactorTest {
     assertThat(redacted)
         .isEqualTo(
             "https://storage.googleapis.com:8443/upload/b/bkt/o"
-                + "?upload_id=REDACTED&upload_id=REDACTED"
+                + "?upload_id="
+                + LoggingUrlRedactor.digestToken("secret-a")
+                + "&upload_id="
+                + LoggingUrlRedactor.digestToken("secret-b")
                 + "&unmod_token=REDACTED"
                 + "&prefix=my-dir/&name=obj#REDACTED");
     assertThat(redacted).doesNotContain("alice");
@@ -191,7 +215,10 @@ public class LoggingUrlRedactorTest {
 
     String redacted = LoggingUrlRedactor.redactUrl(url);
 
-    assertThat(redacted).isEqualTo("/upload//o?prefix=dir/&upload_id=REDACTED");
+    assertThat(redacted)
+        .isEqualTo(
+            "/upload//o?prefix=dir/&upload_id="
+                + LoggingUrlRedactor.digestToken("SECRET_INCOMPLETE"));
     assertThat(redacted).doesNotContain("SECRET_INCOMPLETE");
   }
 
@@ -208,7 +235,9 @@ public class LoggingUrlRedactorTest {
     assertThat(redacted)
         .isEqualTo(
             "https://storage.googleapis.com/storage/v1/b/bkt/o/dir%2Ffile%2B1"
-                + "?uploadType=resumable&upload_id=REDACTED#REDACTED");
+                + "?uploadType=resumable&upload_id="
+                + LoggingUrlRedactor.digestToken("SECRET_VERBATIM")
+                + "#REDACTED");
     assertThat(redacted).doesNotContain("%252F");
     assertThat(redacted).doesNotContain("SECRET_VERBATIM");
     assertThat(redacted).doesNotContain("raw-secret");
@@ -263,7 +292,8 @@ public class LoggingUrlRedactorTest {
     assertThat(LoggingUrlRedactor.redactUrlString(full))
         .isEqualTo(
             "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/a%2Bb"
-                + "?uploadType=resumable&upload_id=REDACTED");
+                + "?uploadType=resumable&upload_id="
+                + LoggingUrlRedactor.digestToken("SECRET_FULL_1"));
 
     String relative = "/upload/storage/v1/b/bkt/o/a+b?upload_id=SECRET_REL#frag_secret";
     String redactedRelative = LoggingUrlRedactor.redactUrlString(relative);
@@ -280,24 +310,107 @@ public class LoggingUrlRedactorTest {
   }
 
   @Test
-  public void formatThrowableForLog_redactsUrlsAcrossCausalChain() {
-    assertThat(LoggingUrlRedactor.formatThrowableForLog(null)).isEqualTo("null");
+  public void redactUrlsInText_keepsParenthesesQuotesAndIpv6HostsInsideUrls() {
+    String id = "SECRET_TEXT_UPLOAD_ID";
+    String digest = LoggingUrlRedactor.digestToken(id);
+    String base = "https://storage.googleapis.com/upload/storage/v1/b/bkt/o";
 
-    IOException root =
-        new IOException(
-            "503 Service Unavailable\n"
-                + "PUT https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
-                + "?uploadType=resumable&upload_id=SECRET_CAUSE_ID\n"
-                + "backend error");
-    IOException outer = new IOException("Upload failed", root);
+    assertThat(
+            LoggingUrlRedactor.redactUrlsInText(
+                "PUT " + base + "?name=report(1).csv&upload_id=" + id))
+        .isEqualTo("PUT " + base + "?name=report(1).csv&upload_id=" + digest);
+    assertThat(
+            LoggingUrlRedactor.redactUrlsInText("PUT " + base + "?name=user's.csv&upload_id=" + id))
+        .isEqualTo("PUT " + base + "?name=user's.csv&upload_id=" + digest);
+    assertThat(LoggingUrlRedactor.redactUrlsInText("PUT http://[::1]:8080/upload?upload_id=" + id))
+        .isEqualTo("PUT http://[::1]:8080/upload?upload_id=" + digest);
+  }
 
-    String summary = LoggingUrlRedactor.formatThrowableForLog(outer);
+  @Test
+  public void redactUrlsInText_keepsWrappingPunctuationOutsideUrls() {
+    String id = "SECRET_WRAPPED_TEXT_UPLOAD_ID";
+    String digest = LoggingUrlRedactor.digestToken(id);
 
-    assertThat(summary).contains("Upload failed");
-    assertThat(summary).contains("503 Service Unavailable");
-    assertThat(summary).contains("uploadType=resumable");
-    assertThat(summary).contains("upload_id=REDACTED");
-    assertThat(summary).doesNotContain("SECRET_CAUSE_ID");
+    assertThat(
+            LoggingUrlRedactor.redactUrlsInText(
+                "failed (see 'https://host.example/o?upload_id=" + id + "'), retrying."))
+        .isEqualTo("failed (see 'https://host.example/o?upload_id=" + digest + "'), retrying.");
+    assertThat(
+            LoggingUrlRedactor.redactUrlsInText(
+                "(https://host.example/o?name=a(1)&upload_id=" + id + ")"))
+        .isEqualTo("(https://host.example/o?name=a(1)&upload_id=" + digest + ")");
+  }
+
+  @Test
+  public void redactThrowable_keepsHttpErrorTypeStatusDetailsAndStackTrace() {
+    String id = "SECRET_JSON_ERROR_UPLOAD_ID";
+    String digest = LoggingUrlRedactor.digestToken(id);
+    HttpHeaders headers = new HttpHeaders();
+    GoogleJsonError details = new GoogleJsonError();
+    details.setCode(503);
+    GoogleJsonResponseException original =
+        new GoogleJsonResponseException(
+            new HttpResponseException.Builder(503, "Service Unavailable", headers)
+                .setMessage(
+                    "503 Service Unavailable\nPUT https://storage.googleapis.com/upload/storage/v1"
+                        + "/b/bkt/o?uploadType=resumable&upload_id="
+                        + id)
+                .setContent("{\"error\":{\"code\":503}}")
+                .setAttemptCount(2),
+            details);
+    original.addSuppressed(new IOException("retry of https://host.example/o?upload_id=" + id));
+
+    Throwable redacted = LoggingUrlRedactor.redactThrowable(original);
+
+    assertThat(redacted).isInstanceOf(GoogleJsonResponseException.class);
+    GoogleJsonResponseException redactedJson = (GoogleJsonResponseException) redacted;
+    assertThat(redactedJson.getStatusCode()).isEqualTo(503);
+    assertThat(redactedJson.getStatusMessage()).isEqualTo("Service Unavailable");
+    assertThat(redactedJson.getHeaders()).isSameInstanceAs(headers);
+    assertThat(redactedJson.getDetails()).isSameInstanceAs(details);
+    assertThat(redactedJson.getContent()).isEqualTo("{\"error\":{\"code\":503}}");
+    assertThat(redactedJson.getAttemptCount()).isEqualTo(2);
+    assertThat(redactedJson.getMessage()).contains("uploadType=resumable&upload_id=" + digest);
+    assertThat(redactedJson.getStackTrace()).isEqualTo(original.getStackTrace());
+    assertThat(redactedJson.getSuppressed()).hasLength(1);
+    assertThat(Throwables.getStackTraceAsString(redacted)).doesNotContain(id);
+    assertThat(original.getMessage()).contains(id);
+    assertThat(LoggingUrlRedactor.redactThrowable(redacted)).isSameInstanceAs(redacted);
+
+    HttpResponseException plainHttp =
+        new HttpResponseException.Builder(410, "Gone", new HttpHeaders())
+            .setMessage("410 Gone\nPUT https://host.example/o?upload_id=" + id)
+            .build();
+    Throwable redactedHttp = LoggingUrlRedactor.redactThrowable(plainHttp);
+    assertThat(redactedHttp.getClass()).isEqualTo(HttpResponseException.class);
+    assertThat(((HttpResponseException) redactedHttp).getStatusCode()).isEqualTo(410);
+    assertThat(redactedHttp.getMessage())
+        .isEqualTo("410 Gone\nPUT https://host.example/o?upload_id=" + digest);
+  }
+
+  @Test
+  public void redactThrowable_replacesOtherTypesKeepingClassNameCauseAndStackTrace() {
+    String id = "SECRET_WRAPPED_UPLOAD_ID";
+    IOException cause = new IOException("PUT https://host.example/o?upload_id=" + id);
+    IllegalStateException outer = new IllegalStateException("upload failed", cause);
+
+    Throwable redacted = LoggingUrlRedactor.redactThrowable(outer);
+
+    assertThat(redacted.toString()).isEqualTo("java.lang.IllegalStateException: upload failed");
+    assertThat(redacted.getStackTrace()).isEqualTo(outer.getStackTrace());
+    assertThat(redacted.getCause().toString())
+        .isEqualTo(
+            "java.io.IOException: PUT https://host.example/o?upload_id="
+                + LoggingUrlRedactor.digestToken(id));
+    assertThat(redacted.getCause().getStackTrace()).isEqualTo(cause.getStackTrace());
+    assertThat(Throwables.getStackTraceAsString(redacted)).doesNotContain(id);
+  }
+
+  @Test
+  public void redactThrowable_returnsSameInstanceWhenNothingNeedsRedaction() {
+    assertThat(LoggingUrlRedactor.redactThrowable(null)).isNull();
+    IOException plain = new IOException("Read timed out", new SocketTimeoutException("timeout"));
+    assertThat(LoggingUrlRedactor.redactThrowable(plain)).isSameInstanceAs(plain);
   }
 
   @Test
@@ -314,5 +427,6 @@ public class LoggingUrlRedactorTest {
     assertThat(digest1).isEqualTo(digest2);
     assertThat(digest1).isNotEqualTo(otherDigest);
     assertThat(digest1).doesNotContain(token);
+    assertThat(LoggingUrlRedactor.digestToken(digest1)).isEqualTo(digest1);
   }
 }

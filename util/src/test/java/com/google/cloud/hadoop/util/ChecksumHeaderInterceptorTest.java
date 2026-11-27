@@ -171,7 +171,8 @@ public class ChecksumHeaderInterceptorTest {
                       msg ->
                           msg.contains("Intercepting request")
                               && msg.contains("uploadType=resumable")
-                              && msg.contains("upload_id=REDACTED")))
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
           .isTrue();
       for (LogRecord logRecord : records) {
         assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);

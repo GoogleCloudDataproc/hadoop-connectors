@@ -124,7 +124,7 @@ public class ResilientOperation {
     if (backOffTime == BackOff.STOP) {
       return false;
     }
-    logger.atInfo().withCause(currentException).log(
+    logger.atInfo().withCause(LoggingUrlRedactor.redactThrowable(currentException)).log(
         "Transient exception caught. Sleeping for %d, then retrying.", backOffTime);
     sleeper.sleep(backOffTime);
     return true;
