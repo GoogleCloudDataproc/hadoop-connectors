@@ -70,6 +70,10 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import javax.net.ssl.SSLException;
 import org.junit.Before;
 import org.junit.Test;
@@ -848,6 +852,171 @@ public class RetryHttpInitializerTest {
     } finally {
       ChecksumContext.clear();
     }
+  }
+
+  @Test
+  public void responseCodeLogging_redactsSensitiveQueryParamsWithoutMutatingUrl()
+      throws IOException {
+    String secretUploadId = "SECRET_STATUS_LOG_UPLOAD_ID";
+    GenericUrl uploadUrl =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable&upload_id="
+                + secretUploadId);
+    Logger julLogger = Logger.getLogger(RetryHttpInitializer.class.getName());
+    List<LogRecord> records = new ArrayList<>();
+    Handler handler = capturingHandler(records);
+    Level previousLevel = julLogger.getLevel();
+    julLogger.addHandler(handler);
+    julLogger.setLevel(Level.INFO);
+    try {
+      HttpRequestFactory requestFactory =
+          mockTransport(emptyResponse(410))
+              .createRequestFactory(
+                  createRetryHttpInitializer(new FakeCredentials("Bearer: token"), millis -> {}));
+      HttpRequest req = requestFactory.buildPutRequest(uploadUrl, null);
+
+      assertThrows(HttpResponseException.class, req::execute);
+
+      assertThat(records).isNotEmpty();
+      assertThat(
+              records.stream()
+                  .map(LogRecord::getMessage)
+                  .anyMatch(
+                      msg ->
+                          msg.contains("status code 410")
+                              && msg.contains("uploadType=resumable")
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
+          .isTrue();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+      }
+      assertThat(req.getUrl().getFirst("upload_id")).isEqualTo(secretUploadId);
+    } finally {
+      julLogger.removeHandler(handler);
+      julLogger.setLevel(previousLevel);
+    }
+  }
+
+  @Test
+  public void escapeRedirectPath_redactsUploadIdInFineLogWithoutBreakingRedirect()
+      throws IOException {
+    String secretUploadId = "SECRET_REDIRECT_UPLOAD_ID";
+    String rawLocation =
+        "https://storage.googleapis.com/upload/storage/v1/b/bkt/o/file+name"
+            + "?uploadType=resumable&upload_id="
+            + secretUploadId;
+    Logger julLogger = Logger.getLogger(RetryHttpInitializer.class.getName());
+    List<LogRecord> records = new ArrayList<>();
+    Handler handler = capturingHandler(records);
+    Level previousLevel = julLogger.getLevel();
+    boolean previousUseParentHandlers = julLogger.getUseParentHandlers();
+    julLogger.setUseParentHandlers(false);
+    julLogger.addHandler(handler);
+    julLogger.setLevel(Level.FINE);
+    try {
+      HttpRequestFactory requestFactory =
+          mockTransport(emptyResponse(308).addHeader("Location", rawLocation), emptyResponse(200))
+              .createRequestFactory(
+                  createRetryHttpInitializer(new FakeCredentials("Bearer: token"), millis -> {}));
+      HttpRequest req =
+          requestFactory
+              .buildPutRequest(
+                  new GenericUrl(
+                      "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                          + "?uploadType=resumable&upload_id="
+                          + secretUploadId),
+                  null)
+              .setThrowExceptionOnExecuteError(false);
+
+      HttpResponse response = req.execute();
+
+      assertThat(response.getStatusCode()).isEqualTo(200);
+      assertThat(
+              records.stream()
+                  .map(LogRecord::getMessage)
+                  .anyMatch(
+                      msg ->
+                          msg.contains("contains unescaped '+'")
+                              && msg.contains("uploadType=resumable")
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
+          .isTrue();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+      }
+    } finally {
+      julLogger.removeHandler(handler);
+      julLogger.setLevel(previousLevel);
+      julLogger.setUseParentHandlers(previousUseParentHandlers);
+    }
+  }
+
+  @Test
+  public void ioExceptionLogging_redactsSensitiveQueryParamsWithoutMutatingUrl()
+      throws IOException {
+    String secretUploadId = "SECRET_IO_LOG_UPLOAD_ID";
+    GenericUrl uploadUrl =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable&upload_id="
+                + secretUploadId);
+    Logger julLogger = Logger.getLogger(RetryHttpInitializer.class.getName());
+    List<LogRecord> records = new ArrayList<>();
+    Handler handler = capturingHandler(records);
+    Level previousLevel = julLogger.getLevel();
+    julLogger.addHandler(handler);
+    julLogger.setLevel(Level.FINE);
+    try {
+      HttpRequestFactory requestFactory =
+          mockTransport(new IOException("transient socket error"))
+              .createRequestFactory(
+                  new RetryHttpInitializer(
+                      new FakeCredentials("Bearer: token"),
+                      RetryHttpInitializerOptions.builder().setMaxRequestRetries(0).build(),
+                      millis -> {}));
+      HttpRequest req = requestFactory.buildPutRequest(uploadUrl, null);
+
+      assertThrows(IOException.class, req::execute);
+
+      assertThat(
+              records.stream()
+                  .map(LogRecord::getMessage)
+                  .anyMatch(
+                      msg ->
+                          msg.contains("Encountered an IOException")
+                              && msg.contains("uploadType=resumable")
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
+          .isTrue();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+      }
+      assertThat(req.getUrl().getFirst("upload_id")).isEqualTo(secretUploadId);
+    } finally {
+      julLogger.removeHandler(handler);
+      julLogger.setLevel(previousLevel);
+    }
+  }
+
+  private static Handler capturingHandler(List<LogRecord> records) {
+    return new Handler() {
+      @Override
+      public void publish(LogRecord logRecord) {
+        records.add(logRecord);
+      }
+
+      @Override
+      public void flush() {
+        // No-op stub for in-memory test log handler.
+      }
+
+      @Override
+      public void close() {
+        // No-op stub for in-memory test log handler.
+      }
+    };
   }
 
   // Helper class to capture headers during intercept

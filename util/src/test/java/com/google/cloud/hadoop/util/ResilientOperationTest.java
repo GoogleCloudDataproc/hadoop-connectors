@@ -26,10 +26,16 @@ import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.testing.util.MockSleeper;
 import com.google.api.client.util.BackOff;
+import com.google.common.base.Throwables;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -206,6 +212,56 @@ public class ResilientOperationTest {
         .isEqualTo(3);
     assertThat(callTester.timesCalled()).isEqualTo(4);
     verifySleeper(sleeper, 3);
+  }
+
+  @Test
+  public void testRetryLogRedactsUrlsInException() throws Exception {
+    String secretUploadId = "SECRET_RETRY_LOG_UPLOAD_ID";
+    List<LogRecord> records = new ArrayList<>();
+    Handler handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord logRecord) {
+            records.add(logRecord);
+          }
+
+          @Override
+          public void flush() {
+            // No-op stub for in-memory test log handler.
+          }
+
+          @Override
+          public void close() {
+            // No-op stub for in-memory test log handler.
+          }
+        };
+    Logger julLogger = Logger.getLogger(ResilientOperation.class.getName());
+    Level previousLevel = julLogger.getLevel();
+    boolean previousUseParentHandlers = julLogger.getUseParentHandlers();
+    julLogger.setUseParentHandlers(false);
+    julLogger.addHandler(handler);
+    julLogger.setLevel(Level.INFO);
+    try {
+      ArrayList<Exception> exceptions = new ArrayList<>();
+      exceptions.add(
+          new SocketTimeoutException(
+              "timed out: https://host.example/o?upload_id=" + secretUploadId));
+      ResilientOperation.retry(
+          new CallableTester(exceptions),
+          new RetryBoundedBackOff(new BackOffTester(), 1),
+          RetryDeterminer.SOCKET_ERRORS,
+          IOException.class,
+          new MockSleeper());
+    } finally {
+      julLogger.removeHandler(handler);
+      julLogger.setLevel(previousLevel);
+      julLogger.setUseParentHandlers(previousUseParentHandlers);
+    }
+
+    assertThat(records).hasSize(1);
+    String loggedError = Throwables.getStackTraceAsString(records.get(0).getThrown());
+    assertThat(loggedError).contains("upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId));
+    assertThat(loggedError).doesNotContain(secretUploadId);
   }
 
   private static class CallableTester implements Callable<Integer> {

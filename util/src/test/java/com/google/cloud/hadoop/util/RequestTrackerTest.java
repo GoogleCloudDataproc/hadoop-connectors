@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.cloud.hadoop.util.TestRequestTracker.ExpectedEventDetails;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+import static com.google.common.truth.Truth.assertThat;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
@@ -136,6 +137,40 @@ public class RequestTrackerTest extends TestCase {
             ExpectedEventDetails.getResponse(URL, STATUS_CODE),
             ExpectedEventDetails.getBackoff(URL, 1, backOff1),
             ExpectedEventDetails.getResponse(URL, STATUS_CODE)));
+  }
+
+  @Test
+  public void testRequestContextRedactsSensitiveQueryParamsWithoutMutatingUrl() throws IOException {
+    String uploadId = "SECRET_TRACKER_UPLOAD_ID";
+    GenericUrl url =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/test-bucket/o"
+                + "?uploadType=resumable&name=dir/file&alt=media&upload_id="
+                + uploadId);
+    HttpRequest uploadRequest =
+        mockTransport(emptyResponse(STATUS_CODE)).createRequestFactory().buildGetRequest(url);
+    HttpResponse uploadResponse = uploadRequest.execute();
+
+    TestRequestTracker uploadTracker = new TestRequestTracker();
+    uploadTracker.init(uploadResponse.getRequest());
+
+    // Invoke redaction before trackResponse so GcsJsonApiEvent.getRequestType reads the URL after
+    // LoggingUrlRedactor.redactUrl has executed.
+    String contextString = uploadTracker.getEvents().get(0).getContext().toString();
+    String trackerString = uploadTracker.toString();
+
+    uploadTracker.trackResponse(uploadResponse);
+
+    assertThat(contextString).contains("uploadType=resumable");
+    assertThat(contextString).contains("name=dir/file");
+    assertThat(contextString).contains("upload_id=" + LoggingUrlRedactor.digestToken(uploadId));
+    assertThat(contextString).doesNotContain(uploadId);
+    assertThat(trackerString).contains("upload_id=" + LoggingUrlRedactor.digestToken(uploadId));
+    assertThat(trackerString).doesNotContain(uploadId);
+    assertThat(uploadRequest.getUrl().getFirst("upload_id")).isEqualTo(uploadId);
+    assertThat(uploadRequest.getUrl().getFirst("alt")).isEqualTo("media");
+    assertThat(uploadTracker.getEvents().get(1).getProperty(GcsJsonApiEvent.REQUEST_TYPE))
+        .isEqualTo(GcsJsonApiEvent.RequestType.GET_MEDIA);
   }
 
   private static HttpRequest getHttpRequest(int statusCode) throws IOException {

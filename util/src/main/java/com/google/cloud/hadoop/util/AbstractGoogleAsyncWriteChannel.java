@@ -180,7 +180,8 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       if (uploadCache == null) {
         throw e;
       }
-      logger.atWarning().withCause(e).log("Reuploading using cached data");
+      logger.atWarning().withCause(LoggingUrlRedactor.redactThrowable(e)).log(
+          "Reuploading using cached data");
       reuploadFromCache();
     } finally {
       closeInternal();
@@ -267,8 +268,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T> implements WritableByte
       if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
       }
+      // HTTP errors embed the resumable upload URL in their message, and callers log the whole
+      // cause chain, so pass on a redacted copy of the cause.
       throw new IOException(
-          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
+          String.format("Upload failed for '%s'", getResourceString()),
+          LoggingUrlRedactor.redactThrowable(e.getCause()));
     }
   }
 }

@@ -26,6 +26,12 @@ import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -119,6 +125,64 @@ public class ChecksumHeaderInterceptorTest {
     // It should safely pull from the supplier both times without crashing
     assertThat(headers.getFirstHeaderStringValue("x-goog-hash"))
         .isEqualTo("crc32c=" + expectedChecksum);
+  }
+
+  @Test
+  public void intercept_finerLogRedactsUploadIdWithoutMutatingUrl() throws IOException {
+    String secretUploadId = "SECRET_CHECKSUM_INTERCEPTOR_UPLOAD_ID";
+    GenericUrl uploadUrl =
+        new GenericUrl(
+            "https://storage.googleapis.com/upload/storage/v1/b/bkt/o"
+                + "?uploadType=resumable&upload_id="
+                + secretUploadId);
+    HttpRequest uploadRequest =
+        new MockHttpTransport().createRequestFactory().buildRequest("PUT", uploadUrl, null);
+    Logger julLogger = Logger.getLogger(ChecksumHeaderInterceptor.class.getName());
+    List<LogRecord> records = new ArrayList<>();
+    Handler handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord logRecord) {
+            records.add(logRecord);
+          }
+
+          @Override
+          public void flush() {
+            // No-op stub for in-memory test log handler.
+          }
+
+          @Override
+          public void close() {
+            // No-op stub for in-memory test log handler.
+          }
+        };
+    Level previousLevel = julLogger.getLevel();
+    boolean previousUseParentHandlers = julLogger.getUseParentHandlers();
+    julLogger.setUseParentHandlers(false);
+    julLogger.addHandler(handler);
+    julLogger.setLevel(Level.FINER);
+    try {
+      interceptor.intercept(uploadRequest);
+
+      assertThat(
+              records.stream()
+                  .map(LogRecord::getMessage)
+                  .anyMatch(
+                      msg ->
+                          msg.contains("Intercepting request")
+                              && msg.contains("uploadType=resumable")
+                              && msg.contains(
+                                  "upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId))))
+          .isTrue();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+      }
+      assertThat(uploadRequest.getUrl().getFirst("upload_id")).isEqualTo(secretUploadId);
+    } finally {
+      julLogger.removeHandler(handler);
+      julLogger.setLevel(previousLevel);
+      julLogger.setUseParentHandlers(previousUseParentHandlers);
+    }
   }
 
   /** Helper method to set a dummy supplier in the context. */

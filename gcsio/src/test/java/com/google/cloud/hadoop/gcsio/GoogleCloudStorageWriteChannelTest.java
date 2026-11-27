@@ -23,6 +23,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpMethods;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponseException;
@@ -34,11 +35,14 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.storage.Storage;
+import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.LoggingUrlRedactor;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
+import com.google.common.base.Throwables;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import com.google.common.primitives.Ints;
@@ -49,6 +53,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -145,6 +153,89 @@ public class GoogleCloudStorageWriteChannelTest {
     assertThat(e).hasCauseThat().hasMessageThat().contains("Provided CRC32C");
   }
 
+  @Test
+  public void write_reuploadFromCache_redactsUploadIdInWarningLog() throws IOException {
+    String secretUploadId = "SECRET_REUPLOAD_CACHE_UPLOAD_ID";
+    byte[] testData = {1, 2, 3, 4};
+    List<LogRecord> records = Collections.synchronizedList(new ArrayList<>());
+    Handler handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord logRecord) {
+            records.add(logRecord);
+          }
+
+          @Override
+          public void flush() {
+            // No-op stub for in-memory test log handler.
+          }
+
+          @Override
+          public void close() {
+            // No-op stub for in-memory test log handler.
+          }
+        };
+    Logger channelLogger = Logger.getLogger(AbstractGoogleAsyncWriteChannel.class.getName());
+    Level previousLevel = channelLogger.getLevel();
+    boolean previousUseParentHandlers = channelLogger.getUseParentHandlers();
+    channelLogger.setUseParentHandlers(false);
+    channelLogger.addHandler(handler);
+    channelLogger.setLevel(Level.WARNING);
+    try {
+      GoogleCloudStorageWriteChannel channel =
+          createResumableWriteChannel(
+              createResumableUploadTransport(
+                  secretUploadId, /* failedPuts= */ 1, calculateCrc32c(testData)),
+              /* uploadCacheSize= */ 1024);
+
+      channel.initialize();
+      channel.write(ByteBuffer.wrap(testData));
+      channel.close();
+
+      LogRecord warning =
+          records.stream()
+              .filter(r -> r.getMessage().contains("Reuploading using cached data"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("No reupload warning logged"));
+      String loggedError = Throwables.getStackTraceAsString(warning.getThrown());
+      assertThat(loggedError).contains("uploadType=resumable");
+      assertThat(loggedError)
+          .contains("upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId));
+      assertThat(warning.getThrown().getStackTrace()).isNotEmpty();
+      for (LogRecord logRecord : records) {
+        assertThat(logRecord.getMessage()).doesNotContain(secretUploadId);
+        if (logRecord.getThrown() != null) {
+          assertThat(Throwables.getStackTraceAsString(logRecord.getThrown()))
+              .doesNotContain(secretUploadId);
+        }
+      }
+    } finally {
+      channelLogger.removeHandler(handler);
+      channelLogger.setLevel(previousLevel);
+      channelLogger.setUseParentHandlers(previousUseParentHandlers);
+    }
+  }
+
+  @Test
+  public void close_uploadFailureWithoutCache_throwsRedactedHttpError() throws IOException {
+    String secretUploadId = "SECRET_NO_CACHE_UPLOAD_ID";
+    GoogleCloudStorageWriteChannel channel =
+        createResumableWriteChannel(
+            createResumableUploadTransport(
+                secretUploadId, /* failedPuts= */ Integer.MAX_VALUE, /* crc32c= */ ""),
+            /* uploadCacheSize= */ 0);
+    channel.initialize();
+    channel.write(ByteBuffer.wrap(new byte[] {1, 2, 3, 4}));
+
+    IOException thrown = assertThrows(IOException.class, channel::close);
+
+    assertThat(thrown).hasCauseThat().isInstanceOf(GoogleJsonResponseException.class);
+    assertThat(((GoogleJsonResponseException) thrown.getCause()).getStatusCode()).isEqualTo(503);
+    String printed = Throwables.getStackTraceAsString(thrown);
+    assertThat(printed).contains("upload_id=" + LoggingUrlRedactor.digestToken(secretUploadId));
+    assertThat(printed).doesNotContain(secretUploadId);
+  }
+
   private String calculateCrc32c(byte[] data) {
     return BaseEncoding.base64().encode(Ints.toByteArray(Hashing.crc32c().hashBytes(data).asInt()));
   }
@@ -225,6 +316,58 @@ public class GoogleCloudStorageWriteChannelTest {
         Executors.newCachedThreadPool(),
         AsyncWriteChannelOptions.builder().build(),
         new StorageResourceId(bucketName, objectName),
+        CreateObjectOptions.DEFAULT_OVERWRITE,
+        ObjectWriteConditions.NONE);
+  }
+
+  /**
+   * Creates a MockHttpTransport for a resumable upload whose session URL carries {@code uploadId}.
+   * The first {@code failedPuts} PUT requests fail with 503, and later ones succeed.
+   */
+  private MockHttpTransport createResumableUploadTransport(
+      String uploadId, int failedPuts, String crc32c) {
+    return new MockHttpTransport() {
+      int putAttempt = 0;
+
+      @Override
+      public LowLevelHttpRequest buildRequest(String method, String url) {
+        return new MockLowLevelHttpRequest() {
+          @Override
+          public LowLevelHttpResponse execute() {
+            if (HttpMethods.POST.equals(method)) {
+              return new MockLowLevelHttpResponse()
+                  .setStatusCode(200)
+                  .addHeader(
+                      "Location",
+                      "https://storage.googleapis.com/upload/storage/v1/b/bucket/o"
+                          + "?uploadType=resumable&upload_id="
+                          + uploadId);
+            }
+            if (HttpMethods.PUT.equals(method) && putAttempt++ < failedPuts) {
+              return new MockLowLevelHttpResponse().setStatusCode(503);
+            }
+            return createPutSuccessResponse("bucket", "object", crc32c);
+          }
+        };
+      }
+    };
+  }
+
+  private GoogleCloudStorageWriteChannel createResumableWriteChannel(
+      MockHttpTransport transport, int uploadCacheSize) {
+    Storage storage =
+        new Storage(
+            transport,
+            GsonFactory.getDefaultInstance(),
+            new RetryHttpInitializer(
+                new FakeCredentials(),
+                RetryHttpInitializerOptions.builder().setMaxRequestRetries(0).build()));
+    return new GoogleCloudStorageWriteChannel(
+        storage,
+        new ClientRequestHelper<>(),
+        Executors.newCachedThreadPool(),
+        AsyncWriteChannelOptions.builder().setUploadCacheSize(uploadCacheSize).build(),
+        new StorageResourceId("bucket", "object"),
         CreateObjectOptions.DEFAULT_OVERWRITE,
         ObjectWriteConditions.NONE);
   }

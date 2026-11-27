@@ -20,6 +20,7 @@ import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpMethods;
 import com.google.api.client.http.HttpRequest;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LazyArgs;
 import java.io.IOException;
 import java.util.function.Supplier;
 
@@ -39,7 +40,9 @@ public class ChecksumHeaderInterceptor implements HttpExecuteInterceptor {
   @Override
   public void intercept(HttpRequest request) throws IOException {
     logger.atFiner().log(
-        "intercept(%s %s): Intercepting request", request.getRequestMethod(), request.getUrl());
+        "intercept(%s %s): Intercepting request",
+        request.getRequestMethod(),
+        LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrl(request.getUrl())));
 
     if (chainedInterceptor != null) {
       chainedInterceptor.intercept(request);

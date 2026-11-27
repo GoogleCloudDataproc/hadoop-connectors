@@ -42,6 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LazyArgs;
 import com.google.common.flogger.LogContext;
 import java.io.EOFException;
 import java.io.IOException;
@@ -173,7 +174,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
         logger.atWarning().withCause(e).atMostEvery(10, SECONDS).log(
             "Failed to get credentials for request to '%s', retrying in %d ms (retry %d/%d)",
-            request.getUrl(), backOffMillis, retries + 1, maxRetries);
+            LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrl(request.getUrl())),
+            backOffMillis,
+            retries + 1,
+            maxRetries);
 
         sleepWithBackoff(backOffMillis, e);
       }
@@ -319,7 +323,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
             .log(
                 "Encountered status code %d when sending %s request to URL '%s'."
                     + " Delegating to response handler for possible retry.",
-                response.getStatusCode(), request.getRequestMethod(), request.getUrl());
+                response.getStatusCode(),
+                request.getRequestMethod(),
+                LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrl(request.getUrl())));
       }
     }
 
@@ -338,7 +344,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           String escapedLocation = redirectLocation.replace("+", "%2B");
           logger.atFine().log(
               "Redirect path '%s' contains unescaped '+', replacing with '%%2B': '%s'",
-              redirectLocation, escapedLocation);
+              LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrlString(redirectLocation)),
+              LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrlString(escapedLocation)));
           response.getHeaders().setLocation(escapedLocation);
         }
       }
@@ -361,7 +368,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         throws IOException {
       // We sadly don't get anything helpful to see if this is something we want to log.
       // As a result we'll turn down the logging level to debug.
-      logger.atFine().log("Encountered an IOException when accessing URL %s", httpRequest.getUrl());
+      logger.atFine().log(
+          "Encountered an IOException when accessing URL %s",
+          LazyArgs.lazy(() -> LoggingUrlRedactor.redactUrl(httpRequest.getUrl())));
       tracker.trackIOException();
 
       long backoffStartTime = System.currentTimeMillis();

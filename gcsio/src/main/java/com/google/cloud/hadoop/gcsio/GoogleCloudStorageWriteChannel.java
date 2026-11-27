@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.util.ChecksumContext;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.GoogleCloudStorageEventBus;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
+import com.google.cloud.hadoop.util.LoggingUrlRedactor;
 import com.google.common.io.BaseEncoding;
 import com.google.common.primitives.Ints;
 import java.io.IOException;
@@ -211,7 +212,7 @@ public class GoogleCloudStorageWriteChannel extends AbstractGoogleAsyncWriteChan
         if (response == null) {
           throw e;
         }
-        logger.atWarning().withCause(e).log(
+        logger.atWarning().withCause(LoggingUrlRedactor.redactThrowable(e)).log(
             "Received IOException during '%s' upload, but successfully converted to response: '%s'.",
             resourceId, response);
         return response;
